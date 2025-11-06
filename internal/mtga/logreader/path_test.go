@@ -8,8 +8,14 @@ import (
 
 func TestDefaultLogPath(t *testing.T) {
 	path, err := DefaultLogPath()
+	// In CI environments or machines without MTGA installed, this will return an error
+	// This is expected behavior, so we just verify the error message is appropriate
 	if err != nil {
-		t.Fatalf("DefaultLogPath() returned error: %v", err)
+		if !strings.Contains(err.Error(), "no log files found") {
+			t.Errorf("DefaultLogPath() returned unexpected error: %v", err)
+		}
+		t.Skipf("Skipping path validation - MTGA not installed: %v", err)
+		return
 	}
 
 	if path == "" {
@@ -19,7 +25,10 @@ func TestDefaultLogPath(t *testing.T) {
 	// Verify path contains platform-specific components
 	switch runtime.GOOS {
 	case "darwin":
-		if !strings.Contains(path, "Library/Application Support/com.wizards.mtga") {
+		// Should contain one of the valid macOS paths
+		validPath := strings.Contains(path, "Library/Application Support/com.wizards.mtga") ||
+			strings.Contains(path, "Library/Logs/Wizards of the Coast/MTGA")
+		if !validPath {
 			t.Errorf("macOS path does not contain expected directory: %s", path)
 		}
 		// Should end with either UTC_Log*.log or Player.log
