@@ -37,3 +37,4 @@ go.work.sum
 # Claude Code specific files
 CLAUDE.md
 .claude/
+.reference-notes.md
