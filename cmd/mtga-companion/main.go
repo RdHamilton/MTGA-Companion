@@ -264,7 +264,7 @@ func runMigrationCommand() {
 
 	// Ensure directory exists
 	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		log.Fatalf("Error creating database directory: %v", err)
 	}
 
