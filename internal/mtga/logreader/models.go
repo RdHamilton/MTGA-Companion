@@ -46,3 +46,30 @@ type PlayerRank struct {
 	LimitedMatchesWon  int
 	LimitedMatchesLost int
 }
+
+// DraftHistory contains a history of draft/limited events.
+type DraftHistory struct {
+	Drafts []DraftEvent
+}
+
+// DraftEvent represents a single draft or limited event.
+type DraftEvent struct {
+	EventID   string // CourseId from MTGA
+	EventName string // InternalEventName (e.g., "PremierDraft_BLB")
+	Status    string // Current module/status (e.g., "Draft", "DeckBuild", "CreateMatch")
+	Wins      int    // CurrentWins
+	Losses    int    // CurrentLosses if available
+	Deck      DraftDeck
+}
+
+// DraftDeck represents the deck built during a draft.
+type DraftDeck struct {
+	Name     string
+	MainDeck []DeckCard
+}
+
+// DeckCard represents a card in a deck with its quantity.
+type DeckCard struct {
+	CardID   int
+	Quantity int
+}
