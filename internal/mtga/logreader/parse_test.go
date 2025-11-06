@@ -185,16 +185,16 @@ func TestContains(t *testing.T) {
 
 func TestParseArenaStats(t *testing.T) {
 	tests := []struct {
-		name              string
-		entries           []*LogEntry
-		wantNil           bool
-		wantTotalMatches  int
-		wantMatchWins     int
-		wantMatchLosses   int
-		wantTotalGames    int
-		wantGameWins      int
-		wantGameLosses    int
-		wantFormatCount   int
+		name             string
+		entries          []*LogEntry
+		wantNil          bool
+		wantTotalMatches int
+		wantMatchWins    int
+		wantMatchLosses  int
+		wantTotalGames   int
+		wantGameWins     int
+		wantGameLosses   int
+		wantFormatCount  int
 	}{
 		{
 			name:    "no match events",
@@ -238,14 +238,14 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-1",
 									"resultList": []interface{}{
 										map[string]interface{}{
-											"scope":          "MatchScope_Match",
-											"winningTeamId":  float64(1),
-											"result":         "ResultType_WinLoss",
+											"scope":         "MatchScope_Match",
+											"winningTeamId": float64(1),
+											"result":        "ResultType_WinLoss",
 										},
 										map[string]interface{}{
-											"scope":          "MatchScope_Game",
-											"winningTeamId":  float64(1),
-											"result":         "ResultType_WinLoss",
+											"scope":         "MatchScope_Game",
+											"winningTeamId": float64(1),
+											"result":        "ResultType_WinLoss",
 										},
 									},
 								},
@@ -253,9 +253,9 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-1",
 									"reservedPlayers": []interface{}{
 										map[string]interface{}{
-											"userId":   "player1",
-											"teamId":   float64(1),
-											"eventId":  "Play",
+											"userId":  "player1",
+											"teamId":  float64(1),
+											"eventId": "Play",
 										},
 									},
 								},
@@ -286,14 +286,14 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-2",
 									"resultList": []interface{}{
 										map[string]interface{}{
-											"scope":          "MatchScope_Match",
-											"winningTeamId":  float64(1),
-											"result":         "ResultType_WinLoss",
+											"scope":         "MatchScope_Match",
+											"winningTeamId": float64(1),
+											"result":        "ResultType_WinLoss",
 										},
 										map[string]interface{}{
-											"scope":          "MatchScope_Game",
-											"winningTeamId":  float64(1),
-											"result":         "ResultType_WinLoss",
+											"scope":         "MatchScope_Game",
+											"winningTeamId": float64(1),
+											"result":        "ResultType_WinLoss",
 										},
 									},
 								},
@@ -301,9 +301,9 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-2",
 									"reservedPlayers": []interface{}{
 										map[string]interface{}{
-											"userId":   "player1",
-											"teamId":   float64(2),
-											"eventId":  "Ladder",
+											"userId":  "player1",
+											"teamId":  float64(2),
+											"eventId": "Ladder",
 										},
 									},
 								},
@@ -334,20 +334,20 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-3",
 									"resultList": []interface{}{
 										map[string]interface{}{
-											"scope":          "MatchScope_Match",
-											"winningTeamId":  float64(1),
+											"scope":         "MatchScope_Match",
+											"winningTeamId": float64(1),
 										},
 										map[string]interface{}{
-											"scope":          "MatchScope_Game",
-											"winningTeamId":  float64(1),
+											"scope":         "MatchScope_Game",
+											"winningTeamId": float64(1),
 										},
 									},
 								},
 								"gameRoomConfig": map[string]interface{}{
 									"reservedPlayers": []interface{}{
 										map[string]interface{}{
-											"teamId":   float64(1),
-											"eventId":  "Play",
+											"teamId":  float64(1),
+											"eventId": "Play",
 										},
 									},
 								},
@@ -365,20 +365,20 @@ func TestParseArenaStats(t *testing.T) {
 									"matchId": "match-4",
 									"resultList": []interface{}{
 										map[string]interface{}{
-											"scope":          "MatchScope_Match",
-											"winningTeamId":  float64(2),
+											"scope":         "MatchScope_Match",
+											"winningTeamId": float64(2),
 										},
 										map[string]interface{}{
-											"scope":          "MatchScope_Game",
-											"winningTeamId":  float64(2),
+											"scope":         "MatchScope_Game",
+											"winningTeamId": float64(2),
 										},
 									},
 								},
 								"gameRoomConfig": map[string]interface{}{
 									"reservedPlayers": []interface{}{
 										map[string]interface{}{
-											"teamId":   float64(1),
-											"eventId":  "Ladder",
+											"teamId":  float64(1),
+											"eventId": "Ladder",
 										},
 									},
 								},
