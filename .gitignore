@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Build output directory
+bin/
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -28,5 +31,10 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# Claude Code specific files
+CLAUDE.md
+.claude/
+.reference-notes.md
