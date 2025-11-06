@@ -1,0 +1,30 @@
+name: Go Dependency Submission
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for dependency submission
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Submit Go dependencies
+        uses: actions/go-dependency-submission@v2
+        with:
+          go-mod-path: './go.mod'
