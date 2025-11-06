@@ -4,11 +4,20 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
 func main() {
+	// Check if this is a migration command
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		runMigrationCommand()
+		return
+	}
+
 	// Get the default log path for the current platform
 	logPath, err := logreader.DefaultLogPath()
 	if err != nil {
@@ -235,4 +244,147 @@ func main() {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}
+}
+
+func runMigrationCommand() {
+	if len(os.Args) < 3 {
+		printMigrationUsage()
+		os.Exit(1)
+	}
+
+	// Get database path from environment or use default
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Ensure directory exists
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		log.Fatalf("Error creating database directory: %v", err)
+	}
+
+	// Create migration manager
+	mgr, err := storage.NewMigrationManager(dbPath)
+	if err != nil {
+		log.Fatalf("Error creating migration manager: %v", err)
+	}
+	defer mgr.Close()
+
+	command := os.Args[2]
+
+	switch command {
+	case "up":
+		fmt.Println("Applying all pending migrations...")
+		if err := mgr.Up(); err != nil {
+			log.Fatalf("Error applying migrations: %v", err)
+		}
+		version, dirty, err := mgr.Version()
+		if err != nil {
+			log.Fatalf("Error getting version: %v", err)
+		}
+		if dirty {
+			fmt.Printf("Current version: %d (dirty)\n", version)
+		} else {
+			fmt.Printf("Current version: %d\n", version)
+		}
+		fmt.Println("All migrations applied successfully!")
+
+	case "down":
+		fmt.Println("Rolling back last migration...")
+		if err := mgr.Down(); err != nil {
+			log.Fatalf("Error rolling back migration: %v", err)
+		}
+		version, dirty, err := mgr.Version()
+		if err != nil {
+			log.Fatalf("Error getting version: %v", err)
+		}
+		if dirty {
+			fmt.Printf("Current version: %d (dirty)\n", version)
+		} else {
+			fmt.Printf("Current version: %d\n", version)
+		}
+		fmt.Println("Migration rolled back successfully!")
+
+	case "status", "version":
+		version, dirty, err := mgr.Version()
+		if err != nil {
+			log.Fatalf("Error getting version: %v", err)
+		}
+		if dirty {
+			fmt.Printf("Current version: %d (dirty - migration failed or interrupted)\n", version)
+			fmt.Println("Use 'migrate force <version>' to recover")
+		} else {
+			fmt.Printf("Current version: %d\n", version)
+		}
+
+	case "force":
+		if len(os.Args) < 4 {
+			fmt.Println("Error: force command requires a version number")
+			fmt.Println("Usage: mtga-companion migrate force <version>")
+			os.Exit(1)
+		}
+		versionStr := os.Args[3]
+		version, err := strconv.Atoi(versionStr)
+		if err != nil {
+			log.Fatalf("Invalid version number: %v", err)
+		}
+		fmt.Printf("Forcing migration version to %d...\n", version)
+		fmt.Println("WARNING: This does not run migrations, only sets the version.")
+		if err := mgr.Force(version); err != nil {
+			log.Fatalf("Error forcing version: %v", err)
+		}
+		fmt.Println("Version forced successfully!")
+
+	case "goto":
+		if len(os.Args) < 4 {
+			fmt.Println("Error: goto command requires a version number")
+			fmt.Println("Usage: mtga-companion migrate goto <version>")
+			os.Exit(1)
+		}
+		versionStr := os.Args[3]
+		version, err := strconv.ParseUint(versionStr, 10, 32)
+		if err != nil {
+			log.Fatalf("Invalid version number: %v", err)
+		}
+		fmt.Printf("Migrating to version %d...\n", version)
+		if err := mgr.Goto(uint(version)); err != nil {
+			log.Fatalf("Error migrating to version %d: %v", version, err)
+		}
+		fmt.Println("Migration successful!")
+
+	default:
+		fmt.Printf("Unknown migration command: %s\n\n", command)
+		printMigrationUsage()
+		os.Exit(1)
+	}
+}
+
+func printMigrationUsage() {
+	fmt.Println("MTGA Companion - Database Migration Tool")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  mtga-companion migrate <command> [args]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  up                Apply all pending migrations")
+	fmt.Println("  down              Rollback the last migration")
+	fmt.Println("  status            Show current migration version")
+	fmt.Println("  version           Show current migration version (alias for status)")
+	fmt.Println("  goto <version>    Migrate to a specific version")
+	fmt.Println("  force <version>   Force set migration version (use with caution)")
+	fmt.Println()
+	fmt.Println("Environment:")
+	fmt.Println("  MTGA_DB_PATH      Override default database path")
+	fmt.Println("                    (default: ~/.mtga-companion/data.db)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  mtga-companion migrate up")
+	fmt.Println("  mtga-companion migrate status")
+	fmt.Println("  mtga-companion migrate goto 1")
+	fmt.Println("  MTGA_DB_PATH=/tmp/test.db mtga-companion migrate up")
 }
