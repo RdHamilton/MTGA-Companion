@@ -31,9 +31,16 @@ func NewReader(path string) (*Reader, error) {
 		return nil, fmt.Errorf("open log file: %w", err)
 	}
 
+	scanner := bufio.NewScanner(file)
+	// Increase buffer size to handle very long JSON lines (e.g., InventoryInfo)
+	// Default is 64KB, we'll use 10MB to be safe
+	const maxScanTokenSize = 10 * 1024 * 1024 // 10MB
+	buf := make([]byte, maxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
+
 	return &Reader{
 		file:    file,
-		scanner: bufio.NewScanner(file),
+		scanner: scanner,
 	}, nil
 }
 

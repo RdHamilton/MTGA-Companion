@@ -22,16 +22,24 @@ func TestDefaultLogPath(t *testing.T) {
 		if !strings.Contains(path, "Library/Application Support/com.wizards.mtga") {
 			t.Errorf("macOS path does not contain expected directory: %s", path)
 		}
-		if !strings.HasSuffix(path, "Player.log") {
-			t.Errorf("path does not end with Player.log: %s", path)
+		// Should end with either UTC_Log*.log or Player.log
+		if !strings.HasSuffix(path, ".log") {
+			t.Errorf("path does not end with .log: %s", path)
+		}
+		if !strings.Contains(path, "UTC_Log") && !strings.HasSuffix(path, "Player.log") {
+			t.Errorf("path should be UTC_Log or Player.log: %s", path)
 		}
 
 	case "windows":
 		if !strings.Contains(path, "AppData") || !strings.Contains(path, "Wizards Of The Coast") {
 			t.Errorf("Windows path does not contain expected directory: %s", path)
 		}
-		if !strings.HasSuffix(path, "Player.log") {
-			t.Errorf("path does not end with Player.log: %s", path)
+		// Should end with either UTC_Log*.log or Player.log
+		if !strings.HasSuffix(path, ".log") {
+			t.Errorf("path does not end with .log: %s", path)
+		}
+		if !strings.Contains(path, "UTC_Log") && !strings.HasSuffix(path, "Player.log") {
+			t.Errorf("path should be UTC_Log or Player.log: %s", path)
 		}
 	}
 }
