@@ -54,6 +54,7 @@ func main() {
 	// Parse all data
 	profile, inventory, rank := logreader.ParseAll(entries)
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
+	arenaStats, _ := logreader.ParseArenaStats(entries)
 
 	// Display player profile
 	if profile != nil && profile.ScreenName != "" {
@@ -178,7 +179,59 @@ func main() {
 		}
 	}
 
-	if profile == nil && inventory == nil && rank == nil && draftHistory == nil {
+	// Display arena statistics
+	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
+		fmt.Println("Arena Statistics (Current Log Session)")
+		fmt.Println("---------------------------------------")
+
+		// Overall match stats
+		if arenaStats.TotalMatches > 0 {
+			matchWinRate := 0.0
+			if arenaStats.TotalMatches > 0 {
+				matchWinRate = float64(arenaStats.MatchWins) / float64(arenaStats.TotalMatches) * 100
+			}
+			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
+				arenaStats.MatchWins, arenaStats.MatchLosses, matchWinRate)
+		}
+
+		// Overall game stats
+		if arenaStats.TotalGames > 0 {
+			gameWinRate := 0.0
+			if arenaStats.TotalGames > 0 {
+				gameWinRate = float64(arenaStats.GameWins) / float64(arenaStats.TotalGames) * 100
+			}
+			fmt.Printf("Games:   %d-%d (%.1f%% win rate)\n",
+				arenaStats.GameWins, arenaStats.GameLosses, gameWinRate)
+		}
+
+		// Format breakdown
+		if len(arenaStats.FormatStats) > 0 {
+			fmt.Println("\nBy Format:")
+			for _, formatStat := range arenaStats.FormatStats {
+				fmt.Printf("\n  %s:\n", formatStat.EventName)
+				if formatStat.MatchesPlayed > 0 {
+					matchWinRate := 0.0
+					if formatStat.MatchesPlayed > 0 {
+						matchWinRate = float64(formatStat.MatchWins) / float64(formatStat.MatchesPlayed) * 100
+					}
+					fmt.Printf("    Matches: %d-%d (%.1f%%)\n",
+						formatStat.MatchWins, formatStat.MatchLosses, matchWinRate)
+				}
+				if formatStat.GamesPlayed > 0 {
+					gameWinRate := 0.0
+					if formatStat.GamesPlayed > 0 {
+						gameWinRate = float64(formatStat.GameWins) / float64(formatStat.GamesPlayed) * 100
+					}
+					fmt.Printf("    Games:   %d-%d (%.1f%%)\n",
+						formatStat.GameWins, formatStat.GameLosses, gameWinRate)
+				}
+			}
+		}
+
+		fmt.Println()
+	}
+
+	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}

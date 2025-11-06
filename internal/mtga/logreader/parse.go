@@ -359,6 +359,143 @@ func contains(s, substr string) bool {
 	return false
 }
 
+// ParseArenaStats extracts gameplay statistics from log entries.
+// It looks for matchGameRoomStateChangedEvent entries with match results.
+func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
+	stats := &ArenaStats{
+		FormatStats: make(map[string]*FormatStats),
+	}
+
+	// Track seen matches to avoid double counting
+	seenMatches := make(map[string]bool)
+
+	for _, entry := range entries {
+		if !entry.IsJSON {
+			continue
+		}
+
+		// Check for matchGameRoomStateChangedEvent
+		if eventData, ok := entry.JSON["matchGameRoomStateChangedEvent"]; ok {
+			eventMap, ok := eventData.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Get gameRoomInfo
+			gameRoomInfo, ok := eventMap["gameRoomInfo"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Check if this is a match completion event (has finalMatchResult)
+			finalMatchResult, hasFinalResult := gameRoomInfo["finalMatchResult"].(map[string]interface{})
+			if !hasFinalResult {
+				continue
+			}
+
+			// Get match ID
+			matchID, _ := finalMatchResult["matchId"].(string)
+			if matchID == "" || seenMatches[matchID] {
+				continue
+			}
+			seenMatches[matchID] = true
+			stats.UniqueMatchIDs++
+
+			// Get event ID (format)
+			gameRoomConfig, ok := gameRoomInfo["gameRoomConfig"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			reservedPlayers, ok := gameRoomConfig["reservedPlayers"].([]interface{})
+			if !ok || len(reservedPlayers) == 0 {
+				continue
+			}
+
+			// Get eventId from first player
+			firstPlayer, ok := reservedPlayers[0].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			eventID, _ := firstPlayer["eventId"].(string)
+			if eventID == "" {
+				eventID = "Unknown"
+			}
+
+			// Get player's team ID to determine wins/losses
+			playerTeamID, _ := firstPlayer["teamId"].(float64)
+
+			// Parse result list
+			resultList, ok := finalMatchResult["resultList"].([]interface{})
+			if !ok {
+				continue
+			}
+
+			// Process each result in the list
+			for _, resultData := range resultList {
+				resultMap, ok := resultData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				scope, _ := resultMap["scope"].(string)
+				winningTeamID, _ := resultMap["winningTeamId"].(float64)
+
+				// Determine if player won
+				playerWon := int(playerTeamID) == int(winningTeamID)
+
+				// Update overall stats based on scope
+				if scope == "MatchScope_Match" {
+					stats.TotalMatches++
+					if playerWon {
+						stats.MatchWins++
+					} else {
+						stats.MatchLosses++
+					}
+				} else if scope == "MatchScope_Game" {
+					stats.TotalGames++
+					if playerWon {
+						stats.GameWins++
+					} else {
+						stats.GameLosses++
+					}
+				}
+
+				// Update format-specific stats
+				if _, exists := stats.FormatStats[eventID]; !exists {
+					stats.FormatStats[eventID] = &FormatStats{
+						EventName: eventID,
+					}
+				}
+
+				formatStat := stats.FormatStats[eventID]
+				if scope == "MatchScope_Match" {
+					formatStat.MatchesPlayed++
+					if playerWon {
+						formatStat.MatchWins++
+					} else {
+						formatStat.MatchLosses++
+					}
+				} else if scope == "MatchScope_Game" {
+					formatStat.GamesPlayed++
+					if playerWon {
+						formatStat.GameWins++
+					} else {
+						formatStat.GameLosses++
+					}
+				}
+			}
+		}
+	}
+
+	if stats.TotalMatches == 0 && stats.TotalGames == 0 {
+		return nil, nil
+	}
+
+	return stats, nil
+}
+
 // ParseAll extracts all available information from log entries.
 func ParseAll(entries []*LogEntry) (*PlayerProfile, *PlayerInventory, *PlayerRank) {
 	profile, _ := ParseProfile(entries)

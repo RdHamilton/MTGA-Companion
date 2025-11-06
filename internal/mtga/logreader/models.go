@@ -73,3 +73,26 @@ type DeckCard struct {
 	CardID   int
 	Quantity int
 }
+
+// ArenaStats contains gameplay statistics from the log session.
+type ArenaStats struct {
+	TotalMatches   int
+	MatchWins      int
+	MatchLosses    int
+	TotalGames     int
+	GameWins       int
+	GameLosses     int
+	FormatStats    map[string]*FormatStats
+	UniqueMatchIDs int
+}
+
+// FormatStats contains statistics for a specific format/event type.
+type FormatStats struct {
+	EventName     string
+	MatchesPlayed int
+	MatchWins     int
+	MatchLosses   int
+	GamesPlayed   int
+	GameWins      int
+	GameLosses    int
+}
