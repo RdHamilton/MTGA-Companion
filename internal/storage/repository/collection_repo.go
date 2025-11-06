@@ -126,7 +126,6 @@ func (r *collectionRepository) RecordChange(ctx context.Context, cardID int, del
 		source,
 		time.Now(),
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to record collection change: %w", err)
 	}

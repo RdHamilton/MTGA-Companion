@@ -71,7 +71,6 @@ func (r *matchRepository) Create(ctx context.Context, match *models.Match) error
 		match.ResultReason,
 		match.CreatedAt,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to create match: %w", err)
 	}
@@ -94,7 +93,6 @@ func (r *matchRepository) CreateGame(ctx context.Context, game *models.Game) err
 		game.DurationSeconds,
 		game.CreatedAt,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to create game: %w", err)
 	}

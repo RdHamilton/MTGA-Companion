@@ -70,7 +70,6 @@ func (r *deckRepository) Create(ctx context.Context, deck *models.Deck) error {
 		deck.ModifiedAt,
 		deck.LastPlayed,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to create deck: %w", err)
 	}
@@ -96,7 +95,6 @@ func (r *deckRepository) Update(ctx context.Context, deck *models.Deck) error {
 		deck.LastPlayed,
 		deck.ID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to update deck: %w", err)
 	}
@@ -245,7 +243,6 @@ func (r *deckRepository) AddCard(ctx context.Context, card *models.DeckCard) err
 		card.Quantity,
 		card.Board,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to add card to deck: %w", err)
 	}

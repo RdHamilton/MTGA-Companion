@@ -30,7 +30,7 @@ func main() {
 	dbPath := filepath.Join(homeDir, ".mtga-companion", "data.db")
 
 	// Ensure the directory exists
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		log.Fatalf("Failed to create database directory: %v", err)
 	}
 

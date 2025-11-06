@@ -59,7 +59,6 @@ func (r *statsRepository) Upsert(ctx context.Context, stats *models.PlayerStats)
 		stats.CreatedAt,
 		stats.UpdatedAt,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to upsert player stats: %w", err)
 	}
