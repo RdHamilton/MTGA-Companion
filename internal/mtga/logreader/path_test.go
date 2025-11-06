@@ -8,7 +8,6 @@ import (
 
 func TestDefaultLogPath(t *testing.T) {
 	path, err := DefaultLogPath()
-
 	// In CI environments or machines without MTGA installed, this will return an error
 	// This is expected behavior, so we just verify the error message is appropriate
 	if err != nil {
