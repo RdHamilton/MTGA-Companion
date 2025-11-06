@@ -53,6 +53,7 @@ func main() {
 
 	// Parse all data
 	profile, inventory, rank := logreader.ParseAll(entries)
+	draftHistory, _ := logreader.ParseDraftHistory(entries)
 
 	// Display player profile
 	if profile != nil && profile.ScreenName != "" {
@@ -146,7 +147,38 @@ func main() {
 		}
 	}
 
-	if profile == nil && inventory == nil && rank == nil {
+	// Display draft history
+	if draftHistory != nil && len(draftHistory.Drafts) > 0 {
+		fmt.Println("Draft History")
+		fmt.Println("-------------")
+		fmt.Printf("Found %d draft/limited event(s)\n\n", len(draftHistory.Drafts))
+
+		for i, draft := range draftHistory.Drafts {
+			fmt.Printf("%d. %s\n", i+1, draft.EventName)
+			fmt.Printf("   Status: %s\n", draft.Status)
+			fmt.Printf("   Record: %d wins", draft.Wins)
+			if draft.Losses > 0 {
+				fmt.Printf(", %d losses", draft.Losses)
+			}
+			fmt.Println()
+
+			if draft.Deck.Name != "" {
+				fmt.Printf("   Deck: %s\n", draft.Deck.Name)
+			}
+
+			if len(draft.Deck.MainDeck) > 0 {
+				totalCards := 0
+				for _, card := range draft.Deck.MainDeck {
+					totalCards += card.Quantity
+				}
+				fmt.Printf("   Main Deck: %d cards\n", totalCards)
+			}
+
+			fmt.Println()
+		}
+	}
+
+	if profile == nil && inventory == nil && rank == nil && draftHistory == nil {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}

@@ -188,6 +188,177 @@ func ParseRank(entries []*LogEntry) (*PlayerRank, error) {
 	return nil, nil
 }
 
+// ParseDraftHistory extracts draft/limited event history from log entries.
+// It looks for "Courses" arrays and filters for limited format events.
+func ParseDraftHistory(entries []*LogEntry) (*DraftHistory, error) {
+	history := &DraftHistory{
+		Drafts: []DraftEvent{},
+	}
+
+	// Track unique course IDs to avoid duplicates
+	seenCourses := make(map[string]bool)
+
+	// Look for Courses array (search from most recent)
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !entry.IsJSON {
+			continue
+		}
+
+		// Check if this entry has a Courses array
+		if coursesData, ok := entry.JSON["Courses"]; ok {
+			courses, ok := coursesData.([]interface{})
+			if !ok {
+				continue
+			}
+
+			// Process each course
+			for _, courseData := range courses {
+				courseMap, ok := courseData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Extract course ID
+				courseID, _ := courseMap["CourseId"].(string)
+				if courseID == "" || seenCourses[courseID] {
+					continue
+				}
+
+				// Extract event name
+				eventName, _ := courseMap["InternalEventName"].(string)
+
+				// Filter for limited/draft events
+				// Look for keywords: Draft, Sealed, Premier, Quick, Traditional
+				isDraftEvent := false
+				lowerEvent := ""
+				if eventName != "" {
+					lowerEvent = eventName
+					if contains(lowerEvent, "Draft") ||
+						contains(lowerEvent, "Sealed") ||
+						contains(lowerEvent, "Premier") ||
+						contains(lowerEvent, "Quick") ||
+						contains(lowerEvent, "Traditional") {
+						isDraftEvent = true
+					}
+				}
+
+				if !isDraftEvent {
+					continue
+				}
+
+				// Mark as seen
+				seenCourses[courseID] = true
+
+				// Create draft event
+				draftEvent := DraftEvent{
+					EventID:   courseID,
+					EventName: eventName,
+				}
+
+				// Extract status/module
+				if status, ok := courseMap["CurrentModule"].(string); ok {
+					draftEvent.Status = status
+				}
+
+				// Extract wins
+				if wins, ok := courseMap["CurrentWins"].(float64); ok {
+					draftEvent.Wins = int(wins)
+				}
+
+				// Extract losses if available
+				if losses, ok := courseMap["CurrentLosses"].(float64); ok {
+					draftEvent.Losses = int(losses)
+				}
+
+				// Extract deck information
+				if courseDeckData, ok := courseMap["CourseDeck"]; ok {
+					if deckMap, ok := courseDeckData.(map[string]interface{}); ok {
+						draftEvent.Deck = parseDraftDeck(deckMap)
+					}
+				}
+
+				// Extract deck summary for name
+				if deckSummary, ok := courseMap["CourseDeckSummary"]; ok {
+					if summaryMap, ok := deckSummary.(map[string]interface{}); ok {
+						if name, ok := summaryMap["Name"].(string); ok {
+							draftEvent.Deck.Name = name
+						}
+					}
+				}
+
+				history.Drafts = append(history.Drafts, draftEvent)
+			}
+
+			// We found a Courses array, no need to continue
+			break
+		}
+	}
+
+	if len(history.Drafts) == 0 {
+		return nil, nil
+	}
+
+	return history, nil
+}
+
+// parseDraftDeck extracts deck information from a CourseDeck object.
+func parseDraftDeck(deckMap map[string]interface{}) DraftDeck {
+	deck := DraftDeck{
+		MainDeck: []DeckCard{},
+	}
+
+	// Extract MainDeck
+	if mainDeckData, ok := deckMap["MainDeck"]; ok {
+		if mainDeck, ok := mainDeckData.([]interface{}); ok {
+			for _, cardData := range mainDeck {
+				if cardMap, ok := cardData.(map[string]interface{}); ok {
+					card := DeckCard{}
+
+					if cardID, ok := cardMap["cardId"].(float64); ok {
+						card.CardID = int(cardID)
+					}
+
+					if quantity, ok := cardMap["quantity"].(float64); ok {
+						card.Quantity = int(quantity)
+					}
+
+					if card.CardID > 0 && card.Quantity > 0 {
+						deck.MainDeck = append(deck.MainDeck, card)
+					}
+				}
+			}
+		}
+	}
+
+	return deck
+}
+
+// contains checks if a string contains a substring.
+func contains(s, substr string) bool {
+	// Check if substr appears in s
+	if len(substr) == 0 {
+		return true
+	}
+	if len(s) < len(substr) {
+		return false
+	}
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			if s[i+j] != substr[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseAll extracts all available information from log entries.
 func ParseAll(entries []*LogEntry) (*PlayerProfile, *PlayerInventory, *PlayerRank) {
 	profile, _ := ParseProfile(entries)
