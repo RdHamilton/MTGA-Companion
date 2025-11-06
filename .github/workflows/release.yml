@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Run tests
+      run: go test -v -race ./...
+
+    - name: Build for multiple platforms
+      run: |
+        # Build for Linux
+        GOOS=linux GOARCH=amd64 go build -v -o bin/mtga-companion-linux-amd64 ./cmd/mtga-companion
+        GOOS=linux GOARCH=arm64 go build -v -o bin/mtga-companion-linux-arm64 ./cmd/mtga-companion
+
+        # Build for macOS
+        GOOS=darwin GOARCH=amd64 go build -v -o bin/mtga-companion-darwin-amd64 ./cmd/mtga-companion
+        GOOS=darwin GOARCH=arm64 go build -v -o bin/mtga-companion-darwin-arm64 ./cmd/mtga-companion
+
+        # Build for Windows
+        GOOS=windows GOARCH=amd64 go build -v -o bin/mtga-companion-windows-amd64.exe ./cmd/mtga-companion
+        GOOS=windows GOARCH=arm64 go build -v -o bin/mtga-companion-windows-arm64.exe ./cmd/mtga-companion
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        echo "## What's Changed" > changelog.md
+        git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"* %s (%h)" >> changelog.md || echo "* Initial release" >> changelog.md
+        echo "" >> changelog.md
+        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo 'v0.0.0')...${{ github.ref_name }}" >> changelog.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          bin/mtga-companion-linux-amd64
+          bin/mtga-companion-linux-arm64
+          bin/mtga-companion-darwin-amd64
+          bin/mtga-companion-darwin-arm64
+          bin/mtga-companion-windows-amd64.exe
+          bin/mtga-companion-windows-arm64.exe
+        body_path: changelog.md
+        draft: false
+        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
