@@ -72,7 +72,7 @@ func TestReader(t *testing.T) {
 Plain text line without JSON
 [UnityCrossThreadLogger]{"type":"GameEnd","eventId":2,"result":"win"}
 `
-	if err := os.WriteFile(logPath, []byte(testData), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(testData), 0o644); err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
 
