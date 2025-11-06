@@ -1,8 +1,7 @@
 module github.com/ramonehamilton/MTGA-Companion
 
-go 1.24.0
+go 1.22
 
-toolchain go1.24.2
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.18.1
