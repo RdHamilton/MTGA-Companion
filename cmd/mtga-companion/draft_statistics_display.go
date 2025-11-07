@@ -86,3 +86,4 @@ func displayDraftStatistics(stats *logreader.DraftStatistics) {
 		fmt.Println()
 	}
 }
+

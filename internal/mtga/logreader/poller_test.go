@@ -282,3 +282,4 @@ func TestPoller_Errors(t *testing.T) {
 		// No error is also acceptable (file not found is handled gracefully)
 	}
 }
+
