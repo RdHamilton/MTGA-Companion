@@ -2,11 +2,3 @@
 # See https://golangci-lint.run/usage/configuration/ for more information
 
 version: "2"
-
-issues:
-  # Exclude all issues from test files
-  exclude-use-default: false
-  exclude:
-    # Exclude all issues from test files
-    - ".*_test\\.go:.*"
-    - ".*\\.test\\.go:.*"
