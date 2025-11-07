@@ -83,7 +83,7 @@ jobs:
       uses: golangci/golangci-lint-action@v8
       with:
         version: latest
-        args: --timeout=5m --skip-files=".*_test\\.go$" --skip-files=".*\\.test\\.go$"
+        args: --timeout=5m
 
   format:
     name: Format Check
