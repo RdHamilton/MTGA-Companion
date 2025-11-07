@@ -1,11 +1,12 @@
 module github.com/ramonehamilton/MTGA-Companion
 
-go 1.22
+go 1.24.0
 
+toolchain go1.24.2
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.18.1
-	modernc.org/sqlite v1.38.2
+	modernc.org/sqlite v1.29.10
 )
 
 require (
