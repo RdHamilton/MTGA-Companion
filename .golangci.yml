@@ -1,0 +1,60 @@
+# golangci-lint configuration file
+# See https://golangci-lint.run/usage/configuration/ for more information
+
+run:
+  # Exclude test files from linting
+  skip-files:
+    - ".*\\.test\\.go$"
+    - ".*_test\\.go$"
+  # Exclude test directories
+  skip-dirs:
+    - test
+    - tests
+
+issues:
+  # Exclude test files from all checks
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - staticcheck
+        - gocritic
+        - gosec
+        - gosimple
+        - govet
+        - ineffassign
+        - misspell
+        - stylecheck
+        - typecheck
+        - unconvert
+        - unparam
+        - unused
+        - varcheck
+        - whitespace
+        - wrapcheck
+        - wsl
+        - exportloopref
+        - gochecknoinits
+        - gochecknoglobals
+        - gofumpt
+        - revive
+        - errname
+        - errorlint
+        - forbidigo
+        - gci
+        - goheader
+        - gomnd
+        - gomodguard
+        - goprintffuncname
+        - lll
+        - maligned
+        - nakedret
+        - noctx
+        - nolintlint
+        - rowserrcheck
+        - scopelint
+        - sqlclosecheck
+        - structcheck
+        - tagliatelle
+        - thelper
+        - tparallel
