@@ -109,6 +109,7 @@ func main() {
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
 	collection, _ := logreader.ParseCollection(entries)
+	deckLibrary, _ := logreader.ParseDecks(entries)
 
 	// Store arena stats persistently (with deduplication)
 	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
@@ -375,7 +376,13 @@ func main() {
 		displayCollection(collection)
 	}
 
-	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil && (collection == nil || len(collection.Cards) == 0) {
+	// Display deck library
+	if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
+		fmt.Println()
+		displayDeckLibrary(deckLibrary)
+	}
+
+	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil && (collection == nil || len(collection.Cards) == 0) && (deckLibrary == nil || len(deckLibrary.Decks) == 0) {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}
@@ -648,6 +655,12 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "collection", "col", "c":
 			// Refresh collection from log file
 			refreshCollection(ctx, logPath)
+		case "decks", "deck", "d":
+			// Refresh decks from log file
+			refreshDecks(ctx, logPath)
+		case "trend", "trends", "t":
+			// Display trend analysis
+			displayTrendAnalysisForPeriod(service, ctx, 30, "weekly")
 		case "help", "h":
 			printHelp()
 		default:
@@ -739,6 +752,44 @@ func refreshCollection(ctx context.Context, logPath string) {
 	}
 }
 
+// refreshDecks refreshes and displays decks from the log file.
+func refreshDecks(ctx context.Context, logPath string) {
+	fmt.Println("\nRefreshing decks...")
+
+	// Create a reader
+	reader, err := logreader.NewReader(logPath)
+	if err != nil {
+		fmt.Printf("Error creating log reader: %v\n", err)
+		return
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
+
+	// Read all JSON entries
+	entries, err := reader.ReadAllJSON()
+	if err != nil {
+		fmt.Printf("Error reading log entries: %v\n", err)
+		return
+	}
+
+	// Parse decks
+	deckLibrary, err := logreader.ParseDecks(entries)
+	if err != nil {
+		fmt.Printf("Error parsing decks: %v\n", err)
+		return
+	}
+
+	// Display decks
+	if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
+		displayDeckLibrary(deckLibrary)
+	} else {
+		fmt.Println("No deck data found in log file.")
+	}
+}
+
 // printHelp displays available commands.
 func printHelp() {
 	fmt.Println("\nAvailable commands:")
@@ -747,6 +798,8 @@ func printHelp() {
 	fmt.Println("  weekly, week, w - Display weekly statistics")
 	fmt.Println("  monthly, month, m - Display monthly statistics")
 	fmt.Println("  collection, col, c - Refresh and display card collection")
+	fmt.Println("  decks, deck, d - Refresh and display saved decks")
+	fmt.Println("  trend, trends, t - Display historical trend analysis")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
