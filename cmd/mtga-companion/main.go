@@ -107,7 +107,7 @@ func main() {
 	// Parse all data
 	profile, inventory, rank := logreader.ParseAll(entries)
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
-	_ = logreader.ParseDraftPicks(entries) // Parse draft picks (used in refreshDraftPicks)
+	_, _ = logreader.ParseDraftPicks(entries) // Parse draft picks (used in refreshDraftPicks)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
 	collection, _ := logreader.ParseCollection(entries)
 	deckLibrary, _ := logreader.ParseDecks(entries)
