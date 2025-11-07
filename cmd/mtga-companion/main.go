@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -379,6 +380,9 @@ func main() {
 
 // displayArenaStatistics displays both current session and all-time statistics.
 func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.Service, ctx context.Context) {
+	// Display weekly and monthly statistics
+	displayWeeklyStats(service, ctx)
+	displayMonthlyStats(service, ctx)
 	// Display current session statistics
 	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
 		fmt.Println("Arena Statistics (Current Log Session)")
@@ -444,6 +448,87 @@ func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.S
 	}
 }
 
+// displayWeeklyStats displays statistics for the current week.
+func displayWeeklyStats(service *storage.Service, ctx context.Context) {
+	now := time.Now()
+	// Get start of week (Monday)
+	weekday := int(now.Weekday())
+	if weekday == 0 {
+		weekday = 7 // Sunday is 7
+	}
+	weekStart := now.AddDate(0, 0, -weekday+1).Truncate(24 * time.Hour)
+	weekEnd := weekStart.AddDate(0, 0, 7)
+
+	startDate := weekStart
+	endDate := weekEnd
+	filter := storage.StatsFilter{
+		StartDate: &startDate,
+		EndDate:   &endDate,
+	}
+
+	stats, err := service.GetStats(ctx, filter)
+	if err != nil {
+		log.Printf("Warning: Failed to retrieve weekly statistics: %v", err)
+		return
+	}
+
+	if stats != nil && (stats.TotalMatches > 0 || stats.TotalGames > 0) {
+		fmt.Println("Arena Statistics (This Week)")
+		fmt.Println("----------------------------")
+		fmt.Printf("Period: %s to %s\n", weekStart.Format("2006-01-02"), weekEnd.Format("2006-01-02"))
+
+		if stats.TotalMatches > 0 {
+			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
+				stats.MatchesWon, stats.MatchesLost, stats.WinRate*100)
+		}
+
+		if stats.TotalGames > 0 {
+			fmt.Printf("Games:   %d-%d (%.1f%% win rate)\n",
+				stats.GamesWon, stats.GamesLost, stats.GameWinRate*100)
+		}
+
+		fmt.Println()
+	}
+}
+
+// displayMonthlyStats displays statistics for the current month.
+func displayMonthlyStats(service *storage.Service, ctx context.Context) {
+	now := time.Now()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	monthEnd := monthStart.AddDate(0, 1, 0)
+
+	startDate := monthStart
+	endDate := monthEnd
+	filter := storage.StatsFilter{
+		StartDate: &startDate,
+		EndDate:   &endDate,
+	}
+
+	stats, err := service.GetStats(ctx, filter)
+	if err != nil {
+		log.Printf("Warning: Failed to retrieve monthly statistics: %v", err)
+		return
+	}
+
+	if stats != nil && (stats.TotalMatches > 0 || stats.TotalGames > 0) {
+		fmt.Println("Arena Statistics (This Month)")
+		fmt.Println("------------------------------")
+		fmt.Printf("Period: %s to %s\n", monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"))
+
+		if stats.TotalMatches > 0 {
+			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
+				stats.MatchesWon, stats.MatchesLost, stats.WinRate*100)
+		}
+
+		if stats.TotalGames > 0 {
+			fmt.Printf("Games:   %d-%d (%.1f%% win rate)\n",
+				stats.GamesWon, stats.GamesLost, stats.GameWinRate*100)
+		}
+
+		fmt.Println()
+	}
+}
+
 // runInteractiveConsole runs an interactive console loop that waits for user input.
 func runInteractiveConsole(service *storage.Service, ctx context.Context, logPath string) {
 	scanner := bufio.NewScanner(os.Stdin)
@@ -468,6 +553,10 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			return
 		case "refresh", "r":
 			refreshStatistics(service, ctx, logPath)
+		case "weekly", "week", "w":
+			displayWeeklyStats(service, ctx)
+		case "monthly", "month", "m":
+			displayMonthlyStats(service, ctx)
 		case "help", "h":
 			printHelp()
 		default:
@@ -526,6 +615,8 @@ func printHelp() {
 	fmt.Println("\nAvailable commands:")
 	fmt.Println("  (empty)    - Refresh and display statistics")
 	fmt.Println("  refresh, r - Refresh and display statistics")
+	fmt.Println("  weekly, week, w - Display weekly statistics")
+	fmt.Println("  monthly, month, m - Display monthly statistics")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
