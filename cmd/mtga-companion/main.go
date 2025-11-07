@@ -49,7 +49,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating log reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
 
 	// Read all JSON entries
 	fmt.Println("Reading log file...")
@@ -273,7 +277,11 @@ func runMigrationCommand() {
 	if err != nil {
 		log.Fatalf("Error creating migration manager: %v", err)
 	}
-	defer mgr.Close()
+	defer func() {
+		if err := mgr.Close(); err != nil {
+			log.Printf("Error closing migration manager: %v", err)
+		}
+	}()
 
 	command := os.Args[2]
 

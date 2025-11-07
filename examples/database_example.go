@@ -41,7 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 
 	// Create service
 	service := storage.NewService(db)
@@ -59,7 +63,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
 
 	entries, err := reader.ReadAllJSON()
 	if err != nil {

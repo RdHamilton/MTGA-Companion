@@ -83,7 +83,10 @@ func (r *collectionRepository) GetAll(ctx context.Context) (map[int]int, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all cards: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	collection := make(map[int]int)
 	for rows.Next() {
@@ -151,7 +154,10 @@ func (r *collectionRepository) GetHistory(ctx context.Context, cardID int) ([]*m
 	if err != nil {
 		return nil, fmt.Errorf("failed to get collection history: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var history []*models.CollectionHistory
 	for rows.Next() {
@@ -191,7 +197,10 @@ func (r *collectionRepository) GetRecentChanges(ctx context.Context, limit int) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent changes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var history []*models.CollectionHistory
 	for rows.Next() {

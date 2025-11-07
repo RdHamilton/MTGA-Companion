@@ -122,7 +122,10 @@ func (r *statsRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats by date range: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var stats []*models.PlayerStats
 	for rows.Next() {
@@ -166,7 +169,10 @@ func (r *statsRepository) GetAllFormats(ctx context.Context, date time.Time) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats for all formats: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var stats []*models.PlayerStats
 	for rows.Next() {
