@@ -284,4 +284,3 @@ func TestBackupManager_GetBackupDir(t *testing.T) {
 		t.Errorf("Expected backup dir %s, got %s", expectedDir, backupDir)
 	}
 }
-

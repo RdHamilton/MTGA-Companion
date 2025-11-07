@@ -59,4 +59,3 @@ func GetDraftRecommendations(packCards []int, previousPicks []DraftPick) DraftRe
 
 	return recommendations
 }
-

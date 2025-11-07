@@ -245,4 +245,3 @@ func parseDeckCards(cardsData []interface{}) []DeckCard {
 
 	return cards
 }
-
