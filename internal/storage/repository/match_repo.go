@@ -162,7 +162,10 @@ func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches by date range: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var matches []*models.Match
 	for rows.Next() {
@@ -213,7 +216,10 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string) ([]*mo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches by format: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var matches []*models.Match
 	for rows.Next() {
@@ -337,7 +343,10 @@ func (r *matchRepository) GetGamesForMatch(ctx context.Context, matchID string) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get games for match: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
 
 	var games []*models.Game
 	for rows.Next() {
