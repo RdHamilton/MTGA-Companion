@@ -741,7 +741,7 @@ func refreshDraftPicks(ctx context.Context, logPath string) {
 	}
 
 	// Display draft picks
-	if draftPicks != nil && len(draftPicks) > 0 {
+	if len(draftPicks) > 0 {
 		for _, picks := range draftPicks {
 			displayDraftPicks(picks)
 		}

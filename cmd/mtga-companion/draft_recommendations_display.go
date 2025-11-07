@@ -7,6 +7,7 @@ import (
 )
 
 // displayDraftRecommendations displays draft recommendations for a pack.
+//nolint:unused // Reserved for future use when displaying recommendations during active drafts
 func displayDraftRecommendations(packCards []int, previousPicks []logreader.DraftPick) {
 	if len(packCards) == 0 {
 		fmt.Println("No cards in pack.")
