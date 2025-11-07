@@ -13,6 +13,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 func main() {
@@ -332,7 +333,7 @@ func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.S
 	}
 
 	// Display all-time statistics from database
-	allTimeStats, err := service.GetStats(ctx, storage.StatsFilter{})
+	allTimeStats, err := service.GetStats(ctx, models.StatsFilter{})
 	if err != nil {
 		log.Printf("Warning: Failed to retrieve all-time statistics: %v", err)
 		return
@@ -372,7 +373,7 @@ func displayWeeklyStats(service *storage.Service, ctx context.Context) {
 
 	startDate := weekStart
 	endDate := weekEnd
-	filter := storage.StatsFilter{
+	filter := models.StatsFilter{
 		StartDate: &startDate,
 		EndDate:   &endDate,
 	}
@@ -410,7 +411,7 @@ func displayMonthlyStats(service *storage.Service, ctx context.Context) {
 
 	startDate := monthStart
 	endDate := monthEnd
-	filter := storage.StatsFilter{
+	filter := models.StatsFilter{
 		StartDate: &startDate,
 		EndDate:   &endDate,
 	}
@@ -546,6 +547,10 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			refreshDraftPicks(ctx, logPath)
 		case "backup", "b":
 			runBackupCommandInteractive(service, ctx)
+		case "account", "accounts", "acc", "a":
+			handleAccountCommand(service, ctx, input)
+		case "switch", "sw":
+			handleAccountSwitch(service, ctx, input)
 		case "help", "h":
 			printHelp()
 		default:
@@ -759,6 +764,251 @@ func refreshDraftPicks(ctx context.Context, logPath string) {
 }
 
 // printHelp displays available commands.
+// handleAccountCommand handles account management commands.
+func handleAccountCommand(service *storage.Service, ctx context.Context, input string) {
+	parts := strings.Fields(input)
+	if len(parts) < 2 {
+		// List all accounts
+		accounts, err := service.GetAllAccounts(ctx)
+		if err != nil {
+			fmt.Printf("Error getting accounts: %v\n", err)
+			return
+		}
+
+		currentAccount, err := service.GetCurrentAccount(ctx)
+		if err != nil {
+			fmt.Printf("Error getting current account: %v\n", err)
+			return
+		}
+
+		fmt.Println("\n=== Accounts ===")
+		for _, account := range accounts {
+			marker := " "
+			if account.ID == currentAccount.ID {
+				marker = "*"
+			}
+			defaultMarker := ""
+			if account.IsDefault {
+				defaultMarker = " (default)"
+			}
+			screenName := ""
+			if account.ScreenName != nil {
+				screenName = fmt.Sprintf(" - %s", *account.ScreenName)
+			}
+			fmt.Printf("%s [%d] %s%s%s\n", marker, account.ID, account.Name, screenName, defaultMarker)
+		}
+		fmt.Println()
+		return
+	}
+
+	command := strings.ToLower(parts[1])
+	switch command {
+	case "create", "new", "add":
+		handleAccountCreate(service, ctx, parts[2:])
+	case "info", "show":
+		handleAccountInfo(service, ctx, parts[2:])
+	case "list", "ls":
+		handleAccountList(service, ctx)
+	default:
+		fmt.Printf("Unknown account command: %s\n", command)
+		fmt.Println("Available commands: create, info, list")
+	}
+}
+
+// handleAccountCreate creates a new account.
+func handleAccountCreate(service *storage.Service, ctx context.Context, args []string) {
+	if len(args) < 1 {
+		fmt.Print("Enter account name: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() {
+			return
+		}
+		name := strings.TrimSpace(scanner.Text())
+		if name == "" {
+			fmt.Println("Account name cannot be empty")
+			return
+		}
+
+		account, err := service.CreateAccount(ctx, name, nil, nil)
+		if err != nil {
+			fmt.Printf("Error creating account: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Account created: [%d] %s\n", account.ID, account.Name)
+		return
+	}
+
+	name := strings.Join(args, " ")
+	account, err := service.CreateAccount(ctx, name, nil, nil)
+	if err != nil {
+		fmt.Printf("Error creating account: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Account created: [%d] %s\n", account.ID, account.Name)
+}
+
+// handleAccountInfo displays information about an account.
+func handleAccountInfo(service *storage.Service, ctx context.Context, args []string) {
+	var accountID int
+	var err error
+
+	if len(args) < 1 {
+		// Show current account
+		account, err := service.GetCurrentAccount(ctx)
+		if err != nil {
+			fmt.Printf("Error getting current account: %v\n", err)
+			return
+		}
+		displayAccountInfo(account, service, ctx)
+		return
+	}
+
+	accountID, err = strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Printf("Invalid account ID: %s\n", args[0])
+		return
+	}
+
+	account, err := service.GetAccount(ctx, accountID)
+	if err != nil {
+		fmt.Printf("Error getting account: %v\n", err)
+		return
+	}
+	if account == nil {
+		fmt.Printf("Account not found: %d\n", accountID)
+		return
+	}
+
+	displayAccountInfo(account, service, ctx)
+}
+
+// displayAccountInfo displays detailed information about an account.
+func displayAccountInfo(account *models.Account, service *storage.Service, ctx context.Context) {
+	fmt.Printf("\n=== Account Information ===\n")
+	fmt.Printf("ID: %d\n", account.ID)
+	fmt.Printf("Name: %s\n", account.Name)
+	if account.ScreenName != nil {
+		fmt.Printf("Screen Name: %s\n", *account.ScreenName)
+	}
+	if account.ClientID != nil {
+		fmt.Printf("Client ID: %s\n", *account.ClientID)
+	}
+	fmt.Printf("Default: %v\n", account.IsDefault)
+	fmt.Printf("Created: %s\n", account.CreatedAt.Format("2006-01-02 15:04:05"))
+
+	// Get statistics for this account
+	accountID := account.ID
+	filter := models.StatsFilter{
+		AccountID: &accountID,
+	}
+	stats, err := service.GetStats(ctx, filter)
+	if err != nil {
+		fmt.Printf("Error getting statistics: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n=== Statistics ===")
+	fmt.Printf("Total Matches: %d\n", stats.TotalMatches)
+	fmt.Printf("Matches Won: %d\n", stats.MatchesWon)
+	fmt.Printf("Matches Lost: %d\n", stats.MatchesLost)
+	if stats.TotalMatches > 0 {
+		fmt.Printf("Win Rate: %.2f%%\n", stats.WinRate*100)
+	}
+	fmt.Printf("Total Games: %d\n", stats.TotalGames)
+	fmt.Printf("Games Won: %d\n", stats.GamesWon)
+	fmt.Printf("Games Lost: %d\n", stats.GamesLost)
+	if stats.TotalGames > 0 {
+		fmt.Printf("Game Win Rate: %.2f%%\n", stats.GameWinRate*100)
+	}
+	fmt.Println()
+}
+
+// handleAccountList lists all accounts.
+func handleAccountList(service *storage.Service, ctx context.Context) {
+	accounts, err := service.GetAllAccounts(ctx)
+	if err != nil {
+		fmt.Printf("Error getting accounts: %v\n", err)
+		return
+	}
+
+	currentAccount, err := service.GetCurrentAccount(ctx)
+	if err != nil {
+		fmt.Printf("Error getting current account: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n=== Accounts ===")
+	for _, account := range accounts {
+		marker := " "
+		if account.ID == currentAccount.ID {
+			marker = "*"
+		}
+		defaultMarker := ""
+		if account.IsDefault {
+			defaultMarker = " (default)"
+		}
+		screenName := ""
+		if account.ScreenName != nil {
+			screenName = fmt.Sprintf(" - %s", *account.ScreenName)
+		}
+		fmt.Printf("%s [%d] %s%s%s\n", marker, account.ID, account.Name, screenName, defaultMarker)
+	}
+	fmt.Println()
+}
+
+// handleAccountSwitch switches to a different account.
+func handleAccountSwitch(service *storage.Service, ctx context.Context, input string) {
+	parts := strings.Fields(input)
+	if len(parts) < 2 {
+		fmt.Print("Enter account ID to switch to: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() {
+			return
+		}
+		accountIDStr := strings.TrimSpace(scanner.Text())
+		accountID, err := strconv.Atoi(accountIDStr)
+		if err != nil {
+			fmt.Printf("Invalid account ID: %s\n", accountIDStr)
+			return
+		}
+
+		if err := service.SetCurrentAccount(ctx, accountID); err != nil {
+			fmt.Printf("Error switching account: %v\n", err)
+			return
+		}
+
+		account, err := service.GetCurrentAccount(ctx)
+		if err != nil {
+			fmt.Printf("Error getting account: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Switched to account: [%d] %s\n", account.ID, account.Name)
+		return
+	}
+
+	accountID, err := strconv.Atoi(parts[1])
+	if err != nil {
+		fmt.Printf("Invalid account ID: %s\n", parts[1])
+		return
+	}
+
+	if err := service.SetCurrentAccount(ctx, accountID); err != nil {
+		fmt.Printf("Error switching account: %v\n", err)
+		return
+	}
+
+	account, err := service.GetCurrentAccount(ctx)
+	if err != nil {
+		fmt.Printf("Error getting account: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Switched to account: [%d] %s\n", account.ID, account.Name)
+}
+
 func printHelp() {
 	fmt.Println("\nAvailable commands:")
 	fmt.Println("  (empty)    - Refresh and display statistics")
@@ -772,6 +1022,8 @@ func printHelp() {
 	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
 	fmt.Println("  draft, drafts, draftstats - Display draft statistics")
 	fmt.Println("  draftpicks, picks - Display draft picks")
+	fmt.Println("  account, accounts, a - Manage accounts (list, create, info)")
+	fmt.Println("  switch, sw <id> - Switch to a different account")
 	fmt.Println("  backup, b  - Create or manage database backups")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")

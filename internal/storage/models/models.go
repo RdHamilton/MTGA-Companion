@@ -2,10 +2,22 @@ package models
 
 import "time"
 
+// Account represents a player account.
+type Account struct {
+	ID          int
+	Name        string
+	ScreenName  *string // Nullable
+	ClientID    *string // Nullable
+	IsDefault   bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 // Match represents a single match in MTGA.
 // A match may consist of multiple games (best-of-3).
 type Match struct {
 	ID              string
+	AccountID       int // Foreign key to accounts
 	EventID         string
 	EventName       string
 	Timestamp       time.Time
@@ -35,6 +47,7 @@ type Game struct {
 // PlayerStats represents aggregated player statistics for a time period.
 type PlayerStats struct {
 	ID            int
+	AccountID     int // Foreign key to accounts
 	Date          time.Time
 	Format        string
 	MatchesPlayed int
@@ -48,6 +61,7 @@ type PlayerStats struct {
 // Deck represents a deck list.
 type Deck struct {
 	ID            string
+	AccountID     int // Foreign key to accounts
 	Name          string
 	Format        string
 	Description   *string // Nullable
@@ -68,6 +82,7 @@ type DeckCard struct {
 
 // CollectionCard represents a card in the player's collection.
 type CollectionCard struct {
+	AccountID int // Foreign key to accounts
 	CardID    int
 	Quantity  int
 	UpdatedAt time.Time
@@ -76,6 +91,7 @@ type CollectionCard struct {
 // CollectionHistory tracks changes to the collection over time.
 type CollectionHistory struct {
 	ID            int
+	AccountID     int // Foreign key to accounts
 	CardID        int
 	QuantityDelta int // Positive or negative change
 	QuantityAfter int // Quantity after this change
@@ -87,6 +103,7 @@ type CollectionHistory struct {
 // RankHistory tracks rank progression over time.
 type RankHistory struct {
 	ID            int
+	AccountID     int // Foreign key to accounts
 	Timestamp     time.Time
 	Format        string // "constructed" or "limited"
 	SeasonOrdinal int
@@ -100,6 +117,7 @@ type RankHistory struct {
 // DraftEvent represents a draft or sealed event.
 type DraftEvent struct {
 	ID        string
+	AccountID int // Foreign key to accounts
 	EventName string
 	SetCode   string
 	StartTime time.Time
@@ -115,6 +133,7 @@ type DraftEvent struct {
 
 // StatsFilter provides filtering options for statistics queries.
 type StatsFilter struct {
+	AccountID *int      // Filter by account ID, nil means all accounts
 	StartDate *time.Time
 	EndDate   *time.Time
 	Format    *string
