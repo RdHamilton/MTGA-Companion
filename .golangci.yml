@@ -1,6 +1,8 @@
 # golangci-lint configuration file
 # See https://golangci-lint.run/usage/configuration/ for more information
 
+version: "2"
+
 run:
   # Exclude test files from linting
   skip-files:
