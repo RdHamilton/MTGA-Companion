@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 )
