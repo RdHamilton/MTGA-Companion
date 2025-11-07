@@ -476,15 +476,18 @@ func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.S
 
 		if allTimeStats.TotalMatches > 0 {
 			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
-				allTimeStats.MatchesWon, allTimeStats.MatchesLost, allTimeStats.WinRate)
+				allTimeStats.MatchesWon, allTimeStats.MatchesLost, allTimeStats.WinRate*100)
 		}
 
 		if allTimeStats.TotalGames > 0 {
 			fmt.Printf("Games:   %d-%d (%.1f%% win rate)\n",
-				allTimeStats.GamesWon, allTimeStats.GamesLost, allTimeStats.GameWinRate)
+				allTimeStats.GamesWon, allTimeStats.GamesLost, allTimeStats.GameWinRate*100)
 		}
 
 		fmt.Println()
+
+		// Display result breakdown
+		displayResultReasons(service, ctx)
 	}
 }
 
@@ -661,6 +664,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "trend", "trends", "t":
 			// Display trend analysis
 			displayTrendAnalysisForPeriod(service, ctx, 30, "weekly")
+		case "results", "result", "res":
+			// Display result breakdown
+			displayResultReasons(service, ctx)
 		case "help", "h":
 			printHelp()
 		default:
@@ -800,6 +806,7 @@ func printHelp() {
 	fmt.Println("  collection, col, c - Refresh and display card collection")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
+	fmt.Println("  results, result, res - Display match result breakdown")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
