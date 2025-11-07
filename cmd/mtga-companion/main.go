@@ -667,6 +667,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "results", "result", "res":
 			// Display result breakdown
 			displayResultReasons(service, ctx)
+		case "rank", "ranks", "rankprog":
+			// Display rank progression
+			displayRankProgressionWithStats(service, ctx)
 		case "help", "h":
 			printHelp()
 		default:
@@ -807,6 +810,7 @@ func printHelp() {
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
 	fmt.Println("  results, result, res - Display match result breakdown")
+	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
