@@ -41,6 +41,7 @@ func displayDeckLibrary(library *logreader.DeckLibrary) {
 }
 
 // displayDeck displays a single deck with details.
+//
 //nolint:unused // Reserved for future use when displaying individual deck details
 func displayDeck(deck *logreader.PlayerDeck) {
 	if deck == nil {
@@ -109,6 +110,7 @@ func displayDeck(deck *logreader.PlayerDeck) {
 }
 
 // countTotalCards counts the total number of cards in a deck card slice.
+//
 //nolint:unused // Reserved for future use when calculating total card counts
 func countTotalCards(cards []logreader.DeckCard) int {
 	total := 0
