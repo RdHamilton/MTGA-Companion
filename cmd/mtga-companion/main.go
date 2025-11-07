@@ -114,7 +114,7 @@ func main() {
 		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
 			log.Printf("Warning: Failed to store arena stats: %v", err)
 		} else {
-			fmt.Println("Statistics stored successfully.\n")
+			fmt.Println("Statistics stored successfully.")
 		}
 	}
 

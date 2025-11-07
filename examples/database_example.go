@@ -86,7 +86,7 @@ func main() {
 		fmt.Println("\nStoring arena statistics...")
 
 		// Store stats in database
-		if err := service.StoreArenaStats(ctx, arenaStats); err != nil {
+		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
 			log.Fatalf("Failed to store arena stats: %v", err)
 		}
 

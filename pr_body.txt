@@ -1,0 +1,89 @@
+## Description
+
+This PR implements issue #11 - Add persistent statistics tracking across log sessions.
+
+## Features
+
+- **Persistent Storage**: Statistics are now stored in a SQLite database at `~/.mtga-companion/data.db`
+- **Match Deduplication**: Prevents duplicate match entries across log sessions using match IDs
+- **All-Time Statistics**: Displays both current session and all-time statistics from the database
+- **Interactive Console**: Application no longer exits immediately; waits for user to type 'exit'
+- **Refresh Command**: Allows users to refresh statistics by re-reading the log file
+- **Auto-Migration**: Database migrations run automatically on startup
+
+## Changes
+
+### Storage Layer
+- Enhanced `StoreArenaStats` to extract match details from log entries
+- Added match deduplication logic to check for existing matches before storing
+- Extracts timestamps from log entries for accurate match timing
+- Stores individual matches and games with proper relationships
+
+### Main Application
+- Initializes database with auto-migration on startup
+- Stores statistics persistently after parsing log file
+- Displays both current session and all-time statistics
+- Added interactive console loop with commands:
+  - `(empty)` or `refresh`/`r` - Refresh and display statistics
+  - `exit`/`quit`/`q` - Exit the application
+  - `help`/`h` - Show help message
+
+## Database
+
+- Uses existing SQLite schema with `matches`, `games`, and `player_stats` tables
+- Automatically runs migrations on startup
+- Database stored at `~/.mtga-companion/data.db`
+
+## Testing
+
+- Tested with existing log files
+- Verified match deduplication prevents duplicate entries
+- Confirmed statistics accumulate across multiple log sessions
+- Tested interactive console commands
+
+## Future Enhancements
+
+### Short-term
+- [ ] Add date range filtering for statistics display
+- [ ] Add format-specific all-time statistics breakdown
+- [ ] Add command to view recent matches
+- [ ] Add command to view match history by format
+- [ ] Add export functionality (CSV, JSON) for statistics
+
+### Medium-term
+- [ ] Add match replay functionality (view individual match details)
+- [ ] Add deck tracking and statistics by deck
+- [ ] Add opponent tracking and statistics
+- [ ] Add time-based statistics (hourly, daily, weekly trends)
+- [ ] Add win streak tracking
+- [ ] Add performance metrics (average game duration, etc.)
+- [ ] Implement desktop GUI using Fyne framework
+- [ ] Add real-time statistics updates in GUI
+- [ ] Add interactive charts and graphs in GUI
+
+### Long-term
+- [ ] Add comprehensive desktop GUI with Fyne for all features
+- [ ] Add data visualization in GUI (charts, graphs, trends)
+- [ ] Add match history viewer in GUI
+- [ ] Add deck builder interface in GUI
+- [ ] Add predictive analytics (win rate predictions)
+- [ ] Add export to external services (MTG Arena Tracker, etc.)
+- [ ] Add backup/restore functionality for database
+- [ ] Add multi-account support
+- [ ] Add system tray integration for desktop app
+- [ ] Add notifications for match completions
+- [ ] Add customizable themes and UI preferences
+
+## Related Issues
+
+Closes #11
+
+## Checklist
+
+- [x] Code follows project patterns and practices
+- [x] Database migrations are handled automatically
+- [x] Match deduplication prevents duplicate entries
+- [x] Statistics accumulate across log sessions
+- [x] Interactive console works as expected
+- [x] All-time statistics are displayed correctly
+- [x] No breaking changes to existing functionality

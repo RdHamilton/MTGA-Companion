@@ -242,16 +242,16 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 
 			// Create match record
 			match := &Match{
-				ID:          matchID,
-				EventID:     eventID,
-				EventName:   eventName,
-				Timestamp:   matchTime,
-				PlayerWins:  playerWins,
+				ID:           matchID,
+				EventID:      eventID,
+				EventName:    eventName,
+				Timestamp:    matchTime,
+				PlayerWins:   playerWins,
 				OpponentWins: opponentWins,
 				PlayerTeamID: int(playerTeamID),
-				Format:      eventID,
-				Result:      matchResult,
-				CreatedAt:   matchTime,
+				Format:       eventID,
+				Result:       matchResult,
+				CreatedAt:    matchTime,
 			}
 
 			matches = append(matches, matchData{
