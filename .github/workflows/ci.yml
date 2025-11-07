@@ -144,7 +144,7 @@ jobs:
       run: go build -v -o bin/ ./cmd/mtga-companion
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: mtga-companion-${{ matrix.os }}
         path: bin/
