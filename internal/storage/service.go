@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
@@ -191,6 +192,7 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 			}
 
 			var matchResult string
+			var resultReason *string
 			var playerWins, opponentWins int
 			var games []*Game
 			gameNumber := 1
@@ -204,6 +206,15 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				scope, _ := resultMap["scope"].(string)
 				winningTeamID, _ := resultMap["winningTeamId"].(float64)
 				playerWon := int(playerTeamID) == int(winningTeamID)
+
+				// Extract result reason if available
+				if reason, ok := resultMap["reason"].(string); ok && reason != "" {
+					normalizedReason := normalizeResultReason(reason)
+					resultReason = &normalizedReason
+				} else if reason, ok := resultMap["Reason"].(string); ok && reason != "" {
+					normalizedReason := normalizeResultReason(reason)
+					resultReason = &normalizedReason
+				}
 
 				switch scope {
 				case "MatchScope_Match":
@@ -230,6 +241,17 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				}
 			}
 
+			// If no result reason found in resultList, check finalMatchResult
+			if resultReason == nil {
+				if reason, ok := finalMatchResult["reason"].(string); ok && reason != "" {
+					normalizedReason := normalizeResultReason(reason)
+					resultReason = &normalizedReason
+				} else if reason, ok := finalMatchResult["Reason"].(string); ok && reason != "" {
+					normalizedReason := normalizeResultReason(reason)
+					resultReason = &normalizedReason
+				}
+			}
+
 			// If no games found, set match result based on match scope
 			if len(games) == 0 && matchResult != "" {
 				if matchResult == "win" {
@@ -252,6 +274,7 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				PlayerTeamID: int(playerTeamID),
 				Format:       eventID,
 				Result:       matchResult,
+				ResultReason: resultReason,
 				CreatedAt:    matchTime,
 			}
 
@@ -263,6 +286,41 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 	}
 
 	return matches, nil
+}
+
+// normalizeResultReason normalizes MTGA result reason codes to readable descriptions.
+func normalizeResultReason(reason string) string {
+	// Map MTGA result codes to readable descriptions
+	reasonMap := map[string]string{
+		"Normal":             "normal",
+		"Concede":            "concede",
+		"Timeout":            "timeout",
+		"Draw":               "draw",
+		"Disconnect":         "disconnect",
+		"ConnectionLost":     "disconnect",
+		"OpponentConcede":    "opponent_concede",
+		"OpponentTimeout":    "opponent_timeout",
+		"OpponentDisconnect": "opponent_disconnect",
+		"LifeReducedToZero":  "life_zero",
+		"DeckEmpty":          "mill",
+		"PoisonCounters":     "poison",
+	}
+
+	// Try exact match first
+	if normalized, ok := reasonMap[reason]; ok {
+		return normalized
+	}
+
+	// Try case-insensitive match
+	reasonLower := strings.ToLower(reason)
+	for key, value := range reasonMap {
+		if strings.ToLower(key) == reasonLower {
+			return value
+		}
+	}
+
+	// Return lowercase version if no mapping found
+	return strings.ToLower(reason)
 }
 
 // parseLogTimestamp attempts to parse a timestamp from the log entry format.
@@ -322,6 +380,41 @@ func (s *Service) GetRecentMatches(ctx context.Context, days int) ([]*Match, err
 	end := time.Now()
 	start := end.Add(-time.Duration(days) * 24 * time.Hour)
 	return s.matches.GetByDateRange(ctx, start, end)
+}
+
+// GetMatches retrieves matches based on the given filter.
+func (s *Service) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
+	var start, end time.Time
+	if filter.StartDate != nil {
+		start = *filter.StartDate
+	} else {
+		// Default to all time if no start date
+		start = time.Time{}
+	}
+	if filter.EndDate != nil {
+		end = *filter.EndDate
+	} else {
+		// Default to now if no end date
+		end = time.Now()
+	}
+
+	matches, err := s.matches.GetByDateRange(ctx, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get matches: %w", err)
+	}
+
+	// Filter by format if specified
+	if filter.Format != nil {
+		filtered := []*models.Match{}
+		for _, match := range matches {
+			if match.Format == *filter.Format {
+				filtered = append(filtered, match)
+			}
+		}
+		return filtered, nil
+	}
+
+	return matches, nil
 }
 
 // StoreDeck stores a complete deck with its cards.
