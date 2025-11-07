@@ -108,6 +108,7 @@ func main() {
 	profile, inventory, rank := logreader.ParseAll(entries)
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
+	collection, _ := logreader.ParseCollection(entries)
 
 	// Store arena stats persistently (with deduplication)
 	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
@@ -368,7 +369,13 @@ func main() {
 	// Display arena statistics - both current session and all-time
 	displayArenaStatistics(arenaStats, service, ctx)
 
-	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil {
+	// Display card collection
+	if collection != nil && len(collection.Cards) > 0 {
+		fmt.Println()
+		displayCollection(collection)
+	}
+
+	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil && (collection == nil || len(collection.Cards) == 0) {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}
@@ -638,6 +645,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			displayWeeklyStats(service, ctx)
 		case "monthly", "month", "m":
 			displayMonthlyStats(service, ctx)
+		case "collection", "col", "c":
+			// Refresh collection from log file
+			refreshCollection(ctx, logPath)
 		case "help", "h":
 			printHelp()
 		default:
@@ -691,6 +701,44 @@ func refreshStatistics(service *storage.Service, ctx context.Context, logPath st
 	displayArenaStatistics(arenaStats, service, ctx)
 }
 
+// refreshCollection refreshes and displays collection from the log file.
+func refreshCollection(ctx context.Context, logPath string) {
+	fmt.Println("\nRefreshing collection...")
+
+	// Create a reader
+	reader, err := logreader.NewReader(logPath)
+	if err != nil {
+		fmt.Printf("Error creating log reader: %v\n", err)
+		return
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
+
+	// Read all JSON entries
+	entries, err := reader.ReadAllJSON()
+	if err != nil {
+		fmt.Printf("Error reading log entries: %v\n", err)
+		return
+	}
+
+	// Parse collection
+	collection, err := logreader.ParseCollection(entries)
+	if err != nil {
+		fmt.Printf("Error parsing collection: %v\n", err)
+		return
+	}
+
+	// Display collection
+	if collection != nil && len(collection.Cards) > 0 {
+		displayCollection(collection)
+	} else {
+		fmt.Println("No collection data found in log file.")
+	}
+}
+
 // printHelp displays available commands.
 func printHelp() {
 	fmt.Println("\nAvailable commands:")
@@ -698,6 +746,7 @@ func printHelp() {
 	fmt.Println("  refresh, r - Refresh and display statistics")
 	fmt.Println("  weekly, week, w - Display weekly statistics")
 	fmt.Println("  monthly, month, m - Display monthly statistics")
+	fmt.Println("  collection, col, c - Refresh and display card collection")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
