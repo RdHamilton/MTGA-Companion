@@ -22,6 +22,12 @@ func main() {
 		return
 	}
 
+	// Check if this is a backup command
+	if len(os.Args) > 1 && os.Args[1] == "backup" {
+		runBackupCommand()
+		return
+	}
+
 	// Initialize database
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -538,6 +544,8 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "draftpicks", "picks":
 			// Display draft picks
 			refreshDraftPicks(ctx, logPath)
+		case "backup", "b":
+			runBackupCommandInteractive(service, ctx)
 		case "help", "h":
 			printHelp()
 		default:
@@ -764,6 +772,7 @@ func printHelp() {
 	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
 	fmt.Println("  draft, drafts, draftstats - Display draft statistics")
 	fmt.Println("  draftpicks, picks - Display draft picks")
+	fmt.Println("  backup, b  - Create or manage database backups")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
@@ -914,4 +923,267 @@ func printMigrationUsage() {
 	fmt.Println("  mtga-companion migrate status")
 	fmt.Println("  mtga-companion migrate goto 1")
 	fmt.Println("  MTGA_DB_PATH=/tmp/test.db mtga-companion migrate up")
+}
+
+// runBackupCommand handles backup and restore commands.
+func runBackupCommand() {
+	// Get database path from environment or use default
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Check if database exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		log.Fatalf("Database file does not exist: %s", dbPath)
+	}
+
+	// Create backup manager
+	backupMgr := storage.NewBackupManager(dbPath)
+
+	if len(os.Args) < 3 {
+		printBackupUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "create", "backup":
+		// Get backup directory from environment or use default
+		backupDir := os.Getenv("MTGA_BACKUP_DIR")
+		backupName := ""
+		if len(os.Args) >= 4 {
+			backupName = os.Args[3]
+		}
+
+		config := storage.DefaultBackupConfig()
+		config.BackupDir = backupDir
+		config.BackupName = backupName
+		config.VerifyBackup = true
+
+		fmt.Println("Creating database backup...")
+		backupPath, err := backupMgr.Backup(config)
+		if err != nil {
+			log.Fatalf("Error creating backup: %v", err)
+		}
+
+		fmt.Printf("Backup created successfully: %s\n", backupPath)
+
+		// Calculate and display backup size
+		info, err := os.Stat(backupPath)
+		if err == nil {
+			sizeMB := float64(info.Size()) / (1024 * 1024)
+			fmt.Printf("Backup size: %.2f MB\n", sizeMB)
+		}
+
+	case "restore":
+		if len(os.Args) < 4 {
+			fmt.Println("Error: restore command requires a backup file path")
+			fmt.Println("Usage: mtga-companion backup restore <backup-file>")
+			os.Exit(1)
+		}
+		backupPath := os.Args[3]
+
+		fmt.Println("WARNING: This will overwrite the current database!")
+		fmt.Printf("Database: %s\n", dbPath)
+		fmt.Printf("Backup:   %s\n", backupPath)
+		fmt.Print("\nAre you sure you want to continue? (yes/no): ")
+
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatalf("Error reading input: %v", err)
+		}
+
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "yes" && response != "y" {
+			fmt.Println("Restore cancelled.")
+			return
+		}
+
+		fmt.Println("\nRestoring database from backup...")
+		if err := backupMgr.Restore(backupPath); err != nil {
+			log.Fatalf("Error restoring backup: %v", err)
+		}
+
+		fmt.Println("Database restored successfully!")
+
+	case "list", "ls":
+		backupDir := os.Getenv("MTGA_BACKUP_DIR")
+		if backupDir == "" {
+			backupDir = backupMgr.GetBackupDir()
+		}
+
+		fmt.Println("Listing backups...")
+		backups, err := backupMgr.ListBackups(backupDir)
+		if err != nil {
+			log.Fatalf("Error listing backups: %v", err)
+		}
+
+		if len(backups) == 0 {
+			fmt.Println("No backups found.")
+			return
+		}
+
+		fmt.Printf("\nFound %d backup(s):\n\n", len(backups))
+		for i, backup := range backups {
+			sizeMB := float64(backup.Size) / (1024 * 1024)
+			fmt.Printf("%d. %s\n", i+1, backup.Name)
+			fmt.Printf("   Path:     %s\n", backup.Path)
+			fmt.Printf("   Size:     %.2f MB\n", sizeMB)
+			fmt.Printf("   Modified: %s\n", backup.ModTime.Format("2006-01-02 15:04:05"))
+			fmt.Printf("   Checksum: %s\n", backup.Checksum)
+			fmt.Println()
+		}
+
+	case "verify":
+		if len(os.Args) < 4 {
+			fmt.Println("Error: verify command requires a backup file path")
+			fmt.Println("Usage: mtga-companion backup verify <backup-file>")
+			os.Exit(1)
+		}
+		backupPath := os.Args[3]
+
+		fmt.Printf("Verifying backup: %s\n", backupPath)
+		if err := backupMgr.VerifyBackup(backupPath); err != nil {
+			log.Fatalf("Backup verification failed: %v", err)
+		}
+
+		fmt.Println("Backup verification successful!")
+
+	default:
+		fmt.Printf("Unknown backup command: %s\n\n", command)
+		printBackupUsage()
+		os.Exit(1)
+	}
+}
+
+func printBackupUsage() {
+	fmt.Println("Usage: mtga-companion backup <command> [options]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  create, backup [name]  - Create a new backup (optional name)")
+	fmt.Println("  restore <backup-file>  - Restore database from backup")
+	fmt.Println("  list, ls               - List all available backups")
+	fmt.Println("  verify <backup-file>    - Verify backup integrity")
+	fmt.Println()
+	fmt.Println("Environment variables:")
+	fmt.Println("  MTGA_DB_PATH     - Path to the database file (default: ~/.mtga-companion/data.db)")
+	fmt.Println("  MTGA_BACKUP_DIR  - Directory for backups (default: ~/.mtga-companion/backups)")
+	fmt.Println()
+}
+
+// runBackupCommandInteractive handles backup commands from the interactive console.
+func runBackupCommandInteractive(service *storage.Service, ctx context.Context) {
+	// Get database path from service
+	// We need to get it from the environment or use default
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Printf("Error getting home directory: %v\n", err)
+			return
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Create backup manager
+	backupMgr := storage.NewBackupManager(dbPath)
+
+	fmt.Println("\nBackup Management")
+	fmt.Println("-----------------")
+	fmt.Println("1. Create backup")
+	fmt.Println("2. List backups")
+	fmt.Println("3. Verify backup")
+	fmt.Print("\nSelect option (1-3) or 'cancel' to go back: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		return
+	}
+
+	choice := strings.TrimSpace(strings.ToLower(input))
+
+	switch choice {
+	case "1", "create", "backup":
+		backupDir := os.Getenv("MTGA_BACKUP_DIR")
+		config := storage.DefaultBackupConfig()
+		config.BackupDir = backupDir
+		config.VerifyBackup = true
+
+		fmt.Println("\nCreating database backup...")
+		backupPath, err := backupMgr.Backup(config)
+		if err != nil {
+			fmt.Printf("Error creating backup: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Backup created successfully: %s\n", backupPath)
+
+		// Calculate and display backup size
+		info, err := os.Stat(backupPath)
+		if err == nil {
+			sizeMB := float64(info.Size()) / (1024 * 1024)
+			fmt.Printf("Backup size: %.2f MB\n", sizeMB)
+		}
+
+	case "2", "list", "ls":
+		backupDir := os.Getenv("MTGA_BACKUP_DIR")
+		if backupDir == "" {
+			backupDir = backupMgr.GetBackupDir()
+		}
+
+		fmt.Println("\nListing backups...")
+		backups, err := backupMgr.ListBackups(backupDir)
+		if err != nil {
+			fmt.Printf("Error listing backups: %v\n", err)
+			return
+		}
+
+		if len(backups) == 0 {
+			fmt.Println("No backups found.")
+			return
+		}
+
+		fmt.Printf("\nFound %d backup(s):\n\n", len(backups))
+		for i, backup := range backups {
+			sizeMB := float64(backup.Size) / (1024 * 1024)
+			fmt.Printf("%d. %s\n", i+1, backup.Name)
+			fmt.Printf("   Path:     %s\n", backup.Path)
+			fmt.Printf("   Size:     %.2f MB\n", sizeMB)
+			fmt.Printf("   Modified: %s\n", backup.ModTime.Format("2006-01-02 15:04:05"))
+			fmt.Printf("   Checksum: %s\n", backup.Checksum)
+			fmt.Println()
+		}
+
+	case "3", "verify":
+		fmt.Print("Enter backup file path: ")
+		backupPath, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf("Error reading input: %v\n", err)
+			return
+		}
+		backupPath = strings.TrimSpace(backupPath)
+
+		fmt.Printf("\nVerifying backup: %s\n", backupPath)
+		if err := backupMgr.VerifyBackup(backupPath); err != nil {
+			fmt.Printf("Backup verification failed: %v\n", err)
+			return
+		}
+
+		fmt.Println("Backup verification successful!")
+
+	case "cancel", "c", "back":
+		return
+
+	default:
+		fmt.Printf("Unknown option: %s\n", choice)
+	}
 }

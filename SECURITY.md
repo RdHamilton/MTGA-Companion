@@ -93,3 +93,4 @@ Security updates will be released as:
 
 Thank you for helping keep MTGA-Companion secure! Your responsible disclosure helps protect all users of the application.
 
+

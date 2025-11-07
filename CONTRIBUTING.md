@@ -251,3 +251,4 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 Contributions of all kinds are welcome - code, documentation, bug reports, feature suggestions, and more. Thank you for helping make MTGA-Companion better!
 
+

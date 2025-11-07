@@ -197,3 +197,4 @@ func TestParseDecks_FromLogFile(t *testing.T) {
 		t.Errorf("ParseDecks() deck name = %s, want Test Deck", deck.Name)
 	}
 }
+

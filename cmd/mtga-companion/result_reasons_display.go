@@ -143,3 +143,4 @@ func displayResultReasons(service *storage.Service, ctx context.Context) {
 		displayResultBreakdown(lossBreakdown, false)
 	}
 }
+
