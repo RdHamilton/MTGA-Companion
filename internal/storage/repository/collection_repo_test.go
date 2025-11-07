@@ -44,7 +44,11 @@ func setupCollectionTestDB(t *testing.T) *sql.DB {
 
 func TestCollectionRepository_UpsertCard(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
@@ -84,7 +88,11 @@ func TestCollectionRepository_UpsertCard(t *testing.T) {
 
 func TestCollectionRepository_GetCard(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
@@ -116,7 +124,11 @@ func TestCollectionRepository_GetCard(t *testing.T) {
 
 func TestCollectionRepository_GetAll(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
