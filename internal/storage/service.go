@@ -45,6 +45,10 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 		return fmt.Errorf("failed to extract matches: %w", err)
 	}
 
+	// Correlate ranks with matches
+	rankSnapshots := extractRankSnapshots(entries)
+	correlateRanksWithMatches(matchesToStore, rankSnapshots)
+
 	// Store matches with deduplication
 	for _, matchData := range matchesToStore {
 		// Check if match already exists (deduplication)
