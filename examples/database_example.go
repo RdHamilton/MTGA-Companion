@@ -41,11 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 
 	// Create service
 	service := storage.NewService(db)
@@ -63,11 +59,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}
-	defer func() {
-		if err := reader.Close(); err != nil {
-			log.Printf("Error closing reader: %v", err)
-		}
-	}()
+	defer reader.Close()
 
 	entries, err := reader.ReadAllJSON()
 	if err != nil {
@@ -86,7 +78,7 @@ func main() {
 		fmt.Println("\nStoring arena statistics...")
 
 		// Store stats in database
-		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
+		if err := service.StoreArenaStats(ctx, arenaStats); err != nil {
 			log.Fatalf("Failed to store arena stats: %v", err)
 		}
 

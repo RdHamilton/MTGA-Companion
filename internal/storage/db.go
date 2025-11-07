@@ -92,18 +92,14 @@ func Open(config *Config) (*DB, error) {
 
 	// Verify connection
 	if err := conn.Ping(); err != nil {
-		if closeErr := conn.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close database after ping error: %w (original error: %v)", closeErr, err)
-		}
+		conn.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	// Run migrations if auto-migrate is enabled
 	if config.AutoMigrate {
 		// Close the connection temporarily for migration
-		if err := conn.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close database for migration: %w", err)
-		}
+		conn.Close()
 
 		// Run migrations
 		mgr, err := NewMigrationManager(config.Path)
@@ -112,9 +108,7 @@ func Open(config *Config) (*DB, error) {
 		}
 
 		if err := mgr.Up(); err != nil {
-			if closeErr := mgr.Close(); closeErr != nil {
-				return nil, fmt.Errorf("failed to close migration manager after error: %w (original error: %v)", closeErr, err)
-			}
+			mgr.Close()
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 
@@ -135,9 +129,7 @@ func Open(config *Config) (*DB, error) {
 
 		// Verify connection again
 		if err := conn.Ping(); err != nil {
-			if closeErr := conn.Close(); closeErr != nil {
-				return nil, fmt.Errorf("failed to close database after ping error: %w (original error: %v)", closeErr, err)
-			}
+			conn.Close()
 			return nil, fmt.Errorf("failed to ping database after migrations: %w", err)
 		}
 	}

@@ -81,11 +81,7 @@ Plain text line without JSON
 		if err != nil {
 			t.Fatalf("NewReader() error = %v", err)
 		}
-		defer func() {
-			if err := r.Close(); err != nil {
-				t.Errorf("Error closing reader: %v", err)
-			}
-		}()
+		defer r.Close()
 
 		if r == nil {
 			t.Fatal("NewReader() returned nil reader")
@@ -97,11 +93,7 @@ Plain text line without JSON
 		if err != nil {
 			t.Fatalf("NewReader() error = %v", err)
 		}
-		defer func() {
-			if err := r.Close(); err != nil {
-				t.Errorf("Error closing reader: %v", err)
-			}
-		}()
+		defer r.Close()
 
 		// Read first entry
 		entry, err := r.ReadEntry()
@@ -118,11 +110,7 @@ Plain text line without JSON
 		if err != nil {
 			t.Fatalf("NewReader() error = %v", err)
 		}
-		defer func() {
-			if err := r.Close(); err != nil {
-				t.Errorf("Error closing reader: %v", err)
-			}
-		}()
+		defer r.Close()
 
 		entries, err := r.ReadAll()
 		if err != nil {
@@ -139,11 +127,7 @@ Plain text line without JSON
 		if err != nil {
 			t.Fatalf("NewReader() error = %v", err)
 		}
-		defer func() {
-			if err := r.Close(); err != nil {
-				t.Errorf("Error closing reader: %v", err)
-			}
-		}()
+		defer r.Close()
 
 		entries, err := r.ReadAllJSON()
 		if err != nil {
@@ -168,11 +152,7 @@ Plain text line without JSON
 		if err != nil {
 			t.Fatalf("NewReader() error = %v", err)
 		}
-		defer func() {
-			if err := r.Close(); err != nil {
-				t.Errorf("Error closing reader: %v", err)
-			}
-		}()
+		defer r.Close()
 
 		// Read all entries
 		for {

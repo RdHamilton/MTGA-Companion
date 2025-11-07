@@ -298,4 +298,3 @@ func (bm *BackupManager) GetBackupDir() string {
 	dbDir := filepath.Dir(bm.dbPath)
 	return filepath.Join(dbDir, "backups")
 }
-

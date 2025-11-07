@@ -110,4 +110,3 @@ func displayDraftPicks(picks *logreader.DraftPicks) {
 
 	fmt.Println()
 }
-

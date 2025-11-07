@@ -446,15 +446,14 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 				playerWon := int(playerTeamID) == int(winningTeamID)
 
 				// Update overall stats based on scope
-				switch scope {
-				case "MatchScope_Match":
+				if scope == "MatchScope_Match" {
 					stats.TotalMatches++
 					if playerWon {
 						stats.MatchWins++
 					} else {
 						stats.MatchLosses++
 					}
-				case "MatchScope_Game":
+				} else if scope == "MatchScope_Game" {
 					stats.TotalGames++
 					if playerWon {
 						stats.GameWins++
@@ -471,15 +470,14 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 				}
 
 				formatStat := stats.FormatStats[eventID]
-				switch scope {
-				case "MatchScope_Match":
+				if scope == "MatchScope_Match" {
 					formatStat.MatchesPlayed++
 					if playerWon {
 						formatStat.MatchWins++
 					} else {
 						formatStat.MatchLosses++
 					}
-				case "MatchScope_Game":
+				} else if scope == "MatchScope_Game" {
 					formatStat.GamesPlayed++
 					if playerWon {
 						formatStat.GameWins++

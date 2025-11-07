@@ -162,4 +162,3 @@ func generatePeriods(startDate, endDate time.Time, periodType string) []TrendPer
 
 	return periods
 }
-
