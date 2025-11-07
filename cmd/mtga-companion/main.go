@@ -373,9 +373,35 @@ func main() {
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}
 
+	// Start log file poller for real-time updates
+	fmt.Println("\nStarting log file poller for real-time updates...")
+	pollerConfig := logreader.DefaultPollerConfig(logPath)
+	pollerConfig.Interval = 2 * time.Second
+	poller, err := logreader.NewPoller(pollerConfig)
+	if err != nil {
+		log.Printf("Warning: Failed to create poller: %v", err)
+		log.Println("Continuing without real-time updates...")
+		// Fall back to interactive console without poller
+		fmt.Println("\nType 'exit' to quit, or press Enter to refresh statistics.")
+		runInteractiveConsole(service, ctx, logPath, nil)
+		return
+	}
+	defer poller.Stop()
+
+	// Start poller
+	updates := poller.Start()
+	errChan := poller.Errors()
+
+	// Start background goroutine to process updates
+	pollerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go processPollerUpdates(pollerCtx, updates, errChan, service, logPath)
+
 	// Interactive console loop
 	fmt.Println("\nType 'exit' to quit, or press Enter to refresh statistics.")
-	runInteractiveConsole(service, ctx, logPath)
+	fmt.Println("Statistics will update automatically as new log entries are detected.")
+	runInteractiveConsole(service, ctx, logPath, poller)
 }
 
 // displayArenaStatistics displays both current session and all-time statistics.
@@ -529,8 +555,59 @@ func displayMonthlyStats(service *storage.Service, ctx context.Context) {
 	}
 }
 
+// processPollerUpdates processes new log entries from the poller in the background.
+func processPollerUpdates(ctx context.Context, updates <-chan *logreader.LogEntry, errChan <-chan error, service *storage.Service, logPath string) {
+	var entryBuffer []*logreader.LogEntry
+	ticker := time.NewTicker(5 * time.Second) // Batch process every 5 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-updates:
+			if !ok {
+				return
+			}
+			// Buffer entries for batch processing
+			entryBuffer = append(entryBuffer, entry)
+		case err, ok := <-errChan:
+			if !ok {
+				return
+			}
+			log.Printf("Poller error: %v", err)
+		case <-ticker.C:
+			// Process buffered entries
+			if len(entryBuffer) > 0 {
+				processNewEntries(ctx, entryBuffer, service)
+				entryBuffer = nil // Clear buffer
+			}
+		}
+	}
+}
+
+// processNewEntries processes new log entries and updates statistics.
+func processNewEntries(ctx context.Context, entries []*logreader.LogEntry, service *storage.Service) {
+	// Parse arena stats from new entries
+	arenaStats, err := logreader.ParseArenaStats(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse arena stats from new entries: %v", err)
+		return
+	}
+
+	// Store new stats if we have match data
+	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
+		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
+			log.Printf("Warning: Failed to store arena stats from poller: %v", err)
+		} else {
+			log.Printf("Updated statistics: %d new matches, %d new games",
+				arenaStats.TotalMatches, arenaStats.TotalGames)
+		}
+	}
+}
+
 // runInteractiveConsole runs an interactive console loop that waits for user input.
-func runInteractiveConsole(service *storage.Service, ctx context.Context, logPath string) {
+func runInteractiveConsole(service *storage.Service, ctx context.Context, logPath string, poller *logreader.Poller) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -549,6 +626,10 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		command := strings.ToLower(input)
 		switch command {
 		case "exit", "quit", "q":
+			fmt.Println("Stopping poller...")
+			if poller != nil {
+				poller.Stop()
+			}
 			fmt.Println("Goodbye!")
 			return
 		case "refresh", "r":
