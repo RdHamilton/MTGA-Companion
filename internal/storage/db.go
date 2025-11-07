@@ -45,6 +45,10 @@ type Config struct {
 	// Options: OFF, NORMAL, FULL, EXTRA
 	// Default: NORMAL for good balance of safety and performance
 	Synchronous string
+
+	// AutoMigrate automatically runs pending database migrations on Open.
+	// Default: false (migrations must be run manually)
+	AutoMigrate bool
 }
 
 // DefaultConfig returns a Config with sensible default values.
@@ -90,6 +94,44 @@ func Open(config *Config) (*DB, error) {
 	if err := conn.Ping(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	// Run migrations if auto-migrate is enabled
+	if config.AutoMigrate {
+		// Close the connection temporarily for migration
+		conn.Close()
+
+		// Run migrations
+		mgr, err := NewMigrationManager(config.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create migration manager: %w", err)
+		}
+
+		if err := mgr.Up(); err != nil {
+			mgr.Close()
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
+		}
+
+		if err := mgr.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close migration manager: %w", err)
+		}
+
+		// Reopen the connection
+		conn, err = sql.Open("sqlite", dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reopen database after migrations: %w", err)
+		}
+
+		// Reconfigure connection pool
+		conn.SetMaxOpenConns(config.MaxOpenConns)
+		conn.SetMaxIdleConns(config.MaxIdleConns)
+		conn.SetConnMaxLifetime(config.ConnMaxLifetime)
+
+		// Verify connection again
+		if err := conn.Ping(); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to ping database after migrations: %w", err)
+		}
 	}
 
 	return &DB{conn: conn}, nil
