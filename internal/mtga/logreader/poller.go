@@ -6,26 +6,31 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 // Poller monitors a log file for new entries and sends them through a channel.
 // It tracks file position to only read new entries and handles log file rotation.
 type Poller struct {
-	path      string
-	interval  time.Duration
-	lastPos   int64
-	lastSize  int64
-	lastMod   time.Time
-	mu        sync.RWMutex
-	ctx       context.Context
-	cancel    context.CancelFunc
-	updates   chan *LogEntry
-	errChan   chan error
-	done      chan struct{}
-	running   bool
-	runningMu sync.RWMutex
+	path          string
+	interval      time.Duration
+	useFileEvents bool
+	watcher       *fsnotify.Watcher
+	lastPos       int64
+	lastSize      int64
+	lastMod       time.Time
+	mu            sync.RWMutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	updates       chan *LogEntry
+	errChan       chan error
+	done          chan struct{}
+	running       bool
+	runningMu     sync.RWMutex
 }
 
 // PollerConfig holds configuration for a Poller.
@@ -33,21 +38,29 @@ type PollerConfig struct {
 	// Path is the path to the log file to monitor.
 	Path string
 
-	// Interval is how often to check for new entries.
+	// Interval is how often to check for new entries when using polling,
+	// or how often to perform fallback checks when using file events.
 	// Default: 2 seconds
 	Interval time.Duration
 
 	// BufferSize is the size of the updates channel buffer.
 	// Default: 100
 	BufferSize int
+
+	// UseFileEvents enables file system event monitoring (fsnotify) for more
+	// efficient log file monitoring. Falls back to periodic polling if file
+	// events are unavailable or fail.
+	// Default: true
+	UseFileEvents bool
 }
 
 // DefaultPollerConfig returns a PollerConfig with sensible defaults.
 func DefaultPollerConfig(path string) *PollerConfig {
 	return &PollerConfig{
-		Path:       path,
-		Interval:   2 * time.Second,
-		BufferSize: 100,
+		Path:          path,
+		Interval:      2 * time.Second,
+		BufferSize:    100,
+		UseFileEvents: true,
 	}
 }
 
@@ -70,13 +83,14 @@ func NewPoller(config *PollerConfig) (*Poller, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	poller := &Poller{
-		path:     config.Path,
-		interval: config.Interval,
-		ctx:      ctx,
-		cancel:   cancel,
-		updates:  make(chan *LogEntry, config.BufferSize),
-		errChan:  make(chan error, 1),
-		done:     make(chan struct{}),
+		path:          config.Path,
+		interval:      config.Interval,
+		useFileEvents: config.UseFileEvents,
+		ctx:           ctx,
+		cancel:        cancel,
+		updates:       make(chan *LogEntry, config.BufferSize),
+		errChan:       make(chan error, 1),
+		done:          make(chan struct{}),
 	}
 
 	// Initialize position tracking
@@ -150,6 +164,116 @@ func (p *Poller) poll() {
 	defer close(p.done)
 	defer close(p.updates)
 
+	// Try to use file system events if enabled
+	if p.useFileEvents {
+		if err := p.setupWatcher(); err != nil {
+			// Failed to setup watcher, fall back to polling
+			p.sendError(fmt.Errorf("failed to setup file watcher, falling back to polling: %w", err))
+			p.pollWithTimer()
+			return
+		}
+		defer p.cleanupWatcher()
+		p.pollWithEvents()
+	} else {
+		// Use timer-based polling
+		p.pollWithTimer()
+	}
+}
+
+// setupWatcher initializes the fsnotify watcher and adds the log file.
+func (p *Poller) setupWatcher() error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("create watcher: %w", err)
+	}
+
+	p.watcher = watcher
+
+	// Watch the parent directory to catch file creation events after rotation
+	// This is necessary because watching a file directly won't catch CREATE events
+	// after the file is removed and recreated
+	dir := filepath.Dir(p.path)
+	if err := p.watcher.Add(dir); err != nil {
+		_ = p.watcher.Close() //nolint:errcheck // Ignore error on cleanup
+		p.watcher = nil
+		return fmt.Errorf("watch directory: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupWatcher closes the fsnotify watcher.
+func (p *Poller) cleanupWatcher() {
+	if p.watcher != nil {
+		_ = p.watcher.Close()
+		p.watcher = nil
+	}
+}
+
+// pollWithEvents uses file system events for monitoring.
+func (p *Poller) pollWithEvents() {
+	// Use a ticker for fallback periodic checks (less frequent than pure polling)
+	// This ensures we don't miss events
+	ticker := time.NewTicker(p.interval * 5) // 5x less frequent
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+
+		case event, ok := <-p.watcher.Events:
+			if !ok {
+				// Watcher closed
+				return
+			}
+
+			// Handle different event types
+			switch {
+			case event.Has(fsnotify.Write):
+				// File was written to - check for updates
+				if err := p.checkForUpdates(); err != nil {
+					p.sendError(err)
+				}
+
+			case event.Has(fsnotify.Create):
+				// File was created (possibly after rotation)
+				// Check if it's our target file and read any new content
+				if event.Name == p.path {
+					// Check for updates immediately
+					if err := p.checkForUpdates(); err != nil {
+						p.sendError(err)
+					}
+				}
+
+			case event.Has(fsnotify.Remove), event.Has(fsnotify.Rename):
+				// File was removed or renamed (log rotation)
+				// Reset position tracking and wait for file to be recreated
+				p.mu.Lock()
+				p.lastPos = 0
+				p.lastSize = 0
+				p.lastMod = time.Time{}
+				p.mu.Unlock()
+			}
+
+		case err, ok := <-p.watcher.Errors:
+			if !ok {
+				// Watcher closed
+				return
+			}
+			p.sendError(fmt.Errorf("watcher error: %w", err))
+
+		case <-ticker.C:
+			// Fallback periodic check to ensure we don't miss anything
+			if err := p.checkForUpdates(); err != nil {
+				p.sendError(err)
+			}
+		}
+	}
+}
+
+// pollWithTimer uses timer-based polling (original implementation).
+func (p *Poller) pollWithTimer() {
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
 
@@ -159,14 +283,18 @@ func (p *Poller) poll() {
 			return
 		case <-ticker.C:
 			if err := p.checkForUpdates(); err != nil {
-				// Send error through error channel (non-blocking)
-				select {
-				case p.errChan <- err:
-				default:
-					// Error channel is full, skip
-				}
+				p.sendError(err)
 			}
 		}
+	}
+}
+
+// sendError sends an error through the error channel (non-blocking).
+func (p *Poller) sendError(err error) {
+	select {
+	case p.errChan <- err:
+	default:
+		// Error channel is full, skip
 	}
 }
 
