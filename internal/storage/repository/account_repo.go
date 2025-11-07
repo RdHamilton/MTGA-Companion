@@ -297,4 +297,3 @@ func (r *accountRepository) Delete(ctx context.Context, id int) error {
 	_, err = r.db.ExecContext(ctx, query, id)
 	return err
 }
-
