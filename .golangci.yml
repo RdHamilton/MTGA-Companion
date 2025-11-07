@@ -3,60 +3,10 @@
 
 version: "2"
 
-run:
-  # Exclude test files from linting
-  skip-files:
-    - ".*\\.test\\.go$"
-    - ".*_test\\.go$"
-  # Exclude test directories
-  skip-dirs:
-    - test
-    - tests
-
 issues:
-  # Exclude test files from all checks
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - staticcheck
-        - gocritic
-        - gosec
-        - gosimple
-        - govet
-        - ineffassign
-        - misspell
-        - stylecheck
-        - typecheck
-        - unconvert
-        - unparam
-        - unused
-        - varcheck
-        - whitespace
-        - wrapcheck
-        - wsl
-        - exportloopref
-        - gochecknoinits
-        - gochecknoglobals
-        - gofumpt
-        - revive
-        - errname
-        - errorlint
-        - forbidigo
-        - gci
-        - goheader
-        - gomnd
-        - gomodguard
-        - goprintffuncname
-        - lll
-        - maligned
-        - nakedret
-        - noctx
-        - nolintlint
-        - rowserrcheck
-        - scopelint
-        - sqlclosecheck
-        - structcheck
-        - tagliatelle
-        - thelper
-        - tparallel
+  # Exclude all issues from test files
+  exclude-use-default: false
+  exclude:
+    # Exclude all issues from test files
+    - ".*_test\\.go:.*"
+    - ".*\\.test\\.go:.*"
