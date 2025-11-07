@@ -59,7 +59,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
 
 	entries, err := reader.ReadAllJSON()
 	if err != nil {
