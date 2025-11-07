@@ -34,7 +34,8 @@ go.work.sum
 .idea/
 .vscode/
 
-# Claude Code specific files
+# AI specific files
 CLAUDE.md
 .claude/
 .reference-notes.md
+.cursorrules
