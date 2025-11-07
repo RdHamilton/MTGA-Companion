@@ -194,7 +194,7 @@ func (p *Poller) setupWatcher() error {
 	// after the file is removed and recreated
 	dir := filepath.Dir(p.path)
 	if err := p.watcher.Add(dir); err != nil {
-		p.watcher.Close()
+		_ = p.watcher.Close() //nolint:errcheck // Ignore error on cleanup
 		p.watcher = nil
 		return fmt.Errorf("watch directory: %w", err)
 	}
