@@ -50,7 +50,11 @@ func setupDeckTestDB(t *testing.T) *sql.DB {
 
 func TestDeckRepository_Create(t *testing.T) {
 	db := setupDeckTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewDeckRepository(db)
 	ctx := context.Background()
@@ -93,7 +97,11 @@ func TestDeckRepository_Create(t *testing.T) {
 
 func TestDeckRepository_Update(t *testing.T) {
 	db := setupDeckTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewDeckRepository(db)
 	ctx := context.Background()

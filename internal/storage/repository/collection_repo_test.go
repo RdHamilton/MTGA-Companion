@@ -340,7 +340,11 @@ func TestCollectionRepository_GetRecentChanges(t *testing.T) {
 
 func TestCollectionRepository_NegativeDelta(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
