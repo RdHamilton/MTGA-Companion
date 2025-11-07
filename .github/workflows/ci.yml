@@ -161,7 +161,7 @@ jobs:
       run: go build -v -o bin/mtga-companion ./cmd/mtga-companion
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: mtga-companion-linux
         path: bin/
