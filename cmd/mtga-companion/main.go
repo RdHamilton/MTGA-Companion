@@ -658,6 +658,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "decks", "deck", "d":
 			// Refresh decks from log file
 			refreshDecks(ctx, logPath)
+		case "trend", "trends", "t":
+			// Display trend analysis
+			displayTrendAnalysisForPeriod(service, ctx, 30, "weekly")
 		case "help", "h":
 			printHelp()
 		default:
@@ -796,6 +799,7 @@ func printHelp() {
 	fmt.Println("  monthly, month, m - Display monthly statistics")
 	fmt.Println("  collection, col, c - Refresh and display card collection")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
+	fmt.Println("  trend, trends, t - Display historical trend analysis")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
