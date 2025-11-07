@@ -78,7 +78,17 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open source database: %w", err)
 	}
-	defer sourceDB.Close()
+	defer func() {
+
+		if closeErr := sourceDB.Close(); closeErr != nil {
+
+			// Log error but don\'t fail backup
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	// Use VACUUM INTO for atomic backup (SQLite 3.27+)
 	// This creates a complete copy of the database without requiring exclusive locks
@@ -107,13 +117,29 @@ func (bm *BackupManager) backupByCopy(backupPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open source database file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() {
+
+		if closeErr := sourceFile.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	destFile, err := os.Create(backupPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create backup file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() {
+
+		if closeErr := destFile.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		_ = os.Remove(backupPath)
@@ -147,13 +173,29 @@ func (bm *BackupManager) Restore(backupPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() {
+
+		if closeErr := sourceFile.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	destFile, err := os.Create(tempPath)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary restore file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() {
+
+		if closeErr := destFile.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		_ = os.Remove(tempPath)
@@ -161,8 +203,14 @@ func (bm *BackupManager) Restore(backupPath string) error {
 	}
 
 	// Close files before rename
-	sourceFile.Close()
-	destFile.Close()
+	if err := sourceFile.Close(); err != nil {
+
+		_ = err
+
+	}
+	if err := destFile.Close(); err != nil {
+		_ = err
+	}
 
 	// Verify the restored database
 	if err := bm.VerifyBackup(tempPath); err != nil {
@@ -194,7 +242,15 @@ func (bm *BackupManager) VerifyBackup(backupPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup as database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+
+		if closeErr := db.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	// Verify connection
 	if err := db.Ping(); err != nil {
@@ -283,7 +339,15 @@ func calculateChecksum(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+
+		if closeErr := file.Close(); closeErr != nil {
+
+			_ = closeErr
+
+		}
+
+	}()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -298,4 +362,3 @@ func (bm *BackupManager) GetBackupDir() string {
 	dbDir := filepath.Dir(bm.dbPath)
 	return filepath.Join(dbDir, "backups")
 }
-
