@@ -147,7 +147,7 @@ func (r *deckRepository) List(ctx context.Context) ([]*models.Deck, error) {
 		return nil, fmt.Errorf("failed to list decks: %w", err)
 	}
 	defer func() {
-		_ = rows.Close() // Ignore error on cleanup
+		_ = rows.Close() //nolint:errcheck // Ignore error on cleanup
 	}()
 
 	var decks []*models.Deck
@@ -191,7 +191,7 @@ func (r *deckRepository) GetByFormat(ctx context.Context, format string) ([]*mod
 		return nil, fmt.Errorf("failed to get decks by format: %w", err)
 	}
 	defer func() {
-		_ = rows.Close() // Ignore error on cleanup
+		_ = rows.Close() //nolint:errcheck // Ignore error on cleanup
 	}()
 
 	var decks []*models.Deck
@@ -276,7 +276,7 @@ func (r *deckRepository) GetCards(ctx context.Context, deckID string) ([]*models
 		return nil, fmt.Errorf("failed to get deck cards: %w", err)
 	}
 	defer func() {
-		_ = rows.Close() // Ignore error on cleanup
+		_ = rows.Close() //nolint:errcheck // Ignore error on cleanup
 	}()
 
 	var cards []*models.DeckCard
