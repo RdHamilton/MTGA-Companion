@@ -205,13 +205,14 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				winningTeamID, _ := resultMap["winningTeamId"].(float64)
 				playerWon := int(playerTeamID) == int(winningTeamID)
 
-				if scope == "MatchScope_Match" {
+				switch scope {
+				case "MatchScope_Match":
 					if playerWon {
 						matchResult = "win"
 					} else {
 						matchResult = "loss"
 					}
-				} else if scope == "MatchScope_Game" {
+				case "MatchScope_Game":
 					game := &Game{
 						MatchID:    matchID,
 						GameNumber: gameNumber,
