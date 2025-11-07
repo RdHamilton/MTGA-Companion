@@ -19,8 +19,21 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	// Create tables (simplified schema for testing)
 	schema := `
+		CREATE TABLE accounts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			screen_name TEXT,
+			client_id TEXT,
+			is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0, 1)),
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		INSERT INTO accounts (name, is_default) VALUES ('Default Account', 1);
+
 		CREATE TABLE matches (
 			id TEXT PRIMARY KEY,
+			account_id INTEGER NOT NULL,
 			event_id TEXT NOT NULL,
 			event_name TEXT NOT NULL,
 			timestamp DATETIME NOT NULL,
@@ -34,7 +47,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			format TEXT NOT NULL,
 			result TEXT NOT NULL,
 			result_reason TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (account_id) REFERENCES accounts(id)
 		);
 
 		CREATE INDEX idx_matches_timestamp ON matches(timestamp);
@@ -68,6 +82,7 @@ func TestMatchRepository_Create(t *testing.T) {
 
 	match := &models.Match{
 		ID:           "match-1",
+		AccountID:    1,
 		EventID:      "event-1",
 		EventName:    "Standard Ranked",
 		Timestamp:    time.Now(),
@@ -113,6 +128,7 @@ func TestMatchRepository_CreateGame(t *testing.T) {
 	// Create a match first
 	match := &models.Match{
 		ID:           "match-1",
+		AccountID:    1,
 		EventID:      "event-1",
 		EventName:    "Standard Ranked",
 		Timestamp:    time.Now(),
@@ -256,7 +272,7 @@ func TestMatchRepository_GetByDateRange(t *testing.T) {
 	}
 
 	// Query for yesterday to tomorrow
-	results, err := repo.GetByDateRange(ctx, yesterday.Add(-1*time.Hour), tomorrow)
+	results, err := repo.GetByDateRange(ctx, yesterday.Add(-1*time.Hour), tomorrow, 0)
 	if err != nil {
 		t.Fatalf("failed to get matches by date range: %v", err)
 	}
@@ -266,7 +282,7 @@ func TestMatchRepository_GetByDateRange(t *testing.T) {
 	}
 
 	// Query for only today
-	results, err = repo.GetByDateRange(ctx, now.Add(-1*time.Hour), now.Add(1*time.Hour))
+	results, err = repo.GetByDateRange(ctx, now.Add(-1*time.Hour), now.Add(1*time.Hour), 0)
 	if err != nil {
 		t.Fatalf("failed to get matches by date range: %v", err)
 	}
@@ -320,7 +336,7 @@ func TestMatchRepository_GetByFormat(t *testing.T) {
 	}
 
 	// Query for Standard format
-	results, err := repo.GetByFormat(ctx, "Standard")
+	results, err := repo.GetByFormat(ctx, "Standard", 0)
 	if err != nil {
 		t.Fatalf("failed to get matches by format: %v", err)
 	}

@@ -4,13 +4,13 @@ import "time"
 
 // Account represents a player account.
 type Account struct {
-	ID          int
-	Name        string
-	ScreenName  *string // Nullable
-	ClientID    *string // Nullable
-	IsDefault   bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID         int
+	Name       string
+	ScreenName *string // Nullable
+	ClientID   *string // Nullable
+	IsDefault  bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // Match represents a single match in MTGA.
@@ -133,7 +133,7 @@ type DraftEvent struct {
 
 // StatsFilter provides filtering options for statistics queries.
 type StatsFilter struct {
-	AccountID *int      // Filter by account ID, nil means all accounts
+	AccountID *int // Filter by account ID, nil means all accounts
 	StartDate *time.Time
 	EndDate   *time.Time
 	Format    *string

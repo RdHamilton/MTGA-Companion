@@ -79,15 +79,11 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 		return "", fmt.Errorf("failed to open source database: %w", err)
 	}
 	defer func() {
-
 		if closeErr := sourceDB.Close(); closeErr != nil {
-
 			// Log error but don\'t fail backup
 
 			_ = closeErr
-
 		}
-
 	}()
 
 	// Use VACUUM INTO for atomic backup (SQLite 3.27+)
@@ -118,13 +114,9 @@ func (bm *BackupManager) backupByCopy(backupPath string) (string, error) {
 		return "", fmt.Errorf("failed to open source database file: %w", err)
 	}
 	defer func() {
-
 		if closeErr := sourceFile.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	destFile, err := os.Create(backupPath)
@@ -132,13 +124,9 @@ func (bm *BackupManager) backupByCopy(backupPath string) (string, error) {
 		return "", fmt.Errorf("failed to create backup file: %w", err)
 	}
 	defer func() {
-
 		if closeErr := destFile.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
@@ -174,13 +162,9 @@ func (bm *BackupManager) Restore(backupPath string) error {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
 	defer func() {
-
 		if closeErr := sourceFile.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	destFile, err := os.Create(tempPath)
@@ -188,13 +172,9 @@ func (bm *BackupManager) Restore(backupPath string) error {
 		return fmt.Errorf("failed to create temporary restore file: %w", err)
 	}
 	defer func() {
-
 		if closeErr := destFile.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
@@ -204,9 +184,7 @@ func (bm *BackupManager) Restore(backupPath string) error {
 
 	// Close files before rename
 	if err := sourceFile.Close(); err != nil {
-
 		_ = err
-
 	}
 	if err := destFile.Close(); err != nil {
 		_ = err
@@ -243,13 +221,9 @@ func (bm *BackupManager) VerifyBackup(backupPath string) error {
 		return fmt.Errorf("failed to open backup as database: %w", err)
 	}
 	defer func() {
-
 		if closeErr := db.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	// Verify connection
@@ -340,13 +314,9 @@ func calculateChecksum(filePath string) (string, error) {
 		return "", err
 	}
 	defer func() {
-
 		if closeErr := file.Close(); closeErr != nil {
-
 			_ = closeErr
-
 		}
-
 	}()
 
 	hash := sha256.New()

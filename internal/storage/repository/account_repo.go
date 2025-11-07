@@ -240,7 +240,11 @@ func (r *accountRepository) setDefaultOnly(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			_ = rollbackErr
+		}
+	}()
 
 	// Unset all defaults
 	_, err = tx.ExecContext(ctx, "UPDATE accounts SET is_default = 0")

@@ -14,12 +14,12 @@ import (
 
 // Service provides high-level operations for storing and retrieving MTGA data.
 type Service struct {
-	db         *DB
-	matches    repository.MatchRepository
-	stats      repository.StatsRepository
-	decks      repository.DeckRepository
-	collection repository.CollectionRepository
-	accounts   repository.AccountRepository
+	db               *DB
+	matches          repository.MatchRepository
+	stats            repository.StatsRepository
+	decks            repository.DeckRepository
+	collection       repository.CollectionRepository
+	accounts         repository.AccountRepository
 	currentAccountID int // Current active account ID
 }
 
@@ -33,7 +33,7 @@ func NewService(db *DB) *Service {
 		collection: repository.NewCollectionRepository(db.Conn()),
 		accounts:   repository.NewAccountRepository(db.Conn()),
 	}
-	
+
 	// Initialize default account if it doesn't exist
 	ctx := context.Background()
 	defaultAccount, err := svc.accounts.GetDefault(ctx)
@@ -58,7 +58,7 @@ func NewService(db *DB) *Service {
 	if defaultAccount != nil {
 		svc.currentAccountID = defaultAccount.ID
 	}
-	
+
 	return svc
 }
 
@@ -559,12 +559,12 @@ func (s *Service) GetCurrentAccountID() int {
 func (s *Service) CreateAccount(ctx context.Context, name string, screenName, clientID *string) (*models.Account, error) {
 	now := time.Now()
 	account := &models.Account{
-		Name:      name,
+		Name:       name,
 		ScreenName: screenName,
 		ClientID:   clientID,
-		IsDefault: false,
-		CreatedAt: now,
-		UpdatedAt: now,
+		IsDefault:  false,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	if err := s.accounts.Create(ctx, account); err != nil {
 		return nil, fmt.Errorf("failed to create account: %w", err)
