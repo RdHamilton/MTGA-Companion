@@ -13,19 +13,19 @@ import (
 // Poller monitors a log file for new entries and sends them through a channel.
 // It tracks file position to only read new entries and handles log file rotation.
 type Poller struct {
-	path       string
-	interval   time.Duration
-	lastPos    int64
-	lastSize   int64
-	lastMod    time.Time
-	mu         sync.RWMutex
-	ctx        context.Context
-	cancel     context.CancelFunc
-	updates    chan *LogEntry
-	errChan    chan error
-	done       chan struct{}
-	running    bool
-	runningMu  sync.RWMutex
+	path      string
+	interval  time.Duration
+	lastPos   int64
+	lastSize  int64
+	lastMod   time.Time
+	mu        sync.RWMutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	updates   chan *LogEntry
+	errChan   chan error
+	done      chan struct{}
+	running   bool
+	runningMu sync.RWMutex
 }
 
 // PollerConfig holds configuration for a Poller.
@@ -228,7 +228,7 @@ func (p *Poller) checkForUpdates() error {
 	scanner.Buffer(buf, maxScanTokenSize)
 
 	var newEntries []*LogEntry
-	var newPos int64 = lastPos
+	newPos := lastPos
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -304,4 +304,3 @@ func (p *Poller) IsRunning() bool {
 	defer p.runningMu.RUnlock()
 	return p.running
 }
-
