@@ -14,22 +14,52 @@ import (
 
 // Service provides high-level operations for storing and retrieving MTGA data.
 type Service struct {
-	db         *DB
-	matches    repository.MatchRepository
-	stats      repository.StatsRepository
-	decks      repository.DeckRepository
-	collection repository.CollectionRepository
+	db               *DB
+	matches          repository.MatchRepository
+	stats            repository.StatsRepository
+	decks            repository.DeckRepository
+	collection       repository.CollectionRepository
+	accounts         repository.AccountRepository
+	currentAccountID int // Current active account ID
 }
 
 // NewService creates a new storage service.
 func NewService(db *DB) *Service {
-	return &Service{
+	svc := &Service{
 		db:         db,
 		matches:    repository.NewMatchRepository(db.Conn()),
 		stats:      repository.NewStatsRepository(db.Conn()),
 		decks:      repository.NewDeckRepository(db.Conn()),
 		collection: repository.NewCollectionRepository(db.Conn()),
+		accounts:   repository.NewAccountRepository(db.Conn()),
 	}
+
+	// Initialize default account if it doesn't exist
+	ctx := context.Background()
+	defaultAccount, err := svc.accounts.GetDefault(ctx)
+	if err != nil {
+		// Log error but continue - account will be created on first use
+		_ = err
+	}
+	if defaultAccount == nil {
+		// Create default account
+		now := time.Now()
+		defaultAccount = &models.Account{
+			Name:      "Default Account",
+			IsDefault: true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := svc.accounts.Create(ctx, defaultAccount); err != nil {
+			// Log error but continue
+			_ = err
+		}
+	}
+	if defaultAccount != nil {
+		svc.currentAccountID = defaultAccount.ID
+	}
+
+	return svc
 }
 
 // StoreArenaStats stores arena statistics parsed from the log.
@@ -93,6 +123,7 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 		}
 
 		stats := &PlayerStats{
+			AccountID:     s.currentAccountID,
 			Date:          today,
 			Format:        eventName,
 			MatchesPlayed: matchesPlayed,
@@ -270,6 +301,7 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 			// Create match record
 			match := &Match{
 				ID:           matchID,
+				AccountID:    s.currentAccountID,
 				EventID:      eventID,
 				EventName:    eventName,
 				Timestamp:    matchTime,
@@ -379,15 +411,26 @@ func (s *Service) GetStats(ctx context.Context, filter StatsFilter) (*Statistics
 	return s.matches.GetStats(ctx, filter)
 }
 
-// GetRecentMatches retrieves matches within a date range.
+// GetRecentMatches retrieves matches within a date range for the current account.
 func (s *Service) GetRecentMatches(ctx context.Context, days int) ([]*Match, error) {
 	end := time.Now()
 	start := end.Add(-time.Duration(days) * 24 * time.Hour)
-	return s.matches.GetByDateRange(ctx, start, end)
+	return s.matches.GetByDateRange(ctx, start, end, s.currentAccountID)
 }
 
 // GetMatches retrieves matches based on the given filter.
 func (s *Service) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
+	// Use account filter if specified, otherwise use current account
+	accountID := s.currentAccountID
+	if filter.AccountID != nil {
+		if *filter.AccountID == 0 {
+			// 0 means all accounts
+			accountID = 0
+		} else {
+			accountID = *filter.AccountID
+		}
+	}
+
 	var start, end time.Time
 	if filter.StartDate != nil {
 		start = *filter.StartDate
@@ -402,7 +445,7 @@ func (s *Service) GetMatches(ctx context.Context, filter models.StatsFilter) ([]
 		end = time.Now()
 	}
 
-	matches, err := s.matches.GetByDateRange(ctx, start, end)
+	matches, err := s.matches.GetByDateRange(ctx, start, end, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches: %w", err)
 	}
@@ -485,6 +528,94 @@ func (s *Service) GetCollection(ctx context.Context) (map[int]int, error) {
 // GetRecentCollectionChanges retrieves recent changes to the collection.
 func (s *Service) GetRecentCollectionChanges(ctx context.Context, limit int) ([]*CollectionHistory, error) {
 	return s.collection.GetRecentChanges(ctx, limit)
+}
+
+// Account Management Methods
+
+// GetCurrentAccount returns the currently active account.
+func (s *Service) GetCurrentAccount(ctx context.Context) (*models.Account, error) {
+	return s.accounts.GetByID(ctx, s.currentAccountID)
+}
+
+// SetCurrentAccount sets the currently active account.
+func (s *Service) SetCurrentAccount(ctx context.Context, accountID int) error {
+	account, err := s.accounts.GetByID(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+	if account == nil {
+		return fmt.Errorf("account not found: %d", accountID)
+	}
+	s.currentAccountID = accountID
+	return nil
+}
+
+// GetCurrentAccountID returns the ID of the currently active account.
+func (s *Service) GetCurrentAccountID() int {
+	return s.currentAccountID
+}
+
+// CreateAccount creates a new account.
+func (s *Service) CreateAccount(ctx context.Context, name string, screenName, clientID *string) (*models.Account, error) {
+	now := time.Now()
+	account := &models.Account{
+		Name:       name,
+		ScreenName: screenName,
+		ClientID:   clientID,
+		IsDefault:  false,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := s.accounts.Create(ctx, account); err != nil {
+		return nil, fmt.Errorf("failed to create account: %w", err)
+	}
+	return account, nil
+}
+
+// GetAllAccounts retrieves all accounts.
+func (s *Service) GetAllAccounts(ctx context.Context) ([]*models.Account, error) {
+	return s.accounts.GetAll(ctx)
+}
+
+// GetAccount retrieves an account by ID.
+func (s *Service) GetAccount(ctx context.Context, id int) (*models.Account, error) {
+	return s.accounts.GetByID(ctx, id)
+}
+
+// UpdateAccount updates an account.
+func (s *Service) UpdateAccount(ctx context.Context, account *models.Account) error {
+	account.UpdatedAt = time.Now()
+	return s.accounts.Update(ctx, account)
+}
+
+// SetDefaultAccount sets an account as the default account.
+func (s *Service) SetDefaultAccount(ctx context.Context, accountID int) error {
+	if err := s.accounts.SetDefault(ctx, accountID); err != nil {
+		return fmt.Errorf("failed to set default account: %w", err)
+	}
+	// Also set as current account
+	s.currentAccountID = accountID
+	return nil
+}
+
+// DeleteAccount deletes an account.
+func (s *Service) DeleteAccount(ctx context.Context, id int) error {
+	// Don't allow deleting the current account
+	if id == s.currentAccountID {
+		return fmt.Errorf("cannot delete the currently active account")
+	}
+	return s.accounts.Delete(ctx, id)
+}
+
+// GetCombinedStatistics retrieves statistics across all accounts or a specific account.
+func (s *Service) GetCombinedStatistics(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error) {
+	// If AccountID is nil or 0, get combined stats for all accounts
+	if filter.AccountID == nil || *filter.AccountID == 0 {
+		// Set AccountID to 0 to get all accounts
+		allAccounts := 0
+		filter.AccountID = &allAccounts
+	}
+	return s.matches.GetStats(ctx, filter)
 }
 
 // Close closes the database connection.

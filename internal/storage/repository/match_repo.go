@@ -22,10 +22,12 @@ type MatchRepository interface {
 	GetByID(ctx context.Context, id string) (*models.Match, error)
 
 	// GetByDateRange retrieves all matches within a date range.
-	GetByDateRange(ctx context.Context, start, end time.Time) ([]*models.Match, error)
+	// If accountID is 0, returns matches for all accounts.
+	GetByDateRange(ctx context.Context, start, end time.Time, accountID int) ([]*models.Match, error)
 
 	// GetByFormat retrieves all matches for a specific format.
-	GetByFormat(ctx context.Context, format string) ([]*models.Match, error)
+	// If accountID is 0, returns matches for all accounts.
+	GetByFormat(ctx context.Context, format string, accountID int) ([]*models.Match, error)
 
 	// GetStats calculates statistics based on the given filter.
 	GetStats(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error)
@@ -48,14 +50,15 @@ func NewMatchRepository(db *sql.DB) MatchRepository {
 func (r *matchRepository) Create(ctx context.Context, match *models.Match) error {
 	query := `
 		INSERT INTO matches (
-			id, event_id, event_name, timestamp, duration_seconds,
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
 			rank_before, rank_after, format, result, result_reason, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		match.ID,
+		match.AccountID,
 		match.EventID,
 		match.EventName,
 		match.Timestamp,
@@ -110,7 +113,7 @@ func (r *matchRepository) CreateGame(ctx context.Context, game *models.Game) err
 func (r *matchRepository) GetByID(ctx context.Context, id string) (*models.Match, error) {
 	query := `
 		SELECT
-			id, event_id, event_name, timestamp, duration_seconds,
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
 			rank_before, rank_after, format, result, result_reason, created_at
 		FROM matches
@@ -120,6 +123,7 @@ func (r *matchRepository) GetByID(ctx context.Context, id string) (*models.Match
 	match := &models.Match{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&match.ID,
+		&match.AccountID,
 		&match.EventID,
 		&match.EventName,
 		&match.Timestamp,
@@ -147,18 +151,26 @@ func (r *matchRepository) GetByID(ctx context.Context, id string) (*models.Match
 }
 
 // GetByDateRange retrieves all matches within a date range.
-func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Time) ([]*models.Match, error) {
+// If accountID is 0, returns matches for all accounts.
+func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Time, accountID int) ([]*models.Match, error) {
 	query := `
 		SELECT
-			id, event_id, event_name, timestamp, duration_seconds,
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
 			rank_before, rank_after, format, result, result_reason, created_at
 		FROM matches
 		WHERE timestamp >= ? AND timestamp <= ?
-		ORDER BY timestamp DESC
 	`
+	args := []interface{}{start, end}
 
-	rows, err := r.db.QueryContext(ctx, query, start, end)
+	if accountID > 0 {
+		query += " AND account_id = ?"
+		args = append(args, accountID)
+	}
+
+	query += " ORDER BY timestamp DESC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches by date range: %w", err)
 	}
@@ -172,6 +184,7 @@ func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 		match := &models.Match{}
 		err := rows.Scan(
 			&match.ID,
+			&match.AccountID,
 			&match.EventID,
 			&match.EventName,
 			&match.Timestamp,
@@ -201,18 +214,26 @@ func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 }
 
 // GetByFormat retrieves all matches for a specific format.
-func (r *matchRepository) GetByFormat(ctx context.Context, format string) ([]*models.Match, error) {
+// If accountID is 0, returns matches for all accounts.
+func (r *matchRepository) GetByFormat(ctx context.Context, format string, accountID int) ([]*models.Match, error) {
 	query := `
 		SELECT
-			id, event_id, event_name, timestamp, duration_seconds,
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
 			rank_before, rank_after, format, result, result_reason, created_at
 		FROM matches
 		WHERE format = ?
-		ORDER BY timestamp DESC
 	`
+	args := []interface{}{format}
 
-	rows, err := r.db.QueryContext(ctx, query, format)
+	if accountID > 0 {
+		query += " AND account_id = ?"
+		args = append(args, accountID)
+	}
+
+	query += " ORDER BY timestamp DESC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches by format: %w", err)
 	}
@@ -226,6 +247,7 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string) ([]*mo
 		match := &models.Match{}
 		err := rows.Scan(
 			&match.ID,
+			&match.AccountID,
 			&match.EventID,
 			&match.EventName,
 			&match.Timestamp,
@@ -260,6 +282,10 @@ func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilte
 	where := "WHERE 1=1"
 	args := make([]interface{}, 0)
 
+	if filter.AccountID != nil && *filter.AccountID > 0 {
+		where += " AND account_id = ?"
+		args = append(args, *filter.AccountID)
+	}
 	if filter.StartDate != nil {
 		where += " AND timestamp >= ?"
 		args = append(args, *filter.StartDate)

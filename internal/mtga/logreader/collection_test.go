@@ -234,4 +234,3 @@ func TestParseCollection_FromLogFile(t *testing.T) {
 		t.Errorf("ParseCollection() card 11111 not found or wrong quantity")
 	}
 }
-
