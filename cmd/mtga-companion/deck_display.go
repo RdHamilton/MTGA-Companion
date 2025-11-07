@@ -41,6 +41,7 @@ func displayDeckLibrary(library *logreader.DeckLibrary) {
 }
 
 // displayDeck displays a single deck with details.
+//nolint:unused // Reserved for future use when displaying individual deck details
 func displayDeck(deck *logreader.PlayerDeck) {
 	if deck == nil {
 		return
