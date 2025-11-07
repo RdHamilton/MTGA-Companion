@@ -51,7 +51,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -100,10 +100,11 @@ jobs:
         cache-dependency-path: go.sum
 
     - name: Install gofumpt
-      run: go install mvdan.cc/gofumpt@latest
+      run: go install mvdan.cc/gofumpt@v0.6.0
 
     - name: Check formatting
       run: |
+        export PATH="$HOME/go/bin:$PATH"
         gofumpt -l . > gofumpt-output.txt
         if [ -s gofumpt-output.txt ]; then
           echo "The following files need formatting:"
@@ -178,7 +179,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
