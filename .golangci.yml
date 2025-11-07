@@ -3,49 +3,50 @@
 
 version: "2"
 
-exclusions:
-  rules:
-    - path: '.*_test\.go'
-      linters:
-        - errcheck
-        - staticcheck
-        - gocritic
-        - gosec
-        - gosimple
-        - govet
-        - ineffassign
-        - misspell
-        - stylecheck
-        - typecheck
-        - unconvert
-        - unparam
-        - unused
-        - varcheck
-        - whitespace
-        - wrapcheck
-        - wsl
-        - exportloopref
-        - gochecknoinits
-        - gochecknoglobals
-        - gofumpt
-        - revive
-        - errname
-        - errorlint
-        - forbidigo
-        - gci
-        - goheader
-        - gomnd
-        - gomodguard
-        - goprintffuncname
-        - lll
-        - maligned
-        - nakedret
-        - noctx
-        - nolintlint
-        - rowserrcheck
-        - scopelint
-        - sqlclosecheck
-        - structcheck
-        - tagliatelle
-        - thelper
-        - tparallel
+linters:
+  exclusions:
+    rules:
+      - path: '.*_test\.go$'
+        linters:
+          - errcheck
+          - staticcheck
+          - gocritic
+          - gosec
+          - gosimple
+          - govet
+          - ineffassign
+          - misspell
+          - stylecheck
+          - typecheck
+          - unconvert
+          - unparam
+          - unused
+          - varcheck
+          - whitespace
+          - wrapcheck
+          - wsl
+          - exportloopref
+          - gochecknoinits
+          - gochecknoglobals
+          - gofumpt
+          - revive
+          - errname
+          - errorlint
+          - forbidigo
+          - gci
+          - goheader
+          - gomnd
+          - gomodguard
+          - goprintffuncname
+          - lll
+          - maligned
+          - nakedret
+          - noctx
+          - nolintlint
+          - rowserrcheck
+          - scopelint
+          - sqlclosecheck
+          - structcheck
+          - tagliatelle
+          - thelper
+          - tparallel
