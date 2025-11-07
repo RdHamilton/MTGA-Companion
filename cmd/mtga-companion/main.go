@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -16,7 +17,24 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
+var (
+	pollInterval  = flag.Duration("poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
+	enableMetrics = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
+	useFileEvents = flag.Bool("use-file-events", true, "Use file system events (fsnotify) for monitoring")
+)
+
 func main() {
+	// Parse flags before checking for subcommands
+	flag.Parse()
+
+	// Validate poll interval
+	if *pollInterval < 1*time.Second {
+		log.Fatalf("Poll interval must be at least 1 second, got %v", *pollInterval)
+	}
+	if *pollInterval > 1*time.Minute {
+		log.Fatalf("Poll interval must be at most 1 minute, got %v", *pollInterval)
+	}
+
 	// Check if this is a migration command
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
 		runMigrationCommand()
@@ -259,7 +277,9 @@ func main() {
 	// Start log file poller for real-time updates
 	fmt.Println("\nStarting log file poller for real-time updates...")
 	pollerConfig := logreader.DefaultPollerConfig(logPath)
-	pollerConfig.Interval = 2 * time.Second
+	pollerConfig.Interval = *pollInterval
+	pollerConfig.UseFileEvents = *useFileEvents
+	pollerConfig.EnableMetrics = *enableMetrics
 	poller, err := logreader.NewPoller(pollerConfig)
 	if err != nil {
 		log.Printf("Warning: Failed to create poller: %v", err)

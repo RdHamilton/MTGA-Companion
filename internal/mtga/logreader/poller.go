@@ -31,6 +31,20 @@ type Poller struct {
 	done          chan struct{}
 	running       bool
 	runningMu     sync.RWMutex
+	metrics       *PollerMetrics
+	enableMetrics bool
+}
+
+// PollerMetrics tracks performance metrics for the poller.
+type PollerMetrics struct {
+	mu                    sync.RWMutex
+	PollCount             uint64
+	EntriesProcessed      uint64
+	ErrorCount            uint64
+	TotalProcessingTime   time.Duration
+	LastPollTime          time.Time
+	LastPollDuration      time.Duration
+	AverageEntriesPerPoll float64
 }
 
 // PollerConfig holds configuration for a Poller.
@@ -52,6 +66,10 @@ type PollerConfig struct {
 	// events are unavailable or fail.
 	// Default: true
 	UseFileEvents bool
+
+	// EnableMetrics enables collection of performance metrics.
+	// Default: false
+	EnableMetrics bool
 }
 
 // DefaultPollerConfig returns a PollerConfig with sensible defaults.
@@ -86,11 +104,13 @@ func NewPoller(config *PollerConfig) (*Poller, error) {
 		path:          config.Path,
 		interval:      config.Interval,
 		useFileEvents: config.UseFileEvents,
+		enableMetrics: config.EnableMetrics,
 		ctx:           ctx,
 		cancel:        cancel,
 		updates:       make(chan *LogEntry, config.BufferSize),
 		errChan:       make(chan error, 1),
 		done:          make(chan struct{}),
+		metrics:       &PollerMetrics{},
 	}
 
 	// Initialize position tracking
@@ -300,6 +320,29 @@ func (p *Poller) sendError(err error) {
 
 // checkForUpdates checks the log file for new entries and sends them through the updates channel.
 func (p *Poller) checkForUpdates() error {
+	start := time.Now()
+	var entriesProcessed uint64
+	var hadError bool
+
+	defer func() {
+		if p.enableMetrics {
+			duration := time.Since(start)
+			p.metrics.mu.Lock()
+			p.metrics.PollCount++
+			p.metrics.EntriesProcessed += entriesProcessed
+			p.metrics.TotalProcessingTime += duration
+			p.metrics.LastPollTime = start
+			p.metrics.LastPollDuration = duration
+			if p.metrics.PollCount > 0 {
+				p.metrics.AverageEntriesPerPoll = float64(p.metrics.EntriesProcessed) / float64(p.metrics.PollCount)
+			}
+			if hadError {
+				p.metrics.ErrorCount++
+			}
+			p.metrics.mu.Unlock()
+		}
+	}()
+
 	file, err := os.Open(p.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -311,11 +354,13 @@ func (p *Poller) checkForUpdates() error {
 			p.mu.Unlock()
 			return nil
 		}
+		hadError = true
 		return fmt.Errorf("open file: %w", err)
 	}
 
 	stat, err := file.Stat()
 	if err != nil {
+		hadError = true
 		_ = file.Close() //nolint:errcheck // Ignore error on cleanup
 		return fmt.Errorf("stat file: %w", err)
 	}
@@ -344,6 +389,7 @@ func (p *Poller) checkForUpdates() error {
 
 	// Seek to last read position
 	if _, err := file.Seek(lastPos, io.SeekStart); err != nil {
+		hadError = true
 		_ = file.Close() //nolint:errcheck // Ignore error on cleanup
 		return fmt.Errorf("seek to position %d: %w", lastPos, err)
 	}
@@ -368,6 +414,7 @@ func (p *Poller) checkForUpdates() error {
 		// Only send JSON entries
 		if entry.IsJSON {
 			newEntries = append(newEntries, entry)
+			entriesProcessed++
 		}
 
 		// Update position (line length + newline)
@@ -375,6 +422,7 @@ func (p *Poller) checkForUpdates() error {
 	}
 
 	if err := scanner.Err(); err != nil {
+		hadError = true
 		_ = file.Close() //nolint:errcheck // Ignore error on cleanup
 		return fmt.Errorf("scan file: %w", err)
 	}
@@ -431,4 +479,45 @@ func (p *Poller) IsRunning() bool {
 	p.runningMu.RLock()
 	defer p.runningMu.RUnlock()
 	return p.running
+}
+
+// Metrics returns a copy of the current poller metrics.
+// Returns nil if metrics are not enabled.
+func (p *Poller) Metrics() *PollerMetrics {
+	if !p.enableMetrics {
+		return nil
+	}
+
+	p.metrics.mu.RLock()
+	defer p.metrics.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	return &PollerMetrics{
+		PollCount:             p.metrics.PollCount,
+		EntriesProcessed:      p.metrics.EntriesProcessed,
+		ErrorCount:            p.metrics.ErrorCount,
+		TotalProcessingTime:   p.metrics.TotalProcessingTime,
+		LastPollTime:          p.metrics.LastPollTime,
+		LastPollDuration:      p.metrics.LastPollDuration,
+		AverageEntriesPerPoll: p.metrics.AverageEntriesPerPoll,
+	}
+}
+
+// LogMetrics logs the current metrics to stdout if metrics are enabled.
+func (p *Poller) LogMetrics() {
+	metrics := p.Metrics()
+	if metrics == nil {
+		return
+	}
+
+	fmt.Printf("\n=== Poller Metrics ===\n")
+	fmt.Printf("Poll Count: %d\n", metrics.PollCount)
+	fmt.Printf("Entries Processed: %d\n", metrics.EntriesProcessed)
+	fmt.Printf("Error Count: %d\n", metrics.ErrorCount)
+	fmt.Printf("Average Entries/Poll: %.2f\n", metrics.AverageEntriesPerPoll)
+	fmt.Printf("Total Processing Time: %v\n", metrics.TotalProcessingTime)
+	if !metrics.LastPollTime.IsZero() {
+		fmt.Printf("Last Poll: %v (duration: %v)\n", metrics.LastPollTime.Format(time.RFC3339), metrics.LastPollDuration)
+	}
+	fmt.Printf("======================\n\n")
 }
