@@ -114,7 +114,6 @@ func TestParseDraftPicks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseDraftPicks(tt.entries)
-
 			if err != nil {
 				t.Errorf("ParseDraftPicks() error = %v", err)
 				return
