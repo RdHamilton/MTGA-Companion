@@ -168,7 +168,11 @@ func TestCollectionRepository_GetAll(t *testing.T) {
 
 func TestCollectionRepository_RecordChange(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
@@ -238,7 +242,11 @@ func TestCollectionRepository_RecordChange(t *testing.T) {
 
 func TestCollectionRepository_GetHistory(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
@@ -278,7 +286,11 @@ func TestCollectionRepository_GetHistory(t *testing.T) {
 
 func TestCollectionRepository_GetRecentChanges(t *testing.T) {
 	db := setupCollectionTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
 
 	repo := NewCollectionRepository(db)
 	ctx := context.Background()
