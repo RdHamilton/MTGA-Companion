@@ -107,6 +107,7 @@ func main() {
 	// Parse all data
 	profile, inventory, rank := logreader.ParseAll(entries)
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
+	_, _ = logreader.ParseDraftPicks(entries) // Parse draft picks (used in refreshDraftPicks)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
 	collection, _ := logreader.ParseCollection(entries)
 	deckLibrary, _ := logreader.ParseDecks(entries)
@@ -213,157 +214,18 @@ func main() {
 		}
 	}
 
-	// Display draft history
+	// Display draft history with card names
 	if draftHistory != nil && len(draftHistory.Drafts) > 0 {
-		fmt.Println("Draft History")
-		fmt.Println("-------------")
-		fmt.Printf("Found %d draft/limited event(s)\n\n", len(draftHistory.Drafts))
-
-		for i, draft := range draftHistory.Drafts {
-			fmt.Printf("%d. %s\n", i+1, draft.EventName)
-			fmt.Printf("   Status: %s\n", draft.Status)
-			fmt.Printf("   Record: %d wins", draft.Wins)
-			if draft.Losses > 0 {
-				fmt.Printf(", %d losses", draft.Losses)
-			}
-			fmt.Println()
-
-			if draft.Deck.Name != "" {
-				fmt.Printf("   Deck: %s\n", draft.Deck.Name)
-			}
-
-			if len(draft.Deck.MainDeck) > 0 {
-				totalCards := 0
-				for _, card := range draft.Deck.MainDeck {
-					totalCards += card.Quantity
-				}
-				fmt.Printf("   Main Deck: %d cards\n", totalCards)
-			}
-
-			fmt.Println()
-		}
-	}
-
-	// Display player profile
-	if profile != nil && profile.ScreenName != "" {
-		fmt.Println("Player Profile")
-		fmt.Println("--------------")
-		fmt.Printf("Screen Name: %s\n", profile.ScreenName)
-		if profile.ClientID != "" {
-			fmt.Printf("Client ID:   %s\n", profile.ClientID)
-		}
 		fmt.Println()
+		displayDraftHistory(draftHistory)
 	}
 
-	// Display inventory
-	if inventory != nil {
-		fmt.Println("Inventory")
-		fmt.Println("---------")
-		fmt.Printf("Gems:              %d\n", inventory.Gems)
-		fmt.Printf("Gold:              %d\n", inventory.Gold)
-		fmt.Printf("Vault Progress:    %d%%\n", inventory.TotalVaultProgress)
-		fmt.Println()
-
-		fmt.Println("Wildcards:")
-		fmt.Printf("  Common:          %d\n", inventory.WildCardCommons)
-		fmt.Printf("  Uncommon:        %d\n", inventory.WildCardUncommons)
-		fmt.Printf("  Rare:            %d\n", inventory.WildCardRares)
-		fmt.Printf("  Mythic:          %d\n", inventory.WildCardMythics)
-		fmt.Println()
-
-		if len(inventory.Boosters) > 0 {
-			fmt.Println("Boosters:")
-			for _, booster := range inventory.Boosters {
-				fmt.Printf("  %s: %d\n", booster.SetCode, booster.Count)
-			}
-			fmt.Println()
-		}
-
-		if len(inventory.CustomTokens) > 0 {
-			fmt.Println("Custom Tokens:")
-			for token, count := range inventory.CustomTokens {
-				fmt.Printf("  %s: %d\n", token, count)
-			}
-			fmt.Println()
-		}
-	}
-
-	// Display rank
-	if rank != nil {
-		fmt.Println("Rank Information")
-		fmt.Println("----------------")
-
-		if rank.ConstructedClass != "" || rank.ConstructedLevel > 0 {
-			fmt.Println("Constructed:")
-			fmt.Printf("  Season:          %d\n", rank.ConstructedSeasonOrdinal)
-			if rank.ConstructedClass != "" {
-				fmt.Printf("  Rank:            %s %d\n", rank.ConstructedClass, rank.ConstructedLevel)
-			} else {
-				fmt.Printf("  Level:           %d\n", rank.ConstructedLevel)
-			}
-			if rank.ConstructedPercentile > 0 {
-				fmt.Printf("  Percentile:      %.1f%%\n", rank.ConstructedPercentile)
-			}
-			if rank.ConstructedStep > 0 {
-				fmt.Printf("  Step:            %d\n", rank.ConstructedStep)
-			}
-			fmt.Println()
-		}
-
-		if rank.LimitedClass != "" || rank.LimitedLevel > 0 {
-			fmt.Println("Limited:")
-			fmt.Printf("  Season:          %d\n", rank.LimitedSeasonOrdinal)
-			if rank.LimitedClass != "" {
-				fmt.Printf("  Rank:            %s %d\n", rank.LimitedClass, rank.LimitedLevel)
-			} else {
-				fmt.Printf("  Level:           %d\n", rank.LimitedLevel)
-			}
-			if rank.LimitedPercentile > 0 {
-				fmt.Printf("  Percentile:      %.1f%%\n", rank.LimitedPercentile)
-			}
-			if rank.LimitedStep > 0 {
-				fmt.Printf("  Step:            %d\n", rank.LimitedStep)
-			}
-
-			// Display win rate if we have match data
-			totalMatches := rank.LimitedMatchesWon + rank.LimitedMatchesLost
-			if totalMatches > 0 {
-				winRate := float64(rank.LimitedMatchesWon) / float64(totalMatches) * 100
-				fmt.Printf("  Matches:         %d-%d (%.1f%% win rate)\n",
-					rank.LimitedMatchesWon, rank.LimitedMatchesLost, winRate)
-			}
-			fmt.Println()
-		}
-	}
-
-	// Display draft history
+	// Display draft statistics
 	if draftHistory != nil && len(draftHistory.Drafts) > 0 {
-		fmt.Println("Draft History")
-		fmt.Println("-------------")
-		fmt.Printf("Found %d draft/limited event(s)\n\n", len(draftHistory.Drafts))
-
-		for i, draft := range draftHistory.Drafts {
-			fmt.Printf("%d. %s\n", i+1, draft.EventName)
-			fmt.Printf("   Status: %s\n", draft.Status)
-			fmt.Printf("   Record: %d wins", draft.Wins)
-			if draft.Losses > 0 {
-				fmt.Printf(", %d losses", draft.Losses)
-			}
+		draftStats := logreader.CalculateDraftStatistics(draftHistory)
+		if draftStats != nil {
 			fmt.Println()
-
-			if draft.Deck.Name != "" {
-				fmt.Printf("   Deck: %s\n", draft.Deck.Name)
-			}
-
-			if len(draft.Deck.MainDeck) > 0 {
-				totalCards := 0
-				for _, card := range draft.Deck.MainDeck {
-					totalCards += card.Quantity
-				}
-				fmt.Printf("   Main Deck: %d cards\n", totalCards)
-			}
-
-			fmt.Println()
+			displayDraftStatistics(draftStats)
 		}
 	}
 
@@ -670,6 +532,12 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "rank", "ranks", "rankprog":
 			// Display rank progression
 			displayRankProgressionWithStats(service, ctx)
+		case "draft", "drafts", "draftstats":
+			// Display draft statistics
+			refreshDraftStatistics(ctx, logPath)
+		case "draftpicks", "picks":
+			// Display draft picks
+			refreshDraftPicks(ctx, logPath)
 		case "help", "h":
 			printHelp()
 		default:
@@ -799,6 +667,89 @@ func refreshDecks(ctx context.Context, logPath string) {
 	}
 }
 
+// refreshDraftStatistics refreshes and displays draft statistics.
+func refreshDraftStatistics(ctx context.Context, logPath string) {
+	fmt.Println("\nRefreshing draft statistics...")
+
+	// Create a reader
+	reader, err := logreader.NewReader(logPath)
+	if err != nil {
+		fmt.Printf("Error creating log reader: %v\n", err)
+		return
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
+
+	// Read all JSON entries
+	entries, err := reader.ReadAllJSON()
+	if err != nil {
+		fmt.Printf("Error reading log entries: %v\n", err)
+		return
+	}
+
+	// Parse draft history
+	draftHistory, err := logreader.ParseDraftHistory(entries)
+	if err != nil {
+		fmt.Printf("Error parsing draft history: %v\n", err)
+		return
+	}
+
+	// Calculate and display statistics
+	if draftHistory != nil && len(draftHistory.Drafts) > 0 {
+		draftStats := logreader.CalculateDraftStatistics(draftHistory)
+		if draftStats != nil {
+			displayDraftStatistics(draftStats)
+		} else {
+			fmt.Println("No draft statistics available.")
+		}
+	} else {
+		fmt.Println("No draft history found in log file.")
+	}
+}
+
+// refreshDraftPicks refreshes and displays draft picks.
+func refreshDraftPicks(ctx context.Context, logPath string) {
+	fmt.Println("\nRefreshing draft picks...")
+
+	// Create a reader
+	reader, err := logreader.NewReader(logPath)
+	if err != nil {
+		fmt.Printf("Error creating log reader: %v\n", err)
+		return
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Error closing reader: %v", err)
+		}
+	}()
+
+	// Read all JSON entries
+	entries, err := reader.ReadAllJSON()
+	if err != nil {
+		fmt.Printf("Error reading log entries: %v\n", err)
+		return
+	}
+
+	// Parse draft picks
+	draftPicks, err := logreader.ParseDraftPicks(entries)
+	if err != nil {
+		fmt.Printf("Error parsing draft picks: %v\n", err)
+		return
+	}
+
+	// Display draft picks
+	if len(draftPicks) > 0 {
+		for _, picks := range draftPicks {
+			displayDraftPicks(picks)
+		}
+	} else {
+		fmt.Println("No draft picks found in log file.")
+	}
+}
+
 // printHelp displays available commands.
 func printHelp() {
 	fmt.Println("\nAvailable commands:")
@@ -811,6 +762,8 @@ func printHelp() {
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
 	fmt.Println("  results, result, res - Display match result breakdown")
 	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
+	fmt.Println("  draft, drafts, draftstats - Display draft statistics")
+	fmt.Println("  draftpicks, picks - Display draft picks")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()

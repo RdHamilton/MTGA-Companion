@@ -98,7 +98,6 @@ func TestParseDecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			entries := []*LogEntry{tt.entry}
 			got, err := ParseDecks(entries)
-
 			if err != nil {
 				t.Errorf("ParseDecks() error = %v", err)
 				return
