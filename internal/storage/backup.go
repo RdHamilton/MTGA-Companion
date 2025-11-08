@@ -323,7 +323,14 @@ func (bm *BackupManager) Restore(backupPath string, encryptionPassword ...string
 		}
 	}()
 
-	// Verify backup integrity
+	// Check if this is an incremental backup
+	metadata, err := bm.loadMetadata(backupPath)
+	if err == nil && metadata.BackupType == BackupTypeIncremental {
+		// Handle incremental restore
+		return bm.restoreIncremental(actualBackupPath, metadata, encryptionPassword...)
+	}
+
+	// Full backup restore - verify backup integrity
 	if err := bm.VerifyBackup(actualBackupPath); err != nil {
 		return fmt.Errorf("backup verification failed: %w", err)
 	}
@@ -875,7 +882,361 @@ func (bm *BackupManager) findLastFullBackup(backupDir string) (string, *BackupMe
 
 // createIncrementalBackup creates an incremental backup containing only changed data.
 func (bm *BackupManager) createIncrementalBackup(config *BackupConfig) (string, error) {
-	// TODO: Implement full incremental backup functionality
-	// For now, return an error indicating it's not yet implemented
-	return "", fmt.Errorf("incremental backups are not yet fully implemented (issue #130)")
+	// Determine backup directory
+	backupDir := config.BackupDir
+	if backupDir == "" {
+		dbDir := filepath.Dir(bm.dbPath)
+		backupDir = filepath.Join(dbDir, "backups")
+	}
+
+	// Create backup directory if it doesn't exist
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create backup directory: %w", err)
+	}
+
+	// Find the last full backup
+	baseBackupPath, baseMetadata, err := bm.findLastFullBackup(backupDir)
+	if err != nil {
+		return "", fmt.Errorf("incremental backup requires a full backup first: %w", err)
+	}
+
+	// Generate current database metadata
+	tempMetadata, err := bm.generateMetadata(BackupTypeIncremental, "", baseBackupPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate current metadata: %w", err)
+	}
+
+	// Compare metadata to find changed tables
+	changedTables := bm.findChangedTables(baseMetadata, tempMetadata)
+	if len(changedTables) == 0 {
+		return "", fmt.Errorf("no changes detected since last backup")
+	}
+
+	// Determine backup filename
+	backupName := config.BackupName
+	if backupName == "" {
+		timestamp := time.Now().Format("20060102_150405")
+		backupName = fmt.Sprintf("backup_%s_incr", timestamp)
+	}
+	backupPath := filepath.Join(backupDir, backupName+".sql")
+
+	// Export changed tables to SQL file
+	if err := bm.exportTablesToSQL(changedTables, backupPath); err != nil {
+		return "", fmt.Errorf("failed to export tables: %w", err)
+	}
+
+	// Encrypt backup if requested
+	if config.Encrypt {
+		if config.EncryptionPassword == "" {
+			_ = os.Remove(backupPath)
+			return "", fmt.Errorf("encryption enabled but no password provided")
+		}
+
+		encryptedPath, err := bm.encryptBackup(backupPath, config)
+		if err != nil {
+			// Keep unencrypted backup if encryption fails
+			return backupPath, fmt.Errorf("backup created but encryption failed: %w", err)
+		}
+		// Remove unencrypted backup
+		_ = os.Remove(backupPath)
+		backupPath = encryptedPath
+	}
+
+	// Compress backup if requested (after encryption)
+	if config.Compress {
+		compressedPath, err := bm.compressBackup(backupPath)
+		if err != nil {
+			// Keep uncompressed backup if compression fails
+			return backupPath, fmt.Errorf("backup created but compression failed: %w", err)
+		}
+		// Remove uncompressed backup
+		_ = os.Remove(backupPath)
+		backupPath = compressedPath
+	}
+
+	// Generate and save metadata for incremental backup
+	originalBackupPath := backupPath
+	originalBackupPath = strings.TrimSuffix(originalBackupPath, ".gz")
+	originalBackupPath = strings.TrimSuffix(originalBackupPath, ".enc")
+
+	metadata, err := bm.generateMetadata(BackupTypeIncremental, originalBackupPath, filepath.Base(baseBackupPath))
+	if err != nil {
+		// Log error but don't fail backup
+		_ = err
+	} else {
+		// Save metadata (use the actual backup path for the .meta file)
+		if err := bm.saveMetadata(metadata, backupPath); err != nil {
+			// Log error but don't fail backup
+			_ = err
+		}
+	}
+
+	return backupPath, nil
+}
+
+// findChangedTables compares two metadata sets and returns tables that have changed.
+func (bm *BackupManager) findChangedTables(oldMetadata, newMetadata *BackupMetadata) []string {
+	var changed []string
+
+	for tableName, newInfo := range newMetadata.Tables {
+		oldInfo, exists := oldMetadata.Tables[tableName]
+		if !exists {
+			// New table added
+			changed = append(changed, tableName)
+			continue
+		}
+
+		// Check if table has changed
+		if oldInfo.Checksum != newInfo.Checksum {
+			changed = append(changed, tableName)
+		}
+	}
+
+	// Sort for consistent ordering
+	sort.Strings(changed)
+	return changed
+}
+
+// exportTablesToSQL exports specified tables to a SQL file.
+func (bm *BackupManager) exportTablesToSQL(tables []string, outputPath string) error {
+	// Open database
+	db, err := sql.Open("sqlite", bm.dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer func() { _ = db.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Create output file
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = outFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Write header
+	header := fmt.Sprintf("-- Incremental backup created at %s\n", time.Now().Format(time.RFC3339))
+	header += fmt.Sprintf("-- Tables: %s\n\n", strings.Join(tables, ", "))
+	if _, err := outFile.WriteString(header); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
+
+	// Export each table
+	for _, tableName := range tables {
+		if err := bm.exportTableToSQL(db, tableName, outFile); err != nil {
+			return fmt.Errorf("failed to export table %s: %w", tableName, err)
+		}
+	}
+
+	return nil
+}
+
+// exportTableToSQL exports a single table to SQL format.
+func (bm *BackupManager) exportTableToSQL(db *sql.DB, tableName string, outFile *os.File) error {
+	// Write table header
+	header := fmt.Sprintf("\n-- Table: %s\n", tableName)
+	if _, err := outFile.WriteString(header); err != nil {
+		return fmt.Errorf("failed to write table header: %w", err)
+	}
+
+	// Delete existing data
+	deleteStmt := fmt.Sprintf("DELETE FROM %q;\n", tableName)
+	if _, err := outFile.WriteString(deleteStmt); err != nil {
+		return fmt.Errorf("failed to write delete statement: %w", err)
+	}
+
+	// Get table schema
+	var createSQL string
+	schemaQuery := fmt.Sprintf("SELECT sql FROM sqlite_master WHERE type='table' AND name=%q", tableName)
+	if err := db.QueryRow(schemaQuery).Scan(&createSQL); err != nil {
+		return fmt.Errorf("failed to get table schema: %w", err)
+	}
+
+	// Get all rows from the table
+	query := fmt.Sprintf("SELECT * FROM %q", tableName)
+	rows, err := db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to query table: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Get column names
+	columns, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("failed to get columns: %w", err)
+	}
+
+	// Export each row as INSERT statement
+	rowCount := 0
+	for rows.Next() {
+		// Scan row into interface slice
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Build INSERT statement
+		insertStmt := fmt.Sprintf("INSERT INTO %q (", tableName)
+		insertStmt += strings.Join(columns, ", ")
+		insertStmt += ") VALUES ("
+
+		// Add values
+		for i, val := range values {
+			if i > 0 {
+				insertStmt += ", "
+			}
+			insertStmt += bm.formatSQLValue(val)
+		}
+		insertStmt += ");\n"
+
+		if _, err := outFile.WriteString(insertStmt); err != nil {
+			return fmt.Errorf("failed to write insert statement: %w", err)
+		}
+		rowCount++
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Write row count comment
+	comment := fmt.Sprintf("-- %d rows exported\n", rowCount)
+	if _, err := outFile.WriteString(comment); err != nil {
+		return fmt.Errorf("failed to write row count: %w", err)
+	}
+
+	return nil
+}
+
+// formatSQLValue formats a value for SQL insertion.
+func (bm *BackupManager) formatSQLValue(val interface{}) string {
+	if val == nil {
+		return "NULL"
+	}
+
+	switch v := val.(type) {
+	case string:
+		// Escape single quotes
+		escaped := strings.ReplaceAll(v, "'", "''")
+		return fmt.Sprintf("'%s'", escaped)
+	case []byte:
+		// Convert bytes to string and escape
+		escaped := strings.ReplaceAll(string(v), "'", "''")
+		return fmt.Sprintf("'%s'", escaped)
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%f", v)
+	case bool:
+		if v {
+			return "1"
+		}
+		return "0"
+	default:
+		// Fallback to string representation
+		return fmt.Sprintf("'%v'", v)
+	}
+}
+
+// restoreIncremental restores a database from an incremental backup.
+func (bm *BackupManager) restoreIncremental(incrementalPath string, metadata *BackupMetadata, encryptionPassword ...string) error {
+	// Find the base backup directory
+	backupDir := filepath.Dir(incrementalPath)
+
+	// Construct base backup path from metadata
+	baseBackupName := metadata.BaseBackup
+	if baseBackupName == "" {
+		return fmt.Errorf("incremental backup metadata missing base backup reference")
+	}
+
+	baseBackupPath := filepath.Join(backupDir, baseBackupName)
+
+	// Check if base backup exists - it might have extensions (.enc, .gz)
+	if _, err := os.Stat(baseBackupPath); os.IsNotExist(err) {
+		// Try common extensions
+		if _, err := os.Stat(baseBackupPath + ".enc"); err == nil {
+			baseBackupPath += ".enc"
+		} else if _, err := os.Stat(baseBackupPath + ".gz"); err == nil {
+			baseBackupPath += ".gz"
+		} else if _, err := os.Stat(baseBackupPath + ".enc.gz"); err == nil {
+			baseBackupPath += ".enc.gz"
+		} else {
+			return fmt.Errorf("base backup not found: %s", baseBackupName)
+		}
+	}
+
+	// First, restore the base full backup
+	if err := bm.Restore(baseBackupPath, encryptionPassword...); err != nil {
+		return fmt.Errorf("failed to restore base backup: %w", err)
+	}
+
+	// Now apply the incremental changes
+	if err := bm.applySQLFile(incrementalPath); err != nil {
+		return fmt.Errorf("failed to apply incremental backup: %w", err)
+	}
+
+	return nil
+}
+
+// applySQLFile applies SQL statements from a file to the database.
+func (bm *BackupManager) applySQLFile(sqlPath string) error {
+	// Read SQL file
+	sqlData, err := os.ReadFile(sqlPath)
+	if err != nil {
+		return fmt.Errorf("failed to read SQL file: %w", err)
+	}
+
+	// Open database
+	db, err := sql.Open("sqlite", bm.dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer func() { _ = db.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Execute SQL in a transaction
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Split SQL into individual statements
+	// Remove comments first
+	lines := strings.Split(string(sqlData), "\n")
+	var sqlLines []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "--") {
+			continue
+		}
+		sqlLines = append(sqlLines, line)
+	}
+
+	// Join and split by semicolon
+	sqlContent := strings.Join(sqlLines, " ")
+	sqlStatements := strings.Split(sqlContent, ";")
+
+	for _, stmt := range sqlStatements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("failed to execute SQL statement: %w", err)
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
