@@ -284,3 +284,235 @@ func TestBackupManager_GetBackupDir(t *testing.T) {
 		t.Errorf("Expected backup dir %s, got %s", expectedDir, backupDir)
 	}
 }
+
+func TestBackupManager_EncryptedBackup(t *testing.T) {
+	// Create a temporary database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database with data
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	// Create a simple table and insert data
+	_, err = db.Conn().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, secret TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create test table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO test (secret) VALUES ('confidential data')")
+	if err != nil {
+		t.Fatalf("Failed to insert test data: %v", err)
+	}
+
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create encrypted backup
+	password := "secure-password-123"
+	configBackup := DefaultBackupConfig()
+	configBackup.Encrypt = true
+	configBackup.EncryptionPassword = password
+
+	backupPath, err := backupMgr.Backup(configBackup)
+	if err != nil {
+		t.Fatalf("Failed to create encrypted backup: %v", err)
+	}
+	defer os.Remove(backupPath)
+
+	// Verify backup file exists and has .enc extension
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		t.Fatalf("Encrypted backup file was not created: %s", backupPath)
+	}
+
+	if filepath.Ext(backupPath) != ".enc" {
+		t.Errorf("Expected .enc extension, got %s", filepath.Ext(backupPath))
+	}
+
+	// Verify backup is encrypted
+	isEnc, err := IsEncrypted(backupPath)
+	if err != nil {
+		t.Fatalf("Failed to check if backup is encrypted: %v", err)
+	}
+	if !isEnc {
+		t.Error("Backup should be encrypted")
+	}
+
+	// Restore encrypted backup
+	if err := backupMgr.Restore(backupPath, password); err != nil {
+		t.Fatalf("Failed to restore encrypted backup: %v", err)
+	}
+
+	// Verify restored data
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database after restore: %v", err)
+	}
+	defer db.Close()
+
+	var secret string
+	err = db.Conn().QueryRow("SELECT secret FROM test WHERE id = 1").Scan(&secret)
+	if err != nil {
+		t.Fatalf("Failed to query restored database: %v", err)
+	}
+
+	if secret != "confidential data" {
+		t.Errorf("Expected 'confidential data', got '%s'", secret)
+	}
+}
+
+func TestBackupManager_EncryptedBackupWrongPassword(t *testing.T) {
+	// Create a temporary database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create encrypted backup
+	correctPassword := "correct-password"
+	configBackup := DefaultBackupConfig()
+	configBackup.Encrypt = true
+	configBackup.EncryptionPassword = correctPassword
+
+	backupPath, err := backupMgr.Backup(configBackup)
+	if err != nil {
+		t.Fatalf("Failed to create encrypted backup: %v", err)
+	}
+	defer os.Remove(backupPath)
+
+	// Try to restore with wrong password
+	wrongPassword := "wrong-password"
+	err = backupMgr.Restore(backupPath, wrongPassword)
+	if err == nil {
+		t.Error("Restore with wrong password should fail")
+	}
+}
+
+func TestBackupManager_EncryptedBackupNoPassword(t *testing.T) {
+	// Create a temporary database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Try to create encrypted backup without password
+	configBackup := DefaultBackupConfig()
+	configBackup.Encrypt = true
+	configBackup.EncryptionPassword = ""
+
+	_, err = backupMgr.Backup(configBackup)
+	if err == nil {
+		t.Error("Creating encrypted backup without password should fail")
+	}
+}
+
+func TestBackupManager_EncryptedAndCompressedBackup(t *testing.T) {
+	// Create a temporary database
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database with data
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	// Create table with some data
+	_, err = db.Conn().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, data TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create test table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO test (data) VALUES ('test data')")
+	if err != nil {
+		t.Fatalf("Failed to insert test data: %v", err)
+	}
+
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create encrypted and compressed backup
+	password := "password-123"
+	configBackup := DefaultBackupConfig()
+	configBackup.Encrypt = true
+	configBackup.EncryptionPassword = password
+	configBackup.Compress = true
+
+	backupPath, err := backupMgr.Backup(configBackup)
+	if err != nil {
+		t.Fatalf("Failed to create encrypted and compressed backup: %v", err)
+	}
+	defer os.Remove(backupPath)
+
+	// Verify backup has both .enc and .gz extensions
+	if filepath.Ext(backupPath) != ".gz" {
+		t.Errorf("Expected .gz extension, got %s", filepath.Ext(backupPath))
+	}
+
+	// Verify base name has .enc
+	baseName := filepath.Base(backupPath)
+	if !contains(baseName, ".enc") {
+		t.Error("Backup filename should contain .enc")
+	}
+
+	// Restore encrypted and compressed backup
+	if err := backupMgr.Restore(backupPath, password); err != nil {
+		t.Fatalf("Failed to restore encrypted and compressed backup: %v", err)
+	}
+
+	// Verify restored data
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database after restore: %v", err)
+	}
+	defer db.Close()
+
+	var data string
+	err = db.Conn().QueryRow("SELECT data FROM test WHERE id = 1").Scan(&data)
+	if err != nil {
+		t.Fatalf("Failed to query restored database: %v", err)
+	}
+
+	if data != "test data" {
+		t.Errorf("Expected 'test data', got '%s'", data)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && substringMatch(s, substr)
+}
+
+func substringMatch(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
