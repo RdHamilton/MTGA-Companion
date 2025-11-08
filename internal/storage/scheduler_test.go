@@ -578,9 +578,15 @@ func TestBackupScheduler_ErrorHandling(t *testing.T) {
 
 	backupMgr := NewBackupManager(dbPath)
 
-	// Create a backup config with invalid backup directory (read-only path)
+	// Create a backup config that will cause errors
+	// Use a file path as the backup directory (should fail on all platforms)
+	invalidBackupDir := filepath.Join(tmpDir, "invalid.txt")
+	if err := os.WriteFile(invalidBackupDir, []byte("not a directory"), 0644); err != nil {
+		t.Fatalf("Failed to create invalid backup dir file: %v", err)
+	}
+
 	backupConfig := DefaultBackupConfig()
-	backupConfig.BackupDir = "/nonexistent/readonly/path"
+	backupConfig.BackupDir = invalidBackupDir // This is a file, not a directory
 
 	schedulerConfig := &SchedulerConfig{
 		Interval:         500 * time.Millisecond,
