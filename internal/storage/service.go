@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/stats"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
@@ -485,6 +486,28 @@ func (s *Service) GetStatsByFormat(ctx context.Context, filter models.StatsFilte
 	}
 
 	return s.matches.GetStatsByFormat(ctx, filter)
+}
+
+// GetPerformanceMetrics retrieves duration-based performance metrics.
+func (s *Service) GetPerformanceMetrics(ctx context.Context, filter models.StatsFilter) (*models.PerformanceMetrics, error) {
+	// Use account filter if specified, otherwise use current account
+	if filter.AccountID == nil {
+		accountID := s.currentAccountID
+		filter.AccountID = &accountID
+	}
+
+	return s.matches.GetPerformanceMetrics(ctx, filter)
+}
+
+// GetStreakStats calculates win/loss streak statistics.
+func (s *Service) GetStreakStats(ctx context.Context, filter models.StatsFilter) (*models.StreakStats, error) {
+	// Get matches ordered by timestamp (oldest to newest) for accurate streak calculation
+	matches, err := s.GetMatches(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get matches for streak calculation: %w", err)
+	}
+
+	return stats.CalculateStreaks(matches), nil
 }
 
 // StoreDeck stores a complete deck with its cards.

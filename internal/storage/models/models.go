@@ -151,3 +151,20 @@ type Statistics struct {
 	WinRate      float64
 	GameWinRate  float64
 }
+
+// StreakStats represents win/loss streak information.
+type StreakStats struct {
+	CurrentStreak     int // Positive = wins, negative = losses, 0 = no streak
+	LongestWinStreak  int
+	LongestLossStreak int
+}
+
+// PerformanceMetrics represents duration-based performance metrics.
+type PerformanceMetrics struct {
+	AvgMatchDuration *float64 // Average match duration in seconds
+	AvgGameDuration  *float64 // Average game duration in seconds
+	FastestMatch     *int     // Fastest match duration in seconds
+	SlowestMatch     *int     // Slowest match duration in seconds
+	FastestGame      *int     // Fastest game duration in seconds
+	SlowestGame      *int     // Slowest game duration in seconds
+}

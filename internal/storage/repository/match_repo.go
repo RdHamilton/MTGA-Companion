@@ -41,6 +41,9 @@ type MatchRepository interface {
 
 	// GetGamesForMatch retrieves all games for a specific match.
 	GetGamesForMatch(ctx context.Context, matchID string) ([]*models.Game, error)
+
+	// GetPerformanceMetrics calculates duration-based performance metrics.
+	GetPerformanceMetrics(ctx context.Context, filter models.StatsFilter) (*models.PerformanceMetrics, error)
 }
 
 // matchRepository is the concrete implementation of MatchRepository.
@@ -570,4 +573,106 @@ func (r *matchRepository) GetGamesForMatch(ctx context.Context, matchID string) 
 	}
 
 	return games, nil
+}
+
+// GetPerformanceMetrics calculates duration-based performance metrics.
+func (r *matchRepository) GetPerformanceMetrics(ctx context.Context, filter models.StatsFilter) (*models.PerformanceMetrics, error) {
+	// Build WHERE clause based on filter
+	where := "WHERE 1=1"
+	args := make([]interface{}, 0)
+
+	if filter.AccountID != nil && *filter.AccountID > 0 {
+		where += " AND account_id = ?"
+		args = append(args, *filter.AccountID)
+	}
+	if filter.StartDate != nil {
+		where += " AND timestamp >= ?"
+		args = append(args, *filter.StartDate)
+	}
+	if filter.EndDate != nil {
+		where += " AND timestamp <= ?"
+		args = append(args, *filter.EndDate)
+	}
+	if filter.Format != nil {
+		where += " AND format = ?"
+		args = append(args, *filter.Format)
+	}
+	if filter.DeckID != nil {
+		where += " AND deck_id = ?"
+		args = append(args, *filter.DeckID)
+	}
+
+	// Get match duration metrics (only consider matches with duration data)
+	matchQuery := fmt.Sprintf(`
+		SELECT
+			AVG(duration_seconds) as avg_duration,
+			MIN(duration_seconds) as min_duration,
+			MAX(duration_seconds) as max_duration
+		FROM matches
+		%s AND duration_seconds IS NOT NULL
+	`, where)
+
+	metrics := &models.PerformanceMetrics{}
+	var avgMatch, minMatch, maxMatch sql.NullFloat64
+
+	err := r.db.QueryRowContext(ctx, matchQuery, args...).Scan(
+		&avgMatch,
+		&minMatch,
+		&maxMatch,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to get match duration metrics: %w", err)
+	}
+
+	// Convert to int pointers for min/max
+	if avgMatch.Valid {
+		avg := avgMatch.Float64
+		metrics.AvgMatchDuration = &avg
+	}
+	if minMatch.Valid {
+		min := int(minMatch.Float64)
+		metrics.FastestMatch = &min
+	}
+	if maxMatch.Valid {
+		max := int(maxMatch.Float64)
+		metrics.SlowestMatch = &max
+	}
+
+	// Get game duration metrics (only consider games with duration data)
+	gameQuery := fmt.Sprintf(`
+		SELECT
+			AVG(g.duration_seconds) as avg_duration,
+			MIN(g.duration_seconds) as min_duration,
+			MAX(g.duration_seconds) as max_duration
+		FROM games g
+		INNER JOIN matches m ON g.match_id = m.id
+		%s AND g.duration_seconds IS NOT NULL
+	`, where)
+
+	var avgGame, minGame, maxGame sql.NullFloat64
+
+	err = r.db.QueryRowContext(ctx, gameQuery, args...).Scan(
+		&avgGame,
+		&minGame,
+		&maxGame,
+	)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to get game duration metrics: %w", err)
+	}
+
+	// Convert to int pointers for min/max
+	if avgGame.Valid {
+		avg := avgGame.Float64
+		metrics.AvgGameDuration = &avg
+	}
+	if minGame.Valid {
+		min := int(minGame.Float64)
+		metrics.FastestGame = &min
+	}
+	if maxGame.Valid {
+		max := int(maxGame.Float64)
+		metrics.SlowestGame = &max
+	}
+
+	return metrics, nil
 }
