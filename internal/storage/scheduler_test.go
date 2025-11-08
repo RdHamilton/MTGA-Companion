@@ -581,7 +581,7 @@ func TestBackupScheduler_ErrorHandling(t *testing.T) {
 	// Create a backup config that will cause errors
 	// Use a file path as the backup directory (should fail on all platforms)
 	invalidBackupDir := filepath.Join(tmpDir, "invalid.txt")
-	if err := os.WriteFile(invalidBackupDir, []byte("not a directory"), 0644); err != nil {
+	if err := os.WriteFile(invalidBackupDir, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("Failed to create invalid backup dir file: %v", err)
 	}
 
