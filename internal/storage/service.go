@@ -464,6 +464,29 @@ func (s *Service) GetMatches(ctx context.Context, filter models.StatsFilter) ([]
 	return matches, nil
 }
 
+// GetRecentMatchesLimit retrieves the N most recent matches.
+// If accountID is 0, returns matches for all accounts.
+func (s *Service) GetRecentMatchesLimit(ctx context.Context, limit int) ([]*models.Match, error) {
+	// Use current account ID or 0 for all accounts
+	accountID := s.currentAccountID
+	if accountID == 0 {
+		// Already 0, show all accounts
+		accountID = 0
+	}
+	return s.matches.GetRecentMatches(ctx, limit, accountID)
+}
+
+// GetStatsByFormat retrieves statistics grouped by format.
+func (s *Service) GetStatsByFormat(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error) {
+	// Use account filter if specified, otherwise use current account
+	if filter.AccountID == nil {
+		accountID := s.currentAccountID
+		filter.AccountID = &accountID
+	}
+
+	return s.matches.GetStatsByFormat(ctx, filter)
+}
+
 // StoreDeck stores a complete deck with its cards.
 func (s *Service) StoreDeck(ctx context.Context, deck *Deck, cards []*DeckCard) error {
 	return s.db.WithTransaction(ctx, func(tx *sql.Tx) error {

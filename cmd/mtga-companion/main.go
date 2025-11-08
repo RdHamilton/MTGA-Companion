@@ -529,7 +529,10 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			continue
 		}
 
-		command := strings.ToLower(input)
+		// Parse command and arguments
+		parts := strings.Fields(input)
+		command := strings.ToLower(parts[0])
+
 		switch command {
 		case "exit", "quit", "q":
 			fmt.Println("Stopping poller...")
@@ -571,6 +574,35 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			handleAccountCommand(service, ctx, input)
 		case "switch", "sw":
 			handleAccountSwitch(service, ctx, input)
+		case "recent", "recentmatches":
+			// Display recent matches with optional limit
+			limit := 10 // default
+			if len(parts) > 1 {
+				if parsedLimit, err := strconv.Atoi(parts[1]); err == nil && parsedLimit > 0 {
+					limit = parsedLimit
+				}
+			}
+			displayRecentMatches(service, ctx, limit)
+		case "format":
+			// Display match history for specific format
+			if len(parts) < 2 {
+				fmt.Println("Usage: format <format_name>")
+				fmt.Println("Example: format Standard")
+			} else {
+				formatName := strings.Join(parts[1:], " ")
+				displayMatchesByFormat(service, ctx, formatName)
+			}
+		case "formats", "byformat", "formatstats":
+			// Display statistics grouped by format
+			displayStatsByFormat(service, ctx)
+		case "daterange", "range":
+			// Display statistics for date range
+			if len(parts) < 3 {
+				fmt.Println("Usage: daterange <start_date> <end_date>")
+				fmt.Println("Example: daterange 2024-01-01 2024-01-31")
+			} else {
+				displayDateRangeStats(service, ctx, parts[1], parts[2])
+			}
 		case "help", "h":
 			printHelp()
 		default:
@@ -1035,6 +1067,10 @@ func printHelp() {
 	fmt.Println("  refresh, r - Refresh and display statistics")
 	fmt.Println("  weekly, week, w - Display weekly statistics")
 	fmt.Println("  monthly, month, m - Display monthly statistics")
+	fmt.Println("  daterange <start> <end> - Display statistics for date range (YYYY-MM-DD)")
+	fmt.Println("  formats, byformat - Display statistics grouped by format")
+	fmt.Println("  recent [limit] - Display recent matches (default: 10)")
+	fmt.Println("  format <name> - Display match history for specific format")
 	fmt.Println("  collection, col, c - Refresh and display card collection")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
