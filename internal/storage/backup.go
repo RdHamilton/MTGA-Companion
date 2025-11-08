@@ -54,6 +54,19 @@ type BackupConfig struct {
 	// 0 means no limit.
 	// Default: 0 (no limit)
 	MaxBackups int
+
+	// Encrypt enables encryption for backups using AES-256-GCM.
+	// Requires EncryptionPassword to be set.
+	// Default: false
+	Encrypt bool
+
+	// EncryptionPassword is the password/passphrase used for encryption.
+	// Only used if Encrypt is true.
+	EncryptionPassword string
+
+	// EncryptionConfig provides advanced encryption settings (Argon2 parameters).
+	// If nil and Encrypt is true, default settings will be used.
+	EncryptionConfig *EncryptionConfig
 }
 
 // DefaultBackupConfig returns a BackupConfig with sensible defaults.
@@ -122,7 +135,24 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 		}
 	}
 
-	// Compress backup if requested
+	// Encrypt backup if requested
+	if config.Encrypt {
+		if config.EncryptionPassword == "" {
+			_ = os.Remove(backupPath)
+			return "", fmt.Errorf("encryption enabled but no password provided")
+		}
+
+		encryptedPath, err := bm.encryptBackup(backupPath, config)
+		if err != nil {
+			// Keep unencrypted backup if encryption fails
+			return backupPath, fmt.Errorf("backup created but encryption failed: %w", err)
+		}
+		// Remove unencrypted backup
+		_ = os.Remove(backupPath)
+		backupPath = encryptedPath
+	}
+
+	// Compress backup if requested (after encryption)
 	if config.Compress {
 		compressedPath, err := bm.compressBackup(backupPath)
 		if err != nil {
@@ -178,23 +208,64 @@ func (bm *BackupManager) backupByCopy(backupPath string) (string, error) {
 
 // Restore restores the database from a backup file.
 // WARNING: This will overwrite the current database.
-func (bm *BackupManager) Restore(backupPath string) error {
+// For encrypted backups, pass the encryption password in encryptionPassword parameter.
+func (bm *BackupManager) Restore(backupPath string, encryptionPassword ...string) error {
 	// Verify backup file exists
 	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 		return fmt.Errorf("backup file does not exist: %s", backupPath)
 	}
 
-	// Check if backup is compressed and decompress if needed
 	actualBackupPath := backupPath
+	var tempFiles []string
+
+	// Check if backup is compressed and decompress if needed
 	if strings.HasSuffix(backupPath, ".gz") {
 		decompressedPath, err := bm.decompressBackup(backupPath)
 		if err != nil {
 			return fmt.Errorf("failed to decompress backup: %w", err)
 		}
 		actualBackupPath = decompressedPath
-		// Clean up decompressed file after restore
-		defer func() { _ = os.Remove(decompressedPath) }() //nolint:errcheck // Ignore error on cleanup
+		tempFiles = append(tempFiles, decompressedPath)
 	}
+
+	// Check if backup is encrypted and decrypt if needed
+	isEncrypted, err := IsEncrypted(actualBackupPath)
+	if err != nil {
+		for _, f := range tempFiles {
+			_ = os.Remove(f)
+		}
+		return fmt.Errorf("failed to check if backup is encrypted: %w", err)
+	}
+
+	if isEncrypted {
+		// Need password for decryption
+		if len(encryptionPassword) == 0 || encryptionPassword[0] == "" {
+			for _, f := range tempFiles {
+				_ = os.Remove(f)
+			}
+			return fmt.Errorf("backup is encrypted but no password provided")
+		}
+
+		decryptedPath := actualBackupPath + ".decrypted"
+		encConfig := DefaultEncryptionConfig(encryptionPassword[0])
+
+		if err := DecryptFile(actualBackupPath, decryptedPath, encConfig); err != nil {
+			for _, f := range tempFiles {
+				_ = os.Remove(f)
+			}
+			return fmt.Errorf("failed to decrypt backup: %w", err)
+		}
+
+		tempFiles = append(tempFiles, decryptedPath)
+		actualBackupPath = decryptedPath
+	}
+
+	// Clean up temporary files after restore
+	defer func() {
+		for _, f := range tempFiles {
+			_ = os.Remove(f)
+		}
+	}()
 
 	// Verify backup integrity
 	if err := bm.VerifyBackup(actualBackupPath); err != nil {
@@ -382,6 +453,27 @@ func calculateChecksum(filePath string) (string, error) {
 func (bm *BackupManager) GetBackupDir() string {
 	dbDir := filepath.Dir(bm.dbPath)
 	return filepath.Join(dbDir, "backups")
+}
+
+// encryptBackup encrypts a backup file using AES-256-GCM.
+func (bm *BackupManager) encryptBackup(backupPath string, config *BackupConfig) (string, error) {
+	// Prepare encryption config
+	encConfig := config.EncryptionConfig
+	if encConfig == nil {
+		encConfig = DefaultEncryptionConfig(config.EncryptionPassword)
+	} else {
+		encConfig.Password = config.EncryptionPassword
+	}
+
+	// Create encrypted file path
+	encryptedPath := backupPath + ".enc"
+
+	// Encrypt the backup file
+	if err := EncryptFile(backupPath, encryptedPath, encConfig); err != nil {
+		return "", fmt.Errorf("failed to encrypt backup: %w", err)
+	}
+
+	return encryptedPath, nil
 }
 
 // compressBackup compresses a backup file using gzip.
