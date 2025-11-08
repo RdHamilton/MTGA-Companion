@@ -382,13 +382,23 @@ func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.S
 
 // displayWeeklyStats displays statistics for the current week.
 func displayWeeklyStats(service *storage.Service, ctx context.Context) {
+	displayWeeklyStatsWithOffset(service, ctx, 0)
+}
+
+// displayWeeklyStatsWithOffset displays statistics for a week with an offset.
+// offset = 0 means current week, -1 means last week, etc.
+func displayWeeklyStatsWithOffset(service *storage.Service, ctx context.Context, offset int) {
+	// Import stats package is needed - add at top of file
+	// For now, calculate inline (will refactor imports later)
+
+	// Get week range using same logic as stats.WeekRange
 	now := time.Now()
-	// Get start of week (Monday)
 	weekday := int(now.Weekday())
 	if weekday == 0 {
-		weekday = 7 // Sunday is 7
+		weekday = 7
 	}
-	weekStart := now.AddDate(0, 0, -weekday+1).Truncate(24 * time.Hour)
+	currentWeekStart := now.AddDate(0, 0, -weekday+1).Truncate(24 * time.Hour)
+	weekStart := currentWeekStart.AddDate(0, 0, offset*7)
 	weekEnd := weekStart.AddDate(0, 0, 7)
 
 	startDate := weekStart
@@ -404,10 +414,27 @@ func displayWeeklyStats(service *storage.Service, ctx context.Context) {
 		return
 	}
 
+	// Get label for the week
+	var label string
+	switch offset {
+	case 0:
+		label = "This Week"
+	case -1:
+		label = "Last Week"
+	case -2:
+		label = "Two Weeks Ago"
+	default:
+		if offset < 0 {
+			label = fmt.Sprintf("%d Weeks Ago", -offset)
+		} else {
+			label = fmt.Sprintf("%d Weeks From Now", offset)
+		}
+	}
+
 	if stats != nil && (stats.TotalMatches > 0 || stats.TotalGames > 0) {
-		fmt.Println("Arena Statistics (This Week)")
-		fmt.Println("----------------------------")
-		fmt.Printf("Period: %s to %s\n", weekStart.Format("2006-01-02"), weekEnd.Format("2006-01-02"))
+		fmt.Printf("Arena Statistics (%s)\n", label)
+		fmt.Println(strings.Repeat("-", len("Arena Statistics ("+label+")")))
+		fmt.Printf("Period: %s to %s\n", weekStart.Format("2006-01-02"), weekEnd.AddDate(0, 0, -1).Format("2006-01-02"))
 
 		if stats.TotalMatches > 0 {
 			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
@@ -420,13 +447,23 @@ func displayWeeklyStats(service *storage.Service, ctx context.Context) {
 		}
 
 		fmt.Println()
+	} else {
+		fmt.Printf("\nNo matches found for %s\n", label)
+		fmt.Printf("Period: %s to %s\n\n", weekStart.Format("2006-01-02"), weekEnd.AddDate(0, 0, -1).Format("2006-01-02"))
 	}
 }
 
 // displayMonthlyStats displays statistics for the current month.
 func displayMonthlyStats(service *storage.Service, ctx context.Context) {
+	displayMonthlyStatsWithOffset(service, ctx, 0)
+}
+
+// displayMonthlyStatsWithOffset displays statistics for a month with an offset.
+// offset = 0 means current month, -1 means last month, etc.
+func displayMonthlyStatsWithOffset(service *storage.Service, ctx context.Context, offset int) {
 	now := time.Now()
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	monthStart := currentMonthStart.AddDate(0, offset, 0)
 	monthEnd := monthStart.AddDate(0, 1, 0)
 
 	startDate := monthStart
@@ -442,10 +479,29 @@ func displayMonthlyStats(service *storage.Service, ctx context.Context) {
 		return
 	}
 
+	// Get label for the month
+	var label string
+	switch offset {
+	case 0:
+		label = "This Month"
+	case -1:
+		label = "Last Month"
+	case -2:
+		label = "Two Months Ago"
+	default:
+		if offset < 0 {
+			label = fmt.Sprintf("%d Months Ago", -offset)
+		} else {
+			label = fmt.Sprintf("%d Months From Now", offset)
+		}
+	}
+
+	monthName := monthStart.Format("January 2006")
+
 	if stats != nil && (stats.TotalMatches > 0 || stats.TotalGames > 0) {
-		fmt.Println("Arena Statistics (This Month)")
-		fmt.Println("------------------------------")
-		fmt.Printf("Period: %s to %s\n", monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"))
+		fmt.Printf("Arena Statistics (%s - %s)\n", label, monthName)
+		fmt.Println(strings.Repeat("-", len("Arena Statistics ("+label+" - "+monthName+")")))
+		fmt.Printf("Period: %s to %s\n", monthStart.Format("2006-01-02"), monthEnd.AddDate(0, 0, -1).Format("2006-01-02"))
 
 		if stats.TotalMatches > 0 {
 			fmt.Printf("Matches: %d-%d (%.1f%% win rate)\n",
@@ -458,6 +514,9 @@ func displayMonthlyStats(service *storage.Service, ctx context.Context) {
 		}
 
 		fmt.Println()
+	} else {
+		fmt.Printf("\nNo matches found for %s (%s)\n", label, monthName)
+		fmt.Printf("Period: %s to %s\n\n", monthStart.Format("2006-01-02"), monthEnd.AddDate(0, 0, -1).Format("2006-01-02"))
 	}
 }
 
@@ -544,9 +603,23 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "refresh", "r":
 			refreshStatistics(service, ctx, logPath)
 		case "weekly", "week", "w":
-			displayWeeklyStats(service, ctx)
+			// Support offset parameter: weekly -1 (last week), weekly -2 (two weeks ago)
+			offset := 0
+			if len(parts) > 1 {
+				if parsedOffset, err := strconv.Atoi(parts[1]); err == nil {
+					offset = parsedOffset
+				}
+			}
+			displayWeeklyStatsWithOffset(service, ctx, offset)
 		case "monthly", "month", "m":
-			displayMonthlyStats(service, ctx)
+			// Support offset parameter: monthly -1 (last month), monthly -2 (two months ago)
+			offset := 0
+			if len(parts) > 1 {
+				if parsedOffset, err := strconv.Atoi(parts[1]); err == nil {
+					offset = parsedOffset
+				}
+			}
+			displayMonthlyStatsWithOffset(service, ctx, offset)
 		case "collection", "col", "c":
 			// Refresh collection from log file
 			refreshCollection(ctx, logPath)
@@ -1065,8 +1138,8 @@ func printHelp() {
 	fmt.Println("\nAvailable commands:")
 	fmt.Println("  (empty)    - Refresh and display statistics")
 	fmt.Println("  refresh, r - Refresh and display statistics")
-	fmt.Println("  weekly, week, w - Display weekly statistics")
-	fmt.Println("  monthly, month, m - Display monthly statistics")
+	fmt.Println("  weekly [offset] - Display weekly statistics (offset: 0=this week, -1=last week)")
+	fmt.Println("  monthly [offset] - Display monthly statistics (offset: 0=this month, -1=last month)")
 	fmt.Println("  daterange <start> <end> - Display statistics for date range (YYYY-MM-DD)")
 	fmt.Println("  formats, byformat - Display statistics grouped by format")
 	fmt.Println("  recent [limit] - Display recent matches (default: 10)")
