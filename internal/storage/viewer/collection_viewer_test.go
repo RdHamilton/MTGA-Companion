@@ -287,6 +287,18 @@ func TestCollectionViewer_FilterBySet(t *testing.T) {
 		t.Fatalf("Expected 1 card with set LEA in database, got %d", cardCount)
 	}
 
+	// Verify card service can read the card directly
+	card1Meta, err := cardService.GetCard(1)
+	if err != nil {
+		t.Fatalf("Card service failed to get card 1: %v", err)
+	}
+	if card1Meta == nil {
+		t.Fatal("Card service returned nil for card 1")
+	}
+	if card1Meta.SetCode != "LEA" {
+		t.Fatalf("Card 1 has set code %q, expected LEA", card1Meta.SetCode)
+	}
+
 	// Filter by set
 	alphaCards, err := viewer.FilterBySet(ctx, "LEA")
 	if err != nil {
