@@ -53,7 +53,7 @@ func (sc *ScryfallClient) GetCardByArenaID(arenaID int) (*Card, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Scryfall API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("scryfall API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -86,7 +86,7 @@ func (sc *ScryfallClient) GetCardByName(name string) (*Card, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Scryfall API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("scryfall API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -130,7 +130,7 @@ func (sc *ScryfallClient) GetBulkDataInfo() ([]BulkDataInfo, error) {
 	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Scryfall API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("scryfall API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

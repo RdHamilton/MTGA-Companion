@@ -72,7 +72,8 @@ func (dv *DeckViewer) GetDeck(ctx context.Context, deckID string) (*models.DeckV
 			Metadata: cardMetadata[deckCard.CardID],
 		}
 
-		if deckCard.Board == "main" {
+		switch deckCard.Board {
+		case "main":
 			view.MainboardCards = append(view.MainboardCards, cardView)
 			view.TotalMainboard += deckCard.Quantity
 
@@ -86,7 +87,7 @@ func (dv *DeckViewer) GetDeck(ctx context.Context, deckID string) (*models.DeckV
 					colorSet[color] = true
 				}
 			}
-		} else if deckCard.Board == "sideboard" {
+		case "sideboard":
 			view.SideboardCards = append(view.SideboardCards, cardView)
 			view.TotalSideboard += deckCard.Quantity
 		}
