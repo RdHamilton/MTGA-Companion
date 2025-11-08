@@ -176,7 +176,7 @@ func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	plaintext, err := io.ReadAll(sourceFile)
 	if err != nil {
@@ -194,7 +194,7 @@ func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Write magic header
 	if _, err := destFile.Write([]byte(EncryptionMagicHeader)); err != nil {
@@ -216,7 +216,7 @@ func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to open encrypted file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	data, err := io.ReadAll(sourceFile)
 	if err != nil {
@@ -247,7 +247,7 @@ func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	if _, err := destFile.Write(plaintext); err != nil {
 		return fmt.Errorf("failed to write decrypted file: %w", err)
@@ -262,7 +262,7 @@ func IsEncrypted(filePath string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	header := make([]byte, len(EncryptionMagicHeader))
 	n, err := file.Read(header)
