@@ -193,7 +193,7 @@ func (bm *BackupManager) Restore(backupPath string) error {
 		}
 		actualBackupPath = decompressedPath
 		// Clean up decompressed file after restore
-		defer os.Remove(decompressedPath)
+		defer func() { _ = os.Remove(decompressedPath) }() //nolint:errcheck // Ignore error on cleanup
 	}
 
 	// Verify backup integrity
@@ -391,7 +391,7 @@ func (bm *BackupManager) compressBackup(backupPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Create compressed file
 	compressedPath := backupPath + ".gz"
@@ -399,11 +399,11 @@ func (bm *BackupManager) compressBackup(backupPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create compressed file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Create gzip writer
 	gzipWriter := gzip.NewWriter(destFile)
-	defer gzipWriter.Close()
+	defer func() { _ = gzipWriter.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Copy and compress
 	if _, err := io.Copy(gzipWriter, sourceFile); err != nil {
@@ -421,14 +421,14 @@ func (bm *BackupManager) decompressBackup(compressedPath string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to open compressed file: %w", err)
 	}
-	defer compressedFile.Close()
+	defer func() { _ = compressedFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Create gzip reader
 	gzipReader, err := gzip.NewReader(compressedFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Create decompressed file (remove .gz extension)
 	decompressedPath := strings.TrimSuffix(compressedPath, ".gz")
@@ -436,7 +436,7 @@ func (bm *BackupManager) decompressBackup(compressedPath string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to create decompressed file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	// Decompress
 	if _, err := io.Copy(destFile, gzipReader); err != nil {
