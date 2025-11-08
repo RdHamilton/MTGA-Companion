@@ -3,6 +3,7 @@ package storage
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -116,13 +117,16 @@ func TestBackupScheduler_StartImmediately(t *testing.T) {
 
 	backupMgr := NewBackupManager(dbPath)
 
+	var mu sync.Mutex
 	backupExecuted := false
 	schedulerConfig := &SchedulerConfig{
 		Interval:         10 * time.Second,
 		BackupConfig:     DefaultBackupConfig(),
 		StartImmediately: true,
 		OnBackupComplete: func(backupPath string, err error) {
+			mu.Lock()
 			backupExecuted = true
+			mu.Unlock()
 		},
 	}
 
@@ -140,14 +144,20 @@ func TestBackupScheduler_StartImmediately(t *testing.T) {
 	elapsed := time.Duration(0)
 
 	for elapsed < maxWait {
-		if backupExecuted {
+		mu.Lock()
+		executed := backupExecuted
+		mu.Unlock()
+		if executed {
 			break
 		}
 		time.Sleep(checkInterval)
 		elapsed += checkInterval
 	}
 
-	if !backupExecuted {
+	mu.Lock()
+	executed := backupExecuted
+	mu.Unlock()
+	if !executed {
 		t.Error("Backup should have been executed immediately")
 	}
 
@@ -171,12 +181,15 @@ func TestBackupScheduler_ScheduledExecution(t *testing.T) {
 
 	backupMgr := NewBackupManager(dbPath)
 
+	var mu sync.Mutex
 	backupCount := 0
 	schedulerConfig := &SchedulerConfig{
 		Interval:     500 * time.Millisecond,
 		BackupConfig: DefaultBackupConfig(),
 		OnBackupComplete: func(backupPath string, err error) {
+			mu.Lock()
 			backupCount++
+			mu.Unlock()
 		},
 	}
 
@@ -193,7 +206,10 @@ func TestBackupScheduler_ScheduledExecution(t *testing.T) {
 	elapsed := time.Duration(0)
 
 	for elapsed < maxWait {
-		if backupCount >= 2 {
+		mu.Lock()
+		count := backupCount
+		mu.Unlock()
+		if count >= 2 {
 			break
 		}
 		time.Sleep(checkInterval)
@@ -204,8 +220,11 @@ func TestBackupScheduler_ScheduledExecution(t *testing.T) {
 		t.Fatalf("Failed to stop scheduler: %v", err)
 	}
 
-	if backupCount < 2 {
-		t.Errorf("Expected at least 2 backups, got %d", backupCount)
+	mu.Lock()
+	count := backupCount
+	mu.Unlock()
+	if count < 2 {
+		t.Errorf("Expected at least 2 backups, got %d", count)
 	}
 
 	status := scheduler.Status()
@@ -228,12 +247,15 @@ func TestBackupScheduler_TriggerBackup(t *testing.T) {
 
 	backupMgr := NewBackupManager(dbPath)
 
+	var mu sync.Mutex
 	backupExecuted := false
 	schedulerConfig := &SchedulerConfig{
 		Interval:     1 * time.Hour, // Long interval
 		BackupConfig: DefaultBackupConfig(),
 		OnBackupComplete: func(backupPath string, err error) {
+			mu.Lock()
 			backupExecuted = true
+			mu.Unlock()
 		},
 	}
 
@@ -260,14 +282,20 @@ func TestBackupScheduler_TriggerBackup(t *testing.T) {
 	elapsed := time.Duration(0)
 
 	for elapsed < maxWait {
-		if backupExecuted {
+		mu.Lock()
+		executed := backupExecuted
+		mu.Unlock()
+		if executed {
 			break
 		}
 		time.Sleep(checkInterval)
 		elapsed += checkInterval
 	}
 
-	if !backupExecuted {
+	mu.Lock()
+	executed := backupExecuted
+	mu.Unlock()
+	if !executed {
 		t.Error("Triggered backup should have executed")
 	}
 
@@ -422,6 +450,7 @@ func TestBackupScheduler_CallbackFunctionality(t *testing.T) {
 
 	backupMgr := NewBackupManager(dbPath)
 
+	var mu sync.Mutex
 	var callbackPath string
 	var callbackErr error
 	callbackCalled := false
@@ -430,9 +459,11 @@ func TestBackupScheduler_CallbackFunctionality(t *testing.T) {
 		Interval:     500 * time.Millisecond,
 		BackupConfig: DefaultBackupConfig(),
 		OnBackupComplete: func(backupPath string, err error) {
+			mu.Lock()
 			callbackPath = backupPath
 			callbackErr = err
 			callbackCalled = true
+			mu.Unlock()
 		},
 	}
 
@@ -448,7 +479,10 @@ func TestBackupScheduler_CallbackFunctionality(t *testing.T) {
 	elapsed := time.Duration(0)
 
 	for elapsed < maxWait {
-		if callbackCalled {
+		mu.Lock()
+		called := callbackCalled
+		mu.Unlock()
+		if called {
 			break
 		}
 		time.Sleep(checkInterval)
@@ -457,21 +491,27 @@ func TestBackupScheduler_CallbackFunctionality(t *testing.T) {
 
 	scheduler.Stop()
 
-	if !callbackCalled {
+	mu.Lock()
+	called := callbackCalled
+	path := callbackPath
+	cbErr := callbackErr
+	mu.Unlock()
+
+	if !called {
 		t.Error("Callback should have been called")
 	}
 
-	if callbackPath == "" {
+	if path == "" {
 		t.Error("Callback should have received backup path")
 	}
 
-	if callbackErr != nil {
-		t.Errorf("Callback should not have received error: %v", callbackErr)
+	if cbErr != nil {
+		t.Errorf("Callback should not have received error: %v", cbErr)
 	}
 
 	// Verify backup file exists
-	if _, err := os.Stat(callbackPath); os.IsNotExist(err) {
-		t.Errorf("Backup file from callback should exist: %s", callbackPath)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Errorf("Backup file from callback should exist: %s", path)
 	}
 }
 

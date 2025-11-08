@@ -73,8 +73,10 @@ func (s *BackupScheduler) Start() error {
 	}
 
 	s.ticker = time.NewTicker(s.config.Interval)
+	s.stopChan = make(chan struct{}) // Create new stop channel for this run
 	s.running = true
-	ticker := s.ticker // Store reference before unlocking
+	ticker := s.ticker     // Store reference before unlocking
+	stopChan := s.stopChan // Store reference before unlocking
 	s.mu.Unlock()
 
 	// Run backup immediately if configured
@@ -82,8 +84,8 @@ func (s *BackupScheduler) Start() error {
 		go s.runBackup()
 	}
 
-	// Start scheduler goroutine with ticker reference
-	go s.run(ticker)
+	// Start scheduler goroutine with ticker and stopChan references
+	go s.run(ticker, stopChan)
 
 	return nil
 }
@@ -96,10 +98,11 @@ func (s *BackupScheduler) Stop() error {
 		s.mu.Unlock()
 		return fmt.Errorf("scheduler is not running")
 	}
+	stopChan := s.stopChan // Get reference before unlocking
 	s.mu.Unlock()
 
-	// Signal stop
-	close(s.stopChan)
+	// Signal stop by closing the channel
+	close(stopChan)
 
 	// Wait for ticker to stop
 	s.mu.Lock()
@@ -110,19 +113,16 @@ func (s *BackupScheduler) Stop() error {
 	s.running = false
 	s.mu.Unlock()
 
-	// Create new stop channel for potential restart
-	s.stopChan = make(chan struct{})
-
 	return nil
 }
 
 // run is the main scheduler loop.
-func (s *BackupScheduler) run(ticker *time.Ticker) {
+func (s *BackupScheduler) run(ticker *time.Ticker, stopChan <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
 			s.runBackup()
-		case <-s.stopChan:
+		case <-stopChan:
 			return
 		}
 	}
