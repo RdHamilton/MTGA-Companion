@@ -240,9 +240,17 @@ func TestCollectionViewer_FilterBySet(t *testing.T) {
 	viewer := NewCollectionViewer(db, cardService)
 	ctx := context.Background()
 
+	var err error
+
 	// Add test cards
-	_, _ = db.ExecContext(ctx, "INSERT INTO collection (card_id, quantity) VALUES (?, ?)", 1, 2)
-	_, _ = db.ExecContext(ctx, "INSERT INTO collection (card_id, quantity) VALUES (?, ?)", 2, 3)
+	_, err = db.ExecContext(ctx, "INSERT INTO collection (card_id, quantity) VALUES (?, ?)", 1, 2)
+	if err != nil {
+		t.Fatalf("Failed to insert collection card: %v", err)
+	}
+	_, err = db.ExecContext(ctx, "INSERT INTO collection (card_id, quantity) VALUES (?, ?)", 2, 3)
+	if err != nil {
+		t.Fatalf("Failed to insert collection card: %v", err)
+	}
 
 	// Add metadata for cards from different sets
 	card1 := &cards.Card{
@@ -257,13 +265,26 @@ func TestCollectionViewer_FilterBySet(t *testing.T) {
 	}
 
 	for _, card := range []*cards.Card{card1, card2} {
-		_, _ = db.Exec(`
+		_, err = db.Exec(`
 			INSERT INTO cards (arena_id, scryfall_id, name, type_line, set_code, set_name,
 				cmc, colors, color_identity, rarity, layout, collector_number, released_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, card.ArenaID, card.ScryfallID, card.Name, card.TypeLine, card.SetCode,
 			card.SetName, card.CMC, "[]", "[]", card.Rarity, card.Layout,
 			card.CollectorNumber, card.ReleasedAt.Format("2006-01-02"))
+		if err != nil {
+			t.Fatalf("Failed to insert card metadata: %v", err)
+		}
+	}
+
+	// Verify cards exist in database before filtering
+	var cardCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM cards WHERE set_code = 'LEA'").Scan(&cardCount)
+	if err != nil {
+		t.Fatalf("Failed to count cards in DB: %v", err)
+	}
+	if cardCount != 1 {
+		t.Fatalf("Expected 1 card with set LEA in database, got %d", cardCount)
 	}
 
 	// Filter by set

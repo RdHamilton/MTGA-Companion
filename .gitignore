@@ -20,6 +20,11 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# SQLite database files
+*.sqlite
+*.sqlite3
+*.db
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
