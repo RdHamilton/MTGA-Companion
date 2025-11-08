@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"compress/gzip"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -8,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -35,6 +38,22 @@ type BackupConfig struct {
 
 	// VerifyBackup indicates whether to verify the backup after creation.
 	VerifyBackup bool
+
+	// Compress enables gzip compression for backups.
+	// Default: false
+	Compress bool
+
+	// RetentionDays specifies how many days to keep backups.
+	// Backups older than this will be automatically cleaned up.
+	// 0 means no automatic cleanup.
+	// Default: 0 (no cleanup)
+	RetentionDays int
+
+	// MaxBackups specifies the maximum number of backups to keep.
+	// When this limit is exceeded, oldest backups are removed.
+	// 0 means no limit.
+	// Default: 0 (no limit)
+	MaxBackups int
 }
 
 // DefaultBackupConfig returns a BackupConfig with sensible defaults.
@@ -103,6 +122,26 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 		}
 	}
 
+	// Compress backup if requested
+	if config.Compress {
+		compressedPath, err := bm.compressBackup(backupPath)
+		if err != nil {
+			// Keep uncompressed backup if compression fails
+			return backupPath, fmt.Errorf("backup created but compression failed: %w", err)
+		}
+		// Remove uncompressed backup
+		_ = os.Remove(backupPath)
+		backupPath = compressedPath
+	}
+
+	// Run cleanup if retention policy is set
+	if config.RetentionDays > 0 || config.MaxBackups > 0 {
+		if err := bm.CleanupBackups(backupDir, config.RetentionDays, config.MaxBackups); err != nil {
+			// Log error but don't fail backup
+			_ = err
+		}
+	}
+
 	return backupPath, nil
 }
 
@@ -145,8 +184,20 @@ func (bm *BackupManager) Restore(backupPath string) error {
 		return fmt.Errorf("backup file does not exist: %s", backupPath)
 	}
 
+	// Check if backup is compressed and decompress if needed
+	actualBackupPath := backupPath
+	if strings.HasSuffix(backupPath, ".gz") {
+		decompressedPath, err := bm.decompressBackup(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to decompress backup: %w", err)
+		}
+		actualBackupPath = decompressedPath
+		// Clean up decompressed file after restore
+		defer func() { _ = os.Remove(decompressedPath) }() //nolint:errcheck // Ignore error on cleanup
+	}
+
 	// Verify backup integrity
-	if err := bm.VerifyBackup(backupPath); err != nil {
+	if err := bm.VerifyBackup(actualBackupPath); err != nil {
 		return fmt.Errorf("backup verification failed: %w", err)
 	}
 
@@ -157,7 +208,7 @@ func (bm *BackupManager) Restore(backupPath string) error {
 	tempPath := bm.dbPath + ".restore.tmp"
 
 	// Copy backup to temporary location
-	sourceFile, err := os.Open(backupPath)
+	sourceFile, err := os.Open(actualBackupPath)
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
@@ -331,4 +382,140 @@ func calculateChecksum(filePath string) (string, error) {
 func (bm *BackupManager) GetBackupDir() string {
 	dbDir := filepath.Dir(bm.dbPath)
 	return filepath.Join(dbDir, "backups")
+}
+
+// compressBackup compresses a backup file using gzip.
+func (bm *BackupManager) compressBackup(backupPath string) (string, error) {
+	// Open source file
+	sourceFile, err := os.Open(backupPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open backup file: %w", err)
+	}
+	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Create compressed file
+	compressedPath := backupPath + ".gz"
+	destFile, err := os.Create(compressedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create compressed file: %w", err)
+	}
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Create gzip writer
+	gzipWriter := gzip.NewWriter(destFile)
+	defer func() { _ = gzipWriter.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Copy and compress
+	if _, err := io.Copy(gzipWriter, sourceFile); err != nil {
+		_ = os.Remove(compressedPath)
+		return "", fmt.Errorf("failed to compress backup: %w", err)
+	}
+
+	return compressedPath, nil
+}
+
+// decompressBackup decompresses a gzipped backup file.
+func (bm *BackupManager) decompressBackup(compressedPath string) (string, error) {
+	// Open compressed file
+	compressedFile, err := os.Open(compressedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open compressed file: %w", err)
+	}
+	defer func() { _ = compressedFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Create gzip reader
+	gzipReader, err := gzip.NewReader(compressedFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer func() { _ = gzipReader.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Create decompressed file (remove .gz extension)
+	decompressedPath := strings.TrimSuffix(compressedPath, ".gz")
+	destFile, err := os.Create(decompressedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create decompressed file: %w", err)
+	}
+	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Decompress
+	if _, err := io.Copy(destFile, gzipReader); err != nil {
+		_ = os.Remove(decompressedPath)
+		return "", fmt.Errorf("failed to decompress backup: %w", err)
+	}
+
+	return decompressedPath, nil
+}
+
+// CleanupBackups removes old backups based on retention policy.
+func (bm *BackupManager) CleanupBackups(backupDir string, retentionDays int, maxBackups int) error {
+	if backupDir == "" {
+		backupDir = bm.GetBackupDir()
+	}
+
+	// Get all backup files
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	// Collect backup files with their info
+	type backupFile struct {
+		path    string
+		modTime time.Time
+	}
+	var backups []backupFile
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		// Include .db and .db.gz files
+		ext := filepath.Ext(entry.Name())
+		if ext != ".db" && ext != ".gz" {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		backups = append(backups, backupFile{
+			path:    filepath.Join(backupDir, entry.Name()),
+			modTime: info.ModTime(),
+		})
+	}
+
+	// Sort backups by modification time (oldest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].modTime.Before(backups[j].modTime)
+	})
+
+	var removed int
+
+	// Remove backups older than retention days
+	if retentionDays > 0 {
+		cutoff := time.Now().AddDate(0, 0, -retentionDays)
+		for _, backup := range backups {
+			if backup.modTime.Before(cutoff) {
+				if err := os.Remove(backup.path); err == nil {
+					removed++
+				}
+			}
+		}
+	}
+
+	// Remove excess backups beyond maxBackups limit
+	if maxBackups > 0 && len(backups)-removed > maxBackups {
+		toRemove := len(backups) - removed - maxBackups
+		for i := 0; i < toRemove && i < len(backups); i++ {
+			if err := os.Remove(backups[i].path); err == nil {
+				removed++
+			}
+		}
+	}
+
+	return nil
 }
