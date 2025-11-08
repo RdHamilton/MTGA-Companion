@@ -465,6 +465,7 @@ func TestMatchRepository_GetStats(t *testing.T) {
 		t.Errorf("expected 3 matches for Standard, got %d", stats.TotalMatches)
 	}
 }
+
 func TestMatchRepository_GetRecentMatches(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()

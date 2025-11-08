@@ -32,11 +32,14 @@ func displayRecentMatches(service *storage.Service, ctx context.Context, limit i
 		timeStr := match.Timestamp.Format("2006-01-02 15:04")
 
 		// Get result indicator
-		resultStr := "LOSS"
-		if match.Result == "win" {
+		var resultStr string
+		switch match.Result {
+		case "win":
 			resultStr = "WIN"
-		} else if match.Result == "draw" {
+		case "draw":
 			resultStr = "DRAW"
+		default:
+			resultStr = "LOSS"
 		}
 
 		// Get score
@@ -128,11 +131,14 @@ func displayMatchesByFormat(service *storage.Service, ctx context.Context, forma
 		timeStr := match.Timestamp.Format("2006-01-02 15:04")
 
 		// Get result indicator
-		resultStr := "LOSS"
-		if match.Result == "win" {
+		var resultStr string
+		switch match.Result {
+		case "win":
 			resultStr = "WIN"
-		} else if match.Result == "draw" {
+		case "draw":
 			resultStr = "DRAW"
+		default:
+			resultStr = "LOSS"
 		}
 
 		// Get score
