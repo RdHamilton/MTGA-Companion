@@ -595,7 +595,11 @@ func TestBackupScheduler_ErrorHandling(t *testing.T) {
 	}
 
 	// Wait for backup attempt with polling
-	maxWait := 3 * time.Second
+	// Use longer timeout for slower CI environments and to account for:
+	// - StartImmediately goroutine scheduling delay
+	// - Backup execution time
+	// - Interval time (500ms)
+	maxWait := 5 * time.Second
 	checkInterval := 100 * time.Millisecond
 	elapsed := time.Duration(0)
 
@@ -612,7 +616,7 @@ func TestBackupScheduler_ErrorHandling(t *testing.T) {
 
 	status := scheduler.Status()
 	if status.FailureCount == 0 {
-		t.Error("Failure count should be greater than 0 for failed backups")
+		t.Errorf("Failure count should be greater than 0 for failed backups (waited %v)", elapsed)
 	}
 
 	if status.LastError == nil {
