@@ -51,13 +51,13 @@ func (dv *DeckViewer) GetDeck(ctx context.Context, deckID string) (*models.DeckV
 
 	// Build deck view
 	view := &models.DeckView{
-		Deck:            deck,
-		MainboardCards:  make([]*models.DeckCardView, 0),
-		SideboardCards:  make([]*models.DeckCardView, 0),
-		TotalMainboard:  0,
-		TotalSideboard:  0,
-		ColorIdentity:   make([]string, 0),
-		ManaCurve:       make(map[int]int),
+		Deck:           deck,
+		MainboardCards: make([]*models.DeckCardView, 0),
+		SideboardCards: make([]*models.DeckCardView, 0),
+		TotalMainboard: 0,
+		TotalSideboard: 0,
+		ColorIdentity:  make([]string, 0),
+		ManaCurve:      make(map[int]int),
 	}
 
 	// Process deck cards

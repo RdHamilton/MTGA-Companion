@@ -51,45 +51,45 @@ type Card struct {
 
 // CardFace represents one face of a multi-faced card.
 type CardFace struct {
-	Name      string   `json:"name"`
-	TypeLine  string   `json:"type_line"`
-	ManaCost  *string  `json:"mana_cost"`
-	OracleText *string `json:"oracle_text"`
-	Colors    []string `json:"colors"`
-	Power     *string  `json:"power,omitempty"`
-	Toughness *string  `json:"toughness,omitempty"`
-	Loyalty   *string  `json:"loyalty,omitempty"`
-	ImageURI  *string  `json:"image_uri,omitempty"`
+	Name       string   `json:"name"`
+	TypeLine   string   `json:"type_line"`
+	ManaCost   *string  `json:"mana_cost"`
+	OracleText *string  `json:"oracle_text"`
+	Colors     []string `json:"colors"`
+	Power      *string  `json:"power,omitempty"`
+	Toughness  *string  `json:"toughness,omitempty"`
+	Loyalty    *string  `json:"loyalty,omitempty"`
+	ImageURI   *string  `json:"image_uri,omitempty"`
 }
 
 // ScryfallCard represents the Scryfall API response format.
 // This matches Scryfall's card object schema.
 type ScryfallCard struct {
-	ID              string        `json:"id"`
-	OracleID        string        `json:"oracle_id"`
-	MultiverseIDs   []int         `json:"multiverse_ids,omitempty"`
-	ArenaID         int           `json:"arena_id"`
-	Name            string        `json:"name"`
-	Lang            string        `json:"lang"`
-	ReleasedAt      string        `json:"released_at"`
-	URI             string        `json:"uri"`
-	ScryfallURI     string        `json:"scryfall_uri"`
-	Layout          string        `json:"layout"`
-	ImageURIs       *ImageURIs    `json:"image_uris,omitempty"`
-	ManaCost        string        `json:"mana_cost"`
-	CMC             float64       `json:"cmc"`
-	TypeLine        string        `json:"type_line"`
-	OracleText      string        `json:"oracle_text,omitempty"`
-	Power           string        `json:"power,omitempty"`
-	Toughness       string        `json:"toughness,omitempty"`
-	Loyalty         string        `json:"loyalty,omitempty"`
-	Colors          []string      `json:"colors"`
-	ColorIdentity   []string      `json:"color_identity"`
-	Set             string        `json:"set"`
-	SetName         string        `json:"set_name"`
-	CollectorNumber string        `json:"collector_number"`
-	Rarity          string        `json:"rarity"`
-	FlavorText      string        `json:"flavor_text,omitempty"`
+	ID              string             `json:"id"`
+	OracleID        string             `json:"oracle_id"`
+	MultiverseIDs   []int              `json:"multiverse_ids,omitempty"`
+	ArenaID         int                `json:"arena_id"`
+	Name            string             `json:"name"`
+	Lang            string             `json:"lang"`
+	ReleasedAt      string             `json:"released_at"`
+	URI             string             `json:"uri"`
+	ScryfallURI     string             `json:"scryfall_uri"`
+	Layout          string             `json:"layout"`
+	ImageURIs       *ImageURIs         `json:"image_uris,omitempty"`
+	ManaCost        string             `json:"mana_cost"`
+	CMC             float64            `json:"cmc"`
+	TypeLine        string             `json:"type_line"`
+	OracleText      string             `json:"oracle_text,omitempty"`
+	Power           string             `json:"power,omitempty"`
+	Toughness       string             `json:"toughness,omitempty"`
+	Loyalty         string             `json:"loyalty,omitempty"`
+	Colors          []string           `json:"colors"`
+	ColorIdentity   []string           `json:"color_identity"`
+	Set             string             `json:"set"`
+	SetName         string             `json:"set_name"`
+	CollectorNumber string             `json:"collector_number"`
+	Rarity          string             `json:"rarity"`
+	FlavorText      string             `json:"flavor_text,omitempty"`
 	CardFaces       []ScryfallCardFace `json:"card_faces,omitempty"`
 }
 

@@ -20,13 +20,13 @@ func NewDraftViewer(cardService *cards.Service) *DraftViewer {
 
 // DraftPickView represents a single draft pick with metadata.
 type DraftPickView struct {
-	CourseID         string
-	PackNumber       int
-	PickNumber       int
-	SelectedCard     *models.DraftCardView
-	AvailableCards   []*models.DraftCardView
-	TotalAvailable   int
-	CardsWithMeta    int // Number of cards that have metadata
+	CourseID       string
+	PackNumber     int
+	PickNumber     int
+	SelectedCard   *models.DraftCardView
+	AvailableCards []*models.DraftCardView
+	TotalAvailable int
+	CardsWithMeta  int // Number of cards that have metadata
 }
 
 // DraftView represents a complete draft with all picks and metadata.
@@ -41,12 +41,12 @@ type DraftView struct {
 
 // DraftColorAnalysis provides analysis of colors in a draft pool.
 type DraftColorAnalysis struct {
-	White int
-	Blue  int
-	Black int
-	Red   int
-	Green int
-	Gold  int // Multi-color cards
+	White     int
+	Blue      int
+	Black     int
+	Red       int
+	Green     int
+	Gold      int // Multi-color cards
 	Colorless int
 }
 

@@ -45,10 +45,10 @@ type DeckView struct {
 	Deck *Deck
 
 	// Cards in the deck with metadata
-	MainboardCards  []*DeckCardView
-	SideboardCards  []*DeckCardView
-	TotalMainboard  int // Total number of cards in mainboard
-	TotalSideboard  int // Total number of cards in sideboard
-	ColorIdentity   []string
-	ManaCurve       map[int]int // CMC -> count
+	MainboardCards []*DeckCardView
+	SideboardCards []*DeckCardView
+	TotalMainboard int // Total number of cards in mainboard
+	TotalSideboard int // Total number of cards in sideboard
+	ColorIdentity  []string
+	ManaCurve      map[int]int // CMC -> count
 }
