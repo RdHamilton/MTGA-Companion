@@ -248,7 +248,6 @@ func (s *Service) getCardFromDB(arenaID int) (*Card, error) {
 		&card.CollectorNumber,
 		&releasedAtStr,
 	)
-
 	if err != nil {
 		return nil, err
 	}

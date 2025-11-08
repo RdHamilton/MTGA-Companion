@@ -184,15 +184,21 @@ func TestCollectionViewer_FilterByRarity(t *testing.T) {
 
 	// Add metadata for cards with different rarities
 	cards := []*cards.Card{
-		{ArenaID: 1, ScryfallID: "1", Name: "Common Card", TypeLine: "Creature", SetCode: "TST",
+		{
+			ArenaID: 1, ScryfallID: "1", Name: "Common Card", TypeLine: "Creature", SetCode: "TST",
 			SetName: "Test", CMC: 1, Rarity: "common", Layout: "normal",
-			CollectorNumber: "1", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{}},
-		{ArenaID: 2, ScryfallID: "2", Name: "Rare Card", TypeLine: "Creature", SetCode: "TST",
+			CollectorNumber: "1", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{},
+		},
+		{
+			ArenaID: 2, ScryfallID: "2", Name: "Rare Card", TypeLine: "Creature", SetCode: "TST",
 			SetName: "Test", CMC: 2, Rarity: "rare", Layout: "normal",
-			CollectorNumber: "2", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{}},
-		{ArenaID: 3, ScryfallID: "3", Name: "Mythic Card", TypeLine: "Creature", SetCode: "TST",
+			CollectorNumber: "2", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{},
+		},
+		{
+			ArenaID: 3, ScryfallID: "3", Name: "Mythic Card", TypeLine: "Creature", SetCode: "TST",
 			SetName: "Test", CMC: 3, Rarity: "mythic", Layout: "normal",
-			CollectorNumber: "3", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{}},
+			CollectorNumber: "3", ReleasedAt: time.Now(), Colors: []string{}, ColorIdentity: []string{},
+		},
 	}
 
 	for _, card := range cards {
