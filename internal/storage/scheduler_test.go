@@ -133,8 +133,19 @@ func TestBackupScheduler_StartImmediately(t *testing.T) {
 	}
 	defer scheduler.Stop()
 
-	// Wait a bit for the immediate backup to execute
-	time.Sleep(500 * time.Millisecond)
+	// Wait for the immediate backup to execute with polling
+	// Use longer timeout for slower CI environments
+	maxWait := 3 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		if backupExecuted {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	if !backupExecuted {
 		t.Error("Backup should have been executed immediately")
@@ -175,8 +186,19 @@ func TestBackupScheduler_ScheduledExecution(t *testing.T) {
 		t.Fatalf("Failed to start scheduler: %v", err)
 	}
 
-	// Wait for at least 2 backups to execute
-	time.Sleep(1200 * time.Millisecond)
+	// Wait for at least 2 backups to execute with polling
+	// Use longer timeout and check interval for slower CI environments
+	maxWait := 5 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		if backupCount >= 2 {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	if err := scheduler.Stop(); err != nil {
 		t.Fatalf("Failed to stop scheduler: %v", err)
@@ -232,8 +254,18 @@ func TestBackupScheduler_TriggerBackup(t *testing.T) {
 		t.Fatalf("TriggerBackup failed: %v", err)
 	}
 
-	// Wait for backup to execute
-	time.Sleep(500 * time.Millisecond)
+	// Wait for backup to execute with polling
+	maxWait := 3 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		if backupExecuted {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	if !backupExecuted {
 		t.Error("Triggered backup should have executed")
@@ -276,8 +308,19 @@ func TestBackupScheduler_Status(t *testing.T) {
 		t.Fatalf("Failed to start scheduler: %v", err)
 	}
 
-	// Wait for at least one backup
-	time.Sleep(600 * time.Millisecond)
+	// Wait for at least one backup with polling
+	maxWait := 3 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		status = scheduler.Status()
+		if status.BackupCount > 0 {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	status = scheduler.Status()
 	if !status.Running {
@@ -399,8 +442,18 @@ func TestBackupScheduler_CallbackFunctionality(t *testing.T) {
 		t.Fatalf("Failed to start scheduler: %v", err)
 	}
 
-	// Wait for backup to execute
-	time.Sleep(600 * time.Millisecond)
+	// Wait for backup to execute with polling
+	maxWait := 3 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		if callbackCalled {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	scheduler.Stop()
 
@@ -453,8 +506,8 @@ func TestBackupScheduler_MultipleStartStopCycles(t *testing.T) {
 			t.Errorf("Cycle %d: Scheduler should be running", i)
 		}
 
-		// Wait a bit
-		time.Sleep(200 * time.Millisecond)
+		// Wait a bit for scheduler to settle
+		time.Sleep(300 * time.Millisecond)
 
 		if err := scheduler.Stop(); err != nil {
 			t.Fatalf("Cycle %d: Failed to stop scheduler: %v", i, err)
@@ -501,8 +554,19 @@ func TestBackupScheduler_ErrorHandling(t *testing.T) {
 		t.Fatalf("Failed to start scheduler: %v", err)
 	}
 
-	// Wait for backup attempt
-	time.Sleep(600 * time.Millisecond)
+	// Wait for backup attempt with polling
+	maxWait := 3 * time.Second
+	checkInterval := 100 * time.Millisecond
+	elapsed := time.Duration(0)
+
+	for elapsed < maxWait {
+		status := scheduler.Status()
+		if status.FailureCount > 0 {
+			break
+		}
+		time.Sleep(checkInterval)
+		elapsed += checkInterval
+	}
 
 	scheduler.Stop()
 
