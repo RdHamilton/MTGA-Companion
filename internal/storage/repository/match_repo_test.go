@@ -465,3 +465,327 @@ func TestMatchRepository_GetStats(t *testing.T) {
 		t.Errorf("expected 3 matches for Standard, got %d", stats.TotalMatches)
 	}
 }
+func TestMatchRepository_GetRecentMatches(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	twoHoursAgo := now.Add(-2 * time.Hour)
+	threeHoursAgo := now.Add(-3 * time.Hour)
+
+	// Create matches with different timestamps
+	matches := []*models.Match{
+		{
+			ID:           "match-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Oldest Match",
+			Timestamp:    threeHoursAgo,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    threeHoursAgo,
+		},
+		{
+			ID:           "match-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Middle Match",
+			Timestamp:    twoHoursAgo,
+			PlayerWins:   1,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "loss",
+			CreatedAt:    twoHoursAgo,
+		},
+		{
+			ID:           "match-3",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Newer Match",
+			Timestamp:    oneHourAgo,
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    oneHourAgo,
+		},
+		{
+			ID:           "match-4",
+			AccountID:    1,
+			EventID:      "event-4",
+			EventName:    "Newest Match",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Limited",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Test getting recent 2 matches
+	results, err := repo.GetRecentMatches(ctx, 2, 0)
+	if err != nil {
+		t.Fatalf("failed to get recent matches: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 matches, got %d", len(results))
+	}
+
+	// Should be ordered by timestamp DESC (newest first)
+	if results[0].ID != "match-4" {
+		t.Errorf("expected newest match first, got %s", results[0].ID)
+	}
+
+	if results[1].ID != "match-3" {
+		t.Errorf("expected second newest match, got %s", results[1].ID)
+	}
+
+	// Test getting all matches
+	results, err = repo.GetRecentMatches(ctx, 10, 0)
+	if err != nil {
+		t.Fatalf("failed to get recent matches: %v", err)
+	}
+
+	if len(results) != 4 {
+		t.Errorf("expected 4 matches, got %d", len(results))
+	}
+
+	// Test getting 1 match
+	results, err = repo.GetRecentMatches(ctx, 1, 0)
+	if err != nil {
+		t.Fatalf("failed to get recent match: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 match, got %d", len(results))
+	}
+
+	if results[0].ID != "match-4" {
+		t.Errorf("expected newest match, got %s", results[0].ID)
+	}
+}
+
+func TestMatchRepository_GetStatsByFormat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create matches with different formats
+	matches := []*models.Match{
+		// Standard matches (2 wins, 1 loss)
+		{
+			ID:           "match-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Standard Match 1",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Standard Match 2",
+			Timestamp:    now,
+			PlayerWins:   1,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "loss",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-3",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Standard Match 3",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		// Historic matches (1 win, 1 loss)
+		{
+			ID:           "match-4",
+			AccountID:    1,
+			EventID:      "event-4",
+			EventName:    "Historic Match 1",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-5",
+			AccountID:    1,
+			EventID:      "event-5",
+			EventName:    "Historic Match 2",
+			Timestamp:    now,
+			PlayerWins:   0,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "loss",
+			CreatedAt:    now,
+		},
+		// Limited matches (1 win)
+		{
+			ID:           "match-6",
+			AccountID:    1,
+			EventID:      "event-6",
+			EventName:    "Limited Match 1",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Limited",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Create games for matches
+	games := []*models.Game{
+		// Standard match games
+		{MatchID: "match-1", GameNumber: 1, Result: "win", CreatedAt: now},
+		{MatchID: "match-1", GameNumber: 2, Result: "win", CreatedAt: now},
+		{MatchID: "match-2", GameNumber: 1, Result: "loss", CreatedAt: now},
+		{MatchID: "match-2", GameNumber: 2, Result: "win", CreatedAt: now},
+		{MatchID: "match-2", GameNumber: 3, Result: "loss", CreatedAt: now},
+		{MatchID: "match-3", GameNumber: 1, Result: "win", CreatedAt: now},
+		{MatchID: "match-3", GameNumber: 2, Result: "loss", CreatedAt: now},
+		{MatchID: "match-3", GameNumber: 3, Result: "win", CreatedAt: now},
+		// Historic match games
+		{MatchID: "match-4", GameNumber: 1, Result: "win", CreatedAt: now},
+		{MatchID: "match-4", GameNumber: 2, Result: "win", CreatedAt: now},
+		{MatchID: "match-5", GameNumber: 1, Result: "loss", CreatedAt: now},
+		{MatchID: "match-5", GameNumber: 2, Result: "loss", CreatedAt: now},
+		// Limited match games
+		{MatchID: "match-6", GameNumber: 1, Result: "win", CreatedAt: now},
+		{MatchID: "match-6", GameNumber: 2, Result: "loss", CreatedAt: now},
+		{MatchID: "match-6", GameNumber: 3, Result: "win", CreatedAt: now},
+	}
+
+	for _, g := range games {
+		if err := repo.CreateGame(ctx, g); err != nil {
+			t.Fatalf("failed to create game: %v", err)
+		}
+	}
+
+	// Get stats by format without filter
+	statsByFormat, err := repo.GetStatsByFormat(ctx, models.StatsFilter{})
+	if err != nil {
+		t.Fatalf("failed to get stats by format: %v", err)
+	}
+
+	// Should have 3 formats
+	if len(statsByFormat) != 3 {
+		t.Errorf("expected 3 formats, got %d", len(statsByFormat))
+	}
+
+	// Check Standard stats
+	standardStats, ok := statsByFormat["Standard"]
+	if !ok {
+		t.Fatal("Standard stats not found")
+	}
+
+	if standardStats.TotalMatches != 3 {
+		t.Errorf("expected 3 Standard matches, got %d", standardStats.TotalMatches)
+	}
+
+	if standardStats.MatchesWon != 2 {
+		t.Errorf("expected 2 Standard wins, got %d", standardStats.MatchesWon)
+	}
+
+	if standardStats.MatchesLost != 1 {
+		t.Errorf("expected 1 Standard loss, got %d", standardStats.MatchesLost)
+	}
+
+	expectedWinRate := 2.0 / 3.0
+	if standardStats.WinRate < expectedWinRate-0.01 || standardStats.WinRate > expectedWinRate+0.01 {
+		t.Errorf("expected Standard win rate ~%.2f, got %.2f", expectedWinRate, standardStats.WinRate)
+	}
+
+	if standardStats.TotalGames != 8 {
+		t.Errorf("expected 8 Standard games, got %d", standardStats.TotalGames)
+	}
+
+	if standardStats.GamesWon != 5 {
+		t.Errorf("expected 5 Standard game wins, got %d", standardStats.GamesWon)
+	}
+
+	// Check Historic stats
+	historicStats, ok := statsByFormat["Historic"]
+	if !ok {
+		t.Fatal("Historic stats not found")
+	}
+
+	if historicStats.TotalMatches != 2 {
+		t.Errorf("expected 2 Historic matches, got %d", historicStats.TotalMatches)
+	}
+
+	if historicStats.MatchesWon != 1 {
+		t.Errorf("expected 1 Historic win, got %d", historicStats.MatchesWon)
+	}
+
+	if historicStats.TotalGames != 4 {
+		t.Errorf("expected 4 Historic games, got %d", historicStats.TotalGames)
+	}
+
+	// Check Limited stats
+	limitedStats, ok := statsByFormat["Limited"]
+	if !ok {
+		t.Fatal("Limited stats not found")
+	}
+
+	if limitedStats.TotalMatches != 1 {
+		t.Errorf("expected 1 Limited match, got %d", limitedStats.TotalMatches)
+	}
+
+	if limitedStats.MatchesWon != 1 {
+		t.Errorf("expected 1 Limited win, got %d", limitedStats.MatchesWon)
+	}
+
+	if limitedStats.TotalGames != 3 {
+		t.Errorf("expected 3 Limited games, got %d", limitedStats.TotalGames)
+	}
+}
