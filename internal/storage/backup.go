@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,32 @@ import (
 	"strings"
 	"time"
 )
+
+// BackupType represents the type of backup (full or incremental).
+type BackupType string
+
+const (
+	// BackupTypeFull creates a complete database backup
+	BackupTypeFull BackupType = "full"
+	// BackupTypeIncremental creates a backup of only changed data since last backup
+	BackupTypeIncremental BackupType = "incremental"
+)
+
+// BackupMetadata contains metadata about a backup.
+type BackupMetadata struct {
+	BackupType BackupType           `json:"backup_type"`
+	Timestamp  time.Time            `json:"timestamp"`
+	BaseBackup string               `json:"base_backup,omitempty"` // Only for incremental backups
+	Tables     map[string]TableInfo `json:"tables"`
+	DBPath     string               `json:"db_path"`
+	BackupPath string               `json:"backup_path"`
+}
+
+// TableInfo contains information about a table's state in a backup.
+type TableInfo struct {
+	Checksum string `json:"checksum"` // Format: "count:N,maxrowid:M"
+	RowCount int    `json:"row_count"`
+}
 
 // BackupManager handles database backup and restore operations.
 type BackupManager struct {
@@ -35,6 +62,10 @@ type BackupConfig struct {
 	// BackupName is the name of the backup file (without extension).
 	// If empty, a timestamp-based name will be generated.
 	BackupName string
+
+	// BackupType specifies whether to create a full or incremental backup.
+	// Default: BackupTypeFull
+	BackupType BackupType
 
 	// VerifyBackup indicates whether to verify the backup after creation.
 	VerifyBackup bool
@@ -74,15 +105,22 @@ func DefaultBackupConfig() *BackupConfig {
 	return &BackupConfig{
 		BackupDir:    "",
 		BackupName:   "",
+		BackupType:   BackupTypeFull,
 		VerifyBackup: true,
 	}
 }
 
 // Backup creates a backup of the database.
 // For SQLite, this uses the VACUUM INTO command which is atomic and doesn't require exclusive locks.
+// Supports both full and incremental backups based on config.BackupType.
 func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 	if config == nil {
 		config = DefaultBackupConfig()
+	}
+
+	// Handle incremental backups separately
+	if config.BackupType == BackupTypeIncremental {
+		return bm.createIncrementalBackup(config)
 	}
 
 	// Determine backup directory
@@ -101,7 +139,7 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 	backupName := config.BackupName
 	if backupName == "" {
 		timestamp := time.Now().Format("20060102_150405")
-		backupName = fmt.Sprintf("backup_%s", timestamp)
+		backupName = fmt.Sprintf("backup_%s_full", timestamp)
 	}
 	backupPath := filepath.Join(backupDir, backupName+".db")
 
@@ -162,6 +200,24 @@ func (bm *BackupManager) Backup(config *BackupConfig) (string, error) {
 		// Remove uncompressed backup
 		_ = os.Remove(backupPath)
 		backupPath = compressedPath
+	}
+
+	// Generate and save metadata for full backup
+	// Note: We save metadata based on the original .db path, not the final path (which may be .enc or .gz)
+	originalBackupPath := backupPath
+	originalBackupPath = strings.TrimSuffix(originalBackupPath, ".gz")
+	originalBackupPath = strings.TrimSuffix(originalBackupPath, ".enc")
+
+	metadata, err := bm.generateMetadata(BackupTypeFull, originalBackupPath, "")
+	if err != nil {
+		// Log error but don't fail backup
+		_ = err
+	} else {
+		// Save metadata (use the actual backup path for the .meta file)
+		if err := bm.saveMetadata(metadata, backupPath); err != nil {
+			// Log error but don't fail backup
+			_ = err
+		}
 	}
 
 	// Run cleanup if retention policy is set
@@ -610,4 +666,216 @@ func (bm *BackupManager) CleanupBackups(backupDir string, retentionDays int, max
 	}
 
 	return nil
+}
+
+// generateMetadata creates metadata for the current database state.
+func (bm *BackupManager) generateMetadata(backupType BackupType, backupPath, baseBackup string) (*BackupMetadata, error) {
+	// Open database
+	db, err := sql.Open("sqlite", bm.dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+	defer func() { _ = db.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	// Get list of tables
+	tables, err := bm.getTableNames(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table names: %w", err)
+	}
+
+	// Calculate checksum for each table
+	tableInfo := make(map[string]TableInfo)
+	for _, table := range tables {
+		checksum, rowCount, err := bm.calculateTableChecksum(db, table)
+		if err != nil {
+			// Skip tables that can't be checksummed
+			continue
+		}
+		tableInfo[table] = TableInfo{
+			Checksum: checksum,
+			RowCount: rowCount,
+		}
+	}
+
+	metadata := &BackupMetadata{
+		BackupType: backupType,
+		Timestamp:  time.Now(),
+		BaseBackup: baseBackup,
+		Tables:     tableInfo,
+		DBPath:     bm.dbPath,
+		BackupPath: backupPath,
+	}
+
+	return metadata, nil
+}
+
+// calculateTableChecksum calculates a checksum for a table based on row count and max rowid.
+func (bm *BackupManager) calculateTableChecksum(db *sql.DB, tableName string) (string, int, error) {
+	var count int
+	var maxRowID sql.NullInt64
+
+	// Get row count
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %q", tableName)
+	if err := db.QueryRow(countQuery).Scan(&count); err != nil {
+		return "", 0, fmt.Errorf("failed to count rows: %w", err)
+	}
+
+	// Get max rowid
+	rowidQuery := fmt.Sprintf("SELECT MAX(rowid) FROM %q", tableName)
+	if err := db.QueryRow(rowidQuery).Scan(&maxRowID); err != nil {
+		// Table might not have rowid, use count only
+		checksum := fmt.Sprintf("count:%d", count)
+		return checksum, count, nil
+	}
+
+	maxRowIDValue := int64(0)
+	if maxRowID.Valid {
+		maxRowIDValue = maxRowID.Int64
+	}
+
+	checksum := fmt.Sprintf("count:%d,maxrowid:%d", count, maxRowIDValue)
+	return checksum, count, nil
+}
+
+// getTableNames returns a list of all user tables in the database.
+func (bm *BackupManager) getTableNames(db *sql.DB) ([]string, error) {
+	query := `
+		SELECT name FROM sqlite_master
+		WHERE type='table'
+		AND name NOT LIKE 'sqlite_%'
+		ORDER BY name
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			continue
+		}
+		tables = append(tables, name)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating tables: %w", err)
+	}
+
+	return tables, nil
+}
+
+// saveMetadata saves backup metadata to a .meta file.
+func (bm *BackupManager) saveMetadata(metadata *BackupMetadata, backupPath string) error {
+	metadataPath := backupPath + ".meta"
+
+	// Marshal metadata to JSON
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(metadataPath, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write metadata file: %w", err)
+	}
+
+	return nil
+}
+
+// loadMetadata loads backup metadata from a .meta file.
+//
+//nolint:unused // Will be used for incremental backup support
+func (bm *BackupManager) loadMetadata(backupPath string) (*BackupMetadata, error) {
+	metadataPath := backupPath + ".meta"
+
+	// Read metadata file
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata file: %w", err)
+	}
+
+	// Unmarshal JSON
+	var metadata BackupMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
+
+	return &metadata, nil
+}
+
+// findLastFullBackup finds the most recent full backup in the backup directory.
+//
+//nolint:unused // Will be used for incremental backup support
+func (bm *BackupManager) findLastFullBackup(backupDir string) (string, *BackupMetadata, error) {
+	if backupDir == "" {
+		backupDir = bm.GetBackupDir()
+	}
+
+	// Check if backup directory exists
+	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
+		return "", nil, fmt.Errorf("no backups found")
+	}
+
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	// Collect all .meta files
+	type backupEntry struct {
+		path     string
+		metadata *BackupMetadata
+		modTime  time.Time
+	}
+	var backups []backupEntry
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".meta") {
+			continue
+		}
+
+		metaPath := filepath.Join(backupDir, entry.Name())
+		metadata, err := bm.loadMetadata(strings.TrimSuffix(metaPath, ".meta"))
+		if err != nil {
+			continue
+		}
+
+		// Only include full backups
+		if metadata.BackupType != BackupTypeFull {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		backups = append(backups, backupEntry{
+			path:     strings.TrimSuffix(metaPath, ".meta"),
+			metadata: metadata,
+			modTime:  info.ModTime(),
+		})
+	}
+
+	if len(backups) == 0 {
+		return "", nil, fmt.Errorf("no full backups found")
+	}
+
+	// Sort by modification time (newest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].modTime.After(backups[j].modTime)
+	})
+
+	return backups[0].path, backups[0].metadata, nil
+}
+
+// createIncrementalBackup creates an incremental backup containing only changed data.
+func (bm *BackupManager) createIncrementalBackup(config *BackupConfig) (string, error) {
+	// TODO: Implement full incremental backup functionality
+	// For now, return an error indicating it's not yet implemented
+	return "", fmt.Errorf("incremental backups are not yet fully implemented (issue #130)")
 }
