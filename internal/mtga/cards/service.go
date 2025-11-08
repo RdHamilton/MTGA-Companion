@@ -221,35 +221,67 @@ func (s *Service) getCardFromDB(arenaID int) (*Card, error) {
 	`
 
 	var card Card
+	var oracleID, manaCost, power, toughness, loyalty, oracleText, flavorText, imageURI sql.NullString
+	var multiverseID sql.NullInt64
 	var colorsJSON, colorIdentityJSON sql.NullString
 	var releasedAtStr string
 
 	err := s.db.QueryRow(query, arenaID).Scan(
 		&card.ArenaID,
 		&card.ScryfallID,
-		&card.OracleID,
-		&card.MultiverseID,
+		&oracleID,
+		&multiverseID,
 		&card.Name,
 		&card.TypeLine,
 		&card.SetCode,
 		&card.SetName,
-		&card.ManaCost,
+		&manaCost,
 		&card.CMC,
 		&colorsJSON,
 		&colorIdentityJSON,
 		&card.Rarity,
-		&card.Power,
-		&card.Toughness,
-		&card.Loyalty,
-		&card.OracleText,
-		&card.FlavorText,
-		&card.ImageURI,
+		&power,
+		&toughness,
+		&loyalty,
+		&oracleText,
+		&flavorText,
+		&imageURI,
 		&card.Layout,
 		&card.CollectorNumber,
 		&releasedAtStr,
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if oracleID.Valid {
+		card.OracleID = &oracleID.String
+	}
+	if multiverseID.Valid {
+		id := int(multiverseID.Int64)
+		card.MultiverseID = &id
+	}
+	if manaCost.Valid {
+		card.ManaCost = &manaCost.String
+	}
+	if power.Valid {
+		card.Power = &power.String
+	}
+	if toughness.Valid {
+		card.Toughness = &toughness.String
+	}
+	if loyalty.Valid {
+		card.Loyalty = &loyalty.String
+	}
+	if oracleText.Valid {
+		card.OracleText = &oracleText.String
+	}
+	if flavorText.Valid {
+		card.FlavorText = &flavorText.String
+	}
+	if imageURI.Valid {
+		card.ImageURI = &imageURI.String
 	}
 
 	// Parse colors
