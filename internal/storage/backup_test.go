@@ -516,3 +516,415 @@ func substringMatch(s, substr string) bool {
 	}
 	return false
 }
+
+func TestBackupManager_IncrementalBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database with initial data
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	// Create tables
+	_, err = db.Conn().Exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create users table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create posts table: %v", err)
+	}
+
+	// Insert initial data
+	_, err = db.Conn().Exec("INSERT INTO users (name) VALUES ('Alice')")
+	if err != nil {
+		t.Fatalf("Failed to insert user: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO posts (title) VALUES ('First Post')")
+	if err != nil {
+		t.Fatalf("Failed to insert post: %v", err)
+	}
+
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create full backup
+	fullConfig := DefaultBackupConfig()
+	fullConfig.BackupType = BackupTypeFull
+	fullBackupPath, err := backupMgr.Backup(fullConfig)
+	if err != nil {
+		t.Fatalf("Failed to create full backup: %v", err)
+	}
+	defer os.Remove(fullBackupPath)
+
+	// Verify metadata was created
+	metaPath := fullBackupPath + ".meta"
+	if _, err := os.Stat(metaPath); os.IsNotExist(err) {
+		t.Fatal("Full backup metadata not created")
+	}
+	defer os.Remove(metaPath)
+
+	// Modify database - change one table
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO users (name) VALUES ('Bob')")
+	if err != nil {
+		t.Fatalf("Failed to insert user: %v", err)
+	}
+
+	db.Close()
+
+	// Create incremental backup
+	incrConfig := DefaultBackupConfig()
+	incrConfig.BackupType = BackupTypeIncremental
+	incrBackupPath, err := backupMgr.Backup(incrConfig)
+	if err != nil {
+		t.Fatalf("Failed to create incremental backup: %v", err)
+	}
+	defer os.Remove(incrBackupPath)
+
+	// Verify incremental backup is SQL file
+	if filepath.Ext(incrBackupPath) != ".sql" {
+		t.Errorf("Expected .sql extension for incremental backup, got %s", filepath.Ext(incrBackupPath))
+	}
+
+	// Verify metadata
+	incrMetaPath := incrBackupPath + ".meta"
+	if _, err := os.Stat(incrMetaPath); os.IsNotExist(err) {
+		t.Fatal("Incremental backup metadata not created")
+	}
+	defer os.Remove(incrMetaPath)
+
+	// Verify SQL file contains only users table (the changed one)
+	sqlData, err := os.ReadFile(incrBackupPath)
+	if err != nil {
+		t.Fatalf("Failed to read incremental backup: %v", err)
+	}
+
+	sqlContent := string(sqlData)
+	if !contains(sqlContent, "users") {
+		t.Error("Incremental backup should contain users table")
+	}
+	if contains(sqlContent, "posts") {
+		t.Error("Incremental backup should not contain unchanged posts table")
+	}
+}
+
+func TestBackupManager_IncrementalRestore(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	// Create table and insert data
+	_, err = db.Conn().Exec("CREATE TABLE data (id INTEGER PRIMARY KEY, value TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO data (value) VALUES ('original')")
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	db.Close()
+
+	// Create backup manager
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create full backup
+	fullConfig := DefaultBackupConfig()
+	fullConfig.BackupType = BackupTypeFull
+	fullBackupPath, err := backupMgr.Backup(fullConfig)
+	if err != nil {
+		t.Fatalf("Failed to create full backup: %v", err)
+	}
+	defer os.Remove(fullBackupPath)
+	defer os.Remove(fullBackupPath + ".meta")
+
+	// Modify database
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO data (value) VALUES ('incremental')")
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	db.Close()
+
+	// Create incremental backup
+	incrConfig := DefaultBackupConfig()
+	incrConfig.BackupType = BackupTypeIncremental
+	incrBackupPath, err := backupMgr.Backup(incrConfig)
+	if err != nil {
+		t.Fatalf("Failed to create incremental backup: %v", err)
+	}
+	defer os.Remove(incrBackupPath)
+	defer os.Remove(incrBackupPath + ".meta")
+
+	// Corrupt the database
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("DELETE FROM data")
+	if err != nil {
+		t.Fatalf("Failed to delete data: %v", err)
+	}
+
+	db.Close()
+
+	// Restore from incremental backup (should restore full + incremental)
+	if err := backupMgr.Restore(incrBackupPath); err != nil {
+		t.Fatalf("Failed to restore incremental backup: %v", err)
+	}
+
+	// Verify restored data includes both original and incremental data
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database after restore: %v", err)
+	}
+	defer db.Close()
+
+	var count int
+	err = db.Conn().QueryRow("SELECT COUNT(*) FROM data").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query restored database: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 rows after incremental restore, got %d", count)
+	}
+}
+
+func TestBackupManager_IncrementalBackupNoChanges(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	db.Close()
+
+	backupMgr := NewBackupManager(dbPath)
+
+	// Create full backup
+	fullConfig := DefaultBackupConfig()
+	fullConfig.BackupType = BackupTypeFull
+	fullBackupPath, err := backupMgr.Backup(fullConfig)
+	if err != nil {
+		t.Fatalf("Failed to create full backup: %v", err)
+	}
+	defer os.Remove(fullBackupPath)
+	defer os.Remove(fullBackupPath + ".meta")
+
+	// Try to create incremental backup without changes
+	incrConfig := DefaultBackupConfig()
+	incrConfig.BackupType = BackupTypeIncremental
+	_, err = backupMgr.Backup(incrConfig)
+	if err == nil {
+		t.Error("Expected error when creating incremental backup with no changes")
+	}
+}
+
+func TestBackupManager_IncrementalBackupNoFullBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	db.Close()
+
+	backupMgr := NewBackupManager(dbPath)
+
+	// Try to create incremental backup without a full backup first
+	incrConfig := DefaultBackupConfig()
+	incrConfig.BackupType = BackupTypeIncremental
+	_, err = backupMgr.Backup(incrConfig)
+	if err == nil {
+		t.Error("Expected error when creating incremental backup without full backup")
+	}
+}
+
+func TestBackupManager_IncrementalBackupEncrypted(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("CREATE TABLE data (id INTEGER PRIMARY KEY, value TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO data (value) VALUES ('test')")
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	db.Close()
+
+	backupMgr := NewBackupManager(dbPath)
+	password := "secure-password"
+
+	// Create encrypted full backup
+	fullConfig := DefaultBackupConfig()
+	fullConfig.BackupType = BackupTypeFull
+	fullConfig.Encrypt = true
+	fullConfig.EncryptionPassword = password
+	fullBackupPath, err := backupMgr.Backup(fullConfig)
+	if err != nil {
+		t.Fatalf("Failed to create encrypted full backup: %v", err)
+	}
+	defer os.Remove(fullBackupPath)
+	defer os.Remove(fullBackupPath + ".meta")
+
+	// Modify database
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO data (value) VALUES ('incremental')")
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	db.Close()
+
+	// Create encrypted incremental backup
+	incrConfig := DefaultBackupConfig()
+	incrConfig.BackupType = BackupTypeIncremental
+	incrConfig.Encrypt = true
+	incrConfig.EncryptionPassword = password
+	incrBackupPath, err := backupMgr.Backup(incrConfig)
+	if err != nil {
+		t.Fatalf("Failed to create encrypted incremental backup: %v", err)
+	}
+	defer os.Remove(incrBackupPath)
+	defer os.Remove(incrBackupPath + ".meta")
+
+	// Verify backup is encrypted
+	if filepath.Ext(incrBackupPath) != ".enc" {
+		t.Errorf("Expected .enc extension for encrypted incremental backup, got %s", filepath.Ext(incrBackupPath))
+	}
+
+	// Restore from encrypted incremental backup
+	if err := backupMgr.Restore(incrBackupPath, password); err != nil {
+		t.Fatalf("Failed to restore encrypted incremental backup: %v", err)
+	}
+
+	// Verify data
+	db, err = Open(config)
+	if err != nil {
+		t.Fatalf("Failed to reopen database: %v", err)
+	}
+	defer db.Close()
+
+	var count int
+	err = db.Conn().QueryRow("SELECT COUNT(*) FROM data").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query database: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 rows, got %d", count)
+	}
+}
+
+func TestBackupManager_MetadataGeneration(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create a simple database
+	config := DefaultConfig(dbPath)
+	db, err := Open(config)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	_, err = db.Conn().Exec("CREATE TABLE test (id INTEGER PRIMARY KEY, data TEXT)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Conn().Exec("INSERT INTO test (data) VALUES ('test1'), ('test2')")
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	db.Close()
+
+	backupMgr := NewBackupManager(dbPath)
+
+	// Generate metadata
+	metadata, err := backupMgr.generateMetadata(BackupTypeFull, dbPath, "")
+	if err != nil {
+		t.Fatalf("Failed to generate metadata: %v", err)
+	}
+
+	// Verify metadata
+	if metadata.BackupType != BackupTypeFull {
+		t.Errorf("Expected backup type %s, got %s", BackupTypeFull, metadata.BackupType)
+	}
+
+	if len(metadata.Tables) == 0 {
+		t.Error("Metadata should contain table information")
+	}
+
+	testTable, exists := metadata.Tables["test"]
+	if !exists {
+		t.Error("Metadata should contain 'test' table")
+	}
+
+	if testTable.RowCount != 2 {
+		t.Errorf("Expected row count 2, got %d", testTable.RowCount)
+	}
+
+	if testTable.Checksum == "" {
+		t.Error("Table checksum should not be empty")
+	}
+}
