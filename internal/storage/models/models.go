@@ -31,6 +31,8 @@ type Match struct {
 	Format          string
 	Result          string  // "win" or "loss"
 	ResultReason    *string // Nullable: "concede", "timeout", "normal", etc.
+	OpponentName    *string // Nullable: opponent's display name
+	OpponentID      *string // Nullable: opponent's unique identifier
 	CreatedAt       time.Time
 }
 
@@ -39,8 +41,9 @@ type Game struct {
 	ID              int
 	MatchID         string
 	GameNumber      int
-	Result          string // "win" or "loss"
-	DurationSeconds *int   // Nullable
+	Result          string  // "win" or "loss"
+	DurationSeconds *int    // Nullable
+	ResultReason    *string // Nullable: "concede", "timeout", "normal", etc.
 	CreatedAt       time.Time
 }
 

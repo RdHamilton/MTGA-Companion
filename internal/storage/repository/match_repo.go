@@ -66,8 +66,9 @@ func (r *matchRepository) Create(ctx context.Context, match *models.Match) error
 		INSERT INTO matches (
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -86,6 +87,8 @@ func (r *matchRepository) Create(ctx context.Context, match *models.Match) error
 		match.Format,
 		match.Result,
 		match.ResultReason,
+		match.OpponentName,
+		match.OpponentID,
 		match.CreatedAt,
 	)
 	if err != nil {
@@ -99,8 +102,8 @@ func (r *matchRepository) Create(ctx context.Context, match *models.Match) error
 func (r *matchRepository) CreateGame(ctx context.Context, game *models.Game) error {
 	query := `
 		INSERT INTO games (
-			match_id, game_number, result, duration_seconds, created_at
-		) VALUES (?, ?, ?, ?, ?)
+			match_id, game_number, result, duration_seconds, result_reason, created_at
+		) VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -108,6 +111,7 @@ func (r *matchRepository) CreateGame(ctx context.Context, game *models.Game) err
 		game.GameNumber,
 		game.Result,
 		game.DurationSeconds,
+		game.ResultReason,
 		game.CreatedAt,
 	)
 	if err != nil {
@@ -129,7 +133,8 @@ func (r *matchRepository) GetByID(ctx context.Context, id string) (*models.Match
 		SELECT
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
 		FROM matches
 		WHERE id = ?
 	`
@@ -151,6 +156,8 @@ func (r *matchRepository) GetByID(ctx context.Context, id string) (*models.Match
 		&match.Format,
 		&match.Result,
 		&match.ResultReason,
+		&match.OpponentName,
+		&match.OpponentID,
 		&match.CreatedAt,
 	)
 
@@ -171,7 +178,8 @@ func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 		SELECT
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
 		FROM matches
 		WHERE timestamp >= ? AND timestamp <= ?
 	`
@@ -212,6 +220,8 @@ func (r *matchRepository) GetByDateRange(ctx context.Context, start, end time.Ti
 			&match.Format,
 			&match.Result,
 			&match.ResultReason,
+			&match.OpponentName,
+			&match.OpponentID,
 			&match.CreatedAt,
 		)
 		if err != nil {
@@ -234,7 +244,8 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string, accoun
 		SELECT
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
 		FROM matches
 		WHERE format = ?
 	`
@@ -275,6 +286,8 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string, accoun
 			&match.Format,
 			&match.Result,
 			&match.ResultReason,
+			&match.OpponentName,
+			&match.OpponentID,
 			&match.CreatedAt,
 		)
 		if err != nil {
@@ -377,7 +390,8 @@ func (r *matchRepository) GetRecentMatches(ctx context.Context, limit int, accou
 		SELECT
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
 		FROM matches
 		WHERE 1=1
 	`
@@ -419,6 +433,8 @@ func (r *matchRepository) GetRecentMatches(ctx context.Context, limit int, accou
 			&match.Format,
 			&match.Result,
 			&match.ResultReason,
+			&match.OpponentName,
+			&match.OpponentID,
 			&match.CreatedAt,
 		)
 		if err != nil {
@@ -440,7 +456,8 @@ func (r *matchRepository) GetLatestMatch(ctx context.Context, accountID int) (*m
 		SELECT
 			id, account_id, event_id, event_name, timestamp, duration_seconds,
 			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason, created_at
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
 		FROM matches
 		WHERE 1=1
 	`
@@ -470,6 +487,8 @@ func (r *matchRepository) GetLatestMatch(ctx context.Context, accountID int) (*m
 		&match.Format,
 		&match.Result,
 		&match.ResultReason,
+		&match.OpponentName,
+		&match.OpponentID,
 		&match.CreatedAt,
 	)
 	if err != nil {
@@ -588,7 +607,7 @@ func (r *matchRepository) GetStatsByFormat(ctx context.Context, filter models.St
 // GetGamesForMatch retrieves all games for a specific match.
 func (r *matchRepository) GetGamesForMatch(ctx context.Context, matchID string) ([]*models.Game, error) {
 	query := `
-		SELECT id, match_id, game_number, result, duration_seconds, created_at
+		SELECT id, match_id, game_number, result, duration_seconds, result_reason, created_at
 		FROM games
 		WHERE match_id = ?
 		ORDER BY game_number ASC
@@ -612,6 +631,7 @@ func (r *matchRepository) GetGamesForMatch(ctx context.Context, matchID string) 
 			&game.GameNumber,
 			&game.Result,
 			&game.DurationSeconds,
+			&game.ResultReason,
 			&game.CreatedAt,
 		)
 		if err != nil {
