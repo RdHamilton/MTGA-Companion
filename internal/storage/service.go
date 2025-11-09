@@ -21,18 +21,20 @@ type Service struct {
 	decks            repository.DeckRepository
 	collection       repository.CollectionRepository
 	accounts         repository.AccountRepository
+	rankHistory      repository.RankHistoryRepository
 	currentAccountID int // Current active account ID
 }
 
 // NewService creates a new storage service.
 func NewService(db *DB) *Service {
 	svc := &Service{
-		db:         db,
-		matches:    repository.NewMatchRepository(db.Conn()),
-		stats:      repository.NewStatsRepository(db.Conn()),
-		decks:      repository.NewDeckRepository(db.Conn()),
-		collection: repository.NewCollectionRepository(db.Conn()),
-		accounts:   repository.NewAccountRepository(db.Conn()),
+		db:          db,
+		matches:     repository.NewMatchRepository(db.Conn()),
+		stats:       repository.NewStatsRepository(db.Conn()),
+		decks:       repository.NewDeckRepository(db.Conn()),
+		collection:  repository.NewCollectionRepository(db.Conn()),
+		accounts:    repository.NewAccountRepository(db.Conn()),
+		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -809,6 +811,40 @@ func (s *Service) GetCombinedStatistics(ctx context.Context, filter models.Stats
 		filter.AccountID = &allAccounts
 	}
 	return s.matches.GetStats(ctx, filter)
+}
+
+// Rank History Methods
+
+// StoreRankSnapshot stores a rank snapshot in the database.
+func (s *Service) StoreRankSnapshot(ctx context.Context, rank *models.RankHistory) error {
+	rank.AccountID = s.currentAccountID
+	rank.CreatedAt = time.Now()
+	return s.rankHistory.Create(ctx, rank)
+}
+
+// GetRankHistoryByFormat retrieves all rank history entries for a specific format.
+func (s *Service) GetRankHistoryByFormat(ctx context.Context, format string) ([]*models.RankHistory, error) {
+	return s.rankHistory.GetByFormat(ctx, s.currentAccountID, format)
+}
+
+// GetRankHistoryBySeason retrieves all rank history entries for a specific season.
+func (s *Service) GetRankHistoryBySeason(ctx context.Context, seasonOrdinal int) ([]*models.RankHistory, error) {
+	return s.rankHistory.GetBySeason(ctx, s.currentAccountID, seasonOrdinal)
+}
+
+// GetRankHistoryByDateRange retrieves rank history entries within a date range.
+func (s *Service) GetRankHistoryByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*models.RankHistory, error) {
+	return s.rankHistory.GetByDateRange(ctx, s.currentAccountID, startDate, endDate)
+}
+
+// GetLatestRankByFormat retrieves the most recent rank snapshot for a format.
+func (s *Service) GetLatestRankByFormat(ctx context.Context, format string) (*models.RankHistory, error) {
+	return s.rankHistory.GetLatestByFormat(ctx, s.currentAccountID, format)
+}
+
+// GetAllRankHistory retrieves all rank history entries.
+func (s *Service) GetAllRankHistory(ctx context.Context) ([]*models.RankHistory, error) {
+	return s.rankHistory.GetAll(ctx, s.currentAccountID)
 }
 
 // Close closes the database connection.
