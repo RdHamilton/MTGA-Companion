@@ -24,20 +24,36 @@ func TestParseDecks(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name: "decks as array",
+			name: "courses with deck data",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"Deck.GetDeckLists": []interface{}{
+					"Courses": []interface{}{
 						map[string]interface{}{
-							"id":     "deck-1",
-							"name":   "Test Deck",
-							"format": "Standard",
-							"mainDeck": []interface{}{
-								map[string]interface{}{
-									"cardId":   float64(12345),
-									"quantity": float64(4),
+							"CourseId": "course-1",
+							"CourseDeckSummary": map[string]interface{}{
+								"DeckId":      "deck-1",
+								"Name":        "Test Deck",
+								"Description": "Decks/Test/TestDeck",
+								"Attributes": []interface{}{
+									map[string]interface{}{
+										"name":  "Format",
+										"value": "Standard",
+									},
+									map[string]interface{}{
+										"name":  "LastPlayed",
+										"value": "\"2024-06-21T09:35:17.8958228-04:00\"",
+									},
 								},
+							},
+							"CourseDeck": map[string]interface{}{
+								"MainDeck": []interface{}{
+									map[string]interface{}{
+										"cardId":   float64(12345),
+										"quantity": float64(4),
+									},
+								},
+								"Sideboard": []interface{}{},
 							},
 						},
 					},
@@ -46,26 +62,55 @@ func TestParseDecks(t *testing.T) {
 			want: &DeckLibrary{
 				Decks: map[string]*PlayerDeck{
 					"deck-1": {
-						DeckID:   "deck-1",
-						Name:     "Test Deck",
-						Format:   "Standard",
-						MainDeck: []DeckCard{{CardID: 12345, Quantity: 4}},
+						DeckID:      "deck-1",
+						Name:        "Test Deck",
+						Description: "Decks/Test/TestDeck",
+						Format:      "Standard",
+						MainDeck:    []DeckCard{{CardID: 12345, Quantity: 4}},
+						Sideboard:   []DeckCard{},
 					},
 				},
 				TotalDecks: 1,
 			},
 		},
 		{
-			name: "decks in object",
+			name: "courses with multiple decks",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"getDeckLists": map[string]interface{}{
-						"decks": []interface{}{
-							map[string]interface{}{
-								"Id":     "deck-2",
-								"Name":   "Another Deck",
-								"Format": "Historic",
+					"Courses": []interface{}{
+						map[string]interface{}{
+							"CourseId": "course-1",
+							"CourseDeckSummary": map[string]interface{}{
+								"DeckId": "deck-1",
+								"Name":   "Explorer Deck",
+								"Attributes": []interface{}{
+									map[string]interface{}{
+										"name":  "Format",
+										"value": "Explorer",
+									},
+								},
+							},
+							"CourseDeck": map[string]interface{}{
+								"MainDeck":  []interface{}{},
+								"Sideboard": []interface{}{},
+							},
+						},
+						map[string]interface{}{
+							"CourseId": "course-2",
+							"CourseDeckSummary": map[string]interface{}{
+								"DeckId": "deck-2",
+								"Name":   "Historic Deck",
+								"Attributes": []interface{}{
+									map[string]interface{}{
+										"name":  "Format",
+										"value": "Historic",
+									},
+								},
+							},
+							"CourseDeck": map[string]interface{}{
+								"MainDeck":  []interface{}{},
+								"Sideboard": []interface{}{},
 							},
 						},
 					},
@@ -73,21 +118,41 @@ func TestParseDecks(t *testing.T) {
 			},
 			want: &DeckLibrary{
 				Decks: map[string]*PlayerDeck{
+					"deck-1": {
+						DeckID: "deck-1",
+						Name:   "Explorer Deck",
+						Format: "Explorer",
+					},
 					"deck-2": {
 						DeckID: "deck-2",
-						Name:   "Another Deck",
+						Name:   "Historic Deck",
 						Format: "Historic",
 					},
 				},
-				TotalDecks: 1,
+				TotalDecks: 2,
 			},
 		},
 		{
-			name: "empty deck list",
+			name: "empty courses list",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"Deck.GetDeckLists": []interface{}{},
+					"Courses": []interface{}{},
+				},
+			},
+			wantNil: true,
+		},
+		{
+			name: "courses without CourseDeckSummary",
+			entry: &LogEntry{
+				IsJSON: true,
+				JSON: map[string]interface{}{
+					"Courses": []interface{}{
+						map[string]interface{}{
+							"CourseId": "course-1",
+							// Missing CourseDeckSummary
+						},
+					},
 				},
 			},
 			wantNil: true,
@@ -153,8 +218,8 @@ func TestParseDecks_FromLogFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "test_player.log")
 
-	// Create test log data with decks
-	testData := `[UnityCrossThreadLogger]{"Deck.GetDeckLists":[{"id":"deck-1","name":"Test Deck","format":"Standard","mainDeck":[{"cardId":12345,"quantity":4}]}]}
+	// Create test log data with Courses (EventGetCoursesV2 format)
+	testData := `[UnityCrossThreadLogger]{"Courses":[{"CourseId":"course-1","CourseDeckSummary":{"DeckId":"deck-1","Name":"Test Deck","Attributes":[{"name":"Format","value":"Standard"}]},"CourseDeck":{"MainDeck":[{"cardId":12345,"quantity":4}],"Sideboard":[]}}]}
 `
 	if err := os.WriteFile(logPath, []byte(testData), 0o644); err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
