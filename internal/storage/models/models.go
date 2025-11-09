@@ -171,3 +171,23 @@ type PerformanceMetrics struct {
 	FastestGame      *int     // Fastest game duration in seconds
 	SlowestGame      *int     // Slowest game duration in seconds
 }
+
+// CurrencyHistory tracks changes to gems and gold over time.
+type CurrencyHistory struct {
+	ID        int
+	AccountID int       // Foreign key to accounts
+	Timestamp time.Time // When the currency snapshot was taken
+	Gems      int       // Current gems amount
+	Gold      int       // Current gold amount
+	GemsDelta int       // Change in gems since last snapshot
+	GoldDelta int       // Change in gold since last snapshot
+	Source    *string   // Nullable: where the currency came from
+	CreatedAt time.Time
+}
+
+// CurrencySnapshot represents a summary of currency at a point in time.
+type CurrencySnapshot struct {
+	Gems      int
+	Gold      int
+	Timestamp time.Time
+}
