@@ -87,7 +87,7 @@ func (r *rankHistoryRepository) GetByFormat(ctx context.Context, accountID int, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*models.RankHistory
 	for rows.Next() {
@@ -128,7 +128,7 @@ func (r *rankHistoryRepository) GetBySeason(ctx context.Context, accountID int, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*models.RankHistory
 	for rows.Next() {
@@ -169,7 +169,7 @@ func (r *rankHistoryRepository) GetByDateRange(ctx context.Context, accountID in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*models.RankHistory
 	for rows.Next() {
@@ -246,7 +246,7 @@ func (r *rankHistoryRepository) GetAll(ctx context.Context, accountID int) ([]*m
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*models.RankHistory
 	for rows.Next() {
