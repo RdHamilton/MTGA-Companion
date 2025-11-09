@@ -694,6 +694,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "formats", "byformat", "formatstats":
 			// Display statistics grouped by format
 			displayStatsByFormat(service, ctx)
+		case "deckstats", "bydeck", "deckperf":
+			// Display statistics grouped by deck
+			displayStatsByDeck(service, ctx)
 		case "daterange", "range":
 			// Display statistics for date range
 			if len(parts) < 3 {
@@ -1168,6 +1171,7 @@ func printHelp() {
 	fmt.Println("  monthly [offset] - Display monthly statistics (offset: 0=this month, -1=last month)")
 	fmt.Println("  daterange <start> <end> - Display statistics for date range (YYYY-MM-DD)")
 	fmt.Println("  formats, byformat - Display statistics grouped by format")
+	fmt.Println("  deckstats, bydeck, deckperf - Display statistics grouped by deck")
 	fmt.Println("  recent [limit] - Display recent matches (default: 10)")
 	fmt.Println("  format <name> - Display match history for specific format")
 	fmt.Println("  match view <id|latest> - Display detailed match information")

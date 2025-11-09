@@ -503,6 +503,17 @@ func (s *Service) GetStatsByFormat(ctx context.Context, filter models.StatsFilte
 	return s.matches.GetStatsByFormat(ctx, filter)
 }
 
+// GetStatsByDeck retrieves statistics grouped by deck.
+func (s *Service) GetStatsByDeck(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error) {
+	// Use account filter if specified, otherwise use current account
+	if filter.AccountID == nil {
+		accountID := s.currentAccountID
+		filter.AccountID = &accountID
+	}
+
+	return s.matches.GetStatsByDeck(ctx, filter)
+}
+
 // GetPerformanceMetrics retrieves duration-based performance metrics.
 func (s *Service) GetPerformanceMetrics(ctx context.Context, filter models.StatsFilter) (*models.PerformanceMetrics, error) {
 	// Use account filter if specified, otherwise use current account

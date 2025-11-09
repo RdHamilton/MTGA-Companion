@@ -43,6 +43,9 @@ type MatchRepository interface {
 	// GetStatsByFormat calculates statistics grouped by format.
 	GetStatsByFormat(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error)
 
+	// GetStatsByDeck calculates statistics grouped by deck.
+	GetStatsByDeck(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error)
+
 	// GetGamesForMatch retrieves all games for a specific match.
 	GetGamesForMatch(ctx context.Context, matchID string) ([]*models.Game, error)
 
@@ -602,6 +605,139 @@ func (r *matchRepository) GetStatsByFormat(ctx context.Context, filter models.St
 	}
 
 	return formatStats, nil
+}
+
+// GetStatsByDeck calculates statistics grouped by deck.
+func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error) {
+	// Build WHERE clause based on filter (same as GetStats but without deck filter)
+	where := "WHERE deck_id IS NOT NULL" // Only include matches with a deck
+	args := make([]interface{}, 0)
+
+	if filter.AccountID != nil && *filter.AccountID > 0 {
+		where += " AND account_id = ?"
+		args = append(args, *filter.AccountID)
+	}
+	if filter.StartDate != nil {
+		where += " AND timestamp >= ?"
+		args = append(args, *filter.StartDate)
+	}
+	if filter.EndDate != nil {
+		where += " AND timestamp <= ?"
+		args = append(args, *filter.EndDate)
+	}
+	if filter.Format != nil {
+		where += " AND format = ?"
+		args = append(args, *filter.Format)
+	}
+
+	// Query for match statistics grouped by deck
+	matchQuery := fmt.Sprintf(`
+		SELECT
+			deck_id,
+			COUNT(*) as total,
+			SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
+			SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses
+		FROM matches
+		%s
+		GROUP BY deck_id
+		ORDER BY total DESC
+	`, where)
+
+	rows, err := r.db.QueryContext(ctx, matchQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stats by deck: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
+
+	// Collect match stats by deck
+	deckStats := make(map[string]*models.Statistics)
+	for rows.Next() {
+		var deckID string
+		stats := &models.Statistics{}
+		err := rows.Scan(
+			&deckID,
+			&stats.TotalMatches,
+			&stats.MatchesWon,
+			&stats.MatchesLost,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan deck match stats: %w", err)
+		}
+
+		// Calculate match win rate
+		if stats.TotalMatches > 0 {
+			stats.WinRate = float64(stats.MatchesWon) / float64(stats.TotalMatches)
+		}
+
+		deckStats[deckID] = stats
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deck match stats: %w", err)
+	}
+
+	// Query for game statistics grouped by deck (via match_id join)
+	gameQuery := fmt.Sprintf(`
+		SELECT
+			m.deck_id,
+			COUNT(*) as total,
+			SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) as wins,
+			SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) as losses
+		FROM games g
+		JOIN matches m ON g.match_id = m.id
+		%s
+		GROUP BY m.deck_id
+	`, where)
+
+	gameRows, err := r.db.QueryContext(ctx, gameQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get game stats by deck: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = gameRows.Close()
+	}()
+
+	for gameRows.Next() {
+		var deckID string
+		var totalGames, gamesWon, gamesLost int
+		err := gameRows.Scan(
+			&deckID,
+			&totalGames,
+			&gamesWon,
+			&gamesLost,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get game stats for deck %s: %w", deckID, err)
+		}
+
+		// Add to existing stats or create new if match stats don't exist
+		if stats, exists := deckStats[deckID]; exists {
+			stats.TotalGames = totalGames
+			stats.GamesWon = gamesWon
+			stats.GamesLost = gamesLost
+		} else {
+			deckStats[deckID] = &models.Statistics{
+				TotalGames: totalGames,
+				GamesWon:   gamesWon,
+				GamesLost:  gamesLost,
+			}
+		}
+
+		// Calculate game win rate
+		if totalGames > 0 {
+			deckStats[deckID].GameWinRate = float64(gamesWon) / float64(totalGames)
+		}
+	}
+
+	if err = gameRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deck game stats: %w", err)
+	}
+
+	return deckStats, nil
 }
 
 // GetGamesForMatch retrieves all games for a specific match.
