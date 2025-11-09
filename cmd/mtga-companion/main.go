@@ -377,6 +377,12 @@ func displayArenaStatistics(arenaStats *logreader.ArenaStats, service *storage.S
 
 		// Display result breakdown
 		displayResultReasons(service, ctx)
+
+		// Display streaks (all-time)
+		displayStreakStats(service, ctx, models.StatsFilter{})
+
+		// Display performance metrics (all-time)
+		displayPerformanceMetrics(service, ctx, models.StatsFilter{})
 	}
 }
 
