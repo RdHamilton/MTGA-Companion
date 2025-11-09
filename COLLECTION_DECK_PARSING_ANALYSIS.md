@@ -141,10 +141,52 @@ RankGetSeasonAndRankDetails - Rank details
 StartHook              - Startup
 ```
 
+## Collection Research Results
+
+After extensive analysis of MTGA Player.log files, **full card collection data is NOT available**.
+
+### What Was Found:
+
+1. **CardPool** - Only contains cards for limited/draft events (temporary card pools)
+   - Example: Jump-In events have `CardPool: [89019, 89020, ...]`
+   - Regular constructed decks have `CardPool: []`
+   - This is NOT the player's full collection
+
+2. **InventoryInfo** - Contains currency and wildcards but NO individual cards:
+   ```json
+   {
+     "Gems": 1885,
+     "Gold": 7850,
+     "WildCardCommons": 48,
+     "WildCardRares": 11,
+     "Changes": []  // Always empty in observed logs
+   }
+   ```
+
+3. **CardSkins** - Only cosmetic card styles, not card ownership
+
+4. **UnownedCards** - Appears in deck summaries but is always empty `{}`
+
+### Conclusion:
+
+**The full card collection (which specific cards you own and quantities) is NOT logged in Player.log.**
+
+Possible reasons:
+- MTGA may store collection in a local database file
+- Collection data may only be transmitted during login/sync (before logging starts)
+- Privacy/security - collection data may be intentionally excluded from logs
+
+### Alternative Approaches:
+
+1. **Local Database**: MTGA likely stores collection in a local SQLite or similar database
+2. **Different Log File**: Check if other log files contain collection data
+3. **Network Capture**: Collection data may only be available via network traffic analysis
+4. **Accept Limitation**: Document that collection tracking is not available
+
 ## Next Steps
 
 1. ✅ Document current findings
-2. ⬜ Implement fixed deck parser using `Courses` data
-3. ⬜ Research if collection data exists in logs at all
-4. ⬜ Add tests with real MTGA log samples
-5. ⬜ Update documentation about what data is available
+2. ✅ Implement fixed deck parser using `Courses` data
+3. ✅ Research if collection data exists in logs at all - **RESULT: NOT AVAILABLE**
+4. ✅ Add tests with real MTGA log samples
+5. ✅ Update documentation about what data is available
