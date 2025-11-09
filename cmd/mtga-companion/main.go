@@ -662,6 +662,26 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 				}
 			}
 			displayRecentMatches(service, ctx, limit)
+		case "match", "matchview", "view":
+			// Display detailed match information
+			if len(parts) < 2 {
+				fmt.Println("Usage: match view <match_id|latest>")
+				fmt.Println("Examples:")
+				fmt.Println("  match view latest              - View most recent match")
+				fmt.Println("  match view 12345-abc-67890     - View specific match by ID")
+			} else if parts[1] == "view" && len(parts) >= 3 {
+				if parts[2] == "latest" {
+					displayLatestMatch(service, ctx)
+				} else {
+					matchID := strings.Join(parts[2:], " ")
+					displayMatchDetails(service, ctx, matchID)
+				}
+			} else if parts[1] == "latest" {
+				displayLatestMatch(service, ctx)
+			} else {
+				matchID := strings.Join(parts[1:], " ")
+				displayMatchDetails(service, ctx, matchID)
+			}
 		case "format":
 			// Display match history for specific format
 			if len(parts) < 2 {
@@ -1150,6 +1170,7 @@ func printHelp() {
 	fmt.Println("  formats, byformat - Display statistics grouped by format")
 	fmt.Println("  recent [limit] - Display recent matches (default: 10)")
 	fmt.Println("  format <name> - Display match history for specific format")
+	fmt.Println("  match view <id|latest> - Display detailed match information")
 	fmt.Println("  collection, col, c - Refresh and display card collection")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")

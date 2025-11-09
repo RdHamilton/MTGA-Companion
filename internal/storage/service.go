@@ -477,6 +477,21 @@ func (s *Service) GetRecentMatchesLimit(ctx context.Context, limit int) ([]*mode
 	return s.matches.GetRecentMatches(ctx, limit, accountID)
 }
 
+// GetLatestMatch retrieves the most recent match.
+func (s *Service) GetLatestMatch(ctx context.Context) (*models.Match, error) {
+	return s.matches.GetLatestMatch(ctx, s.currentAccountID)
+}
+
+// GetMatchByID retrieves a match by its ID.
+func (s *Service) GetMatchByID(ctx context.Context, matchID string) (*models.Match, error) {
+	return s.matches.GetByID(ctx, matchID)
+}
+
+// GetGamesForMatch retrieves all games for a specific match.
+func (s *Service) GetGamesForMatch(ctx context.Context, matchID string) ([]*models.Game, error) {
+	return s.matches.GetGamesForMatch(ctx, matchID)
+}
+
 // GetStatsByFormat retrieves statistics grouped by format.
 func (s *Service) GetStatsByFormat(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error) {
 	// Use account filter if specified, otherwise use current account
