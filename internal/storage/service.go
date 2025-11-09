@@ -847,6 +847,232 @@ func (s *Service) GetAllRankHistory(ctx context.Context) ([]*models.RankHistory,
 	return s.rankHistory.GetAll(ctx, s.currentAccountID)
 }
 
+// Seasonal Rank Progression Methods
+
+// GetSeasonalRankSummary retrieves rank summary for each season for a specific format.
+func (s *Service) GetSeasonalRankSummary(ctx context.Context, format string) ([]*models.SeasonalRankSummary, error) {
+	// Get all rank history for the format
+	history, err := s.GetRankHistoryByFormat(ctx, format)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rank history: %w", err)
+	}
+
+	if len(history) == 0 {
+		return nil, nil
+	}
+
+	// Group by season
+	seasonMap := make(map[int][]*models.RankHistory)
+	for _, rank := range history {
+		seasonMap[rank.SeasonOrdinal] = append(seasonMap[rank.SeasonOrdinal], rank)
+	}
+
+	// Build summaries
+	summaries := make([]*models.SeasonalRankSummary, 0, len(seasonMap))
+	for seasonOrdinal, ranks := range seasonMap {
+		// Sort ranks by timestamp
+		sortByTimestamp := func(ranks []*models.RankHistory) {
+			for i := 0; i < len(ranks); i++ {
+				for j := i + 1; j < len(ranks); j++ {
+					if ranks[i].Timestamp.After(ranks[j].Timestamp) {
+						ranks[i], ranks[j] = ranks[j], ranks[i]
+					}
+				}
+			}
+		}
+		sortByTimestamp(ranks)
+
+		summary := &models.SeasonalRankSummary{
+			SeasonOrdinal:  seasonOrdinal,
+			Format:         format,
+			TotalSnapshots: len(ranks),
+			FirstSeen:      ranks[0].Timestamp,
+			LastSeen:       ranks[len(ranks)-1].Timestamp,
+		}
+
+		// Set start and end ranks
+		if ranks[0].RankClass != nil {
+			startRank := formatRankHistoryString(ranks[0])
+			summary.StartRank = &startRank
+		}
+		if ranks[len(ranks)-1].RankClass != nil {
+			endRank := formatRankHistoryString(ranks[len(ranks)-1])
+			summary.EndRank = &endRank
+		}
+
+		// Find highest and lowest ranks
+		var highest, lowest *models.RankHistory
+		for _, rank := range ranks {
+			if rank.RankClass == nil {
+				continue
+			}
+			if highest == nil || compareRanks(rank, highest) > 0 {
+				highest = rank
+			}
+			if lowest == nil || compareRanks(rank, lowest) < 0 {
+				lowest = rank
+			}
+		}
+
+		if highest != nil {
+			highestStr := formatRankHistoryString(highest)
+			summary.HighestRank = &highestStr
+		}
+		if lowest != nil {
+			lowestStr := formatRankHistoryString(lowest)
+			summary.LowestRank = &lowestStr
+		}
+
+		summaries = append(summaries, summary)
+	}
+
+	// Sort summaries by season (most recent first)
+	for i := 0; i < len(summaries); i++ {
+		for j := i + 1; j < len(summaries); j++ {
+			if summaries[i].SeasonOrdinal < summaries[j].SeasonOrdinal {
+				summaries[i], summaries[j] = summaries[j], summaries[i]
+			}
+		}
+	}
+
+	return summaries, nil
+}
+
+// GetRankAchievements retrieves all rank achievements (first time reaching each rank).
+func (s *Service) GetRankAchievements(ctx context.Context, format string) ([]*models.RankAchievement, error) {
+	// Get all rank history for the format, sorted by timestamp
+	history, err := s.GetRankHistoryByFormat(ctx, format)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rank history: %w", err)
+	}
+
+	if len(history) == 0 {
+		return nil, nil
+	}
+
+	// Sort by timestamp (oldest first)
+	for i := 0; i < len(history); i++ {
+		for j := i + 1; j < len(history); j++ {
+			if history[i].Timestamp.After(history[j].Timestamp) {
+				history[i], history[j] = history[j], history[i]
+			}
+		}
+	}
+
+	// Track first occurrence of each rank class
+	achievements := make(map[string]*models.RankAchievement)
+	var highestRank *models.RankHistory
+
+	for _, rank := range history {
+		if rank.RankClass == nil || *rank.RankClass == "" {
+			continue
+		}
+
+		rankKey := *rank.RankClass
+		if rank.RankLevel != nil {
+			rankKey = fmt.Sprintf("%s %d", *rank.RankClass, *rank.RankLevel)
+		}
+
+		// Track first achievement of this rank
+		if _, exists := achievements[rankKey]; !exists {
+			achievements[rankKey] = &models.RankAchievement{
+				Format:        format,
+				RankClass:     *rank.RankClass,
+				RankLevel:     rank.RankLevel,
+				FirstAchieved: rank.Timestamp,
+				SeasonOrdinal: rank.SeasonOrdinal,
+				IsHighest:     false,
+			}
+		}
+
+		// Track highest rank
+		if highestRank == nil || compareRanks(rank, highestRank) > 0 {
+			highestRank = rank
+		}
+	}
+
+	// Mark the highest rank achievement
+	if highestRank != nil && highestRank.RankClass != nil {
+		highestKey := *highestRank.RankClass
+		if highestRank.RankLevel != nil {
+			highestKey = fmt.Sprintf("%s %d", *highestRank.RankClass, *highestRank.RankLevel)
+		}
+		if achievement, exists := achievements[highestKey]; exists {
+			achievement.IsHighest = true
+		}
+	}
+
+	// Convert map to slice and sort by achievement date
+	result := make([]*models.RankAchievement, 0, len(achievements))
+	for _, achievement := range achievements {
+		result = append(result, achievement)
+	}
+
+	// Sort by first achieved date (oldest first)
+	for i := 0; i < len(result); i++ {
+		for j := i + 1; j < len(result); j++ {
+			if result[i].FirstAchieved.After(result[j].FirstAchieved) {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// formatRankHistoryString formats a rank history entry as a string.
+func formatRankHistoryString(rank *models.RankHistory) string {
+	if rank.RankClass == nil {
+		return "Unranked"
+	}
+	result := *rank.RankClass
+	if rank.RankLevel != nil {
+		result = fmt.Sprintf("%s %d", result, *rank.RankLevel)
+	}
+	if rank.RankStep != nil {
+		result = fmt.Sprintf("%s (Step %d)", result, *rank.RankStep)
+	}
+	return result
+}
+
+// compareRanks compares two ranks. Returns > 0 if a is higher, < 0 if b is higher, 0 if equal.
+func compareRanks(a, b *models.RankHistory) int {
+	if a.RankClass == nil || b.RankClass == nil {
+		return 0
+	}
+
+	// Rank class order (higher is better)
+	rankOrder := map[string]int{
+		"Bronze":   1,
+		"Silver":   2,
+		"Gold":     3,
+		"Platinum": 4,
+		"Diamond":  5,
+		"Mythic":   6,
+	}
+
+	aOrder := rankOrder[*a.RankClass]
+	bOrder := rankOrder[*b.RankClass]
+
+	if aOrder != bOrder {
+		return aOrder - bOrder
+	}
+
+	// Same class, compare level (lower number is higher rank)
+	if a.RankLevel != nil && b.RankLevel != nil {
+		if *a.RankLevel != *b.RankLevel {
+			return *b.RankLevel - *a.RankLevel
+		}
+	}
+
+	// Same level, compare step (higher step is better)
+	if a.RankStep != nil && b.RankStep != nil {
+		return *a.RankStep - *b.RankStep
+	}
+
+	return 0
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()
