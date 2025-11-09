@@ -644,6 +644,37 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "rank", "ranks", "rankprog":
 			// Display rank progression
 			displayRankProgressionWithStats(service, ctx)
+		case "rankhistory", "rh", "rankh":
+			// Display rank history from rank_history table
+			if len(parts) < 2 {
+				displayLatestRank(service, ctx)
+			} else {
+				subCmd := parts[1]
+				switch subCmd {
+				case "all", "history":
+					displayRankHistory(service, ctx)
+				case "constructed", "c":
+					displayRankHistoryByFormat(service, ctx, "constructed")
+				case "limited", "l":
+					displayRankHistoryByFormat(service, ctx, "limited")
+				case "season", "s":
+					if len(parts) >= 3 {
+						displayRankHistoryBySeason(service, ctx, parts[2])
+					} else {
+						fmt.Println("Usage: rankhistory season <season_number>")
+					}
+				case "latest", "current":
+					displayLatestRank(service, ctx)
+				default:
+					fmt.Println("Unknown rankhistory command. Usage:")
+					fmt.Println("  rankhistory                     - Show current rank for all formats")
+					fmt.Println("  rankhistory all                 - Show all rank history")
+					fmt.Println("  rankhistory constructed         - Show constructed rank history")
+					fmt.Println("  rankhistory limited             - Show limited rank history")
+					fmt.Println("  rankhistory season <number>     - Show rank history for a specific season")
+					fmt.Println("  rankhistory latest              - Show current rank (same as 'rankhistory')")
+				}
+			}
 		case "draft", "drafts", "draftstats":
 			// Display draft statistics
 			refreshDraftStatistics(ctx, logPath)
