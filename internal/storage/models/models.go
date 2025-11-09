@@ -191,3 +191,21 @@ type CurrencySnapshot struct {
 	Gold      int
 	Timestamp time.Time
 }
+
+// SetCompletion represents completion statistics for a MTG set.
+type SetCompletion struct {
+	SetCode         string
+	SetName         string
+	TotalCards      int
+	OwnedCards      int
+	Percentage      float64
+	RarityBreakdown map[string]*RarityCompletion
+}
+
+// RarityCompletion represents completion for a specific rarity.
+type RarityCompletion struct {
+	Rarity     string
+	Total      int
+	Owned      int
+	Percentage float64
+}

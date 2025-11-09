@@ -602,6 +602,127 @@ func (s *Service) GetRecentCollectionChanges(ctx context.Context, limit int) ([]
 	return s.collection.GetRecentChanges(ctx, limit)
 }
 
+// GetSetCompletion calculates set completion percentages.
+// Requires card metadata to be populated in the cards table.
+func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion, error) {
+	// Query all sets and their card counts by rarity from the cards table
+	query := `
+		SELECT
+			set_code,
+			set_name,
+			rarity,
+			COUNT(*) as total
+		FROM cards
+		GROUP BY set_code, set_name, rarity
+		ORDER BY set_code, rarity
+	`
+
+	conn := s.db.Conn()
+	rows, err := conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query card sets: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup
+		_ = rows.Close()
+	}()
+
+	// Build set data structure
+	setData := make(map[string]*models.SetCompletion)
+	for rows.Next() {
+		var setCode, setName, rarity string
+		var total int
+
+		if err := rows.Scan(&setCode, &setName, &rarity, &total); err != nil {
+			return nil, fmt.Errorf("failed to scan set data: %w", err)
+		}
+
+		// Initialize set if not exists
+		if _, exists := setData[setCode]; !exists {
+			setData[setCode] = &models.SetCompletion{
+				SetCode:         setCode,
+				SetName:         setName,
+				RarityBreakdown: make(map[string]*models.RarityCompletion),
+			}
+		}
+
+		// Add rarity breakdown
+		setData[setCode].RarityBreakdown[rarity] = &models.RarityCompletion{
+			Rarity: rarity,
+			Total:  total,
+		}
+		setData[setCode].TotalCards += total
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating set data: %w", err)
+	}
+
+	// Get owned cards from collection
+	collection, err := s.collection.GetAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collection: %w", err)
+	}
+
+	// Query card arena IDs with their sets and rarities
+	cardQuery := `
+		SELECT arena_id, set_code, rarity
+		FROM cards
+	`
+
+	cardRows, err := conn.QueryContext(ctx, cardQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query cards: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup
+		_ = cardRows.Close()
+	}()
+
+	// Count owned cards per set and rarity
+	for cardRows.Next() {
+		var arenaID int
+		var setCode, rarity string
+
+		if err := cardRows.Scan(&arenaID, &setCode, &rarity); err != nil {
+			return nil, fmt.Errorf("failed to scan card: %w", err)
+		}
+
+		// Check if player owns this card
+		if quantity, owned := collection[arenaID]; owned && quantity > 0 {
+			if set, exists := setData[setCode]; exists {
+				set.OwnedCards++
+				if rarityData, rarityExists := set.RarityBreakdown[rarity]; rarityExists {
+					rarityData.Owned++
+				}
+			}
+		}
+	}
+
+	if err = cardRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating cards: %w", err)
+	}
+
+	// Calculate percentages
+	result := make([]*models.SetCompletion, 0, len(setData))
+	for _, set := range setData {
+		if set.TotalCards > 0 {
+			set.Percentage = float64(set.OwnedCards) / float64(set.TotalCards) * 100
+		}
+
+		// Calculate rarity percentages
+		for _, rarity := range set.RarityBreakdown {
+			if rarity.Total > 0 {
+				rarity.Percentage = float64(rarity.Owned) / float64(rarity.Total) * 100
+			}
+		}
+
+		result = append(result, set)
+	}
+
+	return result, nil
+}
+
 // Account Management Methods
 
 // GetCurrentAccount returns the currently active account.

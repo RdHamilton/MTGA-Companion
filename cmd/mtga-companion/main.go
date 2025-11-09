@@ -629,6 +629,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "collection", "col", "c":
 			// Refresh collection from log file
 			refreshCollection(ctx, logPath)
+		case "setcomp", "sets", "completion":
+			// Display set completion percentages
+			displaySetCompletion(service, ctx)
 		case "decks", "deck", "d":
 			// Refresh decks from log file
 			refreshDecks(ctx, logPath)
@@ -1176,6 +1179,7 @@ func printHelp() {
 	fmt.Println("  format <name> - Display match history for specific format")
 	fmt.Println("  match view <id|latest> - Display detailed match information")
 	fmt.Println("  collection, col, c - Refresh and display card collection")
+	fmt.Println("  setcomp, sets, completion - Display set completion percentages")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
 	fmt.Println("  results, result, res - Display match result breakdown")
