@@ -64,6 +64,14 @@ func displayMatchDetails(service *storage.Service, ctx context.Context, matchID 
 	}
 	fmt.Println()
 
+	// Display opponent info
+	if match.OpponentName != nil && *match.OpponentName != "" {
+		fmt.Printf("Opponent:     %s\n", *match.OpponentName)
+		if match.OpponentID != nil && *match.OpponentID != "" {
+			fmt.Printf("Opponent ID:  %s\n", *match.OpponentID)
+		}
+	}
+
 	// Display deck info
 	if match.DeckID != nil {
 		fmt.Printf("Deck ID:      %s\n", *match.DeckID)
@@ -102,7 +110,12 @@ func displayMatchDetails(service *storage.Service, ctx context.Context, matchID 
 				durationStr = formatDuration(duration)
 			}
 
-			fmt.Printf("Game %d: %s (%s)\n", game.GameNumber, gameResultStr, durationStr)
+			reasonStr := ""
+			if game.ResultReason != nil && *game.ResultReason != "" {
+				reasonStr = fmt.Sprintf(" - %s", *game.ResultReason)
+			}
+
+			fmt.Printf("Game %d: %s (%s)%s\n", game.GameNumber, gameResultStr, durationStr, reasonStr)
 		}
 		fmt.Println()
 	}

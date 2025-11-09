@@ -47,6 +47,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			format TEXT NOT NULL,
 			result TEXT NOT NULL,
 			result_reason TEXT,
+			opponent_name TEXT,
+			opponent_id TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (account_id) REFERENCES accounts(id)
 		);
@@ -60,6 +62,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 			game_number INTEGER NOT NULL,
 			result TEXT NOT NULL,
 			duration_seconds INTEGER,
+			result_reason TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (match_id) REFERENCES matches(id),
 			UNIQUE(match_id, game_number)
