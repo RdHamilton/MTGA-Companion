@@ -681,6 +681,34 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "draftpicks", "picks":
 			// Display draft picks
 			refreshDraftPicks(ctx, logPath)
+		case "seasons", "season", "seasonal":
+			// Display seasonal rank progression
+			format := "constructed" // default
+			if len(parts) > 1 {
+				if parts[1] == "limited" || parts[1] == "l" {
+					format = "limited"
+				} else if parts[1] == "constructed" || parts[1] == "c" {
+					format = "constructed"
+				} else if parts[1] == "compare" {
+					// Season comparison view
+					compareFormat := "constructed"
+					if len(parts) > 2 && (parts[2] == "limited" || parts[2] == "l") {
+						compareFormat = "limited"
+					}
+					displaySeasonComparison(service, ctx, compareFormat)
+					continue
+				}
+			}
+			displaySeasonalProgression(service, ctx, format)
+		case "achievements", "achieve", "ach":
+			// Display rank achievements
+			format := "constructed" // default
+			if len(parts) > 1 {
+				if parts[1] == "limited" || parts[1] == "l" {
+					format = "limited"
+				}
+			}
+			displayRankAchievements(service, ctx, format)
 		case "backup", "b":
 			runBackupCommandInteractive(service, ctx)
 		case "account", "accounts", "acc", "a":

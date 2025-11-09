@@ -209,3 +209,26 @@ type RarityCompletion struct {
 	Owned      int
 	Percentage float64
 }
+
+// SeasonalRankSummary represents rank information for a single season.
+type SeasonalRankSummary struct {
+	SeasonOrdinal  int
+	Format         string
+	StartRank      *string // First recorded rank in the season
+	EndRank        *string // Last recorded rank in the season
+	HighestRank    *string // Best rank achieved in the season
+	LowestRank     *string // Worst rank during the season
+	TotalSnapshots int     // Number of rank snapshots in the season
+	FirstSeen      time.Time
+	LastSeen       time.Time
+}
+
+// RankAchievement represents a milestone or achievement in rank progression.
+type RankAchievement struct {
+	Format        string
+	RankClass     string    // The rank class achieved (Bronze, Silver, Gold, etc.)
+	RankLevel     *int      // Tier within class (optional)
+	FirstAchieved time.Time // When this rank was first reached
+	SeasonOrdinal int       // Season when first achieved
+	IsHighest     bool      // Whether this is the highest rank ever achieved
+}
