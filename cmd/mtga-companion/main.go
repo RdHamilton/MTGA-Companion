@@ -143,7 +143,6 @@ func main() {
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
 	_, _ = logreader.ParseDraftPicks(entries) // Parse draft picks (used in refreshDraftPicks)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
-	collection, _ := logreader.ParseCollection(entries)
 	deckLibrary, _ := logreader.ParseDecks(entries)
 
 	// Store arena stats persistently (with deduplication)
@@ -266,19 +265,13 @@ func main() {
 	// Display arena statistics - both current session and all-time
 	displayArenaStatistics(arenaStats, service, ctx)
 
-	// Display card collection
-	if collection != nil && len(collection.Cards) > 0 {
-		fmt.Println()
-		displayCollection(collection)
-	}
-
 	// Display deck library
 	if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
 		fmt.Println()
 		displayDeckLibrary(deckLibrary)
 	}
 
-	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil && (collection == nil || len(collection.Cards) == 0) && (deckLibrary == nil || len(deckLibrary.Decks) == 0) {
+	if profile == nil && inventory == nil && rank == nil && draftHistory == nil && arenaStats == nil && (deckLibrary == nil || len(deckLibrary.Decks) == 0) {
 		fmt.Println("No player data found in log file.")
 		fmt.Println("Try playing a game or opening MTG Arena to generate log data.")
 	}
@@ -635,9 +628,6 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 				}
 			}
 			displayMonthlyStatsWithOffset(service, ctx, offset)
-		case "collection", "col", "c":
-			// Refresh collection from log file
-			refreshCollection(ctx, logPath)
 		case "setcomp", "sets", "completion":
 			// Display set completion percentages
 			displaySetCompletion(service, ctx)
@@ -854,44 +844,6 @@ func refreshStatistics(service *storage.Service, ctx context.Context, logPath st
 
 	// Display updated statistics
 	displayArenaStatistics(arenaStats, service, ctx)
-}
-
-// refreshCollection refreshes and displays collection from the log file.
-func refreshCollection(ctx context.Context, logPath string) {
-	fmt.Println("\nRefreshing collection...")
-
-	// Create a reader
-	reader, err := logreader.NewReader(logPath)
-	if err != nil {
-		fmt.Printf("Error creating log reader: %v\n", err)
-		return
-	}
-	defer func() {
-		if err := reader.Close(); err != nil {
-			log.Printf("Error closing reader: %v", err)
-		}
-	}()
-
-	// Read all JSON entries
-	entries, err := reader.ReadAllJSON()
-	if err != nil {
-		fmt.Printf("Error reading log entries: %v\n", err)
-		return
-	}
-
-	// Parse collection
-	collection, err := logreader.ParseCollection(entries)
-	if err != nil {
-		fmt.Printf("Error parsing collection: %v\n", err)
-		return
-	}
-
-	// Display collection
-	if collection != nil && len(collection.Cards) > 0 {
-		displayCollection(collection)
-	} else {
-		fmt.Println("No collection data found in log file.")
-	}
 }
 
 // refreshDecks refreshes and displays decks from the log file.

@@ -23,7 +23,7 @@ type PlayerDeck struct {
 }
 
 // ParseDecks extracts saved player decks from log entries.
-// It looks for deck-related events in MTGA logs.
+// It looks for deck data in EventGetCoursesV2 responses (Courses array).
 func ParseDecks(entries []*LogEntry) (*DeckLibrary, error) {
 	library := &DeckLibrary{
 		Decks:         make(map[string]*PlayerDeck),
@@ -32,62 +32,34 @@ func ParseDecks(entries []*LogEntry) (*DeckLibrary, error) {
 
 	seenDecks := make(map[string]bool)
 
-	// Look for deck data in various event types
-	// MTGA may store decks in different event types like "Deck.GetDeckLists" or similar
+	// Look for EventGetCoursesV2 responses which contain deck data in the Courses array
 	for i := len(entries) - 1; i >= 0; i-- {
 		entry := entries[i]
 		if !entry.IsJSON {
 			continue
 		}
 
-		// Try different possible deck event types
-		var deckData interface{}
-		var found bool
-
-		// Check for deck list events
-		if decks, ok := entry.JSON["Deck.GetDeckLists"]; ok {
-			deckData = decks
-			found = true
-		} else if decks, ok := entry.JSON["getDeckLists"]; ok {
-			deckData = decks
-			found = true
-		} else if decks, ok := entry.JSON["DeckLists"]; ok {
-			deckData = decks
-			found = true
-		} else if decks, ok := entry.JSON["decks"]; ok {
-			deckData = decks
-			found = true
-		}
-
-		if !found {
-			continue
-		}
-
-		// Parse deck list (could be array or object)
-		decksArray, ok := deckData.([]interface{})
+		// Check for Courses key (from EventGetCoursesV2 responses)
+		coursesData, ok := entry.JSON["Courses"]
 		if !ok {
-			// Try as object with decks array
-			if decksMap, ok := deckData.(map[string]interface{}); ok {
-				if decks, ok := decksMap["decks"].([]interface{}); ok {
-					decksArray = decks
-				} else if decks, ok := decksMap["DeckLists"].([]interface{}); ok {
-					decksArray = decks
-				}
-			}
-		}
-
-		if decksArray == nil {
 			continue
 		}
 
-		// Process each deck
-		for _, deckData := range decksArray {
-			deckMap, ok := deckData.(map[string]interface{})
+		// Parse courses array
+		coursesArray, ok := coursesData.([]interface{})
+		if !ok {
+			continue
+		}
+
+		// Process each course (which may contain a deck)
+		for _, courseData := range coursesArray {
+			courseMap, ok := courseData.(map[string]interface{})
 			if !ok {
 				continue
 			}
 
-			deck := parsePlayerDeck(deckMap)
+			// Extract deck from CourseDeckSummary and CourseDeck
+			deck := parseCourseWithDeck(courseMap)
 			if deck == nil || deck.DeckID == "" {
 				continue
 			}
@@ -101,11 +73,6 @@ func ParseDecks(entries []*LogEntry) (*DeckLibrary, error) {
 			library.Decks[deck.DeckID] = deck
 			library.DecksByFormat[deck.Format] = append(library.DecksByFormat[deck.Format], deck)
 		}
-
-		// If we found decks, we can stop searching
-		if len(library.Decks) > 0 {
-			break
-		}
 	}
 
 	library.TotalDecks = len(library.Decks)
@@ -117,21 +84,27 @@ func ParseDecks(entries []*LogEntry) (*DeckLibrary, error) {
 	return library, nil
 }
 
-// parsePlayerDeck extracts deck information from a deck object.
-func parsePlayerDeck(deckMap map[string]interface{}) *PlayerDeck {
+// parseCourseWithDeck extracts deck information from a Course object (from EventGetCoursesV2).
+// The structure is: Course -> CourseDeckSummary (metadata) + CourseDeck (cards).
+func parseCourseWithDeck(courseMap map[string]interface{}) *PlayerDeck {
 	deck := &PlayerDeck{
 		MainDeck:  []DeckCard{},
 		Sideboard: []DeckCard{},
 	}
 
-	// Extract deck ID
-	if id, ok := deckMap["id"].(string); ok {
-		deck.DeckID = id
-	} else if id, ok := deckMap["Id"].(string); ok {
-		deck.DeckID = id
-	} else if id, ok := deckMap["deckId"].(string); ok {
-		deck.DeckID = id
-	} else if id, ok := deckMap["DeckId"].(string); ok {
+	// Extract CourseDeckSummary for metadata
+	summaryData, ok := courseMap["CourseDeckSummary"]
+	if !ok {
+		return nil
+	}
+
+	summaryMap, ok := summaryData.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	// Extract DeckId
+	if id, ok := summaryMap["DeckId"].(string); ok {
 		deck.DeckID = id
 	}
 
@@ -139,73 +112,78 @@ func parsePlayerDeck(deckMap map[string]interface{}) *PlayerDeck {
 		return nil
 	}
 
-	// Extract deck name
-	if name, ok := deckMap["name"].(string); ok {
-		deck.Name = name
-	} else if name, ok := deckMap["Name"].(string); ok {
+	// Extract Name
+	if name, ok := summaryMap["Name"].(string); ok {
 		deck.Name = name
 	}
 
-	// Extract format
-	if format, ok := deckMap["format"].(string); ok {
-		deck.Format = format
-	} else if format, ok := deckMap["Format"].(string); ok {
-		deck.Format = format
-	} else {
+	// Extract Description
+	if desc, ok := summaryMap["Description"].(string); ok {
+		deck.Description = desc
+	}
+
+	// Extract Attributes array for format and timestamps
+	if attrsData, ok := summaryMap["Attributes"].([]interface{}); ok {
+		for _, attrData := range attrsData {
+			attrMap, ok := attrData.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			name, _ := attrMap["name"].(string)
+			value, _ := attrMap["value"].(string)
+
+			switch name {
+			case "Format":
+				deck.Format = value
+			case "LastPlayed":
+				// Value is quoted: "\"2024-06-21T09:35:17...\""
+				// Remove outer quotes
+				if len(value) > 2 && value[0] == '"' && value[len(value)-1] == '"' {
+					value = value[1 : len(value)-1]
+				}
+				if t, err := time.Parse(time.RFC3339, value); err == nil {
+					deck.LastPlayed = &t
+				}
+			case "LastUpdated":
+				// Value is quoted: "\"2024-05-10T09:54:31...\""
+				if len(value) > 2 && value[0] == '"' && value[len(value)-1] == '"' {
+					value = value[1 : len(value)-1]
+				}
+				if t, err := time.Parse(time.RFC3339, value); err == nil {
+					deck.Modified = t
+				}
+			}
+		}
+	}
+
+	// Default format if not found
+	if deck.Format == "" {
 		deck.Format = "Unknown"
 	}
 
-	// Extract description
-	if desc, ok := deckMap["description"].(string); ok {
-		deck.Description = desc
-	} else if desc, ok := deckMap["Description"].(string); ok {
-		deck.Description = desc
+	// Extract CourseDeck for card lists
+	deckData, ok := courseMap["CourseDeck"]
+	if !ok {
+		return deck // Return deck with metadata even if cards missing
 	}
 
-	// Extract main deck
-	if mainDeckData, ok := deckMap["mainDeck"].([]interface{}); ok {
+	deckMap, ok := deckData.(map[string]interface{})
+	if !ok {
+		return deck
+	}
+
+	// Extract MainDeck
+	if mainDeckData, ok := deckMap["MainDeck"].([]interface{}); ok {
 		deck.MainDeck = parseDeckCards(mainDeckData)
-	} else if mainDeckData, ok := deckMap["MainDeck"].([]interface{}); ok {
-		deck.MainDeck = parseDeckCards(mainDeckData)
 	}
 
-	// Extract sideboard
-	if sideboardData, ok := deckMap["sideboard"].([]interface{}); ok {
-		deck.Sideboard = parseDeckCards(sideboardData)
-	} else if sideboardData, ok := deckMap["Sideboard"].([]interface{}); ok {
+	// Extract Sideboard
+	if sideboardData, ok := deckMap["Sideboard"].([]interface{}); ok {
 		deck.Sideboard = parseDeckCards(sideboardData)
 	}
 
-	// Extract timestamps
-	if created, ok := deckMap["created"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, created); err == nil {
-			deck.Created = t
-		}
-	} else if created, ok := deckMap["Created"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, created); err == nil {
-			deck.Created = t
-		}
-	}
-
-	if modified, ok := deckMap["modified"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, modified); err == nil {
-			deck.Modified = t
-		}
-	} else if modified, ok := deckMap["Modified"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, modified); err == nil {
-			deck.Modified = t
-		}
-	}
-
-	if lastPlayed, ok := deckMap["lastPlayed"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, lastPlayed); err == nil {
-			deck.LastPlayed = &t
-		}
-	} else if lastPlayed, ok := deckMap["LastPlayed"].(string); ok {
-		if t, err := time.Parse(time.RFC3339, lastPlayed); err == nil {
-			deck.LastPlayed = &t
-		}
-	}
+	// Note: CommandZone and Companions are also available but not currently stored
 
 	return deck
 }
