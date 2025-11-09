@@ -709,6 +709,33 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 				}
 			}
 			displayRankAchievements(service, ctx, format)
+		case "progress", "prog", "p":
+			// Display rank progression and estimated matches
+			format := "constructed" // default
+			if len(parts) > 1 {
+				if parts[1] == "limited" || parts[1] == "l" {
+					format = "limited"
+				}
+			}
+			displayRankProgressionAnalysis(service, ctx, format)
+		case "floors", "floor", "f":
+			// Display rank floors
+			format := "constructed" // default
+			if len(parts) > 1 {
+				if parts[1] == "limited" || parts[1] == "l" {
+					format = "limited"
+				}
+			}
+			displayRankFloors(service, format)
+		case "doublerankups", "dru", "doubleup":
+			// Display double rank up events
+			format := "constructed" // default
+			if len(parts) > 1 {
+				if parts[1] == "limited" || parts[1] == "l" {
+					format = "limited"
+				}
+			}
+			displayDoubleRankUps(service, ctx, format)
 		case "backup", "b":
 			runBackupCommandInteractive(service, ctx)
 		case "account", "accounts", "acc", "a":
