@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -21,6 +22,7 @@ var (
 	pollInterval  = flag.Duration("poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
 	enableMetrics = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
 	useFileEvents = flag.Bool("use-file-events", true, "Use file system events (fsnotify) for monitoring")
+	useGUI        = flag.Bool("gui", false, "Launch GUI mode instead of CLI")
 )
 
 func main() {
@@ -81,6 +83,13 @@ func main() {
 	}()
 
 	ctx := context.Background()
+
+	// Check if GUI mode is requested
+	if *useGUI {
+		guiApp := gui.NewApp(service)
+		guiApp.Run()
+		return
+	}
 
 	// Get the default log path for the current platform
 	logPath, err := logreader.DefaultLogPath()
