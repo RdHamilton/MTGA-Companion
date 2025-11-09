@@ -232,3 +232,34 @@ type RankAchievement struct {
 	SeasonOrdinal int       // Season when first achieved
 	IsHighest     bool      // Whether this is the highest rank ever achieved
 }
+
+// RankProgression represents progress toward next rank tier.
+type RankProgression struct {
+	CurrentRank      string    // Current rank (e.g., "Gold 2")
+	NextRank         string    // Next rank target (e.g., "Gold 1")
+	CurrentStep      int       // Current step within tier
+	StepsToNext      int       // Steps needed to reach next tier
+	IsAtFloor        bool      // Whether current rank is at a floor
+	EstimatedMatches *int      // Estimated matches needed (based on win rate)
+	WinRateUsed      *float64  // Win rate used for estimation
+	Format           string    // "constructed" or "limited"
+	LastUpdated      time.Time // When this was calculated
+}
+
+// RankFloor represents a rank floor (ranks below which you cannot drop).
+type RankFloor struct {
+	RankClass string // "Bronze", "Silver", "Gold", etc.
+	RankLevel int    // Tier level (e.g., 4 for Bronze 4)
+	Format    string // "constructed" or "limited"
+}
+
+// DoubleRankUp represents a detected double rank up event.
+type DoubleRankUp struct {
+	PreviousRank  string    // Rank before the jump
+	NewRank       string    // Rank after the jump
+	SkippedRank   string    // The rank that was skipped
+	MatchID       string    // Match that triggered the double rank up
+	Timestamp     time.Time // When it occurred
+	Format        string    // "constructed" or "limited"
+	SeasonOrdinal int       // Season when it occurred
+}

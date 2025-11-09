@@ -1020,6 +1020,171 @@ func (s *Service) GetRankAchievements(ctx context.Context, format string) ([]*mo
 	return result, nil
 }
 
+// Rank Progression Analysis Methods
+
+// GetRankProgression calculates progress toward next rank tier.
+func (s *Service) GetRankProgression(ctx context.Context, format string) (*models.RankProgression, error) {
+	// Get latest rank for format
+	latestRank, err := s.GetLatestRankByFormat(ctx, format)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest rank: %w", err)
+	}
+
+	if latestRank == nil || latestRank.RankClass == nil {
+		return nil, nil
+	}
+
+	// Parse current rank
+	currentRank := *latestRank.RankClass
+	currentLevel := 1
+	if latestRank.RankLevel != nil {
+		currentLevel = *latestRank.RankLevel
+	}
+	currentStep := 0
+	if latestRank.RankStep != nil {
+		currentStep = *latestRank.RankStep
+	}
+
+	// Determine next rank
+	nextRank := calculateNextRank(currentRank, currentLevel)
+
+	// Calculate steps to next tier (assuming 6 steps per tier in most ranks)
+	stepsPerTier := 6
+	if currentRank == "Mythic" {
+		stepsPerTier = 0 // Mythic has no tiers
+	}
+	stepsToNext := stepsPerTier - currentStep
+
+	// Check if at floor
+	isAtFloor := isRankFloor(currentRank, currentLevel)
+
+	// Calculate estimated matches based on recent win rate
+	filter := models.StatsFilter{
+		Format: &format,
+	}
+	stats, err := s.GetStats(ctx, filter)
+	if err == nil && stats != nil && stats.TotalMatches > 0 {
+		winRate := stats.WinRate
+		// Estimate matches needed: steps / (win rate - 0.5)
+		// Assumes you gain 1 step per win and lose 1 per loss
+		// Net gain per match = (winRate * 1) + ((1-winRate) * -1) = 2*winRate - 1
+		netGainPerMatch := 2*winRate - 1
+		if netGainPerMatch > 0 {
+			estimated := int(float64(stepsToNext) / netGainPerMatch)
+			return &models.RankProgression{
+				CurrentRank:      formatRank(currentRank, currentLevel, currentStep),
+				NextRank:         nextRank,
+				CurrentStep:      currentStep,
+				StepsToNext:      stepsToNext,
+				IsAtFloor:        isAtFloor,
+				EstimatedMatches: &estimated,
+				WinRateUsed:      &winRate,
+				Format:           format,
+				LastUpdated:      time.Now(),
+			}, nil
+		}
+	}
+
+	return &models.RankProgression{
+		CurrentRank: formatRank(currentRank, currentLevel, currentStep),
+		NextRank:    nextRank,
+		CurrentStep: currentStep,
+		StepsToNext: stepsToNext,
+		IsAtFloor:   isAtFloor,
+		Format:      format,
+		LastUpdated: time.Now(),
+	}, nil
+}
+
+// DetectDoubleRankUps detects all double rank up events in match history.
+func (s *Service) DetectDoubleRankUps(ctx context.Context, format string) ([]*models.DoubleRankUp, error) {
+	// Get all matches with rank changes for the format
+	filter := models.StatsFilter{
+		Format: &format,
+	}
+	matches, err := s.GetMatches(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get matches: %w", err)
+	}
+
+	var doubleRankUps []*models.DoubleRankUp
+
+	for _, match := range matches {
+		if match.RankBefore == nil || match.RankAfter == nil {
+			continue
+		}
+
+		// Parse ranks
+		beforeClass, beforeLevel := parseRankString(*match.RankBefore)
+		afterClass, afterLevel := parseRankString(*match.RankAfter)
+
+		if beforeClass == "" || afterClass == "" {
+			continue
+		}
+
+		// Check if rank class jumped
+		if beforeClass != afterClass {
+			// Check if it's a double rank up (skipped a class)
+			classOrder := []string{"Bronze", "Silver", "Gold", "Platinum", "Diamond", "Mythic"}
+			beforeIdx := -1
+			afterIdx := -1
+			for i, class := range classOrder {
+				if class == beforeClass {
+					beforeIdx = i
+				}
+				if class == afterClass {
+					afterIdx = i
+				}
+			}
+
+			if afterIdx > beforeIdx+1 {
+				// Skipped at least one class
+				skippedClass := classOrder[beforeIdx+1]
+				doubleRankUps = append(doubleRankUps, &models.DoubleRankUp{
+					PreviousRank:  *match.RankBefore,
+					NewRank:       *match.RankAfter,
+					SkippedRank:   skippedClass + " (entire tier)",
+					MatchID:       match.ID,
+					Timestamp:     match.Timestamp,
+					Format:        format,
+					SeasonOrdinal: 0, // Would need to get from rank history
+				})
+			}
+		} else if beforeLevel > 0 && afterLevel > 0 {
+			// Same class, check if level jumped
+			if beforeLevel-afterLevel > 1 {
+				// Skipped a level
+				skippedLevel := beforeLevel - 1
+				doubleRankUps = append(doubleRankUps, &models.DoubleRankUp{
+					PreviousRank:  *match.RankBefore,
+					NewRank:       *match.RankAfter,
+					SkippedRank:   fmt.Sprintf("%s %d", beforeClass, skippedLevel),
+					MatchID:       match.ID,
+					Timestamp:     match.Timestamp,
+					Format:        format,
+					SeasonOrdinal: 0,
+				})
+			}
+		}
+	}
+
+	return doubleRankUps, nil
+}
+
+// GetRankFloors returns all rank floors for a format.
+func (s *Service) GetRankFloors(format string) []*models.RankFloor {
+	floors := []*models.RankFloor{
+		{RankClass: "Bronze", RankLevel: 4, Format: format},
+		{RankClass: "Silver", RankLevel: 4, Format: format},
+		{RankClass: "Gold", RankLevel: 4, Format: format},
+		{RankClass: "Platinum", RankLevel: 4, Format: format},
+		{RankClass: "Diamond", RankLevel: 4, Format: format},
+	}
+	return floors
+}
+
+// Helper functions for seasonal and rank analysis
+
 // formatRankHistoryString formats a rank history entry as a string.
 func formatRankHistoryString(rank *models.RankHistory) string {
 	if rank.RankClass == nil {
@@ -1071,6 +1236,64 @@ func compareRanks(a, b *models.RankHistory) int {
 	}
 
 	return 0
+}
+
+// Helper functions for rank analysis
+
+func calculateNextRank(rankClass string, level int) string {
+	if rankClass == "Mythic" {
+		return "Mythic (Top Rank)"
+	}
+
+	if level > 1 {
+		return fmt.Sprintf("%s %d", rankClass, level-1)
+	}
+
+	// Next class
+	classOrder := map[string]string{
+		"Bronze":   "Silver",
+		"Silver":   "Gold",
+		"Gold":     "Platinum",
+		"Platinum": "Diamond",
+		"Diamond":  "Mythic",
+	}
+
+	if nextClass, exists := classOrder[rankClass]; exists {
+		if nextClass == "Mythic" {
+			return "Mythic"
+		}
+		return fmt.Sprintf("%s 4", nextClass)
+	}
+
+	return "Unknown"
+}
+
+func isRankFloor(rankClass string, level int) bool {
+	return level == 4
+}
+
+func formatRank(rankClass string, level, step int) string {
+	if rankClass == "Mythic" {
+		return "Mythic"
+	}
+	if level > 0 {
+		return fmt.Sprintf("%s %d (Step %d)", rankClass, level, step)
+	}
+	return fmt.Sprintf("%s (Step %d)", rankClass, step)
+}
+
+func parseRankString(rankStr string) (class string, level int) {
+	// Parse strings like "Gold 2" or "Mythic"
+	parts := strings.Split(rankStr, " ")
+	if len(parts) == 0 {
+		return "", 0
+	}
+
+	class = parts[0]
+	if len(parts) > 1 {
+		_, _ = fmt.Sscanf(parts[1], "%d", &level)
+	}
+	return class, level
 }
 
 // Close closes the database connection.
