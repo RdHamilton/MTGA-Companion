@@ -33,6 +33,10 @@ type MatchRepository interface {
 	// If accountID is 0, returns matches for all accounts.
 	GetRecentMatches(ctx context.Context, limit int, accountID int) ([]*models.Match, error)
 
+	// GetLatestMatch retrieves the most recent match.
+	// If accountID is 0, returns the latest match for all accounts.
+	GetLatestMatch(ctx context.Context, accountID int) (*models.Match, error)
+
 	// GetStats calculates statistics based on the given filter.
 	GetStats(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error)
 
@@ -428,6 +432,54 @@ func (r *matchRepository) GetRecentMatches(ctx context.Context, limit int, accou
 	}
 
 	return matches, nil
+}
+
+// GetLatestMatch retrieves the most recent match.
+func (r *matchRepository) GetLatestMatch(ctx context.Context, accountID int) (*models.Match, error) {
+	query := `
+		SELECT
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
+			player_wins, opponent_wins, player_team_id, deck_id,
+			rank_before, rank_after, format, result, result_reason, created_at
+		FROM matches
+		WHERE 1=1
+	`
+	args := make([]interface{}, 0)
+
+	if accountID > 0 {
+		query += " AND account_id = ?"
+		args = append(args, accountID)
+	}
+
+	query += " ORDER BY timestamp DESC LIMIT 1"
+
+	match := &models.Match{}
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&match.ID,
+		&match.AccountID,
+		&match.EventID,
+		&match.EventName,
+		&match.Timestamp,
+		&match.DurationSeconds,
+		&match.PlayerWins,
+		&match.OpponentWins,
+		&match.PlayerTeamID,
+		&match.DeckID,
+		&match.RankBefore,
+		&match.RankAfter,
+		&match.Format,
+		&match.Result,
+		&match.ResultReason,
+		&match.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No matches found
+		}
+		return nil, fmt.Errorf("failed to get latest match: %w", err)
+	}
+
+	return match, nil
 }
 
 // GetStatsByFormat calculates statistics grouped by format.
