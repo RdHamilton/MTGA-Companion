@@ -1809,6 +1809,14 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		return
 	}
 
+	// Handle period comparison exports separately (requires 4 dates: period1 start/end, period2 start/end)
+	if exportType == "compare-periods" || exportType == "period-comparison" {
+		fmt.Println("Period comparison requires both periods' date ranges")
+		fmt.Println("Use: export compare-periods -start 2024-01-01 -end 2024-01-31 -start2 2024-02-01 -end2 2024-02-29")
+		fmt.Println("Note: -start2 and -end2 flags are not yet implemented. Use result-comparison for recent vs all-time.")
+		return
+	}
+
 	// Create filter for statistics exports
 	filter := models.StatsFilter{
 		StartDate: startDate,
