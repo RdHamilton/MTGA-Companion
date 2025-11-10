@@ -148,7 +148,6 @@ func TestClient_RateLimitRetry(t *testing.T) {
 
 	var card Card
 	err := client.doRequest(ctx, server.URL, &card)
-
 	if err != nil {
 		t.Fatalf("Expected success after retry, got error: %v", err)
 	}
