@@ -17,6 +17,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/viewer"
 )
 
 var (
@@ -1665,7 +1666,13 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 
 	exportType := strings.ToLower(args[0])
 
-	// Parse common options
+	// Handle deck exports separately
+	if exportType == "deck" || exportType == "decks" {
+		handleDeckExport(service, ctx, args[1:])
+		return
+	}
+
+	// Parse common options for statistics exports
 	format := export.FormatCSV
 	outputPath := ""
 	prettyJSON := true
@@ -1739,6 +1746,93 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	fmt.Printf("✓ Export successful: %s\n", actualPath)
 }
 
+// handleDeckExport handles deck export commands.
+func handleDeckExport(service *storage.Service, ctx context.Context, args []string) {
+	// Parse deck export options
+	deckFormat := export.DeckFormatArena // default
+	outputPath := ""
+	var deckIDs []string
+	var formatFilter string
+	exportAll := false
+
+	// Parse flags
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "-arena":
+			deckFormat = export.DeckFormatArena
+		case arg == "-text":
+			deckFormat = export.DeckFormatText
+		case arg == "-json":
+			deckFormat = export.DeckFormatJSON
+		case arg == "-csv":
+			deckFormat = export.DeckFormatCSV
+		case arg == "-o" || arg == "--output":
+			if i+1 < len(args) {
+				outputPath = args[i+1]
+				i++
+			}
+		case arg == "-id" || arg == "--deck-id":
+			if i+1 < len(args) {
+				deckIDs = append(deckIDs, args[i+1])
+				i++
+			}
+		case arg == "-format" || arg == "--format":
+			if i+1 < len(args) {
+				formatFilter = args[i+1]
+				i++
+			}
+		case arg == "-all" || arg == "--all":
+			exportAll = true
+		default:
+			// Treat as deck ID if it doesn't start with -
+			if !strings.HasPrefix(arg, "-") {
+				deckIDs = append(deckIDs, arg)
+			}
+		}
+	}
+
+	// Create deck viewer
+	deckViewer := viewer.NewDeckViewer(service.GetDB(), nil)
+
+	var err error
+
+	// Determine output path
+	if outputPath == "" {
+		if len(deckIDs) == 1 {
+			// Get deck name for filename
+			deck, err := deckViewer.GetDeck(ctx, deckIDs[0])
+			if err == nil && deck != nil {
+				outputPath = filepath.Join("exports", export.GenerateDeckFilename(deck.Deck.Name, deckFormat))
+			}
+		}
+		if outputPath == "" {
+			outputPath = filepath.Join("exports", fmt.Sprintf("decks_%s.%s", time.Now().Format("20060102_150405"), deckFormat))
+		}
+	}
+
+	// Execute export based on options
+	switch {
+	case exportAll:
+		err = export.ExportAllDecks(ctx, deckViewer, deckFormat, outputPath)
+	case formatFilter != "":
+		err = export.ExportDecksByFormat(ctx, deckViewer, formatFilter, deckFormat, outputPath)
+	case len(deckIDs) > 0:
+		err = export.ExportDecks(ctx, deckViewer, deckIDs, deckFormat, outputPath)
+	default:
+		fmt.Println("Error: No decks specified. Use -all, -format, or provide deck IDs.")
+		printDeckExportHelp()
+		return
+	}
+
+	if err != nil {
+		fmt.Printf("Deck export failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✓ Deck export successful: %s\n", outputPath)
+}
+
 // printExportHelp prints help for the export command.
 func printExportHelp() {
 	fmt.Println("\nExport Commands:")
@@ -1746,6 +1840,7 @@ func printExportHelp() {
 	fmt.Println("  export stats [options]        - Export aggregated statistics")
 	fmt.Println("  export daily [options]        - Export daily statistics")
 	fmt.Println("  export performance [options]  - Export performance metrics")
+	fmt.Println("  export deck/decks [options]   - Export deck lists")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -json                         - Export as JSON (default: CSV)")
 	fmt.Println("  -csv                          - Export as CSV")
@@ -1758,4 +1853,29 @@ func printExportHelp() {
 	fmt.Println("  export stats -csv -o stats.csv")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
+	fmt.Println("  export decks -all -arena      - Export all decks in Arena format")
+	fmt.Println("  export deck <deck_id> -json   - Export specific deck as JSON")
+}
+
+// printDeckExportHelp prints detailed help for deck exports.
+func printDeckExportHelp() {
+	fmt.Println("\nDeck Export Commands:")
+	fmt.Println("  export deck/decks [options]   - Export deck lists")
+	fmt.Println("\nDeck Format Options:")
+	fmt.Println("  -arena                        - Arena format (default)")
+	fmt.Println("  -text                         - Human-readable text format")
+	fmt.Println("  -json                         - JSON format")
+	fmt.Println("  -csv                          - CSV format (one row per card)")
+	fmt.Println("\nDeck Selection Options:")
+	fmt.Println("  -all                          - Export all decks")
+	fmt.Println("  -format <format>              - Export decks of specific format (Standard, etc.)")
+	fmt.Println("  -id, --deck-id <id>           - Export specific deck by ID")
+	fmt.Println("  <deck_id>                     - Export specific deck (can be multiple)")
+	fmt.Println("\nOther Options:")
+	fmt.Println("  -o, --output <path>           - Specify output file path")
+	fmt.Println("\nExamples:")
+	fmt.Println("  export decks -all -arena      - Export all decks in Arena format")
+	fmt.Println("  export deck <id> -json        - Export specific deck as JSON")
+	fmt.Println("  export decks -format Standard -text")
+	fmt.Println("  export deck <id1> <id2> -csv  - Export multiple decks as CSV")
 }
