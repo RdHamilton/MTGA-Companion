@@ -7,7 +7,8 @@ toolchain go1.24.10
 require (
 	fyne.io/fyne/v2 v2.7.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/golang-migrate/migrate/v4 v4.18.1
+	github.com/go-echarts/go-echarts/v2 v2.6.7
+	github.com/golang-migrate/migrate/v4 v4.19.0
 	golang.org/x/crypto v0.43.0
 	modernc.org/sqlite v1.40.0
 )
@@ -34,6 +35,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
@@ -45,7 +47,6 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/image v0.24.0 // indirect
 	golang.org/x/net v0.45.0 // indirect

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
@@ -798,6 +799,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "export", "exp":
 			// Export data to CSV/JSON
 			handleExportCommand(service, ctx, parts[1:])
+		case "chart", "charts":
+			// Display trend charts
+			handleTrendsCommand(service, ctx, parts[1:])
 		case "help", "h":
 			printHelp()
 		default:
@@ -1234,6 +1238,7 @@ func printHelp() {
 	fmt.Println("  setcomp, sets, completion - Display set completion percentages")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
+	fmt.Println("  chart, charts - Display visual trend charts (type 'chart help' for details)")
 	fmt.Println("  results, result, res - Display match result breakdown")
 	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
 	fmt.Println("  draft, drafts, draftstats - Display draft statistics")
@@ -2044,6 +2049,485 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	}
 
 	fmt.Printf("✓ Export successful: %s\n", actualPath)
+}
+
+// handleTrendsCommand handles trend visualization commands.
+func handleTrendsCommand(service *storage.Service, ctx context.Context, args []string) {
+	if len(args) < 1 {
+		printTrendsHelp()
+		return
+	}
+
+	trendType := args[0]
+
+	// Default parameters
+	var startDate, endDate *time.Time
+	var formatFilter *string
+	periodType := "weekly" // Default period
+	chartType := "line"    // Default chart type
+
+	// Parse flags
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-start", "--start-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					startDate = &t
+					i++
+				}
+			}
+		case "-end", "--end-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					endDate = &t
+					i++
+				}
+			}
+		case "-format", "--format":
+			if i+1 < len(args) {
+				formatFilter = &args[i+1]
+				i++
+			}
+		case "-period", "--period":
+			if i+1 < len(args) {
+				periodType = args[i+1]
+				i++
+			}
+		case "-type", "--chart-type":
+			if i+1 < len(args) {
+				chartType = args[i+1]
+				i++
+			}
+		case "-line":
+			chartType = "line"
+		case "-bar":
+			chartType = "bar"
+		}
+	}
+
+	// Set default date range if not provided (last 30 days)
+	if startDate == nil || endDate == nil {
+		now := time.Now()
+		if endDate == nil {
+			endDate = &now
+		}
+		if startDate == nil {
+			start := now.AddDate(0, 0, -30)
+			startDate = &start
+		}
+	}
+
+	switch trendType {
+	case "winrate", "wr":
+		displayWinRateTrendChart(service, ctx, *startDate, *endDate, periodType, formatFilter, chartType)
+	case "results", "breakdown", "rb":
+		displayResultBreakdownChart(service, ctx, *startDate, *endDate, formatFilter)
+	case "rank", "progression", "rp":
+		displayRankProgressionChart(service, ctx, *startDate, *endDate, periodType, formatFilter)
+	case "help", "h":
+		printTrendsHelp()
+	default:
+		// Default to win rate trend
+		displayWinRateTrendChart(service, ctx, *startDate, *endDate, periodType, formatFilter, chartType)
+	}
+}
+
+// displayWinRateTrendChart displays a win rate trend chart.
+func displayWinRateTrendChart(service *storage.Service, ctx context.Context, startDate, endDate time.Time, periodType string, formatFilter *string, chartType string) {
+	// Get trend analysis
+	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType, formatFilter)
+	if err != nil {
+		fmt.Printf("Error getting trend analysis: %v\n", err)
+		return
+	}
+
+	if len(analysis.Periods) == 0 {
+		fmt.Println("No data available for the specified period")
+		return
+	}
+
+	// Prepare data points
+	dataPoints := make([]charts.DataPoint, len(analysis.Periods))
+	for i, period := range analysis.Periods {
+		dataPoints[i] = charts.DataPoint{
+			Label: period.Period.Label,
+			Value: period.WinRate,
+		}
+	}
+
+	// Configure chart
+	config := charts.DefaultChartConfig()
+	config.Title = "Win Rate Trend"
+	if formatFilter != nil {
+		config.Title = fmt.Sprintf("Win Rate Trend (%s)", *formatFilter)
+	}
+	config.YAxisLabel = "Win Rate (%)"
+	config.Width = "900px"
+	config.Height = "500px"
+
+	// Create output file
+	outputPath := filepath.Join("charts", fmt.Sprintf("winrate_trend_%s.html", time.Now().Format("20060102_150405")))
+	if err := os.MkdirAll("charts", 0o755); err != nil {
+		fmt.Printf("Error creating charts directory: %v\n", err)
+		return
+	}
+
+	// Render chart
+	if chartType == "bar" {
+		err = charts.RenderBarChart(dataPoints, config, outputPath)
+	} else {
+		err = charts.RenderLineChart(dataPoints, config, outputPath)
+	}
+
+	if err != nil {
+		fmt.Printf("Error creating chart: %v\n", err)
+		return
+	}
+
+	fmt.Printf("\n✓ Chart created: %s\n", outputPath)
+
+	// Open in browser
+	if err := charts.OpenInBrowser(outputPath); err != nil {
+		fmt.Printf("Note: Could not open browser automatically. Please open %s manually.\n", outputPath)
+	} else {
+		fmt.Println("Opening chart in browser...")
+	}
+
+	// Display summary
+	fmt.Printf("\nPeriod: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	fmt.Printf("Trend: %s", analysis.Trend)
+	if analysis.TrendValue != 0 {
+		fmt.Printf(" (%.1f%%)\n", analysis.TrendValue)
+	} else {
+		fmt.Println()
+	}
+	if analysis.Overall != nil {
+		fmt.Printf("Overall Win Rate: %.1f%% (%d matches)\n", analysis.Overall.WinRate, analysis.Overall.TotalMatches)
+	}
+	fmt.Println()
+}
+
+// displayResultBreakdownChart displays a result breakdown pie chart.
+func displayResultBreakdownChart(service *storage.Service, ctx context.Context, startDate, endDate time.Time, formatFilter *string) {
+	// Get matches
+	filter := storage.StatsFilter{
+		StartDate: &startDate,
+		EndDate:   &endDate,
+		Format:    formatFilter,
+	}
+
+	matches, err := service.GetMatches(ctx, filter)
+	if err != nil {
+		fmt.Printf("Error getting matches: %v\n", err)
+		return
+	}
+
+	if len(matches) == 0 {
+		fmt.Println("No matches found for the specified period")
+		return
+	}
+
+	// Calculate win and loss breakdowns
+	winBreakdown := calculateMatchBreakdown(matches, true)
+	lossBreakdown := calculateMatchBreakdown(matches, false)
+
+	// Create win breakdown chart
+	if winBreakdown.Total > 0 {
+		createBreakdownPieChart(winBreakdown, "Wins", startDate, endDate, formatFilter)
+	}
+
+	// Create loss breakdown chart
+	if lossBreakdown.Total > 0 {
+		createBreakdownPieChart(lossBreakdown, "Losses", startDate, endDate, formatFilter)
+	}
+
+	// Display summary
+	fmt.Printf("\nPeriod: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	if formatFilter != nil {
+		fmt.Printf("Format: %s\n", *formatFilter)
+	}
+	fmt.Printf("Total Matches: %d (Wins: %d, Losses: %d)\n\n", len(matches), winBreakdown.Total, lossBreakdown.Total)
+}
+
+// matchBreakdown represents a breakdown of match results by reason.
+type matchBreakdown struct {
+	Normal             int
+	Concede            int
+	Timeout            int
+	Draw               int
+	Disconnect         int
+	OpponentConcede    int
+	OpponentTimeout    int
+	OpponentDisconnect int
+	Other              int
+	Total              int
+}
+
+// calculateMatchBreakdown calculates a breakdown of match results by reason.
+func calculateMatchBreakdown(matches []*storage.Match, isWin bool) matchBreakdown {
+	breakdown := matchBreakdown{}
+
+	for _, match := range matches {
+		// Filter by win/loss
+		if isWin && match.Result != "win" {
+			continue
+		}
+		if !isWin && match.Result != "loss" {
+			continue
+		}
+
+		breakdown.Total++
+
+		if match.ResultReason == nil {
+			breakdown.Normal++
+			continue
+		}
+
+		reason := *match.ResultReason
+		switch reason {
+		case "ResultReason_Game":
+			breakdown.Normal++
+		case "ResultReason_Concede":
+			breakdown.Concede++
+		case "ResultReason_Timeout":
+			breakdown.Timeout++
+		case "ResultReason_Draw":
+			breakdown.Draw++
+		case "ResultReason_Disconnect":
+			breakdown.Disconnect++
+		case "ResultReason_OpponentConcede":
+			breakdown.OpponentConcede++
+		case "ResultReason_OpponentTimeout":
+			breakdown.OpponentTimeout++
+		case "ResultReason_OpponentDisconnect":
+			breakdown.OpponentDisconnect++
+		default:
+			breakdown.Other++
+		}
+	}
+
+	return breakdown
+}
+
+// createBreakdownPieChart creates a pie chart for the given breakdown.
+func createBreakdownPieChart(breakdown matchBreakdown, resultType string, startDate, endDate time.Time, formatFilter *string) {
+	// Prepare data points (only include non-zero values)
+	dataPoints := []charts.DataPoint{}
+
+	if breakdown.Normal > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Normal", Value: float64(breakdown.Normal)})
+	}
+	if breakdown.Concede > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Concede", Value: float64(breakdown.Concede)})
+	}
+	if breakdown.Timeout > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Timeout", Value: float64(breakdown.Timeout)})
+	}
+	if breakdown.Draw > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Draw", Value: float64(breakdown.Draw)})
+	}
+	if breakdown.Disconnect > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Disconnect", Value: float64(breakdown.Disconnect)})
+	}
+	if breakdown.OpponentConcede > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Concede", Value: float64(breakdown.OpponentConcede)})
+	}
+	if breakdown.OpponentTimeout > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Timeout", Value: float64(breakdown.OpponentTimeout)})
+	}
+	if breakdown.OpponentDisconnect > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Disconnect", Value: float64(breakdown.OpponentDisconnect)})
+	}
+	if breakdown.Other > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Other", Value: float64(breakdown.Other)})
+	}
+
+	if len(dataPoints) == 0 {
+		return
+	}
+
+	// Configure chart
+	config := charts.DefaultChartConfig()
+	config.Title = fmt.Sprintf("%s Breakdown", resultType)
+	if formatFilter != nil {
+		config.Title = fmt.Sprintf("%s Breakdown (%s)", resultType, *formatFilter)
+	}
+	config.Width = "900px"
+	config.Height = "600px"
+
+	// Create output file
+	filename := fmt.Sprintf("%s_breakdown_%s.html", strings.ToLower(resultType), time.Now().Format("20060102_150405"))
+	outputPath := filepath.Join("charts", filename)
+	if err := os.MkdirAll("charts", 0o755); err != nil {
+		fmt.Printf("Error creating charts directory: %v\n", err)
+		return
+	}
+
+	// Render pie chart
+	if err := charts.RenderPieChart(dataPoints, config, outputPath); err != nil {
+		fmt.Printf("Error creating %s chart: %v\n", resultType, err)
+		return
+	}
+
+	fmt.Printf("✓ %s chart created: %s\n", resultType, outputPath)
+
+	// Open in browser
+	if err := charts.OpenInBrowser(outputPath); err != nil {
+		fmt.Printf("Note: Could not open browser automatically for %s chart.\n", resultType)
+	} else {
+		fmt.Printf("Opening %s chart in browser...\n", resultType)
+	}
+}
+
+// displayRankProgressionChart displays a rank progression line chart.
+func displayRankProgressionChart(service *storage.Service, ctx context.Context, startDate, endDate time.Time, periodType string, formatFilter *string) {
+	// Default to constructed format if not specified
+	format := "constructed"
+	if formatFilter != nil {
+		format = *formatFilter
+	}
+
+	// Convert period type to TimelinePeriod
+	var period storage.TimelinePeriod
+	switch periodType {
+	case "daily":
+		period = storage.PeriodDaily
+	case "weekly":
+		period = storage.PeriodWeekly
+	case "monthly":
+		period = storage.PeriodMonthly
+	default:
+		period = storage.PeriodWeekly
+	}
+
+	// Get rank progression timeline
+	timeline, err := service.GetRankProgressionTimeline(ctx, format, &startDate, &endDate, period)
+	if err != nil {
+		fmt.Printf("Error getting rank progression: %v\n", err)
+		return
+	}
+
+	if len(timeline.Entries) == 0 {
+		fmt.Println("No rank progression data found for the specified period")
+		return
+	}
+
+	// Convert timeline entries to chart data points
+	dataPoints := make([]charts.DataPoint, len(timeline.Entries))
+	for i, entry := range timeline.Entries {
+		dataPoints[i] = charts.DataPoint{
+			Label: entry.Date,
+			Value: rankToNumericValue(entry.RankClass, entry.RankLevel),
+		}
+	}
+
+	// Configure chart
+	config := charts.DefaultChartConfig()
+	// Capitalize format (constructed -> Constructed, limited -> Limited)
+	formatTitle := format
+	if len(format) > 0 {
+		formatTitle = strings.ToUpper(format[:1]) + format[1:]
+	}
+	config.Title = fmt.Sprintf("Rank Progression (%s)", formatTitle)
+	config.Subtitle = fmt.Sprintf("%s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	config.YAxisLabel = "Rank"
+	config.Width = "1000px"
+	config.Height = "600px"
+
+	// Create output file
+	outputPath := filepath.Join("charts", fmt.Sprintf("rank_progression_%s_%s.html", format, time.Now().Format("20060102_150405")))
+	if err := os.MkdirAll("charts", 0o755); err != nil {
+		fmt.Printf("Error creating charts directory: %v\n", err)
+		return
+	}
+
+	// Render line chart
+	if err := charts.RenderLineChart(dataPoints, config, outputPath); err != nil {
+		fmt.Printf("Error creating rank progression chart: %v\n", err)
+		return
+	}
+
+	fmt.Printf("\n✓ Rank progression chart created: %s\n", outputPath)
+
+	// Open in browser
+	if err := charts.OpenInBrowser(outputPath); err != nil {
+		fmt.Printf("Note: Could not open browser automatically.\n")
+	} else {
+		fmt.Println("Opening rank progression chart in browser...")
+	}
+
+	// Display summary
+	fmt.Printf("\nPeriod: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	fmt.Printf("Format: %s\n", format)
+	fmt.Printf("Start Rank: %s\n", timeline.StartRank)
+	fmt.Printf("End Rank: %s\n", timeline.EndRank)
+	fmt.Printf("Highest Rank: %s\n", timeline.HighestRank)
+	fmt.Printf("Lowest Rank: %s\n", timeline.LowestRank)
+	fmt.Printf("Total Changes: %d\n", timeline.TotalChanges)
+	fmt.Printf("Milestones: %d\n\n", timeline.Milestones)
+}
+
+// rankToNumericValue converts rank class and level to a numeric value for charting.
+// Lower ranks = lower numbers, higher ranks = higher numbers.
+func rankToNumericValue(rankClass *string, rankLevel *int) float64 {
+	if rankClass == nil {
+		return 0
+	}
+
+	// Map rank classes to base values
+	rankClassValues := map[string]float64{
+		"Bronze":   0,
+		"Silver":   4,
+		"Gold":     8,
+		"Platinum": 12,
+		"Diamond":  16,
+		"Mythic":   20,
+	}
+
+	baseValue, ok := rankClassValues[*rankClass]
+	if !ok {
+		return 0
+	}
+
+	// Add level offset (higher level = higher value)
+	// Rank levels go from 4 (lowest) to 1 (highest)
+	if rankLevel != nil && *rankLevel >= 1 && *rankLevel <= 4 {
+		baseValue += float64(5 - *rankLevel) // Convert so level 4=1, level 1=4
+	} else if *rankClass == "Mythic" {
+		// Mythic has no levels, just use base value
+		baseValue += 4 // Treat Mythic as highest
+	}
+
+	return baseValue
+}
+
+// printTrendsHelp prints help for the trends/chart command.
+func printTrendsHelp() {
+	fmt.Println("\nChart Commands:")
+	fmt.Println("  chart [type] [options]            - Create interactive HTML charts")
+	fmt.Println("  chart winrate [options]           - Create win rate trend chart")
+	fmt.Println("  chart results [options]           - Create result breakdown pie charts")
+	fmt.Println("  chart rank [options]              - Create rank progression chart")
+	fmt.Println("\nNote: Charts are saved as HTML files in the 'charts' directory and opened in your browser")
+	fmt.Println("\nOptions:")
+	fmt.Println("  -start, --start-date <date>       - Start date (YYYY-MM-DD)")
+	fmt.Println("  -end, --end-date <date>           - End date (YYYY-MM-DD)")
+	fmt.Println("  -format, --format <format>        - Filter by format (constructed/limited)")
+	fmt.Println("  -period, --period <type>          - Period type: daily, weekly, monthly (default: weekly)")
+	fmt.Println("  -type, --chart-type <type>        - Chart type: line, bar (default: line)")
+	fmt.Println("  -line                             - Use line chart")
+	fmt.Println("  -bar                              - Use bar chart")
+	fmt.Println("\nExamples:")
+	fmt.Println("  chart                             - Show win rate trend (last 30 days)")
+	fmt.Println("  chart winrate                     - Show win rate trend chart")
+	fmt.Println("  chart results                     - Show result breakdown pie charts (wins/losses)")
+	fmt.Println("  chart rank                        - Show rank progression chart (constructed)")
+	fmt.Println("  chart rank -format limited        - Show rank progression for limited")
+	fmt.Println("  chart -start 2024-01-01 -end 2024-12-31 -period monthly")
+	fmt.Println("  chart results -format constructed - Result breakdown for constructed format")
+	fmt.Println("  chart -format limited -bar        - Limited win rate (bar chart)")
+	fmt.Println()
 }
 
 // handleDeckExport handles deck export commands.
