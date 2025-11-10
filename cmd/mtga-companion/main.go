@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
@@ -798,6 +799,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 		case "export", "exp":
 			// Export data to CSV/JSON
 			handleExportCommand(service, ctx, parts[1:])
+		case "chart", "charts":
+			// Display trend charts
+			handleTrendsCommand(service, ctx, parts[1:])
 		case "help", "h":
 			printHelp()
 		default:
@@ -1234,6 +1238,7 @@ func printHelp() {
 	fmt.Println("  setcomp, sets, completion - Display set completion percentages")
 	fmt.Println("  decks, deck, d - Refresh and display saved decks")
 	fmt.Println("  trend, trends, t - Display historical trend analysis")
+	fmt.Println("  chart, charts - Display visual trend charts (type 'chart help' for details)")
 	fmt.Println("  results, result, res - Display match result breakdown")
 	fmt.Println("  rank, ranks, rankprog - Display rank progression and tier statistics")
 	fmt.Println("  draft, drafts, draftstats - Display draft statistics")
@@ -1838,6 +1843,182 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	}
 
 	fmt.Printf("✓ Export successful: %s\n", actualPath)
+}
+
+// handleTrendsCommand handles trend visualization commands.
+func handleTrendsCommand(service *storage.Service, ctx context.Context, args []string) {
+	if len(args) < 1 {
+		printTrendsHelp()
+		return
+	}
+
+	trendType := args[0]
+
+	// Default parameters
+	var startDate, endDate *time.Time
+	var formatFilter *string
+	periodType := "weekly" // Default period
+	chartType := "line"    // Default chart type
+
+	// Parse flags
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-start", "--start-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					startDate = &t
+					i++
+				}
+			}
+		case "-end", "--end-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					endDate = &t
+					i++
+				}
+			}
+		case "-format", "--format":
+			if i+1 < len(args) {
+				formatFilter = &args[i+1]
+				i++
+			}
+		case "-period", "--period":
+			if i+1 < len(args) {
+				periodType = args[i+1]
+				i++
+			}
+		case "-type", "--chart-type":
+			if i+1 < len(args) {
+				chartType = args[i+1]
+				i++
+			}
+		case "-line":
+			chartType = "line"
+		case "-bar":
+			chartType = "bar"
+		}
+	}
+
+	// Set default date range if not provided (last 30 days)
+	if startDate == nil || endDate == nil {
+		now := time.Now()
+		if endDate == nil {
+			endDate = &now
+		}
+		if startDate == nil {
+			start := now.AddDate(0, 0, -30)
+			startDate = &start
+		}
+	}
+
+	switch trendType {
+	case "winrate", "wr":
+		displayWinRateTrendChart(service, ctx, *startDate, *endDate, periodType, formatFilter, chartType)
+	case "help", "h":
+		printTrendsHelp()
+	default:
+		// Default to win rate trend
+		displayWinRateTrendChart(service, ctx, *startDate, *endDate, periodType, formatFilter, chartType)
+	}
+}
+
+// displayWinRateTrendChart displays a win rate trend chart.
+func displayWinRateTrendChart(service *storage.Service, ctx context.Context, startDate, endDate time.Time, periodType string, formatFilter *string, chartType string) {
+	// Get trend analysis
+	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType, formatFilter)
+	if err != nil {
+		fmt.Printf("Error getting trend analysis: %v\n", err)
+		return
+	}
+
+	if len(analysis.Periods) == 0 {
+		fmt.Println("No data available for the specified period")
+		return
+	}
+
+	// Prepare data points
+	dataPoints := make([]charts.DataPoint, len(analysis.Periods))
+	for i, period := range analysis.Periods {
+		dataPoints[i] = charts.DataPoint{
+			Label: period.Period.Label,
+			Value: period.WinRate,
+		}
+	}
+
+	// Configure chart
+	config := charts.DefaultChartConfig()
+	config.Title = "Win Rate Trend"
+	if formatFilter != nil {
+		config.Title = fmt.Sprintf("Win Rate Trend (%s)", *formatFilter)
+	}
+	config.YAxisLabel = "Win Rate (%)"
+	config.Width = "900px"
+	config.Height = "500px"
+
+	// Create output file
+	outputPath := filepath.Join("charts", fmt.Sprintf("winrate_trend_%s.html", time.Now().Format("20060102_150405")))
+	if err := os.MkdirAll("charts", 0755); err != nil {
+		fmt.Printf("Error creating charts directory: %v\n", err)
+		return
+	}
+
+	// Render chart
+	if chartType == "bar" {
+		err = charts.RenderBarChart(dataPoints, config, outputPath)
+	} else {
+		err = charts.RenderLineChart(dataPoints, config, outputPath)
+	}
+
+	if err != nil {
+		fmt.Printf("Error creating chart: %v\n", err)
+		return
+	}
+
+	fmt.Printf("\n✓ Chart created: %s\n", outputPath)
+
+	// Open in browser
+	if err := charts.OpenInBrowser(outputPath); err != nil {
+		fmt.Printf("Note: Could not open browser automatically. Please open %s manually.\n", outputPath)
+	} else {
+		fmt.Println("Opening chart in browser...")
+	}
+
+	// Display summary
+	fmt.Printf("\nPeriod: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	fmt.Printf("Trend: %s", analysis.Trend)
+	if analysis.TrendValue != 0 {
+		fmt.Printf(" (%.1f%%)\n", analysis.TrendValue)
+	} else {
+		fmt.Println()
+	}
+	if analysis.Overall != nil {
+		fmt.Printf("Overall Win Rate: %.1f%% (%d matches)\n", analysis.Overall.WinRate, analysis.Overall.TotalMatches)
+	}
+	fmt.Println()
+}
+
+// printTrendsHelp prints help for the trends/chart command.
+func printTrendsHelp() {
+	fmt.Println("\nChart Commands:")
+	fmt.Println("  chart [type] [options]            - Create interactive HTML charts")
+	fmt.Println("  chart winrate [options]           - Create win rate trend chart")
+	fmt.Println("\nNote: Charts are saved as HTML files in the 'charts' directory and opened in your browser")
+	fmt.Println("\nOptions:")
+	fmt.Println("  -start, --start-date <date>       - Start date (YYYY-MM-DD)")
+	fmt.Println("  -end, --end-date <date>           - End date (YYYY-MM-DD)")
+	fmt.Println("  -format, --format <format>        - Filter by format (constructed/limited)")
+	fmt.Println("  -period, --period <type>          - Period type: daily, weekly, monthly (default: weekly)")
+	fmt.Println("  -type, --chart-type <type>        - Chart type: line, bar (default: line)")
+	fmt.Println("  -line                             - Use line chart")
+	fmt.Println("  -bar                              - Use bar chart")
+	fmt.Println("\nExamples:")
+	fmt.Println("  chart                             - Show win rate trend (last 30 days)")
+	fmt.Println("  chart winrate                     - Show win rate trend chart")
+	fmt.Println("  chart -start 2024-01-01 -end 2024-12-31 -period monthly")
+	fmt.Println("  chart -format constructed -line   - Constructed win rate (line chart)")
+	fmt.Println("  chart -format limited -bar        - Limited win rate (bar chart)")
+	fmt.Println()
 }
 
 // handleDeckExport handles deck export commands.

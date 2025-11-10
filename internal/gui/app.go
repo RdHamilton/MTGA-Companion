@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
@@ -38,6 +41,7 @@ func (a *App) Run() {
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),
 		container.NewTabItem("Recent Matches", a.createMatchesView()),
+		container.NewTabItem("Charts", a.createChartsView()),
 	)
 
 	a.window.SetContent(tabs)
@@ -73,6 +77,7 @@ Game Win Rate: %.1f%%
 		a.window.SetContent(container.NewAppTabs(
 			container.NewTabItem("Statistics", a.createStatsView()),
 			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Charts", a.createChartsView()),
 		))
 	})
 
@@ -121,4 +126,85 @@ func (a *App) createMatchesView() fyne.CanvasObject {
 	label.Wrapping = fyne.TextWrapWord
 
 	return container.NewScroll(label)
+}
+
+// createChartsView creates the charts view.
+func (a *App) createChartsView() fyne.CanvasObject {
+	// Date range selector
+	now := time.Now()
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+
+	// Get trend data for last 30 days
+	analysis, err := a.service.GetTrendAnalysis(a.ctx, thirtyDaysAgo, now, "weekly", nil)
+	if err != nil || len(analysis.Periods) == 0 {
+		return widget.NewLabel(fmt.Sprintf("No chart data available: %v", err))
+	}
+
+	// Prepare data points
+	dataPoints := make([]charts.DataPoint, len(analysis.Periods))
+	for i, period := range analysis.Periods {
+		dataPoints[i] = charts.DataPoint{
+			Label: period.Period.Label,
+			Value: period.WinRate,
+		}
+	}
+
+	// Create chart config
+	config := charts.DefaultFyneChartConfig()
+	config.Title = "Win Rate Trend (Last 30 Days)"
+	config.Width = 750
+	config.Height = 450
+
+	// Create chart
+	chart := charts.CreateFyneLineChart(dataPoints, config)
+
+	// Add summary info
+	summaryText := fmt.Sprintf(`
+Period: %s to %s
+Trend: %s`,
+		thirtyDaysAgo.Format("2006-01-02"),
+		now.Format("2006-01-02"),
+		analysis.Trend,
+	)
+
+	if analysis.TrendValue != 0 {
+		summaryText += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
+	}
+
+	if analysis.Overall != nil {
+		summaryText += fmt.Sprintf(`
+Overall Win Rate: %.1f%% (%d matches)`,
+			analysis.Overall.WinRate,
+			analysis.Overall.TotalMatches,
+		)
+	}
+
+	summary := widget.NewLabel(summaryText)
+	summary.Wrapping = fyne.TextWrapWord
+
+	// Create chart type selector
+	chartTypeSelect := widget.NewSelect([]string{"Line Chart", "Bar Chart"}, func(selected string) {
+		// Recreate the entire Charts tab with the new chart type
+		a.window.SetContent(container.NewAppTabs(
+			container.NewTabItem("Statistics", a.createStatsView()),
+			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Charts", a.createChartsView()),
+		))
+	})
+	chartTypeSelect.Selected = "Line Chart"
+
+	// Layout: selector at top, chart in middle, summary at bottom
+	return container.NewBorder(
+		container.NewVBox(
+			widget.NewLabel("Chart Type:"),
+			chartTypeSelect,
+			widget.NewSeparator(),
+		),
+		container.NewVBox(
+			widget.NewSeparator(),
+			summary,
+		),
+		nil, nil,
+		container.NewScroll(chart),
+	)
 }
