@@ -18,6 +18,8 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -58,6 +60,12 @@ func main() {
 	// Check if this is a draft command
 	if len(os.Args) > 1 && os.Args[1] == "draft" {
 		runDraftCommand()
+		return
+	}
+
+	// Check if this is a cards command
+	if len(os.Args) > 1 && os.Args[1] == "cards" {
+		runCardsCommand()
 		return
 	}
 
@@ -3135,6 +3143,125 @@ func printDraftUsage() {
 	fmt.Println("  detailed   - Full detailed view with pack contents (default)")
 	fmt.Println("  compact    - Compact table showing pick summary")
 	fmt.Println("  summary    - High-level summary only")
+	fmt.Println()
+	fmt.Println("Environment Variables:")
+	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
+	fmt.Println()
+}
+
+func runCardsCommand() {
+	if len(os.Args) < 3 {
+		printCardsUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "import":
+		runCardsImport()
+	default:
+		fmt.Printf("Unknown cards command: %s\n\n", command)
+		printCardsUsage()
+		os.Exit(1)
+	}
+}
+
+func runCardsImport() {
+	// Define flags for import command
+	importFlags := flag.NewFlagSet("import", flag.ExitOnError)
+	forceDownload := importFlags.Bool("force", false, "Force re-download of bulk data file")
+	verbose := importFlags.Bool("verbose", false, "Enable verbose output")
+	batchSize := importFlags.Int("batch-size", 500, "Number of cards to insert per batch")
+
+	if err := importFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path from environment or use default
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Ensure database directory exists
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		log.Fatalf("Error creating database directory: %v", err)
+	}
+
+	// Open database with auto-migrate to ensure schema is up to date
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
+
+	// Create storage service
+	service := storage.NewService(db)
+	defer service.Close()
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create importer with options
+	options := importer.DefaultBulkImportOptions()
+	options.ForceDownload = *forceDownload
+	options.Verbose = *verbose
+	options.BatchSize = *batchSize
+
+	bulkImporter := importer.NewBulkImporter(scryfallClient, service, options)
+
+	// Run import
+	ctx := context.Background()
+	fmt.Println("Starting bulk card import from Scryfall...")
+	fmt.Println()
+
+	stats, err := bulkImporter.Import(ctx)
+	if err != nil {
+		log.Fatalf("Import failed: %v", err)
+	}
+
+	if !*verbose {
+		// Print summary if not already printed in verbose mode
+		fmt.Println("Import complete!")
+		fmt.Printf("  Total cards processed: %d\n", stats.TotalCards)
+		fmt.Printf("  Cards imported: %d\n", stats.ImportedCards)
+		fmt.Printf("  Cards skipped (no Arena ID): %d\n", stats.SkippedCards)
+		fmt.Printf("  Errors: %d\n", stats.ErrorCards)
+		fmt.Printf("  Total time: %.2fs\n", stats.Duration.Seconds())
+	}
+}
+
+func printCardsUsage() {
+	fmt.Println("MTGA Companion - Card Management")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  mtga-companion cards <command> [flags]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  import     Import card data from Scryfall bulk data")
+	fmt.Println()
+	fmt.Println("Import Flags:")
+	fmt.Println("  --force        Force re-download of bulk data file")
+	fmt.Println("  --verbose      Enable verbose output with progress")
+	fmt.Println("  --batch-size   Number of cards to insert per batch (default: 500)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  # Initial import")
+	fmt.Println("  mtga-companion cards import")
+	fmt.Println()
+	fmt.Println("  # Force re-import with verbose output")
+	fmt.Println("  mtga-companion cards import --force --verbose")
+	fmt.Println()
+	fmt.Println("  # Import with custom batch size")
+	fmt.Println("  mtga-companion cards import --batch-size 1000")
 	fmt.Println()
 	fmt.Println("Environment Variables:")
 	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
