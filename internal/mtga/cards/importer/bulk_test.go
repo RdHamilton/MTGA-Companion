@@ -50,7 +50,7 @@ func TestConvertToStorageCard(t *testing.T) {
 		},
 	}
 
-	storageCard := convertToStorageCard(card)
+	storageCard := ConvertToStorageCard(card)
 
 	if storageCard.ID != "test-id" {
 		t.Errorf("Expected ID 'test-id', got %s", storageCard.ID)
