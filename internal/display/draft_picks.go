@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // DraftPicksDisplayer handles displaying draft picks in a readable format.
 type DraftPicksDisplayer struct {
-	cardService *cards.Service
+	cardService *cardlookup.Service
 }
 
 // NewDraftPicksDisplayer creates a new draft picks displayer.
-func NewDraftPicksDisplayer(cardService *cards.Service) *DraftPicksDisplayer {
+func NewDraftPicksDisplayer(cardService *cardlookup.Service) *DraftPicksDisplayer {
 	return &DraftPicksDisplayer{
 		cardService: cardService,
 	}
