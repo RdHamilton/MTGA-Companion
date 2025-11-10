@@ -27,10 +27,8 @@ const (
 	BackoffFactor  = 2.0
 )
 
-var (
-	// Conservative rate limit: 1 request per second
-	DefaultRateLimit = rate.Every(1 * time.Second)
-)
+// Conservative rate limit: 1 request per second
+var DefaultRateLimit = rate.Every(1 * time.Second)
 
 // Client provides access to 17Lands draft statistics.
 type Client struct {
@@ -243,7 +241,7 @@ func (c *Client) doRequest(ctx context.Context, url string) ([]byte, error) {
 			Err:     err,
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
