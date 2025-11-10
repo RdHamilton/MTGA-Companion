@@ -461,7 +461,11 @@ func (v *MatchHistoryViewer) exportMatches() {
 		if err != nil || writer == nil {
 			return
 		}
-		defer writer.Close()
+		defer func() {
+			if closeErr := writer.Close(); closeErr != nil {
+				dialog.ShowError(closeErr, v.app.window)
+			}
+		}()
 
 		_, err = writer.Write([]byte(csv))
 		if err != nil {
