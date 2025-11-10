@@ -23,10 +23,10 @@ const (
 
 // Options holds configuration for export operations.
 type Options struct {
-	Format    Format
-	FilePath  string
+	Format     Format
+	FilePath   string
 	PrettyJSON bool
-	Overwrite bool
+	Overwrite  bool
 }
 
 // Exporter handles exporting data to various formats.
@@ -215,7 +215,7 @@ func (e *Exporter) writeToFile(data []byte) error {
 func (e *Exporter) createFile() (*os.File, error) {
 	// Ensure directory exists
 	dir := filepath.Dir(e.opts.FilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 

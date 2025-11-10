@@ -12,34 +12,34 @@ import (
 
 // MatchExportRow represents a match for CSV export.
 type MatchExportRow struct {
-	MatchID         string  `csv:"match_id" json:"match_id"`
-	EventID         string  `csv:"event_id" json:"event_id"`
-	EventName       string  `csv:"event_name" json:"event_name"`
-	Timestamp       string  `csv:"timestamp" json:"timestamp"`
-	Format          string  `csv:"format" json:"format"`
-	Result          string  `csv:"result" json:"result"`
-	ResultReason    string  `csv:"result_reason" json:"result_reason"`
-	PlayerWins      int     `csv:"player_wins" json:"player_wins"`
-	OpponentWins    int     `csv:"opponent_wins" json:"opponent_wins"`
-	DurationSeconds *int    `csv:"duration_seconds" json:"duration_seconds,omitempty"`
-	DeckID          string  `csv:"deck_id" json:"deck_id"`
-	RankBefore      string  `csv:"rank_before" json:"rank_before"`
-	RankAfter       string  `csv:"rank_after" json:"rank_after"`
-	OpponentName    string  `csv:"opponent_name" json:"opponent_name"`
-	OpponentID      string  `csv:"opponent_id" json:"opponent_id"`
+	MatchID         string `csv:"match_id" json:"match_id"`
+	EventID         string `csv:"event_id" json:"event_id"`
+	EventName       string `csv:"event_name" json:"event_name"`
+	Timestamp       string `csv:"timestamp" json:"timestamp"`
+	Format          string `csv:"format" json:"format"`
+	Result          string `csv:"result" json:"result"`
+	ResultReason    string `csv:"result_reason" json:"result_reason"`
+	PlayerWins      int    `csv:"player_wins" json:"player_wins"`
+	OpponentWins    int    `csv:"opponent_wins" json:"opponent_wins"`
+	DurationSeconds *int   `csv:"duration_seconds" json:"duration_seconds,omitempty"`
+	DeckID          string `csv:"deck_id" json:"deck_id"`
+	RankBefore      string `csv:"rank_before" json:"rank_before"`
+	RankAfter       string `csv:"rank_after" json:"rank_after"`
+	OpponentName    string `csv:"opponent_name" json:"opponent_name"`
+	OpponentID      string `csv:"opponent_id" json:"opponent_id"`
 }
 
 // StatisticsExportRow represents aggregated statistics for CSV export.
 type StatisticsExportRow struct {
-	Format          string  `csv:"format" json:"format"`
-	TotalMatches    int     `csv:"total_matches" json:"total_matches"`
-	MatchesWon      int     `csv:"matches_won" json:"matches_won"`
-	MatchesLost     int     `csv:"matches_lost" json:"matches_lost"`
-	TotalGames      int     `csv:"total_games" json:"total_games"`
-	GamesWon        int     `csv:"games_won" json:"games_won"`
-	GamesLost       int     `csv:"games_lost" json:"games_lost"`
-	WinRate         float64 `csv:"win_rate" json:"win_rate"`
-	GameWinRate     float64 `csv:"game_win_rate" json:"game_win_rate"`
+	Format       string  `csv:"format" json:"format"`
+	TotalMatches int     `csv:"total_matches" json:"total_matches"`
+	MatchesWon   int     `csv:"matches_won" json:"matches_won"`
+	MatchesLost  int     `csv:"matches_lost" json:"matches_lost"`
+	TotalGames   int     `csv:"total_games" json:"total_games"`
+	GamesWon     int     `csv:"games_won" json:"games_won"`
+	GamesLost    int     `csv:"games_lost" json:"games_lost"`
+	WinRate      float64 `csv:"win_rate" json:"win_rate"`
+	GameWinRate  float64 `csv:"game_win_rate" json:"game_win_rate"`
 }
 
 // DailyStatsExportRow represents daily statistics for CSV export.
