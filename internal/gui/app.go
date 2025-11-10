@@ -3,7 +3,6 @@ package gui
 import (
 	"context"
 	"fmt"
-
 	"time"
 
 	"fyne.io/fyne/v2"

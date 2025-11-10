@@ -1958,7 +1958,7 @@ func displayWinRateTrendChart(service *storage.Service, ctx context.Context, sta
 
 	// Create output file
 	outputPath := filepath.Join("charts", fmt.Sprintf("winrate_trend_%s.html", time.Now().Format("20060102_150405")))
-	if err := os.MkdirAll("charts", 0755); err != nil {
+	if err := os.MkdirAll("charts", 0o755); err != nil {
 		fmt.Printf("Error creating charts directory: %v\n", err)
 		return
 	}
