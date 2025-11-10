@@ -1726,9 +1726,9 @@ func runBackupCommand() {
 		switch *format {
 		case "json":
 			type BackupDetails struct {
-				Path     string                 `json:"path"`
-				Size     int64                  `json:"size"`
-				ModTime  time.Time              `json:"modified"`
+				Path     string                  `json:"path"`
+				Size     int64                   `json:"size"`
+				ModTime  time.Time               `json:"modified"`
 				Metadata *storage.BackupMetadata `json:"metadata,omitempty"`
 			}
 
