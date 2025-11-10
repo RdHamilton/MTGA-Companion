@@ -2285,22 +2285,22 @@ func calculateMatchBreakdown(matches []*storage.Match, isWin bool) matchBreakdow
 		}
 
 		reason := *match.ResultReason
-		switch {
-		case reason == "ResultReason_Game":
+		switch reason {
+		case "ResultReason_Game":
 			breakdown.Normal++
-		case reason == "ResultReason_Concede":
+		case "ResultReason_Concede":
 			breakdown.Concede++
-		case reason == "ResultReason_Timeout":
+		case "ResultReason_Timeout":
 			breakdown.Timeout++
-		case reason == "ResultReason_Draw":
+		case "ResultReason_Draw":
 			breakdown.Draw++
-		case reason == "ResultReason_Disconnect":
+		case "ResultReason_Disconnect":
 			breakdown.Disconnect++
-		case reason == "ResultReason_OpponentConcede":
+		case "ResultReason_OpponentConcede":
 			breakdown.OpponentConcede++
-		case reason == "ResultReason_OpponentTimeout":
+		case "ResultReason_OpponentTimeout":
 			breakdown.OpponentTimeout++
-		case reason == "ResultReason_OpponentDisconnect":
+		case "ResultReason_OpponentDisconnect":
 			breakdown.OpponentDisconnect++
 		default:
 			breakdown.Other++
