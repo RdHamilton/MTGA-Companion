@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -793,6 +794,9 @@ func runInteractiveConsole(service *storage.Service, ctx context.Context, logPat
 			} else {
 				displayDateRangeStats(service, ctx, parts[1], parts[2])
 			}
+		case "export", "exp":
+			// Export data to CSV/JSON
+			handleExportCommand(service, ctx, parts[1:])
 		case "help", "h":
 			printHelp()
 		default:
@@ -1236,6 +1240,7 @@ func printHelp() {
 	fmt.Println("  account, accounts, a - Manage accounts (list, create, info)")
 	fmt.Println("  switch, sw <id> - Switch to a different account")
 	fmt.Println("  backup, b  - Create or manage database backups")
+	fmt.Println("  export, exp - Export data to CSV/JSON (type 'export' for details)")
 	fmt.Println("  exit, quit, q - Exit the application")
 	fmt.Println("  help, h    - Show this help message")
 	fmt.Println()
@@ -1649,4 +1654,108 @@ func runBackupCommandInteractive(service *storage.Service, ctx context.Context) 
 	default:
 		fmt.Printf("Unknown option: %s\n", choice)
 	}
+}
+
+// handleExportCommand handles export commands with various subcommands.
+func handleExportCommand(service *storage.Service, ctx context.Context, args []string) {
+	if len(args) < 1 {
+		printExportHelp()
+		return
+	}
+
+	exportType := strings.ToLower(args[0])
+
+	// Parse common options
+	format := export.FormatCSV
+	outputPath := ""
+	prettyJSON := true
+	overwrite := true
+	var startDate, endDate *time.Time
+	var formatFilter *string
+
+	// Parse flags from args
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "-json" || arg == "--json":
+			format = export.FormatJSON
+		case arg == "-csv" || arg == "--csv":
+			format = export.FormatCSV
+		case arg == "-o" || arg == "--output":
+			if i+1 < len(args) {
+				outputPath = args[i+1]
+				i++
+			}
+		case arg == "-start" || arg == "--start-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					startDate = &t
+					i++
+				}
+			}
+		case arg == "-end" || arg == "--end-date":
+			if i+1 < len(args) {
+				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
+					endDate = &t
+					i++
+				}
+			}
+		case arg == "-format" || arg == "--format":
+			if i+1 < len(args) {
+				formatFilter = &args[i+1]
+				i++
+			}
+		}
+	}
+
+	// Create filter
+	filter := models.StatsFilter{
+		StartDate: startDate,
+		EndDate:   endDate,
+		Format:    formatFilter,
+	}
+
+	// Execute export based on type
+	opts := export.ExportOptions{
+		Type:       exportType,
+		Format:     format,
+		OutputPath: outputPath,
+		Filter:     filter,
+		Overwrite:  overwrite,
+		PrettyJSON: prettyJSON,
+	}
+
+	if err := export.ExportStatistics(ctx, service, opts); err != nil {
+		fmt.Printf("Export failed: %v\n", err)
+		return
+	}
+
+	// Determine actual output path if one was generated
+	actualPath := outputPath
+	if actualPath == "" {
+		actualPath = filepath.Join("exports", export.GenerateFilename(exportType, format))
+	}
+
+	fmt.Printf("✓ Export successful: %s\n", actualPath)
+}
+
+// printExportHelp prints help for the export command.
+func printExportHelp() {
+	fmt.Println("\nExport Commands:")
+	fmt.Println("  export matches [options]      - Export match history")
+	fmt.Println("  export stats [options]        - Export aggregated statistics")
+	fmt.Println("  export daily [options]        - Export daily statistics")
+	fmt.Println("  export performance [options]  - Export performance metrics")
+	fmt.Println("\nOptions:")
+	fmt.Println("  -json                         - Export as JSON (default: CSV)")
+	fmt.Println("  -csv                          - Export as CSV")
+	fmt.Println("  -o, --output <path>           - Specify output file path")
+	fmt.Println("  -start, --start-date <date>   - Start date (YYYY-MM-DD)")
+	fmt.Println("  -end, --end-date <date>       - End date (YYYY-MM-DD)")
+	fmt.Println("  -format, --format <format>    - Filter by format (constructed/limited)")
+	fmt.Println("\nExamples:")
+	fmt.Println("  export matches -json          - Export all matches as JSON")
+	fmt.Println("  export stats -csv -o stats.csv")
+	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
+	fmt.Println("  export matches -format constructed -json")
 }
