@@ -288,6 +288,98 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 	return chart
 }
 
+// CreateFynePieChartBreakdown creates a horizontal bar breakdown view (pie chart alternative).
+// This provides a simpler visualization for categorical data compared to drawing actual pie slices.
+func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.CanvasObject {
+	if len(data) == 0 {
+		return widget.NewLabel("No data available")
+	}
+
+	// Calculate total
+	total := 0.0
+	for _, point := range data {
+		total += point.Value
+	}
+
+	if total == 0 {
+		return widget.NewLabel("No data to display")
+	}
+
+	// Chart dimensions
+	chartWidth := config.Width
+	chartHeight := config.Height
+	leftMargin := float32(150)
+	rightMargin := float32(100)
+	topMargin := float32(50)
+	bottomMargin := float32(20)
+
+	plotWidth := chartWidth - leftMargin - rightMargin
+	plotHeight := chartHeight - topMargin - bottomMargin
+
+	barHeight := plotHeight / float32(len(data))
+	if barHeight > 40 {
+		barHeight = 40
+	}
+
+	// Container for all chart elements
+	objects := []fyne.CanvasObject{}
+
+	// Add title
+	if config.Title != "" {
+		title := canvas.NewText(config.Title, color.Black)
+		title.TextSize = 16
+		title.Alignment = fyne.TextAlignCenter
+		title.Move(fyne.NewPos(chartWidth/2-100, 10))
+		objects = append(objects, title)
+	}
+
+	// Define colors for segments
+	colors := []color.Color{
+		color.RGBA{R: 84, G: 112, B: 198, A: 255},
+		color.RGBA{R: 145, G: 204, B: 117, A: 255},
+		color.RGBA{R: 250, G: 200, B: 88, A: 255},
+		color.RGBA{R: 238, G: 102, B: 102, A: 255},
+		color.RGBA{R: 115, G: 192, B: 222, A: 255},
+		color.RGBA{R: 59, G: 162, B: 114, A: 255},
+		color.RGBA{R: 252, G: 132, B: 82, A: 255},
+		color.RGBA{R: 154, G: 96, B: 180, A: 255},
+		color.RGBA{R: 234, G: 124, B: 204, A: 255},
+	}
+
+	// Draw bars for each category
+	for i, point := range data {
+		percentage := (point.Value / total) * 100
+		barWidth := plotWidth * float32(point.Value/total)
+
+		y := topMargin + (barHeight+10)*float32(i)
+
+		// Label
+		label := canvas.NewText(point.Label, color.Black)
+		label.TextSize = 11
+		label.Move(fyne.NewPos(10, y+barHeight/2-7))
+		objects = append(objects, label)
+
+		// Bar
+		bar := canvas.NewRectangle(colors[i%len(colors)])
+		bar.Resize(fyne.NewSize(barWidth, barHeight))
+		bar.Move(fyne.NewPos(leftMargin, y))
+		objects = append(objects, bar)
+
+		// Value and percentage
+		valueText := fmt.Sprintf("%.0f (%.1f%%)", point.Value, percentage)
+		valueLabel := canvas.NewText(valueText, color.Black)
+		valueLabel.TextSize = 10
+		valueLabel.Move(fyne.NewPos(leftMargin+barWidth+10, y+barHeight/2-7))
+		objects = append(objects, valueLabel)
+	}
+
+	// Create container with fixed size
+	chart := container.NewWithoutLayout(objects...)
+	chart.Resize(fyne.NewSize(chartWidth, chartHeight))
+
+	return chart
+}
+
 // findMinMaxValues finds the minimum and maximum values in the data.
 func findMinMaxValues(data []DataPoint) (float64, float64) {
 	if len(data) == 0 {

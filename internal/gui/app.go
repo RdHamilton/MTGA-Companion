@@ -129,6 +129,17 @@ func (a *App) createMatchesView() fyne.CanvasObject {
 
 // createChartsView creates the charts view.
 func (a *App) createChartsView() fyne.CanvasObject {
+	// Create sub-tabs for different chart types
+	chartTabs := container.NewAppTabs(
+		container.NewTabItem("Win Rate Trend", a.createWinRateTrendView()),
+		container.NewTabItem("Result Breakdown", a.createResultBreakdownView()),
+	)
+
+	return chartTabs
+}
+
+// createWinRateTrendView creates the win rate trend chart view.
+func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	// Date range selector
 	now := time.Now()
 	thirtyDaysAgo := now.AddDate(0, 0, -30)
@@ -206,4 +217,167 @@ Overall Win Rate: %.1f%% (%d matches)`,
 		nil, nil,
 		container.NewScroll(chart),
 	)
+}
+
+// createResultBreakdownView creates the result breakdown chart view.
+func (a *App) createResultBreakdownView() fyne.CanvasObject {
+	// Date range (last 30 days)
+	now := time.Now()
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+
+	// Get matches
+	filter := storage.StatsFilter{
+		StartDate: &thirtyDaysAgo,
+		EndDate:   &now,
+	}
+
+	matches, err := a.service.GetMatches(a.ctx, filter)
+	if err != nil || len(matches) == 0 {
+		return widget.NewLabel(fmt.Sprintf("No match data available: %v", err))
+	}
+
+	// Calculate breakdowns
+	winBreakdown := a.calculateBreakdown(matches, true)
+	lossBreakdown := a.calculateBreakdown(matches, false)
+
+	// Prepare data for charts
+	winData := a.breakdownToDataPoints(winBreakdown)
+	lossData := a.breakdownToDataPoints(lossBreakdown)
+
+	// Create chart configs
+	winConfig := charts.DefaultFyneChartConfig()
+	winConfig.Title = "Wins Breakdown"
+	winConfig.Width = 750
+	winConfig.Height = 350
+
+	lossConfig := charts.DefaultFyneChartConfig()
+	lossConfig.Title = "Losses Breakdown"
+	lossConfig.Width = 750
+	lossConfig.Height = 350
+
+	// Create charts
+	winChart := charts.CreateFynePieChartBreakdown(winData, winConfig)
+	lossChart := charts.CreateFynePieChartBreakdown(lossData, lossConfig)
+
+	// Summary
+	summaryText := fmt.Sprintf(`
+Period: %s to %s
+Total Matches: %d
+Wins: %d | Losses: %d`,
+		thirtyDaysAgo.Format("2006-01-02"),
+		now.Format("2006-01-02"),
+		len(matches),
+		winBreakdown["Total"],
+		lossBreakdown["Total"],
+	)
+
+	summary := widget.NewLabel(summaryText)
+	summary.Wrapping = fyne.TextWrapWord
+
+	// Layout: summary at top, both charts below
+	return container.NewBorder(
+		container.NewVBox(
+			summary,
+			widget.NewSeparator(),
+		),
+		nil, nil, nil,
+		container.NewScroll(
+			container.NewVBox(
+				winChart,
+				widget.NewSeparator(),
+				lossChart,
+			),
+		),
+	)
+}
+
+// calculateBreakdown calculates match result breakdown.
+func (a *App) calculateBreakdown(matches []*storage.Match, isWin bool) map[string]int {
+	breakdown := map[string]int{
+		"Normal":             0,
+		"Concede":            0,
+		"Timeout":            0,
+		"Draw":               0,
+		"Disconnect":         0,
+		"OpponentConcede":    0,
+		"OpponentTimeout":    0,
+		"OpponentDisconnect": 0,
+		"Other":              0,
+		"Total":              0,
+	}
+
+	for _, match := range matches {
+		if isWin && match.Result != "win" {
+			continue
+		}
+		if !isWin && match.Result != "loss" {
+			continue
+		}
+
+		breakdown["Total"]++
+
+		if match.ResultReason == nil {
+			breakdown["Normal"]++
+			continue
+		}
+
+		reason := *match.ResultReason
+		switch reason {
+		case "ResultReason_Game":
+			breakdown["Normal"]++
+		case "ResultReason_Concede":
+			breakdown["Concede"]++
+		case "ResultReason_Timeout":
+			breakdown["Timeout"]++
+		case "ResultReason_Draw":
+			breakdown["Draw"]++
+		case "ResultReason_Disconnect":
+			breakdown["Disconnect"]++
+		case "ResultReason_OpponentConcede":
+			breakdown["OpponentConcede"]++
+		case "ResultReason_OpponentTimeout":
+			breakdown["OpponentTimeout"]++
+		case "ResultReason_OpponentDisconnect":
+			breakdown["OpponentDisconnect"]++
+		default:
+			breakdown["Other"]++
+		}
+	}
+
+	return breakdown
+}
+
+// breakdownToDataPoints converts breakdown map to DataPoint slice (only non-zero values).
+func (a *App) breakdownToDataPoints(breakdown map[string]int) []charts.DataPoint {
+	dataPoints := []charts.DataPoint{}
+
+	// Define order of categories
+	categories := []string{
+		"Normal", "Concede", "Timeout", "Draw", "Disconnect",
+		"OpponentConcede", "OpponentTimeout", "OpponentDisconnect", "Other",
+	}
+
+	// Add labels for display
+	labels := map[string]string{
+		"Normal":             "Normal",
+		"Concede":            "Concede",
+		"Timeout":            "Timeout",
+		"Draw":               "Draw",
+		"Disconnect":         "Disconnect",
+		"OpponentConcede":    "Opp. Concede",
+		"OpponentTimeout":    "Opp. Timeout",
+		"OpponentDisconnect": "Opp. Disconnect",
+		"Other":              "Other",
+	}
+
+	for _, cat := range categories {
+		if count := breakdown[cat]; count > 0 {
+			dataPoints = append(dataPoints, charts.DataPoint{
+				Label: labels[cat],
+				Value: float64(count),
+			})
+		}
+	}
+
+	return dataPoints
 }

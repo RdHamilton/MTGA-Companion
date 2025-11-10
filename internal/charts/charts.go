@@ -252,6 +252,64 @@ func RenderMultiLineChart(series []SeriesData, config ChartConfig, outputPath st
 	return nil
 }
 
+// RenderPieChart creates an interactive pie chart HTML file.
+func RenderPieChart(data []DataPoint, config ChartConfig, outputPath string) error {
+	pie := charts.NewPie()
+
+	// Set global options
+	pie.SetGlobalOptions(
+		charts.WithInitializationOpts(opts.Initialization{
+			Width:  config.Width,
+			Height: config.Height,
+			Theme:  config.Theme,
+		}),
+		charts.WithTitleOpts(opts.Title{
+			Title:    config.Title,
+			Subtitle: config.Subtitle,
+		}),
+		charts.WithTooltipOpts(opts.Tooltip{
+			Show:    opts.Bool(true),
+			Trigger: "item",
+		}),
+		charts.WithLegendOpts(opts.Legend{
+			Show:   opts.Bool(config.ShowLegend),
+			Orient: "vertical",
+			Left:   "left",
+		}),
+	)
+
+	// Prepare pie data
+	pieData := make([]opts.PieData, len(data))
+	for i, point := range data {
+		pieData[i] = opts.PieData{
+			Name:  point.Label,
+			Value: point.Value,
+		}
+	}
+
+	// Add data to chart
+	pie.AddSeries("", pieData).
+		SetSeriesOptions(
+			charts.WithLabelOpts(opts.Label{
+				Show:      opts.Bool(true),
+				Formatter: "{b}: {c} ({d}%)",
+			}),
+		)
+
+	// Create output file
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create chart file: %w", err)
+	}
+	defer f.Close()
+
+	if err := pie.Render(f); err != nil {
+		return fmt.Errorf("failed to render chart: %w", err)
+	}
+
+	return nil
+}
+
 // OpenInBrowser opens the given file path in the default web browser.
 func OpenInBrowser(filePath string) error {
 	// Get absolute path
