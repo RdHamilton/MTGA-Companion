@@ -41,7 +41,6 @@ func (s *Service) SaveDraftEvent(ctx context.Context, event *models.DraftEvent) 
 		event.Rewards,
 		event.CreatedAt,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to save draft event: %w", err)
 	}
@@ -73,7 +72,6 @@ func (s *Service) GetDraftEvent(ctx context.Context, id string) (*models.DraftEv
 		&event.Rewards,
 		&event.CreatedAt,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get draft event: %w", err)
 	}
@@ -94,7 +92,9 @@ func (s *Service) GetAllDraftEvents(ctx context.Context) ([]*models.DraftEvent, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query draft events: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var events []*models.DraftEvent
 	for rows.Next() {

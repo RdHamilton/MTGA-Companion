@@ -36,7 +36,6 @@ func (s *Service) SaveDraftPick(ctx context.Context, pick *models.DraftPick) err
 		pick.Timestamp,
 		time.Now(),
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to save draft pick: %w", err)
 	}
@@ -69,7 +68,9 @@ func (s *Service) SaveDraftPicks(ctx context.Context, draftEventID string, picks
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		_ = stmt.Close()
+	}()
 
 	for _, pick := range picks {
 		// Ensure the pick belongs to the correct draft event
@@ -115,7 +116,9 @@ func (s *Service) GetDraftPicks(ctx context.Context, draftEventID string) ([]*mo
 	if err != nil {
 		return nil, fmt.Errorf("failed to query draft picks: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var picks []*models.DraftPick
 	for rows.Next() {
@@ -225,7 +228,9 @@ func (s *Service) GetAllDraftEventsWithPicks(ctx context.Context) ([]string, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to query draft events with picks: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var eventIDs []string
 	for rows.Next() {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -35,7 +36,12 @@ func NewMigrationManager(dbPath string) (*MigrationManager, error) {
 	}
 
 	// Create database URL
-	databaseURL := fmt.Sprintf("sqlite://%s", dbPath)
+	// Convert Windows backslashes to forward slashes and ensure absolute paths have leading slash
+	normalizedPath := filepath.ToSlash(dbPath)
+	if filepath.IsAbs(dbPath) && normalizedPath[0] != '/' {
+		normalizedPath = "/" + normalizedPath
+	}
+	databaseURL := fmt.Sprintf("sqlite://%s", normalizedPath)
 
 	// Create migrate instance
 	m, err := migrate.NewWithSourceInstance("iofs", sourceDriver, databaseURL)
