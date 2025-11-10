@@ -25,7 +25,7 @@ func setupTestService(t *testing.T) *Service {
 	}
 
 	// Close migration manager
-	migrationMgr.Close()
+	_ = migrationMgr.Close()
 
 	// Open database
 	config := DefaultConfig(dbPath)
@@ -39,8 +39,8 @@ func setupTestService(t *testing.T) *Service {
 
 	// Cleanup function
 	t.Cleanup(func() {
-		db.Close()
-		os.Remove(dbPath)
+		_ = db.Close()
+		_ = os.Remove(dbPath)
 	})
 
 	return service
