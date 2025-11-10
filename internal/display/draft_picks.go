@@ -73,7 +73,7 @@ func (d *DraftPicksDisplayer) displaySinglePick(ctx context.Context, pick *model
 	// Display available cards
 	for i, cardID := range pick.AvailableCards {
 		isSelected := cardID == pick.SelectedCard
-		prefix := "│  "
+		var prefix string
 		if i == len(pick.AvailableCards)-1 {
 			if isSelected {
 				prefix = "└─►"
