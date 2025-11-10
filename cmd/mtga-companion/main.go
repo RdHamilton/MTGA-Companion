@@ -1684,36 +1684,36 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
-		switch {
-		case arg == "-json" || arg == "--json":
+		switch arg {
+		case "-json", "--json":
 			format = export.FormatJSON
-		case arg == "-csv" || arg == "--csv":
+		case "-csv", "--csv":
 			format = export.FormatCSV
-		case arg == "-o" || arg == "--output":
+		case "-o", "--output":
 			if i+1 < len(args) {
 				outputPath = args[i+1]
 				i++
 			}
-		case arg == "-start" || arg == "--start-date":
+		case "-start", "--start-date":
 			if i+1 < len(args) {
 				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
 					startDate = &t
 					i++
 				}
 			}
-		case arg == "-end" || arg == "--end-date":
+		case "-end", "--end-date":
 			if i+1 < len(args) {
 				if t, err := time.Parse("2006-01-02", args[i+1]); err == nil {
 					endDate = &t
 					i++
 				}
 			}
-		case arg == "-format" || arg == "--format":
+		case "-format", "--format":
 			if i+1 < len(args) {
 				formatFilter = &args[i+1]
 				i++
 			}
-		case arg == "-period" || arg == "--period":
+		case "-period", "--period":
 			if i+1 < len(args) {
 				periodType = args[i+1]
 				i++
@@ -1793,31 +1793,31 @@ func handleDeckExport(service *storage.Service, ctx context.Context, args []stri
 	// Parse flags
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		switch {
-		case arg == "-arena":
+		switch arg {
+		case "-arena":
 			deckFormat = export.DeckFormatArena
-		case arg == "-text":
+		case "-text":
 			deckFormat = export.DeckFormatText
-		case arg == "-json":
+		case "-json":
 			deckFormat = export.DeckFormatJSON
-		case arg == "-csv":
+		case "-csv":
 			deckFormat = export.DeckFormatCSV
-		case arg == "-o" || arg == "--output":
+		case "-o", "--output":
 			if i+1 < len(args) {
 				outputPath = args[i+1]
 				i++
 			}
-		case arg == "-id" || arg == "--deck-id":
+		case "-id", "--deck-id":
 			if i+1 < len(args) {
 				deckIDs = append(deckIDs, args[i+1])
 				i++
 			}
-		case arg == "-format" || arg == "--format":
+		case "-format", "--format":
 			if i+1 < len(args) {
 				formatFilter = args[i+1]
 				i++
 			}
-		case arg == "-all" || arg == "--all":
+		case "-all", "--all":
 			exportAll = true
 		default:
 			// Treat as deck ID if it doesn't start with -
