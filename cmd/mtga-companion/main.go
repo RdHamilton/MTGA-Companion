@@ -1917,6 +1917,104 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		return
 	}
 
+	// Handle rank timeline exports separately (requires format parameter)
+	if exportType == "rank-timeline" || exportType == "timeline" {
+		// Rank format is required (constructed or limited)
+		if formatFilter == nil || (*formatFilter != "constructed" && *formatFilter != "limited") {
+			fmt.Println("Error: Rank timeline requires a format (-format constructed or -format limited)")
+			return
+		}
+
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		// Parse period type
+		var period storage.TimelinePeriod
+		switch periodType {
+		case "all":
+			period = storage.PeriodAll
+		case "daily":
+			period = storage.PeriodDaily
+		case "weekly":
+			period = storage.PeriodWeekly
+		case "monthly":
+			period = storage.PeriodMonthly
+		default:
+			fmt.Printf("Invalid period type: %s (use all, daily, weekly, or monthly)\n", periodType)
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("rank_timeline", format))
+		}
+
+		if err := export.ExportRankTimeline(ctx, service, *formatFilter, filter, period, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Rank timeline export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle rank timeline summary exports
+	if exportType == "rank-timeline-summary" || exportType == "timeline-summary" {
+		// Rank format is required (constructed or limited)
+		if formatFilter == nil || (*formatFilter != "constructed" && *formatFilter != "limited") {
+			fmt.Println("Error: Rank timeline summary requires a format (-format constructed or -format limited)")
+			return
+		}
+
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		// Parse period type
+		var period storage.TimelinePeriod
+		switch periodType {
+		case "all":
+			period = storage.PeriodAll
+		case "daily":
+			period = storage.PeriodDaily
+		case "weekly":
+			period = storage.PeriodWeekly
+		case "monthly":
+			period = storage.PeriodMonthly
+		default:
+			fmt.Printf("Invalid period type: %s (use all, daily, weekly, or monthly)\n", periodType)
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("rank_timeline_summary", format))
+		}
+
+		if err := export.ExportRankTimelineSummary(ctx, service, *formatFilter, filter, period, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Rank timeline summary export successful: %s\n", opts.FilePath)
+		return
+	}
+
 	// Create filter for statistics exports
 	filter := models.StatsFilter{
 		StartDate: startDate,
@@ -2053,6 +2151,8 @@ func printExportHelp() {
 	fmt.Println("  export predict [options]          - Predict future win rate based on trends")
 	fmt.Println("  export predict-formats [options]  - Predict win rates for each format")
 	fmt.Println("  export predict-summary [options]  - Prediction summary with insights")
+	fmt.Println("  export rank-timeline [options]    - Export rank progression timeline")
+	fmt.Println("  export timeline-summary [options] - Export rank progression summary")
 	fmt.Println("  export deck/decks [options]       - Export deck lists")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -json                             - Export as JSON (default: CSV)")
@@ -2081,6 +2181,9 @@ func printExportHelp() {
 	fmt.Println("  export predict -window 50 -project 20 - Analyze last 50, project 20 ahead")
 	fmt.Println("  export predict-formats -json      - Predictions for each format")
 	fmt.Println("  export predict-summary -csv       - Summary with strongest/weakest formats")
+	fmt.Println("  export rank-timeline -format constructed -period daily")
+	fmt.Println("  export rank-timeline -format limited -period all -json")
+	fmt.Println("  export timeline-summary -format constructed -start 2024-01-01")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
 	fmt.Println("  export decks -all -arena          - Export all decks in Arena format")
