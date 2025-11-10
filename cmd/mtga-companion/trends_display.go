@@ -74,7 +74,7 @@ func displayTrendAnalysisForPeriod(service *storage.Service, ctx context.Context
 	endDate := now
 	startDate := now.AddDate(0, 0, -days)
 
-	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType)
+	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType, nil)
 	if err != nil {
 		log.Printf("Warning: Failed to retrieve trend analysis: %v", err)
 		return

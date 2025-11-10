@@ -1749,7 +1749,7 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 			opts.FilePath = filepath.Join("exports", export.GenerateFilename("trends", format))
 		}
 
-		if err := export.ExportTrendAnalysis(ctx, service, *startDate, *endDate, periodType, opts); err != nil {
+		if err := export.ExportTrendAnalysis(ctx, service, *startDate, *endDate, periodType, formatFilter, opts); err != nil {
 			fmt.Printf("Export failed: %v\n", err)
 			return
 		}
