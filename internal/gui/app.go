@@ -133,6 +133,7 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	chartTabs := container.NewAppTabs(
 		container.NewTabItem("Win Rate Trend", a.createWinRateTrendView()),
 		container.NewTabItem("Result Breakdown", a.createResultBreakdownView()),
+		container.NewTabItem("Rank Progression", a.createRankProgressionView()),
 	)
 
 	return chartTabs
@@ -380,4 +381,116 @@ func (a *App) breakdownToDataPoints(breakdown map[string]int) []charts.DataPoint
 	}
 
 	return dataPoints
+}
+
+// createRankProgressionView creates the rank progression chart view.
+func (a *App) createRankProgressionView() fyne.CanvasObject {
+	// Date range (last 30 days)
+	now := time.Now()
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+
+	// Get rank progression timeline for constructed
+	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
+	if err != nil || len(timeline.Entries) == 0 {
+		return widget.NewLabel(fmt.Sprintf("No rank progression data available: %v", err))
+	}
+
+	// Convert timeline entries to chart data points
+	dataPoints := make([]charts.DataPoint, len(timeline.Entries))
+	for i, entry := range timeline.Entries {
+		dataPoints[i] = charts.DataPoint{
+			Label: entry.Date,
+			Value: a.rankToNumericValue(entry.RankClass, entry.RankLevel),
+		}
+	}
+
+	// Create chart config
+	config := charts.DefaultFyneChartConfig()
+	config.Title = "Rank Progression - Constructed (Last 30 Days)"
+	config.Width = 750
+	config.Height = 450
+
+	// Create chart
+	chart := charts.CreateFyneLineChart(dataPoints, config)
+
+	// Summary
+	summaryText := fmt.Sprintf(`
+Period: %s to %s
+Start Rank: %s
+End Rank: %s
+Highest Rank: %s
+Lowest Rank: %s
+Total Changes: %d
+Milestones: %d`,
+		thirtyDaysAgo.Format("2006-01-02"),
+		now.Format("2006-01-02"),
+		timeline.StartRank,
+		timeline.EndRank,
+		timeline.HighestRank,
+		timeline.LowestRank,
+		timeline.TotalChanges,
+		timeline.Milestones,
+	)
+
+	summary := widget.NewLabel(summaryText)
+	summary.Wrapping = fyne.TextWrapWord
+
+	// Format selector
+	formatSelect := widget.NewSelect([]string{"Constructed", "Limited"}, func(selected string) {
+		// Recreate the entire Charts tab with the new format
+		a.window.SetContent(container.NewAppTabs(
+			container.NewTabItem("Statistics", a.createStatsView()),
+			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Charts", a.createChartsView()),
+		))
+	})
+	formatSelect.Selected = "Constructed"
+
+	// Layout: selector at top, chart in middle, summary at bottom
+	return container.NewBorder(
+		container.NewVBox(
+			widget.NewLabel("Format:"),
+			formatSelect,
+			widget.NewSeparator(),
+		),
+		container.NewVBox(
+			widget.NewSeparator(),
+			summary,
+		),
+		nil, nil,
+		container.NewScroll(chart),
+	)
+}
+
+// rankToNumericValue converts rank class and level to a numeric value for charting.
+func (a *App) rankToNumericValue(rankClass *string, rankLevel *int) float64 {
+	if rankClass == nil {
+		return 0
+	}
+
+	// Map rank classes to base values
+	rankClassValues := map[string]float64{
+		"Bronze":   0,
+		"Silver":   4,
+		"Gold":     8,
+		"Platinum": 12,
+		"Diamond":  16,
+		"Mythic":   20,
+	}
+
+	baseValue, ok := rankClassValues[*rankClass]
+	if !ok {
+		return 0
+	}
+
+	// Add level offset (higher level = higher value)
+	// Rank levels go from 4 (lowest) to 1 (highest)
+	if rankLevel != nil && *rankLevel >= 1 && *rankLevel <= 4 {
+		baseValue += float64(5 - *rankLevel) // Convert so level 4=1, level 1=4
+	} else if *rankClass == "Mythic" {
+		// Mythic has no levels, just use base value
+		baseValue += 4 // Treat Mythic as highest
+	}
+
+	return baseValue
 }
