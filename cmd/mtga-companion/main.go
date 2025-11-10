@@ -1680,6 +1680,7 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	var startDate, endDate *time.Time
 	var formatFilter *string
 	periodType := "daily" // Default for trend exports
+	recentDays := 30      // Default for result comparison exports
 
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
@@ -1718,6 +1719,13 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 				periodType = args[i+1]
 				i++
 			}
+		case "-recent", "--recent-days":
+			if i+1 < len(args) {
+				if days, err := strconv.Atoi(args[i+1]); err == nil && days > 0 {
+					recentDays = days
+					i++
+				}
+			}
 		}
 	}
 
@@ -1747,6 +1755,57 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		}
 
 		fmt.Printf("✓ Trend export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle result comparison exports separately
+	if exportType == "result-comparison" || exportType == "results-comparison" {
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("result_comparison", format))
+		}
+
+		if err := export.ExportResultComparison(ctx, service, recentDays, formatFilter, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Result comparison export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle result trend exports separately
+	if exportType == "result-trends" || exportType == "results-trends" {
+		// Result trend exports require date range
+		if startDate == nil || endDate == nil {
+			fmt.Println("Result trend export requires -start and -end dates")
+			fmt.Println("Example: export result-trends -start 2024-01-01 -end 2024-12-31 -period daily")
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("result_trends", format))
+		}
+
+		if err := export.ExportResultTrends(ctx, service, *startDate, *endDate, periodType, formatFilter, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Result trend export successful: %s\n", opts.FilePath)
 		return
 	}
 
@@ -1871,30 +1930,35 @@ func handleDeckExport(service *storage.Service, ctx context.Context, args []stri
 // printExportHelp prints help for the export command.
 func printExportHelp() {
 	fmt.Println("\nExport Commands:")
-	fmt.Println("  export matches [options]      - Export match history")
-	fmt.Println("  export stats [options]        - Export aggregated statistics")
-	fmt.Println("  export daily [options]        - Export daily statistics")
-	fmt.Println("  export performance [options]  - Export performance metrics")
-	fmt.Println("  export trends [options]       - Export historical trend analysis")
-	fmt.Println("  export results [options]      - Export result breakdown (win/loss reasons)")
-	fmt.Println("  export deck/decks [options]   - Export deck lists")
+	fmt.Println("  export matches [options]          - Export match history")
+	fmt.Println("  export stats [options]            - Export aggregated statistics")
+	fmt.Println("  export daily [options]            - Export daily statistics")
+	fmt.Println("  export performance [options]      - Export performance metrics")
+	fmt.Println("  export trends [options]           - Export historical trend analysis")
+	fmt.Println("  export results [options]          - Export result breakdown (win/loss reasons)")
+	fmt.Println("  export result-comparison [opts]   - Compare recent vs. all-time results")
+	fmt.Println("  export result-trends [options]    - Trend analysis for result reasons over time")
+	fmt.Println("  export deck/decks [options]       - Export deck lists")
 	fmt.Println("\nOptions:")
-	fmt.Println("  -json                         - Export as JSON (default: CSV)")
-	fmt.Println("  -csv                          - Export as CSV")
-	fmt.Println("  -o, --output <path>           - Specify output file path")
-	fmt.Println("  -start, --start-date <date>   - Start date (YYYY-MM-DD)")
-	fmt.Println("  -end, --end-date <date>       - End date (YYYY-MM-DD)")
-	fmt.Println("  -format, --format <format>    - Filter by format (constructed/limited)")
-	fmt.Println("  -period, --period <type>      - Period type for trends: daily, weekly, monthly (default: daily)")
+	fmt.Println("  -json                             - Export as JSON (default: CSV)")
+	fmt.Println("  -csv                              - Export as CSV")
+	fmt.Println("  -o, --output <path>               - Specify output file path")
+	fmt.Println("  -start, --start-date <date>       - Start date (YYYY-MM-DD)")
+	fmt.Println("  -end, --end-date <date>           - End date (YYYY-MM-DD)")
+	fmt.Println("  -format, --format <format>        - Filter by format (constructed/limited)")
+	fmt.Println("  -period, --period <type>          - Period type: daily, weekly, monthly (default: daily)")
+	fmt.Println("  -recent, --recent-days <days>     - Recent period in days (default: 30)")
 	fmt.Println("\nExamples:")
-	fmt.Println("  export matches -json          - Export all matches as JSON")
+	fmt.Println("  export matches -json              - Export all matches as JSON")
 	fmt.Println("  export stats -csv -o stats.csv")
 	fmt.Println("  export trends -start 2024-01-01 -end 2024-12-31 -period daily")
-	fmt.Println("  export results -json          - Export result breakdown as JSON")
+	fmt.Println("  export results -json              - Export result breakdown as JSON")
+	fmt.Println("  export result-comparison -recent 7 -format constructed")
+	fmt.Println("  export result-trends -start 2024-01-01 -end 2024-12-31 -period weekly")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
-	fmt.Println("  export decks -all -arena      - Export all decks in Arena format")
-	fmt.Println("  export deck <deck_id> -json   - Export specific deck as JSON")
+	fmt.Println("  export decks -all -arena          - Export all decks in Arena format")
+	fmt.Println("  export deck <deck_id> -json       - Export specific deck as JSON")
 }
 
 // printDeckExportHelp prints detailed help for deck exports.
