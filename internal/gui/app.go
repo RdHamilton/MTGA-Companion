@@ -39,7 +39,7 @@ func (a *App) Run() {
 	// Create tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),
-		container.NewTabItem("Recent Matches", a.createMatchesView()),
+		container.NewTabItem("Match History", a.createMatchesView()),
 		container.NewTabItem("Charts", a.createChartsView()),
 	)
 
@@ -75,7 +75,7 @@ Game Win Rate: %.1f%%
 	refreshBtn := widget.NewButton("Refresh", func() {
 		a.window.SetContent(container.NewAppTabs(
 			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
 		))
 	})
@@ -83,48 +83,10 @@ Game Win Rate: %.1f%%
 	return container.NewBorder(nil, refreshBtn, nil, nil, container.NewScroll(label))
 }
 
-// createMatchesView creates the recent matches view.
+// createMatchesView creates the enhanced match history view.
 func (a *App) createMatchesView() fyne.CanvasObject {
-	filter := storage.StatsFilter{}
-	matches, err := a.service.GetMatches(a.ctx, filter)
-	if err != nil {
-		return widget.NewLabel(fmt.Sprintf("Error: %v", err))
-	}
-
-	if len(matches) == 0 {
-		return widget.NewLabel("No matches found")
-	}
-
-	// Limit to 20 most recent
-	limit := 20
-	if len(matches) < limit {
-		limit = len(matches)
-	}
-
-	var content string
-	content += "Recent Matches\n"
-	content += "==============\n\n"
-
-	for i := 0; i < limit; i++ {
-		match := matches[i]
-		result := "W"
-		if match.Result == "loss" {
-			result = "L"
-		}
-
-		content += fmt.Sprintf("%s | %s | %s | %d-%d\n",
-			result,
-			match.Timestamp.Format("2006-01-02 15:04"),
-			match.EventName,
-			match.PlayerWins,
-			match.OpponentWins,
-		)
-	}
-
-	label := widget.NewLabel(content)
-	label.Wrapping = fyne.TextWrapWord
-
-	return container.NewScroll(label)
+	viewer := NewMatchHistoryViewer(a, a.service, a.ctx)
+	return viewer.CreateView()
 }
 
 // createChartsView creates the charts view.
@@ -198,7 +160,7 @@ Overall Win Rate: %.1f%% (%d matches)`,
 		// Recreate the entire Charts tab with the new chart type
 		a.window.SetContent(container.NewAppTabs(
 			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
 		))
 	})
@@ -440,7 +402,7 @@ Milestones: %d`,
 		// Recreate the entire Charts tab with the new format
 		a.window.SetContent(container.NewAppTabs(
 			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Recent Matches", a.createMatchesView()),
+			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
 		))
 	})
