@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -1419,9 +1420,11 @@ func runBackupCommand() {
 		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
 	}
 
-	// Check if database exists
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Fatalf("Database file does not exist: %s", dbPath)
+	// Check if database exists (except for list command which doesn't need it)
+	if len(os.Args) >= 3 && os.Args[2] != "list" && os.Args[2] != "ls" {
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			log.Fatalf("Database file does not exist: %s", dbPath)
+		}
 	}
 
 	// Create backup manager
@@ -1436,73 +1439,156 @@ func runBackupCommand() {
 
 	switch command {
 	case "create", "backup":
-		// Get backup directory from environment or use default
-		backupDir := os.Getenv("MTGA_BACKUP_DIR")
-		backupName := ""
-		if len(os.Args) >= 4 {
-			backupName = os.Args[3]
+		// Define flags for create command
+		createFlags := flag.NewFlagSet("create", flag.ExitOnError)
+		backupType := createFlags.String("type", "full", "Backup type: 'full' or 'incremental'")
+		backupDir := createFlags.String("dir", os.Getenv("MTGA_BACKUP_DIR"), "Backup directory")
+		backupName := createFlags.String("name", "", "Backup name (default: auto-generated timestamp)")
+		compress := createFlags.Bool("compress", false, "Compress backup with gzip")
+		encrypt := createFlags.Bool("encrypt", false, "Encrypt backup")
+		passwordEnv := createFlags.String("password-env", "", "Environment variable containing encryption password")
+		verify := createFlags.Bool("verify", true, "Verify backup after creation")
+
+		if err := createFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
 		}
 
+		// Build backup config
 		config := storage.DefaultBackupConfig()
-		config.BackupDir = backupDir
-		config.BackupName = backupName
-		config.VerifyBackup = true
+		config.BackupDir = *backupDir
+		config.BackupName = *backupName
+		config.VerifyBackup = *verify
+		config.Compress = *compress
+		config.Encrypt = *encrypt
 
-		fmt.Println("Creating database backup...")
+		// Set backup type
+		switch *backupType {
+		case "full":
+			config.BackupType = storage.BackupTypeFull
+		case "incremental", "incr":
+			config.BackupType = storage.BackupTypeIncremental
+		default:
+			log.Fatalf("Invalid backup type: %s (must be 'full' or 'incremental')", *backupType)
+		}
+
+		// Handle encryption password
+		if *encrypt {
+			if *passwordEnv == "" {
+				log.Fatal("Error: --password-env is required when --encrypt is specified")
+			}
+			password := os.Getenv(*passwordEnv)
+			if password == "" {
+				log.Fatalf("Error: environment variable %s is not set or empty", *passwordEnv)
+			}
+			config.EncryptionPassword = password
+		}
+
+		// Print configuration
+		fmt.Printf("Creating %s backup...\n", *backupType)
+		if *compress {
+			fmt.Println("  Compression: enabled")
+		}
+		if *encrypt {
+			fmt.Println("  Encryption: enabled")
+		}
+
 		backupPath, err := backupMgr.Backup(config)
 		if err != nil {
 			log.Fatalf("Error creating backup: %v", err)
 		}
 
-		fmt.Printf("Backup created successfully: %s\n", backupPath)
+		fmt.Printf("\n✓ Backup created successfully: %s\n", backupPath)
 
-		// Calculate and display backup size
+		// Display backup size
 		info, err := os.Stat(backupPath)
 		if err == nil {
 			sizeMB := float64(info.Size()) / (1024 * 1024)
-			fmt.Printf("Backup size: %.2f MB\n", sizeMB)
+			fmt.Printf("  Size: %.2f MB\n", sizeMB)
 		}
 
 	case "restore":
-		if len(os.Args) < 4 {
+		// Define flags for restore command
+		restoreFlags := flag.NewFlagSet("restore", flag.ExitOnError)
+		passwordEnv := restoreFlags.String("password-env", "", "Environment variable containing decryption password")
+		noConfirm := restoreFlags.Bool("yes", false, "Skip confirmation prompt")
+
+		if err := restoreFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
+		}
+
+		if restoreFlags.NArg() < 1 {
 			fmt.Println("Error: restore command requires a backup file path")
-			fmt.Println("Usage: mtga-companion backup restore <backup-file>")
+			fmt.Println("Usage: mtga-companion backup restore <backup-file> [flags]")
+			fmt.Println("\nFlags:")
+			restoreFlags.PrintDefaults()
 			os.Exit(1)
 		}
-		backupPath := os.Args[3]
+		backupPath := restoreFlags.Arg(0)
 
-		fmt.Println("WARNING: This will overwrite the current database!")
-		fmt.Printf("Database: %s\n", dbPath)
-		fmt.Printf("Backup:   %s\n", backupPath)
-		fmt.Print("\nAre you sure you want to continue? (yes/no): ")
-
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatalf("Error reading input: %v", err)
+		// Check if backup file exists
+		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+			log.Fatalf("Backup file does not exist: %s", backupPath)
 		}
 
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response != "yes" && response != "y" {
-			fmt.Println("Restore cancelled.")
-			return
+		// Show warning and get confirmation
+		if !*noConfirm {
+			fmt.Println("WARNING: This will overwrite the current database!")
+			fmt.Printf("Database: %s\n", dbPath)
+			fmt.Printf("Backup:   %s\n", backupPath)
+			fmt.Print("\nAre you sure you want to continue? (yes/no): ")
+
+			reader := bufio.NewReader(os.Stdin)
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				log.Fatalf("Error reading input: %v", err)
+			}
+
+			response = strings.TrimSpace(strings.ToLower(response))
+			if response != "yes" && response != "y" {
+				fmt.Println("Restore cancelled.")
+				return
+			}
 		}
 
 		fmt.Println("\nRestoring database from backup...")
-		if err := backupMgr.Restore(backupPath); err != nil {
-			log.Fatalf("Error restoring backup: %v", err)
+
+		// Handle decryption password if needed
+		var password string
+		if *passwordEnv != "" {
+			password = os.Getenv(*passwordEnv)
+			if password == "" {
+				log.Fatalf("Error: environment variable %s is not set or empty", *passwordEnv)
+			}
 		}
 
-		fmt.Println("Database restored successfully!")
+		// Restore with optional password
+		if password != "" {
+			if err := backupMgr.Restore(backupPath, password); err != nil {
+				log.Fatalf("Error restoring backup: %v", err)
+			}
+		} else {
+			if err := backupMgr.Restore(backupPath); err != nil {
+				log.Fatalf("Error restoring backup: %v", err)
+			}
+		}
+
+		fmt.Println("✓ Database restored successfully!")
 
 	case "list", "ls":
-		backupDir := os.Getenv("MTGA_BACKUP_DIR")
-		if backupDir == "" {
-			backupDir = backupMgr.GetBackupDir()
+		// Define flags for list command
+		listFlags := flag.NewFlagSet("list", flag.ExitOnError)
+		format := listFlags.String("format", "table", "Output format: 'table' or 'json'")
+		backupDir := listFlags.String("dir", os.Getenv("MTGA_BACKUP_DIR"), "Backup directory")
+
+		if err := listFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
 		}
 
-		fmt.Println("Listing backups...")
-		backups, err := backupMgr.ListBackups(backupDir)
+		if *backupDir == "" {
+			*backupDir = backupMgr.GetBackupDir()
+		}
+
+		backups, err := backupMgr.ListBackups(*backupDir)
 		if err != nil {
 			log.Fatalf("Error listing backups: %v", err)
 		}
@@ -1512,31 +1598,182 @@ func runBackupCommand() {
 			return
 		}
 
-		fmt.Printf("\nFound %d backup(s):\n\n", len(backups))
-		for i, backup := range backups {
-			sizeMB := float64(backup.Size) / (1024 * 1024)
-			fmt.Printf("%d. %s\n", i+1, backup.Name)
-			fmt.Printf("   Path:     %s\n", backup.Path)
-			fmt.Printf("   Size:     %.2f MB\n", sizeMB)
-			fmt.Printf("   Modified: %s\n", backup.ModTime.Format("2006-01-02 15:04:05"))
-			fmt.Printf("   Checksum: %s\n", backup.Checksum)
-			fmt.Println()
+		// Format output
+		switch *format {
+		case "json":
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(backups); err != nil {
+				log.Fatalf("Error encoding JSON: %v", err)
+			}
+		case "table":
+			fmt.Printf("\nFound %d backup(s) in %s:\n\n", len(backups), *backupDir)
+			for i, backup := range backups {
+				sizeMB := float64(backup.Size) / (1024 * 1024)
+				fmt.Printf("%d. %s\n", i+1, backup.Name)
+				fmt.Printf("   Path:     %s\n", backup.Path)
+				fmt.Printf("   Size:     %.2f MB\n", sizeMB)
+				fmt.Printf("   Modified: %s\n", backup.ModTime.Format("2006-01-02 15:04:05"))
+				fmt.Printf("   Checksum: %s\n", backup.Checksum)
+				fmt.Println()
+			}
+		default:
+			log.Fatalf("Invalid format: %s (must be 'table' or 'json')", *format)
 		}
 
 	case "verify":
-		if len(os.Args) < 4 {
+		// Define flags for verify command
+		verifyFlags := flag.NewFlagSet("verify", flag.ExitOnError)
+		if err := verifyFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
+		}
+
+		if verifyFlags.NArg() < 1 {
 			fmt.Println("Error: verify command requires a backup file path")
 			fmt.Println("Usage: mtga-companion backup verify <backup-file>")
 			os.Exit(1)
 		}
-		backupPath := os.Args[3]
+		backupPath := verifyFlags.Arg(0)
 
 		fmt.Printf("Verifying backup: %s\n", backupPath)
 		if err := backupMgr.VerifyBackup(backupPath); err != nil {
 			log.Fatalf("Backup verification failed: %v", err)
 		}
 
-		fmt.Println("Backup verification successful!")
+		fmt.Println("✓ Backup verification successful!")
+
+	case "cleanup":
+		// Define flags for cleanup command
+		cleanupFlags := flag.NewFlagSet("cleanup", flag.ExitOnError)
+		backupDir := cleanupFlags.String("dir", os.Getenv("MTGA_BACKUP_DIR"), "Backup directory")
+		olderThan := cleanupFlags.Int("older-than", 0, "Delete backups older than N days (0 = disabled)")
+		keepLast := cleanupFlags.Int("keep-last", 0, "Keep only the last N backups (0 = disabled)")
+		dryRun := cleanupFlags.Bool("dry-run", false, "Show what would be deleted without actually deleting")
+
+		if err := cleanupFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
+		}
+
+		if *backupDir == "" {
+			*backupDir = backupMgr.GetBackupDir()
+		}
+
+		if *olderThan == 0 && *keepLast == 0 {
+			fmt.Println("Error: either --older-than or --keep-last must be specified")
+			fmt.Println("Usage: mtga-companion backup cleanup [flags]")
+			fmt.Println("\nFlags:")
+			cleanupFlags.PrintDefaults()
+			os.Exit(1)
+		}
+
+		// List backups first to show what would be deleted
+		backups, err := backupMgr.ListBackups(*backupDir)
+		if err != nil {
+			log.Fatalf("Error listing backups: %v", err)
+		}
+
+		if len(backups) == 0 {
+			fmt.Println("No backups found.")
+			return
+		}
+
+		if *dryRun {
+			fmt.Printf("DRY RUN: Would clean up backups in %s\n", *backupDir)
+			fmt.Printf("Found %d backup(s)\n", len(backups))
+			if *olderThan > 0 {
+				fmt.Printf("  - Deleting backups older than %d days\n", *olderThan)
+			}
+			if *keepLast > 0 {
+				fmt.Printf("  - Keeping only the last %d backups\n", *keepLast)
+			}
+			return
+		}
+
+		fmt.Printf("Cleaning up backups in %s...\n", *backupDir)
+		if err := backupMgr.CleanupBackups(*backupDir, *olderThan, *keepLast); err != nil {
+			log.Fatalf("Error cleaning up backups: %v", err)
+		}
+
+		// Show how many remain
+		remainingBackups, err := backupMgr.ListBackups(*backupDir)
+		if err == nil {
+			fmt.Printf("✓ Cleanup complete. %d backup(s) remaining.\n", len(remainingBackups))
+		}
+
+	case "info":
+		// Define flags for info command
+		infoFlags := flag.NewFlagSet("info", flag.ExitOnError)
+		format := infoFlags.String("format", "table", "Output format: 'table' or 'json'")
+
+		if err := infoFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
+		}
+
+		if infoFlags.NArg() < 1 {
+			fmt.Println("Error: info command requires a backup file path")
+			fmt.Println("Usage: mtga-companion backup info <backup-file> [flags]")
+			fmt.Println("\nFlags:")
+			infoFlags.PrintDefaults()
+			os.Exit(1)
+		}
+		backupPath := infoFlags.Arg(0)
+
+		// Check if backup exists
+		info, err := os.Stat(backupPath)
+		if os.IsNotExist(err) {
+			log.Fatalf("Backup file does not exist: %s", backupPath)
+		}
+		if err != nil {
+			log.Fatalf("Error accessing backup file: %v", err)
+		}
+
+		// Try to load metadata
+		metadata, err := backupMgr.LoadBackupMetadata(backupPath)
+
+		// Format output
+		switch *format {
+		case "json":
+			type BackupDetails struct {
+				Path     string                  `json:"path"`
+				Size     int64                   `json:"size"`
+				ModTime  time.Time               `json:"modified"`
+				Metadata *storage.BackupMetadata `json:"metadata,omitempty"`
+			}
+
+			details := BackupDetails{
+				Path:     backupPath,
+				Size:     info.Size(),
+				ModTime:  info.ModTime(),
+				Metadata: metadata,
+			}
+
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(details); err != nil {
+				log.Fatalf("Error encoding JSON: %v", err)
+			}
+		case "table":
+			sizeMB := float64(info.Size()) / (1024 * 1024)
+			fmt.Printf("\nBackup Information:\n")
+			fmt.Printf("  Path:     %s\n", backupPath)
+			fmt.Printf("  Size:     %.2f MB\n", sizeMB)
+			fmt.Printf("  Modified: %s\n", info.ModTime().Format("2006-01-02 15:04:05"))
+
+			if metadata != nil {
+				fmt.Printf("\n  Type:     %s\n", metadata.BackupType)
+				fmt.Printf("  Created:  %s\n", metadata.Timestamp.Format("2006-01-02 15:04:05"))
+				if metadata.BaseBackup != "" {
+					fmt.Printf("  Base:     %s\n", metadata.BaseBackup)
+				}
+				if len(metadata.Tables) > 0 {
+					fmt.Printf("\n  Tables:   %d\n", len(metadata.Tables))
+				}
+			} else if err != nil {
+				fmt.Printf("\n  Metadata: Not available (%v)\n", err)
+			}
+		default:
+			log.Fatalf("Invalid format: %s (must be 'table' or 'json')", *format)
+		}
 
 	default:
 		fmt.Printf("Unknown backup command: %s\n\n", command)
@@ -1546,17 +1783,51 @@ func runBackupCommand() {
 }
 
 func printBackupUsage() {
-	fmt.Println("Usage: mtga-companion backup <command> [options]")
+	fmt.Println("MTGA Companion - Database Backup Management")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  mtga-companion backup <command> [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  create, backup [name]  - Create a new backup (optional name)")
-	fmt.Println("  restore <backup-file>  - Restore database from backup")
-	fmt.Println("  list, ls               - List all available backups")
-	fmt.Println("  verify <backup-file>    - Verify backup integrity")
+	fmt.Println("  create     Create a new database backup")
+	fmt.Println("  restore    Restore database from backup")
+	fmt.Println("  list, ls   List all available backups")
+	fmt.Println("  verify     Verify backup integrity")
+	fmt.Println("  cleanup    Delete old backups based on retention policy")
+	fmt.Println("  info       Show detailed backup information")
 	fmt.Println()
-	fmt.Println("Environment variables:")
-	fmt.Println("  MTGA_DB_PATH     - Path to the database file (default: ~/.mtga-companion/data.db)")
-	fmt.Println("  MTGA_BACKUP_DIR  - Directory for backups (default: ~/.mtga-companion/backups)")
+	fmt.Println("Examples:")
+	fmt.Println("  # Create full backup")
+	fmt.Println("  mtga-companion backup create")
+	fmt.Println()
+	fmt.Println("  # Create incremental backup with encryption")
+	fmt.Println("  export BACKUP_PWD=mypassword")
+	fmt.Println("  mtga-companion backup create --type incremental --encrypt --password-env BACKUP_PWD")
+	fmt.Println()
+	fmt.Println("  # Create compressed backup")
+	fmt.Println("  mtga-companion backup create --compress")
+	fmt.Println()
+	fmt.Println("  # Restore from encrypted backup")
+	fmt.Println("  mtga-companion backup restore backup.db --password-env BACKUP_PWD")
+	fmt.Println()
+	fmt.Println("  # List backups in JSON format")
+	fmt.Println("  mtga-companion backup list --format json")
+	fmt.Println()
+	fmt.Println("  # Clean up old backups (keep last 10)")
+	fmt.Println("  mtga-companion backup cleanup --keep-last 10")
+	fmt.Println()
+	fmt.Println("  # Clean up backups older than 30 days")
+	fmt.Println("  mtga-companion backup cleanup --older-than 30")
+	fmt.Println()
+	fmt.Println("  # Show backup metadata")
+	fmt.Println("  mtga-companion backup info backup.db")
+	fmt.Println()
+	fmt.Println("For command-specific help:")
+	fmt.Println("  mtga-companion backup <command> --help")
+	fmt.Println()
+	fmt.Println("Environment Variables:")
+	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
+	fmt.Println("  MTGA_BACKUP_DIR  Backup directory (default: ~/.mtga-companion/backups)")
 	fmt.Println()
 }
 
