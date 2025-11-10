@@ -1684,8 +1684,10 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	overwrite := true
 	var startDate, endDate *time.Time
 	var formatFilter *string
-	periodType := "daily" // Default for trend exports
-	recentDays := 30      // Default for result comparison exports
+	periodType := "daily"   // Default for trend exports
+	recentDays := 30        // Default for result comparison exports
+	recentMatches := 30     // Default for prediction analysis window
+	projectionMatches := 10 // Default for prediction projection
 
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
@@ -1728,6 +1730,20 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 			if i+1 < len(args) {
 				if days, err := strconv.Atoi(args[i+1]); err == nil && days > 0 {
 					recentDays = days
+					i++
+				}
+			}
+		case "-window", "--recent-matches":
+			if i+1 < len(args) {
+				if matches, err := strconv.Atoi(args[i+1]); err == nil && matches > 0 {
+					recentMatches = matches
+					i++
+				}
+			}
+		case "-project", "--projection":
+			if i+1 < len(args) {
+				if matches, err := strconv.Atoi(args[i+1]); err == nil && matches > 0 {
+					projectionMatches = matches
 					i++
 				}
 			}
@@ -1811,6 +1827,196 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		}
 
 		fmt.Printf("✓ Result trend export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle period comparison exports separately (requires 4 dates: period1 start/end, period2 start/end)
+	if exportType == "compare-periods" || exportType == "period-comparison" {
+		fmt.Println("Period comparison requires both periods' date ranges")
+		fmt.Println("Use: export compare-periods -start 2024-01-01 -end 2024-01-31 -start2 2024-02-01 -end2 2024-02-29")
+		fmt.Println("Note: -start2 and -end2 flags are not yet implemented. Use result-comparison for recent vs all-time.")
+		return
+	}
+
+	// Handle prediction exports separately
+	if exportType == "predict" || exportType == "prediction" || exportType == "predict-winrate" {
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+			Format:    formatFilter,
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("prediction", format))
+		}
+
+		if err := export.ExportWinRatePrediction(ctx, service, filter, recentMatches, projectionMatches, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Prediction export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle format-specific prediction exports
+	if exportType == "predict-formats" || exportType == "predictions-by-format" {
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+			Format:    formatFilter,
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("predictions_by_format", format))
+		}
+
+		if err := export.ExportPredictionsByFormat(ctx, service, filter, recentMatches, projectionMatches, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Format predictions export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle prediction summary exports
+	if exportType == "predict-summary" || exportType == "prediction-summary" {
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+			Format:    formatFilter,
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("prediction_summary", format))
+		}
+
+		if err := export.ExportPredictionSummary(ctx, service, filter, recentMatches, projectionMatches, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Prediction summary export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle rank timeline exports separately (requires format parameter)
+	if exportType == "rank-timeline" || exportType == "timeline" {
+		// Rank format is required (constructed or limited)
+		if formatFilter == nil || (*formatFilter != "constructed" && *formatFilter != "limited") {
+			fmt.Println("Error: Rank timeline requires a format (-format constructed or -format limited)")
+			return
+		}
+
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		// Parse period type
+		var period storage.TimelinePeriod
+		switch periodType {
+		case "all":
+			period = storage.PeriodAll
+		case "daily":
+			period = storage.PeriodDaily
+		case "weekly":
+			period = storage.PeriodWeekly
+		case "monthly":
+			period = storage.PeriodMonthly
+		default:
+			fmt.Printf("Invalid period type: %s (use all, daily, weekly, or monthly)\n", periodType)
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("rank_timeline", format))
+		}
+
+		if err := export.ExportRankTimeline(ctx, service, *formatFilter, filter, period, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Rank timeline export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Handle rank timeline summary exports
+	if exportType == "rank-timeline-summary" || exportType == "timeline-summary" {
+		// Rank format is required (constructed or limited)
+		if formatFilter == nil || (*formatFilter != "constructed" && *formatFilter != "limited") {
+			fmt.Println("Error: Rank timeline summary requires a format (-format constructed or -format limited)")
+			return
+		}
+
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		// Parse period type
+		var period storage.TimelinePeriod
+		switch periodType {
+		case "all":
+			period = storage.PeriodAll
+		case "daily":
+			period = storage.PeriodDaily
+		case "weekly":
+			period = storage.PeriodWeekly
+		case "monthly":
+			period = storage.PeriodMonthly
+		default:
+			fmt.Printf("Invalid period type: %s (use all, daily, weekly, or monthly)\n", periodType)
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("rank_timeline_summary", format))
+		}
+
+		if err := export.ExportRankTimelineSummary(ctx, service, *formatFilter, filter, period, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Rank timeline summary export successful: %s\n", opts.FilePath)
 		return
 	}
 
@@ -2123,6 +2329,11 @@ func printExportHelp() {
 	fmt.Println("  export hour-of-day [options]      - Export statistics by hour of day (0-23)")
 	fmt.Println("  export day-of-week [options]      - Export statistics by day of week")
 	fmt.Println("  export time-patterns [options]    - Export time-based performance summary")
+	fmt.Println("  export predict [options]          - Predict future win rate based on trends")
+	fmt.Println("  export predict-formats [options]  - Predict win rates for each format")
+	fmt.Println("  export predict-summary [options]  - Prediction summary with insights")
+	fmt.Println("  export rank-timeline [options]    - Export rank progression timeline")
+	fmt.Println("  export timeline-summary [options] - Export rank progression summary")
 	fmt.Println("  export deck/decks [options]       - Export deck lists")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -json                             - Export as JSON (default: CSV)")
@@ -2133,6 +2344,8 @@ func printExportHelp() {
 	fmt.Println("  -format, --format <format>        - Filter by format (constructed/limited)")
 	fmt.Println("  -period, --period <type>          - Period type: daily, weekly, monthly (default: daily)")
 	fmt.Println("  -recent, --recent-days <days>     - Recent period in days (default: 30)")
+	fmt.Println("  -window, --recent-matches <num>   - Recent matches for prediction analysis (default: 30)")
+	fmt.Println("  -project, --projection <num>      - Matches ahead to project (default: 10)")
 	fmt.Println("\nExamples:")
 	fmt.Println("  export matches -json              - Export all matches as JSON")
 	fmt.Println("  export stats -csv -o stats.csv")
@@ -2145,6 +2358,13 @@ func printExportHelp() {
 	fmt.Println("  export hour-of-day -json          - Export win rates by hour (0-23)")
 	fmt.Println("  export day-of-week -csv           - Export win rates by day of week")
 	fmt.Println("  export time-patterns -json        - Export best/worst hours and days")
+	fmt.Println("  export predict -json              - Predict future win rate with confidence")
+	fmt.Println("  export predict -window 50 -project 20 - Analyze last 50, project 20 ahead")
+	fmt.Println("  export predict-formats -json      - Predictions for each format")
+	fmt.Println("  export predict-summary -csv       - Summary with strongest/weakest formats")
+	fmt.Println("  export rank-timeline -format constructed -period daily")
+	fmt.Println("  export rank-timeline -format limited -period all -json")
+	fmt.Println("  export timeline-summary -format constructed -start 2024-01-01")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
 	fmt.Println("  export decks -all -arena          - Export all decks in Arena format")
