@@ -255,6 +255,14 @@ func ExportStatistics(ctx context.Context, service *storage.Service, exportOpts 
 		return ExportPerformanceMetrics(ctx, service, exportOpts.Filter, opts)
 	case "results", "result", "breakdown":
 		return ExportResultBreakdown(ctx, service, exportOpts.Filter, opts)
+	case "streaks", "streak":
+		return ExportStreakData(ctx, service, exportOpts.Filter, opts)
+	case "hour-of-day", "hourly", "hours":
+		return ExportHourOfDayStats(ctx, service, exportOpts.Filter, opts)
+	case "day-of-week", "daily-pattern", "days":
+		return ExportDayOfWeekStats(ctx, service, exportOpts.Filter, opts)
+	case "time-patterns", "time-summary":
+		return ExportTimePatternSummary(ctx, service, exportOpts.Filter, opts)
 	default:
 		return fmt.Errorf("unknown export type: %s", exportOpts.Type)
 	}
