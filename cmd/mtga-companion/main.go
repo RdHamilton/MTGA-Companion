@@ -2121,6 +2121,8 @@ func handleTrendsCommand(service *storage.Service, ctx context.Context, args []s
 	switch trendType {
 	case "winrate", "wr":
 		displayWinRateTrendChart(service, ctx, *startDate, *endDate, periodType, formatFilter, chartType)
+	case "results", "breakdown", "rb":
+		displayResultBreakdownChart(service, ctx, *startDate, *endDate, formatFilter)
 	case "help", "h":
 		printTrendsHelp()
 	default:
@@ -2204,11 +2206,184 @@ func displayWinRateTrendChart(service *storage.Service, ctx context.Context, sta
 	fmt.Println()
 }
 
+// displayResultBreakdownChart displays a result breakdown pie chart.
+func displayResultBreakdownChart(service *storage.Service, ctx context.Context, startDate, endDate time.Time, formatFilter *string) {
+	// Get matches
+	filter := storage.StatsFilter{
+		StartDate: &startDate,
+		EndDate:   &endDate,
+		Format:    formatFilter,
+	}
+
+	matches, err := service.GetMatches(ctx, filter)
+	if err != nil {
+		fmt.Printf("Error getting matches: %v\n", err)
+		return
+	}
+
+	if len(matches) == 0 {
+		fmt.Println("No matches found for the specified period")
+		return
+	}
+
+	// Calculate win and loss breakdowns
+	winBreakdown := calculateMatchBreakdown(matches, true)
+	lossBreakdown := calculateMatchBreakdown(matches, false)
+
+	// Create win breakdown chart
+	if winBreakdown.Total > 0 {
+		createBreakdownPieChart(winBreakdown, "Wins", startDate, endDate, formatFilter)
+	}
+
+	// Create loss breakdown chart
+	if lossBreakdown.Total > 0 {
+		createBreakdownPieChart(lossBreakdown, "Losses", startDate, endDate, formatFilter)
+	}
+
+	// Display summary
+	fmt.Printf("\nPeriod: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	if formatFilter != nil {
+		fmt.Printf("Format: %s\n", *formatFilter)
+	}
+	fmt.Printf("Total Matches: %d (Wins: %d, Losses: %d)\n\n", len(matches), winBreakdown.Total, lossBreakdown.Total)
+}
+
+// matchBreakdown represents a breakdown of match results by reason.
+type matchBreakdown struct {
+	Normal             int
+	Concede            int
+	Timeout            int
+	Draw               int
+	Disconnect         int
+	OpponentConcede    int
+	OpponentTimeout    int
+	OpponentDisconnect int
+	Other              int
+	Total              int
+}
+
+// calculateMatchBreakdown calculates a breakdown of match results by reason.
+func calculateMatchBreakdown(matches []*storage.Match, isWin bool) matchBreakdown {
+	breakdown := matchBreakdown{}
+
+	for _, match := range matches {
+		// Filter by win/loss
+		if isWin && match.Result != "win" {
+			continue
+		}
+		if !isWin && match.Result != "loss" {
+			continue
+		}
+
+		breakdown.Total++
+
+		if match.ResultReason == nil {
+			breakdown.Normal++
+			continue
+		}
+
+		reason := *match.ResultReason
+		switch {
+		case reason == "ResultReason_Game":
+			breakdown.Normal++
+		case reason == "ResultReason_Concede":
+			breakdown.Concede++
+		case reason == "ResultReason_Timeout":
+			breakdown.Timeout++
+		case reason == "ResultReason_Draw":
+			breakdown.Draw++
+		case reason == "ResultReason_Disconnect":
+			breakdown.Disconnect++
+		case reason == "ResultReason_OpponentConcede":
+			breakdown.OpponentConcede++
+		case reason == "ResultReason_OpponentTimeout":
+			breakdown.OpponentTimeout++
+		case reason == "ResultReason_OpponentDisconnect":
+			breakdown.OpponentDisconnect++
+		default:
+			breakdown.Other++
+		}
+	}
+
+	return breakdown
+}
+
+// createBreakdownPieChart creates a pie chart for the given breakdown.
+func createBreakdownPieChart(breakdown matchBreakdown, resultType string, startDate, endDate time.Time, formatFilter *string) {
+	// Prepare data points (only include non-zero values)
+	dataPoints := []charts.DataPoint{}
+
+	if breakdown.Normal > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Normal", Value: float64(breakdown.Normal)})
+	}
+	if breakdown.Concede > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Concede", Value: float64(breakdown.Concede)})
+	}
+	if breakdown.Timeout > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Timeout", Value: float64(breakdown.Timeout)})
+	}
+	if breakdown.Draw > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Draw", Value: float64(breakdown.Draw)})
+	}
+	if breakdown.Disconnect > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Disconnect", Value: float64(breakdown.Disconnect)})
+	}
+	if breakdown.OpponentConcede > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Concede", Value: float64(breakdown.OpponentConcede)})
+	}
+	if breakdown.OpponentTimeout > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Timeout", Value: float64(breakdown.OpponentTimeout)})
+	}
+	if breakdown.OpponentDisconnect > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Opponent Disconnect", Value: float64(breakdown.OpponentDisconnect)})
+	}
+	if breakdown.Other > 0 {
+		dataPoints = append(dataPoints, charts.DataPoint{Label: "Other", Value: float64(breakdown.Other)})
+	}
+
+	if len(dataPoints) == 0 {
+		return
+	}
+
+	// Configure chart
+	config := charts.DefaultChartConfig()
+	config.Title = fmt.Sprintf("%s Breakdown", resultType)
+	if formatFilter != nil {
+		config.Title = fmt.Sprintf("%s Breakdown (%s)", resultType, *formatFilter)
+	}
+	config.Width = "900px"
+	config.Height = "600px"
+
+	// Create output file
+	filename := fmt.Sprintf("%s_breakdown_%s.html", strings.ToLower(resultType), time.Now().Format("20060102_150405"))
+	outputPath := filepath.Join("charts", filename)
+	if err := os.MkdirAll("charts", 0o755); err != nil {
+		fmt.Printf("Error creating charts directory: %v\n", err)
+		return
+	}
+
+	// Render pie chart
+	if err := charts.RenderPieChart(dataPoints, config, outputPath); err != nil {
+		fmt.Printf("Error creating %s chart: %v\n", resultType, err)
+		return
+	}
+
+	fmt.Printf("✓ %s chart created: %s\n", resultType, outputPath)
+
+	// Open in browser
+	if err := charts.OpenInBrowser(outputPath); err != nil {
+		fmt.Printf("Note: Could not open browser automatically for %s chart.\n", resultType)
+	} else {
+		fmt.Printf("Opening %s chart in browser...\n", resultType)
+	}
+}
+
 // printTrendsHelp prints help for the trends/chart command.
 func printTrendsHelp() {
 	fmt.Println("\nChart Commands:")
 	fmt.Println("  chart [type] [options]            - Create interactive HTML charts")
 	fmt.Println("  chart winrate [options]           - Create win rate trend chart")
+	fmt.Println("  chart results [options]           - Create result breakdown pie charts")
 	fmt.Println("\nNote: Charts are saved as HTML files in the 'charts' directory and opened in your browser")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -start, --start-date <date>       - Start date (YYYY-MM-DD)")
@@ -2221,8 +2396,9 @@ func printTrendsHelp() {
 	fmt.Println("\nExamples:")
 	fmt.Println("  chart                             - Show win rate trend (last 30 days)")
 	fmt.Println("  chart winrate                     - Show win rate trend chart")
+	fmt.Println("  chart results                     - Show result breakdown pie charts (wins/losses)")
 	fmt.Println("  chart -start 2024-01-01 -end 2024-12-31 -period monthly")
-	fmt.Println("  chart -format constructed -line   - Constructed win rate (line chart)")
+	fmt.Println("  chart results -format constructed - Result breakdown for constructed format")
 	fmt.Println("  chart -format limited -bar        - Limited win rate (bar chart)")
 	fmt.Println()
 }
