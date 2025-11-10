@@ -61,9 +61,10 @@ type StatisticsJSON struct {
 }
 
 // ExportTrendAnalysis exports trend analysis data to the specified format.
-func ExportTrendAnalysis(ctx context.Context, service *storage.Service, startDate, endDate time.Time, periodType string, opts Options) error {
+// formatFilter parameter is optional - pass nil for all formats.
+func ExportTrendAnalysis(ctx context.Context, service *storage.Service, startDate, endDate time.Time, periodType string, formatFilter *string, opts Options) error {
 	// Get trend analysis
-	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType)
+	analysis, err := service.GetTrendAnalysis(ctx, startDate, endDate, periodType, formatFilter)
 	if err != nil {
 		return fmt.Errorf("failed to get trend analysis: %w", err)
 	}

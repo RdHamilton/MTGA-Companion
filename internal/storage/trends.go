@@ -32,7 +32,8 @@ type TrendAnalysis struct {
 }
 
 // GetTrendAnalysis calculates historical trend analysis for the specified date range.
-func (s *Service) GetTrendAnalysis(ctx context.Context, startDate, endDate time.Time, periodType string) (*TrendAnalysis, error) {
+// format parameter is optional - pass nil for all formats.
+func (s *Service) GetTrendAnalysis(ctx context.Context, startDate, endDate time.Time, periodType string, format *string) (*TrendAnalysis, error) {
 	analysis := &TrendAnalysis{
 		Periods: []TrendData{},
 	}
@@ -45,6 +46,7 @@ func (s *Service) GetTrendAnalysis(ctx context.Context, startDate, endDate time.
 		filter := models.StatsFilter{
 			StartDate: &period.StartDate,
 			EndDate:   &period.EndDate,
+			Format:    format,
 		}
 
 		stats, err := s.GetStats(ctx, filter)
@@ -67,6 +69,7 @@ func (s *Service) GetTrendAnalysis(ctx context.Context, startDate, endDate time.
 	overallFilter := models.StatsFilter{
 		StartDate: &startDate,
 		EndDate:   &endDate,
+		Format:    format,
 	}
 	overall, err := s.GetStats(ctx, overallFilter)
 	if err != nil {
