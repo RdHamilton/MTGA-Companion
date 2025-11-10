@@ -1679,6 +1679,7 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	overwrite := true
 	var startDate, endDate *time.Time
 	var formatFilter *string
+	periodType := "daily" // Default for trend exports
 
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
@@ -1712,10 +1713,44 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 				formatFilter = &args[i+1]
 				i++
 			}
+		case arg == "-period" || arg == "--period":
+			if i+1 < len(args) {
+				periodType = args[i+1]
+				i++
+			}
 		}
 	}
 
-	// Create filter
+	// Handle trend exports separately
+	if exportType == "trend" || exportType == "trends" {
+		// Trend exports require date range
+		if startDate == nil || endDate == nil {
+			fmt.Println("Trend export requires -start and -end dates")
+			fmt.Println("Example: export trend -start 2024-01-01 -end 2024-12-31 -period daily")
+			return
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("trends", format))
+		}
+
+		if err := export.ExportTrendAnalysis(ctx, service, *startDate, *endDate, periodType, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Trend export successful: %s\n", opts.FilePath)
+		return
+	}
+
+	// Create filter for statistics exports
 	filter := models.StatsFilter{
 		StartDate: startDate,
 		EndDate:   endDate,
@@ -1840,6 +1875,7 @@ func printExportHelp() {
 	fmt.Println("  export stats [options]        - Export aggregated statistics")
 	fmt.Println("  export daily [options]        - Export daily statistics")
 	fmt.Println("  export performance [options]  - Export performance metrics")
+	fmt.Println("  export trends [options]       - Export historical trend analysis")
 	fmt.Println("  export deck/decks [options]   - Export deck lists")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -json                         - Export as JSON (default: CSV)")
@@ -1848,9 +1884,11 @@ func printExportHelp() {
 	fmt.Println("  -start, --start-date <date>   - Start date (YYYY-MM-DD)")
 	fmt.Println("  -end, --end-date <date>       - End date (YYYY-MM-DD)")
 	fmt.Println("  -format, --format <format>    - Filter by format (constructed/limited)")
+	fmt.Println("  -period, --period <type>      - Period type for trends: daily, weekly, monthly (default: daily)")
 	fmt.Println("\nExamples:")
 	fmt.Println("  export matches -json          - Export all matches as JSON")
 	fmt.Println("  export stats -csv -o stats.csv")
+	fmt.Println("  export trends -start 2024-01-01 -end 2024-12-31 -period daily")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
 	fmt.Println("  export decks -all -arena      - Export all decks in Arena format")
