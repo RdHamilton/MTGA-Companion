@@ -281,7 +281,7 @@ func (bi *BulkImporter) processBulkFile(ctx context.Context, filePath string) (p
 		}
 
 		// Convert to storage card
-		storageCard := convertToStorageCard(&card)
+		storageCard := ConvertToStorageCard(&card)
 		batch = append(batch, storageCard)
 
 		// Insert batch if full
@@ -328,8 +328,8 @@ func (bi *BulkImporter) insertBatch(ctx context.Context, cards []*storage.Card) 
 	return nil
 }
 
-// convertToStorageCard converts a Scryfall card to a storage card.
-func convertToStorageCard(card *scryfall.Card) *storage.Card {
+// ConvertToStorageCard converts a Scryfall card to a storage card.
+func ConvertToStorageCard(card *scryfall.Card) *storage.Card {
 	// Convert Legalities struct to map
 	legalities := legalitiesToMap(card.Legalities)
 

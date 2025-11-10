@@ -20,6 +20,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -3160,6 +3161,10 @@ func runCardsCommand() {
 	switch command {
 	case "import":
 		runCardsImport()
+	case "check-updates":
+		runCardsCheckUpdates()
+	case "update":
+		runCardsUpdate()
 	default:
 		fmt.Printf("Unknown cards command: %s\n\n", command)
 		printCardsUsage()
@@ -3246,7 +3251,9 @@ func printCardsUsage() {
 	fmt.Println("  mtga-companion cards <command> [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  import     Import card data from Scryfall bulk data")
+	fmt.Println("  import           Import card data from Scryfall bulk data")
+	fmt.Println("  check-updates    Check for available card data updates")
+	fmt.Println("  update           Apply card data updates")
 	fmt.Println()
 	fmt.Println("Import Flags:")
 	fmt.Println("  --force        Force re-download of bulk data file")
@@ -3263,7 +3270,205 @@ func printCardsUsage() {
 	fmt.Println("  # Import with custom batch size")
 	fmt.Println("  mtga-companion cards import --batch-size 1000")
 	fmt.Println()
+	fmt.Println("Update Flags:")
+	fmt.Println("  --force        Force update all sets regardless of staleness")
+	fmt.Println("  --verbose      Enable verbose output")
+	fmt.Println("  --set CODE     Update specific set only")
+	fmt.Println()
+	fmt.Println("Update Examples:")
+	fmt.Println("  # Check for updates")
+	fmt.Println("  mtga-companion cards check-updates")
+	fmt.Println()
+	fmt.Println("  # Apply updates")
+	fmt.Println("  mtga-companion cards update")
+	fmt.Println()
+	fmt.Println("  # Force update with verbose output")
+	fmt.Println("  mtga-companion cards update --force --verbose")
+	fmt.Println()
+	fmt.Println("  # Update specific set")
+	fmt.Println("  mtga-companion cards update --set BLB")
+	fmt.Println()
 	fmt.Println("Environment Variables:")
 	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
 	fmt.Println()
+}
+
+func runCardsCheckUpdates() {
+	// Define flags for check-updates command
+	checkFlags := flag.NewFlagSet("check-updates", flag.ExitOnError)
+	if err := checkFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Check if database exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Println("Database not found. Run 'mtga-companion cards import' first.")
+		os.Exit(1)
+	}
+
+	// Open database
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
+
+	// Create storage service
+	service := storage.NewService(db)
+	defer service.Close()
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create updater
+	options := updater.DefaultUpdateOptions()
+	options.Progress = func(message string) {
+		fmt.Println(message)
+	}
+
+	cardUpdater := updater.NewUpdater(scryfallClient, service, options)
+
+	// Check for updates
+	ctx := context.Background()
+	fmt.Println("Checking for card data updates...")
+	fmt.Println()
+
+	info, err := cardUpdater.CheckUpdates(ctx)
+	if err != nil {
+		log.Fatalf("Error checking updates: %v", err)
+	}
+
+	// Display results
+	if len(info.NewSets) == 0 && len(info.StaleSets) == 0 {
+		fmt.Println("✓ Card data is up to date!")
+		if !info.LastUpdate.IsZero() {
+			fmt.Printf("  Last updated: %s\n", info.LastUpdate.Format("2006-01-02 15:04:05"))
+		}
+	} else {
+		if len(info.NewSets) > 0 {
+			fmt.Printf("New sets available (%d):\n", len(info.NewSets))
+			for _, setCode := range info.NewSets {
+				fmt.Printf("  - %s\n", setCode)
+			}
+			fmt.Printf("  Estimated new cards: %d\n", info.TotalNewCards)
+			fmt.Println()
+		}
+
+		if len(info.StaleSets) > 0 {
+			fmt.Printf("Stale sets (%d sets older than %d days):\n",
+				info.TotalStaleSets,
+				int(options.StaleSetThreshold.Hours()/24))
+			for i, setCode := range info.StaleSets {
+				if i < 10 {
+					fmt.Printf("  - %s\n", setCode)
+				}
+			}
+			if len(info.StaleSets) > 10 {
+				fmt.Printf("  ... and %d more\n", len(info.StaleSets)-10)
+			}
+			fmt.Println()
+		}
+
+		fmt.Println("Run 'mtga-companion cards update' to apply updates.")
+	}
+}
+
+func runCardsUpdate() {
+	// Define flags for update command
+	updateFlags := flag.NewFlagSet("update", flag.ExitOnError)
+	forceUpdate := updateFlags.Bool("force", false, "Force update all sets")
+	verbose := updateFlags.Bool("verbose", false, "Enable verbose output")
+	specificSet := updateFlags.String("set", "", "Update specific set only")
+
+	if err := updateFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Check if database exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Println("Database not found. Run 'mtga-companion cards import' first.")
+		os.Exit(1)
+	}
+
+	// Open database
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer db.Close()
+
+	// Create storage service
+	service := storage.NewService(db)
+	defer service.Close()
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create updater with options
+	options := updater.DefaultUpdateOptions()
+	options.Force = *forceUpdate
+	options.Verbose = *verbose
+	options.SpecificSet = *specificSet
+
+	if *verbose {
+		options.Progress = func(message string) {
+			fmt.Println(message)
+		}
+	}
+
+	cardUpdater := updater.NewUpdater(scryfallClient, service, options)
+
+	// Run update
+	ctx := context.Background()
+
+	var stats *updater.UpdateStats
+	var updateErr error
+
+	if *specificSet != "" {
+		fmt.Printf("Updating set: %s\n", *specificSet)
+		stats, updateErr = cardUpdater.UpdateSpecificSet(ctx, *specificSet)
+	} else {
+		fmt.Println("Checking for updates...")
+		stats, updateErr = cardUpdater.Update(ctx)
+	}
+
+	if updateErr != nil {
+		log.Fatalf("Update failed: %v", updateErr)
+	}
+
+	// Print summary
+	fmt.Println()
+	fmt.Println("Update complete!")
+	fmt.Printf("  Sets processed: %d\n", stats.SetsProcessed)
+	fmt.Printf("  Sets updated: %d\n", stats.SetsUpdated)
+	fmt.Printf("  Cards added: %d\n", stats.CardsAdded)
+	fmt.Printf("  Cards updated: %d\n", stats.CardsUpdated)
+	if stats.Errors > 0 {
+		fmt.Printf("  Errors: %d\n", stats.Errors)
+	}
+	fmt.Printf("  Duration: %.2fs\n", stats.Duration.Seconds())
 }
