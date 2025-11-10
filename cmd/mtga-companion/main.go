@@ -17,7 +17,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/display"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
-	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
@@ -3018,11 +3018,9 @@ func runDraftCommand() {
 		_ = service.Close()
 	}()
 
-	// Create card service
-	cardService, err := cards.NewService(db.Conn(), nil)
-	if err != nil {
-		log.Fatalf("Error creating card service: %v", err)
-	}
+	// Create card lookup service
+	scryfallClient := scryfall.NewClient()
+	cardService := cardlookup.NewService(service, scryfallClient, cardlookup.DefaultServiceOptions())
 
 	ctx := context.Background()
 
