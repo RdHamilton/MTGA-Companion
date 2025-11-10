@@ -796,6 +796,12 @@ func (bm *BackupManager) saveMetadata(metadata *BackupMetadata, backupPath strin
 // loadMetadata loads backup metadata from a .meta file.
 //
 //nolint:unused // Will be used for incremental backup support
+// LoadBackupMetadata loads and returns metadata for a backup file.
+// This is a public wrapper around loadMetadata for CLI and external use.
+func (bm *BackupManager) LoadBackupMetadata(backupPath string) (*BackupMetadata, error) {
+	return bm.loadMetadata(backupPath)
+}
+
 func (bm *BackupManager) loadMetadata(backupPath string) (*BackupMetadata, error) {
 	metadataPath := backupPath + ".meta"
 
