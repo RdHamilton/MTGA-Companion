@@ -109,7 +109,7 @@ func exportDecksArenaFormat(decks []*models.DeckView, outputPath string) error {
 		}
 
 		// Header comment with deck info
-		content.WriteString(fmt.Sprintf("Deck\n"))
+		content.WriteString("Deck\n")
 
 		// Main deck
 		for _, card := range deck.MainboardCards {

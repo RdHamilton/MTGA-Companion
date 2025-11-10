@@ -72,7 +72,7 @@ func (e *Exporter) exportJSON(data interface{}) error {
 
 // exportCSV exports data to CSV format.
 // data must be a slice of structs.
-func (e *Exporter) exportCSV(data interface{}) error {
+func (e *Exporter) exportCSV(data interface{}) (err error) {
 	v := reflect.ValueOf(data)
 	if v.Kind() != reflect.Slice {
 		return fmt.Errorf("CSV export requires a slice, got %s", v.Kind())
@@ -83,11 +83,15 @@ func (e *Exporter) exportCSV(data interface{}) error {
 	}
 
 	// Create or open file
-	file, err := e.createFile()
-	if err != nil {
-		return err
+	file, fileErr := e.createFile()
+	if fileErr != nil {
+		return fileErr
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
@@ -196,12 +200,16 @@ func (e *Exporter) valueToString(v reflect.Value) string {
 }
 
 // writeToFile writes data to the configured file path.
-func (e *Exporter) writeToFile(data []byte) error {
-	file, err := e.createFile()
-	if err != nil {
-		return err
+func (e *Exporter) writeToFile(data []byte) (err error) {
+	file, fileErr := e.createFile()
+	if fileErr != nil {
+		return fileErr
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	_, err = file.Write(data)
 	if err != nil {
