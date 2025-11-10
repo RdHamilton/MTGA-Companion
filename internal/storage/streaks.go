@@ -66,14 +66,15 @@ func (s *Service) GetStreakData(ctx context.Context, filter models.StatsFilter) 
 		}
 
 		// Update current streak
-		if currentStreakType == "" {
+		switch currentStreakType {
+		case "":
 			// First match
 			currentStreakType = resultType
 			currentStreakLength = 1
-		} else if currentStreakType == resultType {
+		case resultType:
 			// Streak continues
 			currentStreakLength++
-		} else {
+		default:
 			// Streak ends
 			if currentStreakType == "win" {
 				if currentStreakLength > longestWinStreak {
@@ -97,7 +98,8 @@ func (s *Service) GetStreakData(ctx context.Context, filter models.StatsFilter) 
 	}
 
 	// Handle final ongoing streak
-	if currentStreakType == "win" {
+	switch currentStreakType {
+	case "win":
 		if currentStreakLength > longestWinStreak {
 			longestWinStreak = currentStreakLength
 		}
@@ -107,7 +109,7 @@ func (s *Service) GetStreakData(ctx context.Context, filter models.StatsFilter) 
 		if currentStreakLength >= 10 {
 			streaksOver10++
 		}
-	} else if currentStreakType == "loss" {
+	case "loss":
 		if currentStreakLength > longestLossStreak {
 			longestLossStreak = currentStreakLength
 		}
@@ -167,15 +169,16 @@ func (s *Service) GetStreakHistory(ctx context.Context, filter models.StatsFilte
 			resultType = "loss"
 		}
 
-		if currentStreakType == "" {
+		switch currentStreakType {
+		case "":
 			// First match
 			currentStreakType = resultType
 			currentStreakLength = 1
 			streakStartMatch = match
-		} else if currentStreakType == resultType {
+		case resultType:
 			// Streak continues
 			currentStreakLength++
-		} else {
+		default:
 			// Streak ends
 			if currentStreakLength >= minLength {
 				prevMatch := reversed[i-1] // Previous match is the end of the streak
