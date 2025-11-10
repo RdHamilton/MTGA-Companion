@@ -54,7 +54,7 @@ type SeriesData struct {
 }
 
 // RenderLineChart creates an interactive line chart HTML file.
-func RenderLineChart(data []DataPoint, config ChartConfig, outputPath string) error {
+func RenderLineChart(data []DataPoint, config ChartConfig, outputPath string) (err error) {
 	line := charts.NewLine()
 
 	// Set global options
@@ -109,9 +109,13 @@ func RenderLineChart(data []DataPoint, config ChartConfig, outputPath string) er
 	if err != nil {
 		return fmt.Errorf("failed to create chart file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close chart file: %w", closeErr)
+		}
+	}()
 
-	if err := line.Render(f); err != nil {
+	if err = line.Render(f); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
@@ -119,7 +123,7 @@ func RenderLineChart(data []DataPoint, config ChartConfig, outputPath string) er
 }
 
 // RenderBarChart creates an interactive bar chart HTML file.
-func RenderBarChart(data []DataPoint, config ChartConfig, outputPath string) error {
+func RenderBarChart(data []DataPoint, config ChartConfig, outputPath string) (err error) {
 	bar := charts.NewBar()
 
 	// Set global options
@@ -171,9 +175,13 @@ func RenderBarChart(data []DataPoint, config ChartConfig, outputPath string) err
 	if err != nil {
 		return fmt.Errorf("failed to create chart file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close chart file: %w", closeErr)
+		}
+	}()
 
-	if err := bar.Render(f); err != nil {
+	if err = bar.Render(f); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
@@ -181,7 +189,7 @@ func RenderBarChart(data []DataPoint, config ChartConfig, outputPath string) err
 }
 
 // RenderMultiLineChart creates a multi-series line chart HTML file.
-func RenderMultiLineChart(series []SeriesData, config ChartConfig, outputPath string) error {
+func RenderMultiLineChart(series []SeriesData, config ChartConfig, outputPath string) (err error) {
 	line := charts.NewLine()
 
 	// Set global options
@@ -243,9 +251,13 @@ func RenderMultiLineChart(series []SeriesData, config ChartConfig, outputPath st
 	if err != nil {
 		return fmt.Errorf("failed to create chart file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close chart file: %w", closeErr)
+		}
+	}()
 
-	if err := line.Render(f); err != nil {
+	if err = line.Render(f); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
@@ -253,7 +265,7 @@ func RenderMultiLineChart(series []SeriesData, config ChartConfig, outputPath st
 }
 
 // RenderPieChart creates an interactive pie chart HTML file.
-func RenderPieChart(data []DataPoint, config ChartConfig, outputPath string) error {
+func RenderPieChart(data []DataPoint, config ChartConfig, outputPath string) (err error) {
 	pie := charts.NewPie()
 
 	// Set global options
@@ -301,9 +313,13 @@ func RenderPieChart(data []DataPoint, config ChartConfig, outputPath string) err
 	if err != nil {
 		return fmt.Errorf("failed to create chart file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close chart file: %w", closeErr)
+		}
+	}()
 
-	if err := pie.Render(f); err != nil {
+	if err = pie.Render(f); err != nil {
 		return fmt.Errorf("failed to render chart: %w", err)
 	}
 
