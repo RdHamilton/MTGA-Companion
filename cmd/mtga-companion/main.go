@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
+	"github.com/ramonehamilton/MTGA-Companion/internal/display"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -49,6 +51,12 @@ func main() {
 	// Check if this is a backup command
 	if len(os.Args) > 1 && os.Args[1] == "backup" {
 		runBackupCommand()
+		return
+	}
+
+	// Check if this is a draft command
+	if len(os.Args) > 1 && os.Args[1] == "draft" {
+		runDraftCommand()
 		return
 	}
 
@@ -2695,4 +2703,169 @@ func printDeckExportHelp() {
 	fmt.Println("  export deck <id> -json        - Export specific deck as JSON")
 	fmt.Println("  export decks -format Standard -text")
 	fmt.Println("  export deck <id1> <id2> -csv  - Export multiple decks as CSV")
+}
+
+// runDraftCommand handles draft-related commands.
+func runDraftCommand() {
+	// Get database path from environment or use default
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Check if database exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		log.Fatalf("Database file does not exist: %s", dbPath)
+	}
+
+	// Open database
+	config := storage.DefaultConfig(dbPath)
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	// Create storage service
+	service := storage.NewService(db)
+	defer func() {
+		_ = service.Close()
+	}()
+
+	// Create card service
+	cardService, err := cards.NewService(db.Conn(), nil)
+	if err != nil {
+		log.Fatalf("Error creating card service: %v", err)
+	}
+
+	ctx := context.Background()
+
+	if len(os.Args) < 3 {
+		printDraftUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "picks", "show-picks", "list-picks":
+		// Define flags for picks command
+		picksFlags := flag.NewFlagSet("picks", flag.ExitOnError)
+		draftEventID := picksFlags.String("event", "", "Draft event ID")
+		format := picksFlags.String("format", "detailed", "Display format: 'detailed', 'compact', or 'summary'")
+		listEvents := picksFlags.Bool("list-events", false, "List all draft events with picks")
+
+		if err := picksFlags.Parse(os.Args[3:]); err != nil {
+			log.Fatalf("Error parsing flags: %v", err)
+		}
+
+		// List events if requested
+		if *listEvents {
+			events, err := service.GetAllDraftEventsWithPicks(ctx)
+			if err != nil {
+				log.Fatalf("Error listing draft events: %v", err)
+			}
+
+			if len(events) == 0 {
+				fmt.Println("No draft events with picks found.")
+				return
+			}
+
+			fmt.Printf("\nDraft Events with Picks:\n")
+			fmt.Printf("========================\n\n")
+			for i, eventID := range events {
+				count, err := service.GetDraftPicksCount(ctx, eventID)
+				if err != nil {
+					fmt.Printf("%d. %s (error getting count)\n", i+1, eventID)
+					continue
+				}
+				fmt.Printf("%d. %s (%d picks)\n", i+1, eventID, count)
+			}
+			fmt.Println("\nUse: mtga-companion draft picks --event <event-id> to view picks")
+			return
+		}
+
+		// Require event ID if not listing
+		if *draftEventID == "" {
+			fmt.Println("Error: --event flag is required")
+			fmt.Println("Use --list-events to see available draft events")
+			fmt.Println("\nUsage: mtga-companion draft picks --event <event-id> [--format detailed|compact|summary]")
+			os.Exit(1)
+		}
+
+		// Get picks for the event
+		picks, err := service.GetDraftPicks(ctx, *draftEventID)
+		if err != nil {
+			log.Fatalf("Error getting draft picks: %v", err)
+		}
+
+		if len(picks) == 0 {
+			fmt.Printf("No picks found for draft event: %s\n", *draftEventID)
+			return
+		}
+
+		// Create displayer
+		displayer := display.NewDraftPicksDisplayer(cardService)
+
+		// Display picks based on format
+		switch *format {
+		case "detailed", "full":
+			if err := displayer.DisplayPicks(ctx, picks); err != nil {
+				log.Fatalf("Error displaying picks: %v", err)
+			}
+		case "compact", "table":
+			if err := displayer.DisplayPicksCompact(ctx, picks); err != nil {
+				log.Fatalf("Error displaying picks: %v", err)
+			}
+		case "summary":
+			if err := displayer.DisplayPicksSummary(ctx, picks); err != nil {
+				log.Fatalf("Error displaying picks: %v", err)
+			}
+		default:
+			log.Fatalf("Invalid format: %s (must be 'detailed', 'compact', or 'summary')", *format)
+		}
+
+	default:
+		fmt.Printf("Unknown draft command: %s\n\n", command)
+		printDraftUsage()
+		os.Exit(1)
+	}
+}
+
+func printDraftUsage() {
+	fmt.Println("MTGA Companion - Draft Management")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  mtga-companion draft <command> [flags]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  picks      Display draft picks for a draft event")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  # List all draft events with picks")
+	fmt.Println("  mtga-companion draft picks --list-events")
+	fmt.Println()
+	fmt.Println("  # Show detailed picks for a draft event")
+	fmt.Println("  mtga-companion draft picks --event draft-abc123")
+	fmt.Println()
+	fmt.Println("  # Show compact table view")
+	fmt.Println("  mtga-companion draft picks --event draft-abc123 --format compact")
+	fmt.Println()
+	fmt.Println("  # Show summary only")
+	fmt.Println("  mtga-companion draft picks --event draft-abc123 --format summary")
+	fmt.Println()
+	fmt.Println("Display Formats:")
+	fmt.Println("  detailed   - Full detailed view with pack contents (default)")
+	fmt.Println("  compact    - Compact table showing pick summary")
+	fmt.Println("  summary    - High-level summary only")
+	fmt.Println()
+	fmt.Println("Environment Variables:")
+	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
+	fmt.Println()
 }
