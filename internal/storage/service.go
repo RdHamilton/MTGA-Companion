@@ -65,6 +65,11 @@ func NewService(db *DB) *Service {
 	return svc
 }
 
+// GetDB returns the underlying database connection.
+func (s *Service) GetDB() *sql.DB {
+	return s.db.Conn()
+}
+
 // StoreArenaStats stores arena statistics parsed from the log.
 // It creates match and game records with deduplication and updates daily stats.
 func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.ArenaStats, entries []*logreader.LogEntry) error {
