@@ -20,6 +20,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/draftdata"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/imagecache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/query"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
@@ -3538,6 +3539,12 @@ func runCardsCommand() {
 		runCardsCheckUpdates()
 	case "update":
 		runCardsUpdate()
+	case "auto-update":
+		runCardsAutoUpdate()
+	case "cache-clear":
+		runCardsCacheClear()
+	case "cache-stats":
+		runCardsCacheStats()
 	default:
 		fmt.Printf("Unknown cards command: %s\n\n", command)
 		printCardsUsage()
@@ -3626,7 +3633,10 @@ func printCardsUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  import           Import card data from Scryfall bulk data")
 	fmt.Println("  check-updates    Check for available card data updates")
-	fmt.Println("  update           Apply card data updates")
+	fmt.Println("  update           Apply card data updates (incremental)")
+	fmt.Println("  auto-update      Automatically check and apply bulk data updates")
+	fmt.Println("  cache-clear      Clear the image cache")
+	fmt.Println("  cache-stats      Show image cache statistics")
 	fmt.Println()
 	fmt.Println("Import Flags:")
 	fmt.Println("  --force        Force re-download of bulk data file")
@@ -3660,6 +3670,28 @@ func printCardsUsage() {
 	fmt.Println()
 	fmt.Println("  # Update specific set")
 	fmt.Println("  mtga-companion cards update --set BLB")
+	fmt.Println()
+	fmt.Println("Auto-Update Flags:")
+	fmt.Println("  --check-only   Check for updates without applying them")
+	fmt.Println("  --force        Force update regardless of timestamps")
+	fmt.Println("  --verbose      Enable verbose output")
+	fmt.Println()
+	fmt.Println("Auto-Update Examples:")
+	fmt.Println("  # Check if bulk data updates are available")
+	fmt.Println("  mtga-companion cards auto-update --check-only")
+	fmt.Println()
+	fmt.Println("  # Automatically apply bulk data updates if available")
+	fmt.Println("  mtga-companion cards auto-update")
+	fmt.Println()
+	fmt.Println("  # Force bulk data update with verbose output")
+	fmt.Println("  mtga-companion cards auto-update --force --verbose")
+	fmt.Println()
+	fmt.Println("Cache Management Examples:")
+	fmt.Println("  # Show cache statistics")
+	fmt.Println("  mtga-companion cards cache-stats")
+	fmt.Println()
+	fmt.Println("  # Clear all cached images")
+	fmt.Println("  mtga-companion cards cache-clear")
 	fmt.Println()
 	fmt.Println("Environment Variables:")
 	fmt.Println("  MTGA_DB_PATH     Path to database file (default: ~/.mtga-companion/data.db)")
@@ -3844,6 +3876,170 @@ func runCardsUpdate() {
 		fmt.Printf("  Errors: %d\n", stats.Errors)
 	}
 	fmt.Printf("  Duration: %.2fs\n", stats.Duration.Seconds())
+}
+
+func runCardsAutoUpdate() {
+	// Define flags for auto-update command
+	autoFlags := flag.NewFlagSet("auto-update", flag.ExitOnError)
+	forceUpdate := autoFlags.Bool("force", false, "Force update even if remote timestamp is not newer")
+	verbose := autoFlags.Bool("verbose", false, "Enable verbose output")
+	checkOnly := autoFlags.Bool("check-only", false, "Only check for updates without applying them")
+
+	if err := autoFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+
+	// Check if database exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Println("Database not found. Run 'mtga-companion cards import' first.")
+		os.Exit(1)
+	}
+
+	// Open database
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Create storage service
+	service := storage.NewService(db)
+	defer func() { _ = service.Close() }()
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create bulk import options
+	importOptions := importer.DefaultBulkImportOptions()
+	importOptions.Verbose = *verbose
+
+	// Create bulk data updater
+	bulkUpdater := updater.NewBulkDataUpdater(scryfallClient, service, importOptions)
+	if *verbose {
+		bulkUpdater.SetProgressCallback(func(message string) {
+			fmt.Println(message)
+		})
+	}
+
+	ctx := context.Background()
+
+	// Check for updates
+	fmt.Println("Checking for bulk data updates...")
+	needsUpdate, remoteTime, err := bulkUpdater.CheckForUpdates(ctx)
+	if err != nil {
+		log.Fatalf("Error checking for updates: %v", err)
+	}
+
+	// Get last update time
+	lastUpdate, err := service.GetLastBulkDataUpdate(ctx)
+	if err != nil {
+		log.Fatalf("Error getting last update time: %v", err)
+	}
+
+	if !lastUpdate.IsZero() {
+		fmt.Printf("Last bulk data update: %s\n", lastUpdate.Format("2006-01-02 15:04:05"))
+	} else {
+		fmt.Println("No previous bulk data update found")
+	}
+
+	if !remoteTime.IsZero() {
+		fmt.Printf("Remote bulk data timestamp: %s\n", remoteTime.Format("2006-01-02 15:04:05"))
+	}
+
+	if *forceUpdate {
+		fmt.Println("Force update enabled - will update regardless of timestamps")
+		needsUpdate = true
+	}
+
+	if !needsUpdate {
+		fmt.Println("✓ Bulk data is up to date!")
+		return
+	}
+
+	fmt.Println("Updates available!")
+
+	if *checkOnly {
+		fmt.Println("Run 'mtga-companion cards auto-update' to apply updates.")
+		return
+	}
+
+	// Perform update
+	fmt.Println("Starting bulk data update...")
+	updated, err := bulkUpdater.UpdateIfNeeded(ctx)
+	if err != nil {
+		log.Fatalf("Update failed: %v", err)
+	}
+
+	if updated {
+		fmt.Println("✓ Bulk data update complete!")
+	} else {
+		fmt.Println("No update was performed (data is up to date)")
+	}
+}
+
+func runCardsCacheClear() {
+	// No flags for cache-clear
+	if len(os.Args) > 3 {
+		fmt.Println("cache-clear command takes no arguments")
+		os.Exit(1)
+	}
+
+	// Create cache with default options
+	options := imagecache.DefaultCacheOptions()
+	cache, err := imagecache.NewCache(options)
+	if err != nil {
+		log.Fatalf("Error creating cache: %v", err)
+	}
+
+	fmt.Printf("Clearing image cache at %s...\n", options.CacheDir)
+
+	if err := cache.Clear(); err != nil {
+		log.Fatalf("Error clearing cache: %v", err)
+	}
+
+	fmt.Println("✓ Image cache cleared successfully!")
+}
+
+func runCardsCacheStats() {
+	// No flags for cache-stats
+	if len(os.Args) > 3 {
+		fmt.Println("cache-stats command takes no arguments")
+		os.Exit(1)
+	}
+
+	// Create cache with default options
+	options := imagecache.DefaultCacheOptions()
+	cache, err := imagecache.NewCache(options)
+	if err != nil {
+		log.Fatalf("Error creating cache: %v", err)
+	}
+
+	stats := cache.GetCacheStats()
+
+	fmt.Println("Image Cache Statistics")
+	fmt.Println("=====================")
+	fmt.Printf("Cache directory: %s\n", stats.CacheDir)
+	fmt.Printf("Total files:     %d\n", stats.TotalFiles)
+	fmt.Printf("Total size:      %.2f MB\n", float64(stats.TotalSize)/(1024*1024))
+	if stats.MaxSize > 0 {
+		fmt.Printf("Max size:        %.2f MB\n", float64(stats.MaxSize)/(1024*1024))
+		percentUsed := float64(stats.TotalSize) / float64(stats.MaxSize) * 100
+		fmt.Printf("Usage:           %.1f%%\n", percentUsed)
+	} else {
+		fmt.Println("Max size:        Unlimited")
+	}
 }
 
 // Draft Stats Commands

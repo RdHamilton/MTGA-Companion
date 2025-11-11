@@ -1276,6 +1276,53 @@ func parseRankString(rankStr string) (class string, level int) {
 	return class, level
 }
 
+// Bulk Data Update Methods
+
+// GetLastBulkDataUpdate retrieves the timestamp of the last bulk data update.
+func (s *Service) GetLastBulkDataUpdate(ctx context.Context) (time.Time, error) {
+	conn := s.db.Conn()
+
+	query := `SELECT value FROM metadata WHERE key = 'bulk_data_last_update' LIMIT 1`
+	var timestampStr string
+	err := conn.QueryRowContext(ctx, query).Scan(&timestampStr)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No update has occurred yet - return zero time
+			return time.Time{}, nil
+		}
+		return time.Time{}, fmt.Errorf("failed to get last bulk data update: %w", err)
+	}
+
+	// Parse the timestamp
+	timestamp, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse bulk data timestamp: %w", err)
+	}
+
+	return timestamp, nil
+}
+
+// SetLastBulkDataUpdate records the timestamp of the last bulk data update.
+func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time) error {
+	conn := s.db.Conn()
+
+	timestampStr := timestamp.Format(time.RFC3339)
+	query := `
+		INSERT INTO metadata (key, value, updated_at)
+		VALUES ('bulk_data_last_update', ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(key) DO UPDATE SET
+			value = excluded.value,
+			updated_at = CURRENT_TIMESTAMP
+	`
+
+	_, err := conn.ExecContext(ctx, query, timestampStr)
+	if err != nil {
+		return fmt.Errorf("failed to set last bulk data update: %w", err)
+	}
+
+	return nil
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()
