@@ -18,8 +18,10 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/draftdata"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -67,6 +69,12 @@ func main() {
 	// Check if this is a cards command
 	if len(os.Args) > 1 && os.Args[1] == "cards" {
 		runCardsCommand()
+		return
+	}
+
+	// Check if this is a draft-stats command
+	if len(os.Args) > 1 && os.Args[1] == "draft-stats" {
+		runDraftStatsCommand()
 		return
 	}
 
@@ -3469,4 +3477,223 @@ func runCardsUpdate() {
 		fmt.Printf("  Errors: %d\n", stats.Errors)
 	}
 	fmt.Printf("  Duration: %.2fs\n", stats.Duration.Seconds())
+}
+
+// Draft Stats Commands
+
+func runDraftStatsCommand() {
+	if len(os.Args) < 3 {
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "update":
+		runDraftStatsUpdate()
+	case "check":
+		runDraftStatsCheck()
+	default:
+		fmt.Printf("Unknown draft-stats command: %s\n\n", command)
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+}
+
+func printDraftStatsUsage() {
+	fmt.Println("Usage: mtga-companion draft-stats <command> [options]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  update        Update draft statistics from 17Lands")
+	fmt.Println("  check         Check for stale draft statistics")
+	fmt.Println()
+	fmt.Println("Update Options:")
+	fmt.Println("  --set <code>  Update specific set (e.g., --set BLB)")
+	fmt.Println("  --all         Update all sets (not just stale ones)")
+	fmt.Println("  --force       Force update even if data is fresh")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  mtga-companion draft-stats update")
+	fmt.Println("  mtga-companion draft-stats update --set BLB")
+	fmt.Println("  mtga-companion draft-stats update --all")
+	fmt.Println("  mtga-companion draft-stats check")
+}
+
+func runDraftStatsUpdate() {
+	// Parse flags
+	fs := flag.NewFlagSet("draft-stats update", flag.ExitOnError)
+	setCode := fs.String("set", "", "Specific set code to update")
+	updateAll := fs.Bool("all", false, "Update all sets")
+	force := fs.Bool("force", false, "Force update even if fresh")
+
+	if err := fs.Parse(os.Args[3:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize database
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+
+	dbPath := filepath.Join(homeDir, ".mtga-companion", "data.db")
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
+
+	service := storage.NewService(db)
+
+	// Create clients
+	scryfallClient := scryfall.NewClient()
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Create updater
+	updater, err := draftdata.NewUpdater(draftdata.UpdaterConfig{
+		ScryfallClient:       scryfallClient,
+		SeventeenLandsClient: seventeenlandsClient,
+		Storage:              service,
+	})
+	if err != nil {
+		log.Fatalf("Error creating updater: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Update specific set
+	if *setCode != "" {
+		fmt.Printf("Updating draft statistics for set: %s\n", *setCode)
+		result, err := updater.UpdateSet(ctx, *setCode)
+		if err != nil {
+			log.Fatalf("Error updating set %s: %v", *setCode, err)
+		}
+
+		fmt.Println()
+		if result.Success {
+			fmt.Println("✓ Update successful!")
+			fmt.Printf("  Card ratings: %d\n", result.CardRatings)
+			fmt.Printf("  Color ratings: %d\n", result.ColorRatings)
+			fmt.Printf("  Duration: %v\n", result.Duration)
+		} else {
+			fmt.Println("✗ Update failed")
+			if result.Error != nil {
+				fmt.Printf("  Error: %v\n", result.Error)
+			}
+		}
+		return
+	}
+
+	// Update all active sets
+	fmt.Println("Updating draft statistics for active sets...")
+	fmt.Println()
+
+	updated, skipped, results, err := updater.UpdateActiveSets(ctx)
+	if err != nil {
+		log.Fatalf("Error updating active sets: %v", err)
+	}
+
+	fmt.Println()
+	fmt.Println("Update complete!")
+	fmt.Printf("  Sets updated: %d\n", updated)
+	fmt.Printf("  Sets skipped (fresh): %d\n", skipped)
+	fmt.Println()
+
+	if len(results) > 0 {
+		fmt.Println("Details:")
+		for _, result := range results {
+			if result.Success {
+				fmt.Printf("  ✓ %s: %d card ratings, %d color ratings (%v)\n",
+					result.SetCode, result.CardRatings, result.ColorRatings, result.Duration)
+			} else {
+				fmt.Printf("  ✗ %s: %v\n", result.SetCode, result.Error)
+			}
+		}
+	}
+
+	_ = updateAll
+	_ = force
+}
+
+func runDraftStatsCheck() {
+	// Initialize database
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+
+	dbPath := filepath.Join(homeDir, ".mtga-companion", "data.db")
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
+
+	service := storage.NewService(db)
+
+	// Create clients
+	scryfallClient := scryfall.NewClient()
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Create updater
+	updater, err := draftdata.NewUpdater(draftdata.UpdaterConfig{
+		ScryfallClient:       scryfallClient,
+		SeventeenLandsClient: seventeenlandsClient,
+		Storage:              service,
+	})
+	if err != nil {
+		log.Fatalf("Error creating updater: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Check for stale data
+	stale, err := updater.CheckStaleness(ctx)
+	if err != nil {
+		log.Fatalf("Error checking staleness: %v", err)
+	}
+
+	fmt.Println("Draft Statistics Staleness Check")
+	fmt.Println("=================================")
+	fmt.Println()
+
+	if len(stale) == 0 {
+		fmt.Println("✓ All draft statistics are up to date!")
+		return
+	}
+
+	fmt.Printf("Found %d stale data entries:\n", len(stale))
+	fmt.Println()
+
+	// Group by expansion
+	byExpansion := make(map[string][]*storage.DraftCardRating)
+	for _, s := range stale {
+		byExpansion[s.Expansion] = append(byExpansion[s.Expansion], s)
+	}
+
+	for expansion, entries := range byExpansion {
+		fmt.Printf("  %s:\n", expansion)
+		for _, entry := range entries {
+			age := time.Since(entry.LastUpdated)
+			fmt.Printf("    Format: %s, Colors: %s, Age: %v\n",
+				entry.Format, entry.Colors, age.Round(time.Hour))
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("Run 'mtga-companion draft-stats update' to refresh stale data.")
 }
