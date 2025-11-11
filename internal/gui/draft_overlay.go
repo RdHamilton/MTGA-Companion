@@ -120,6 +120,8 @@ func (dow *DraftOverlayWindow) handleUpdate(update *draft.OverlayUpdate) {
 		dow.handlePickMade(update)
 	case draft.UpdateTypeDraftEnd:
 		dow.handleDraftEnd(update)
+	case draft.UpdateTypeDeckBuilder:
+		dow.handleDeckBuilder(update)
 	}
 }
 
@@ -193,6 +195,117 @@ func (dow *DraftOverlayWindow) handleDraftEnd(update *draft.OverlayUpdate) {
 	dow.packContainer.RemoveAll()
 	dow.packContainer.Add(widget.NewLabel("Draft finished. Waiting for next draft..."))
 	dow.packContainer.Refresh()
+}
+
+// handleDeckBuilder shows deck building recommendations.
+func (dow *DraftOverlayWindow) handleDeckBuilder(update *draft.OverlayUpdate) {
+	if update.DeckRecommendation == nil {
+		return
+	}
+
+	rec := update.DeckRecommendation
+
+	// Update status
+	dow.statusLabel.SetText(fmt.Sprintf("Deck Builder - %s", draft.FormatColorName(rec.Colors)))
+
+	// Show deck grade and stats
+	gradeText := fmt.Sprintf("Grade: %s (%.1f avg GIHWR)",
+		rec.DeckStrength.Grade,
+		rec.DeckStrength.OverallRating)
+	dow.colorLabel.SetText(gradeText)
+
+	// Clear and rebuild deck display
+	dow.packContainer.RemoveAll()
+
+	// Add deck overview
+	overview := widget.NewLabelWithStyle(
+		fmt.Sprintf("Recommended: %d Main / %d Sideboard / %d Lands",
+			len(rec.MainDeck), len(rec.Sideboard), rec.Lands.TotalLands),
+		fyne.TextAlignLeading,
+		fyne.TextStyle{Bold: true},
+	)
+	dow.packContainer.Add(overview)
+
+	// Add land recommendation
+	landText := fmt.Sprintf("Lands: %s", rec.Lands.Explanation)
+	for color, count := range rec.Lands.ColorSplit {
+		landText += fmt.Sprintf("\n  %s: %d", draft.FormatColorName(color), count)
+	}
+	dow.packContainer.Add(widget.NewLabel(landText))
+
+	// Add mana curve
+	curveText := fmt.Sprintf("Curve: Avg CMC %.1f (%d creatures, %d non-creatures)",
+		rec.ManaCurve.AvgCMC, rec.ManaCurve.Creatures, rec.ManaCurve.NonCreatures)
+	dow.packContainer.Add(widget.NewLabel(curveText))
+
+	dow.packContainer.Add(widget.NewSeparator())
+
+	// Add main deck section
+	mainDeckHeader := widget.NewLabelWithStyle(
+		"Main Deck (23 spells):",
+		fyne.TextAlignLeading,
+		fyne.TextStyle{Bold: true},
+	)
+	dow.packContainer.Add(mainDeckHeader)
+
+	for i, card := range rec.MainDeck {
+		if i >= 23 {
+			break // Only show first 23
+		}
+		cardWidget := dow.createDeckCardWidget(card, true)
+		dow.packContainer.Add(cardWidget)
+	}
+
+	dow.packContainer.Add(widget.NewSeparator())
+
+	// Add sideboard section
+	sideboardHeader := widget.NewLabelWithStyle(
+		fmt.Sprintf("Sideboard (%d cards):", len(rec.Sideboard)),
+		fyne.TextAlignLeading,
+		fyne.TextStyle{Bold: true},
+	)
+	dow.packContainer.Add(sideboardHeader)
+
+	// Show first 10 sideboard cards
+	for i, card := range rec.Sideboard {
+		if i >= 10 {
+			break
+		}
+		cardWidget := dow.createDeckCardWidget(card, false)
+		dow.packContainer.Add(cardWidget)
+	}
+
+	if len(rec.Sideboard) > 10 {
+		dow.packContainer.Add(widget.NewLabel(fmt.Sprintf("... and %d more", len(rec.Sideboard)-10)))
+	}
+
+	dow.packContainer.Refresh()
+}
+
+// createDeckCardWidget creates a widget for a deck card selection.
+func (dow *DraftOverlayWindow) createDeckCardWidget(card draft.CardSelection, isMainDeck bool) fyne.CanvasObject {
+	// Format card name with colors
+	nameText := card.Name
+	if len(card.Colors) > 0 {
+		nameText += fmt.Sprintf(" [%s]", strings.Join(card.Colors, ""))
+	}
+
+	// Format rating
+	ratingText := fmt.Sprintf("%.1f%%", card.GIHWR)
+
+	// Create container
+	nameLabel := widget.NewLabel(fmt.Sprintf("%s - %s", nameText, ratingText))
+
+	// Add styling for main deck cards
+	if isMainDeck {
+		nameLabel = widget.NewLabelWithStyle(
+			fmt.Sprintf("%s - %s", nameText, ratingText),
+			fyne.TextAlignLeading,
+			fyne.TextStyle{Bold: true},
+		)
+	}
+
+	return container.NewVBox(nameLabel)
 }
 
 // updateColorSuggestion updates the color suggestion display.

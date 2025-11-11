@@ -44,24 +44,26 @@ type OverlayConfig struct {
 
 // OverlayUpdate represents an update to send to the UI.
 type OverlayUpdate struct {
-	Type            UpdateType
-	DraftState      *DraftState
-	PackRatings     *PackRatings
-	BestPick        *CardRating
-	TopPicks        []*CardRating
-	ColorSuggestion *ColorSuggestion
-	Timestamp       time.Time
+	Type               UpdateType
+	DraftState         *DraftState
+	PackRatings        *PackRatings
+	BestPick           *CardRating
+	TopPicks           []*CardRating
+	ColorSuggestion    *ColorSuggestion
+	DeckRecommendation *DeckRecommendation
+	Timestamp          time.Time
 }
 
 // UpdateType represents the type of overlay update.
 type UpdateType string
 
 const (
-	UpdateTypeDraftStart UpdateType = "draft_start"
-	UpdateTypeNewPack    UpdateType = "new_pack"
-	UpdateTypePickMade   UpdateType = "pick_made"
-	UpdateTypeDraftEnd   UpdateType = "draft_end"
-	UpdateTypeColorRec   UpdateType = "color_recommendation"
+	UpdateTypeDraftStart   UpdateType = "draft_start"
+	UpdateTypeNewPack      UpdateType = "new_pack"
+	UpdateTypePickMade     UpdateType = "pick_made"
+	UpdateTypeDraftEnd     UpdateType = "draft_end"
+	UpdateTypeColorRec     UpdateType = "color_recommendation"
+	UpdateTypeDeckBuilder  UpdateType = "deck_builder"
 )
 
 // ColorSuggestion represents suggested colors for the draft.
@@ -422,6 +424,12 @@ func (o *Overlay) handlePickEvent() {
 
 		o.updateCallback(update)
 	}
+
+	// Check if draft is complete (45 picks = 3 packs × 15 picks)
+	if o.isDraftComplete() {
+		fmt.Println("[INFO] Draft complete! Building deck recommendations...")
+		o.handleDraftComplete()
+	}
 }
 
 // updateColorSuggestion recalculates the color suggestion based on current picks.
@@ -530,4 +538,54 @@ func (o *Overlay) GetSelectedColors() []string {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.selectedColors
+}
+
+// isDraftComplete checks if the draft has reached 45 picks.
+func (o *Overlay) isDraftComplete() bool {
+	if o.currentState == nil {
+		return false
+	}
+
+	// A draft has 45 picks total (3 packs × 15 picks)
+	return len(o.currentState.Picks) >= 45
+}
+
+// handleDraftComplete processes draft completion and builds deck recommendations.
+func (o *Overlay) handleDraftComplete() {
+	if o.currentState == nil {
+		return
+	}
+
+	// Mark draft as complete
+	o.currentState.Event.InProgress = false
+	endTime := time.Now()
+	o.currentState.Event.EndTime = &endTime
+
+	// Build deck recommendations
+	recommendation, err := BuildDeck(
+		o.currentState.Picks,
+		o.ratingsProvider,
+		o.colorConfig,
+	)
+
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to build deck recommendations: %v\n", err)
+		return
+	}
+
+	fmt.Printf("[INFO] Deck recommendations: %s deck, %d main / %d sideboard, grade: %s\n",
+		FormatColorName(recommendation.Colors),
+		len(recommendation.MainDeck),
+		len(recommendation.Sideboard),
+		recommendation.DeckStrength.Grade)
+
+	// Send deck builder update
+	if o.updateCallback != nil {
+		o.updateCallback(&OverlayUpdate{
+			Type:               UpdateTypeDeckBuilder,
+			DraftState:         o.currentState,
+			DeckRecommendation: recommendation,
+			Timestamp:          time.Now(),
+		})
+	}
 }
