@@ -96,6 +96,12 @@ func main() {
 		return
 	}
 
+	// Check if this is a deck command
+	if len(os.Args) > 1 && os.Args[1] == "deck" {
+		runDeckCommand()
+		return
+	}
+
 	// Initialize database
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -4260,6 +4266,233 @@ func runCardsMigrationStats() {
 	} else {
 		fmt.Println("Last processed:             Never")
 	}
+}
+
+// Deck Commands
+
+func runDeckCommand() {
+	if len(os.Args) < 3 {
+		printDeckUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "list":
+		runDeckList()
+	case "analyze":
+		runDeckAnalyze()
+	default:
+		fmt.Printf("Unknown deck command: %s\n\n", command)
+		printDeckUsage()
+		os.Exit(1)
+	}
+}
+
+func runDeckList() {
+	// Get database path
+	dbPath := getDBPath()
+
+	// Open database with auto-migrate
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx := context.Background()
+
+	// Create storage service
+	svc := storage.NewService(db)
+
+	// Get all decks (using repository directly since there's no service method)
+	decks, err := svc.ListDecks(ctx)
+	if err != nil {
+		log.Fatalf("Error getting decks: %v", err)
+	}
+
+	if len(decks) == 0 {
+		fmt.Println("No decks found.")
+		return
+	}
+
+	fmt.Println("Decks")
+	fmt.Println("=====")
+	fmt.Println()
+
+	for _, deck := range decks {
+		fmt.Printf("ID:     %s\n", deck.ID)
+		fmt.Printf("Name:   %s\n", deck.Name)
+		fmt.Printf("Format: %s\n", deck.Format)
+		if deck.ColorIdentity != nil {
+			fmt.Printf("Colors: %s\n", *deck.ColorIdentity)
+		}
+		fmt.Println()
+	}
+}
+
+func runDeckAnalyze() {
+	// Define flags for analyze command
+	analyzeFlags := flag.NewFlagSet("analyze", flag.ExitOnError)
+	deckID := analyzeFlags.String("deck", "", "Deck ID to analyze (required)")
+
+	if err := analyzeFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	if *deckID == "" {
+		fmt.Println("Error: --deck flag is required")
+		fmt.Println()
+		fmt.Println("Usage: mtga-companion deck analyze --deck <deck-id>")
+		os.Exit(1)
+	}
+
+	// Get database path
+	dbPath := getDBPath()
+
+	// Open database with auto-migrate
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx := context.Background()
+
+	// Create storage service
+	svc := storage.NewService(db)
+
+	// Analyze deck
+	analysis, err := svc.AnalyzeDeck(ctx, *deckID)
+	if err != nil {
+		log.Fatalf("Error analyzing deck: %v", err)
+	}
+
+	// Display results
+	fmt.Printf("Deck Analysis: %s\n", analysis.DeckName)
+	fmt.Println(strings.Repeat("=", len(analysis.DeckName)+15))
+	fmt.Println()
+
+	// Total cards
+	fmt.Printf("Total Cards: %d\n", analysis.TotalCards)
+	fmt.Printf("Average CMC: %.2f\n", analysis.AverageCMC)
+	fmt.Println()
+
+	// Mana curve
+	fmt.Println("Mana Curve")
+	fmt.Println("----------")
+	for cmc := 0; cmc <= analysis.ManaCurve.MaxCMC; cmc++ {
+		count := analysis.ManaCurve.Curve[cmc]
+		if count > 0 {
+			percentage := float64(count) / float64(analysis.TotalCards) * 100
+			bar := strings.Repeat("█", count)
+			fmt.Printf("  %d: %s (%d cards, %.1f%%)\n", cmc, bar, count, percentage)
+		}
+	}
+	fmt.Println()
+
+	// Color distribution
+	fmt.Println("Color Distribution")
+	fmt.Println("------------------")
+	if analysis.ColorDist.TotalColoredCards > 0 {
+		if analysis.ColorDist.White > 0 {
+			pct := float64(analysis.ColorDist.White) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  White:     %d (%.1f%%)\n", analysis.ColorDist.White, pct)
+		}
+		if analysis.ColorDist.Blue > 0 {
+			pct := float64(analysis.ColorDist.Blue) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  Blue:      %d (%.1f%%)\n", analysis.ColorDist.Blue, pct)
+		}
+		if analysis.ColorDist.Black > 0 {
+			pct := float64(analysis.ColorDist.Black) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  Black:     %d (%.1f%%)\n", analysis.ColorDist.Black, pct)
+		}
+		if analysis.ColorDist.Red > 0 {
+			pct := float64(analysis.ColorDist.Red) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  Red:       %d (%.1f%%)\n", analysis.ColorDist.Red, pct)
+		}
+		if analysis.ColorDist.Green > 0 {
+			pct := float64(analysis.ColorDist.Green) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  Green:     %d (%.1f%%)\n", analysis.ColorDist.Green, pct)
+		}
+		if analysis.ColorDist.Multicolor > 0 {
+			pct := float64(analysis.ColorDist.Multicolor) / float64(analysis.ColorDist.TotalColoredCards) * 100
+			fmt.Printf("  Multicolor: %d (%.1f%%)\n", analysis.ColorDist.Multicolor, pct)
+		}
+	}
+	if analysis.ColorDist.Colorless > 0 {
+		fmt.Printf("  Colorless:  %d\n", analysis.ColorDist.Colorless)
+	}
+	fmt.Println()
+
+	// Type breakdown
+	fmt.Println("Type Breakdown")
+	fmt.Println("--------------")
+	nonLands := analysis.TotalCards - analysis.TypeBreakdown.Lands
+	if nonLands > 0 {
+		if analysis.TypeBreakdown.Creatures > 0 {
+			pct := float64(analysis.TypeBreakdown.Creatures) / float64(nonLands) * 100
+			fmt.Printf("  Creatures:     %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Creatures, pct)
+		}
+		if analysis.TypeBreakdown.Instants > 0 {
+			pct := float64(analysis.TypeBreakdown.Instants) / float64(nonLands) * 100
+			fmt.Printf("  Instants:      %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Instants, pct)
+		}
+		if analysis.TypeBreakdown.Sorceries > 0 {
+			pct := float64(analysis.TypeBreakdown.Sorceries) / float64(nonLands) * 100
+			fmt.Printf("  Sorceries:     %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Sorceries, pct)
+		}
+		if analysis.TypeBreakdown.Enchantments > 0 {
+			pct := float64(analysis.TypeBreakdown.Enchantments) / float64(nonLands) * 100
+			fmt.Printf("  Enchantments:  %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Enchantments, pct)
+		}
+		if analysis.TypeBreakdown.Artifacts > 0 {
+			pct := float64(analysis.TypeBreakdown.Artifacts) / float64(nonLands) * 100
+			fmt.Printf("  Artifacts:     %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Artifacts, pct)
+		}
+		if analysis.TypeBreakdown.Planeswalkers > 0 {
+			pct := float64(analysis.TypeBreakdown.Planeswalkers) / float64(nonLands) * 100
+			fmt.Printf("  Planeswalkers: %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Planeswalkers, pct)
+		}
+		if analysis.TypeBreakdown.Other > 0 {
+			pct := float64(analysis.TypeBreakdown.Other) / float64(nonLands) * 100
+			fmt.Printf("  Other:         %d (%.1f%% of non-lands)\n", analysis.TypeBreakdown.Other, pct)
+		}
+	}
+	fmt.Println()
+
+	// Land analysis
+	fmt.Println("Land Analysis")
+	fmt.Println("-------------")
+	fmt.Printf("  Total Lands:  %d (%.1f%% of deck)\n", analysis.LandAnalysis.TotalLands, analysis.LandAnalysis.LandRatio)
+	fmt.Printf("  Basic Lands:  %d\n", analysis.LandAnalysis.BasicLands)
+	fmt.Printf("  Non-Basic:    %d\n", analysis.LandAnalysis.NonBasicLands)
+	if analysis.LandAnalysis.SpellsToLands > 0 {
+		fmt.Printf("  Spell/Land Ratio: %.2f:1\n", analysis.LandAnalysis.SpellsToLands)
+	}
+}
+
+func printDeckUsage() {
+	fmt.Println("MTGA Companion - Deck Analysis")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  mtga-companion deck <command> [flags]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  list         List all decks")
+	fmt.Println("  analyze      Analyze a deck's mana curve, colors, and types")
+	fmt.Println()
+	fmt.Println("Analyze Flags:")
+	fmt.Println("  --deck       Deck ID to analyze (required)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  mtga-companion deck list")
+	fmt.Println("  mtga-companion deck analyze --deck abc123")
 }
 
 // Draft Stats Commands

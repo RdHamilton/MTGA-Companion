@@ -552,6 +552,11 @@ func (s *Service) StoreDeck(ctx context.Context, deck *Deck, cards []*DeckCard) 
 	})
 }
 
+// ListDecks returns all decks.
+func (s *Service) ListDecks(ctx context.Context) ([]*models.Deck, error) {
+	return s.decks.List(ctx)
+}
+
 // UpdateCollection updates the collection based on changes detected in the log.
 // This would typically be called when processing inventory updates.
 func (s *Service) UpdateCollection(ctx context.Context, cardID int, newQuantity int, source string) error {
