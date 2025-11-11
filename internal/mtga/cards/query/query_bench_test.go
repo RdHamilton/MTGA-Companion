@@ -110,8 +110,10 @@ func BenchmarkGet_CacheMiss(b *testing.B) {
 
 // BenchmarkGetMany_AllCached benchmarks batch query with all cached.
 func BenchmarkGetMany_AllCached(b *testing.B) {
-	arenaIDs := []int{1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999, 10000,
-		11111, 12222, 13333, 14444, 15555, 16666, 17777, 18888, 19999, 20000}
+	arenaIDs := []int{
+		1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999, 10000,
+		11111, 12222, 13333, 14444, 15555, 16666, 17777, 18888, 19999, 20000,
+	}
 
 	mockUnified := &mockUnifiedService{}
 	mockStore := &mockStorage{
