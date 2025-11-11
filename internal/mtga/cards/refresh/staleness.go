@@ -12,11 +12,11 @@ import (
 type DataType int
 
 const (
-	DataTypeUnknown DataType = iota
-	DataTypeMetadata          // Scryfall metadata
-	DataTypeStatistics        // 17Lands statistics
-	DataTypeSetInfo           // Set information
-	DataTypeBulk              // Bulk data
+	DataTypeUnknown    DataType = iota
+	DataTypeMetadata            // Scryfall metadata
+	DataTypeStatistics          // 17Lands statistics
+	DataTypeSetInfo             // Set information
+	DataTypeBulk                // Bulk data
 )
 
 func (dt DataType) String() string {
@@ -52,15 +52,15 @@ func (dt DataType) StaleAge() time.Duration {
 
 // DataFreshness represents the freshness status of cached data.
 type DataFreshness struct {
-	Type         DataType
-	LastUpdated  time.Time
-	StaleAge     time.Duration
-	Age          time.Duration
-	IsFresh      bool
-	IsStale      bool
-	IsVeryStale  bool // >2x stale age
-	ItemID       string
-	ItemName     string
+	Type        DataType
+	LastUpdated time.Time
+	StaleAge    time.Duration
+	Age         time.Duration
+	IsFresh     bool
+	IsStale     bool
+	IsVeryStale bool // >2x stale age
+	ItemID      string
+	ItemName    string
 }
 
 // StalenessSummary provides an overview of data freshness.
@@ -79,15 +79,15 @@ type StalenessSummary struct {
 
 // RefreshItem represents an item that needs refreshing.
 type RefreshItem struct {
-	Type         DataType
-	ArenaID      int
-	SetCode      string
-	Format       string
-	LastUpdated  time.Time
-	StaleDays    int
-	IsActive     bool
-	AccessCount  int
-	Priority     int
+	Type        DataType
+	ArenaID     int
+	SetCode     string
+	Format      string
+	LastUpdated time.Time
+	StaleDays   int
+	IsActive    bool
+	AccessCount int
+	Priority    int
 }
 
 // RefreshPriority defines refresh priority levels.
@@ -187,7 +187,6 @@ func (st *StalenessTracker) getMetadataStaleness(ctx context.Context) (*metadata
 		int(veryStaleAge.Seconds()),
 		int(veryStaleAge.Seconds()),
 	).Scan(&result.Total, &result.Fresh, &result.Stale, &result.VeryStale)
-
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +220,6 @@ func (st *StalenessTracker) getStatisticsStaleness(ctx context.Context) (*statis
 		int(staleAge.Seconds()),
 		int(staleAge.Seconds()),
 	).Scan(&result.Total, &result.Fresh, &result.Stale)
-
 	if err != nil {
 		return nil, err
 	}
