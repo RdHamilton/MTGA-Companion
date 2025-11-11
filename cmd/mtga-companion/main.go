@@ -21,8 +21,10 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/draftdata"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/query"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/unified"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -2805,19 +2807,255 @@ func rankToNumericValue(rankClass *string, rankLevel *int) float64 {
 	return baseValue
 }
 
+// storageMetadataAdapter adapts storage.Service to implement unified.CardMetadataProvider.
+type storageMetadataAdapter struct {
+	storage *storage.Service
+}
+
+func (a *storageMetadataAdapter) GetCard(ctx context.Context, arenaID int) (*storage.Card, error) {
+	return a.storage.GetCardByArenaID(ctx, arenaID)
+}
+
+func (a *storageMetadataAdapter) GetCards(ctx context.Context, arenaIDs []int) ([]*storage.Card, error) {
+	cards := make([]*storage.Card, 0, len(arenaIDs))
+	for _, id := range arenaIDs {
+		card, err := a.storage.GetCardByArenaID(ctx, id)
+		if err == nil && card != nil {
+			cards = append(cards, card)
+		}
+	}
+	return cards, nil
+}
+
+func (a *storageMetadataAdapter) GetSetCards(ctx context.Context, setCode string) ([]*storage.Card, error) {
+	return a.storage.GetCardsBySet(ctx, setCode)
+}
+
+// storageDraftStatsAdapter adapts storage.Service to implement unified.DraftStatsProvider.
+type storageDraftStatsAdapter struct {
+	storage *storage.Service
+}
+
+func (a *storageDraftStatsAdapter) GetCardRating(ctx context.Context, arenaID int, expansion, format, colors string) (*storage.DraftCardRating, error) {
+	return a.storage.GetCardRating(ctx, arenaID, expansion, format, colors)
+}
+
+func (a *storageDraftStatsAdapter) GetCardRatingsForSet(ctx context.Context, expansion, format, colors string) ([]*storage.DraftCardRating, error) {
+	return a.storage.GetCardRatingsForSet(ctx, expansion, format, colors)
+}
+
 // handleCardExport handles card data export commands.
 func handleCardExport(service *storage.Service, ctx context.Context, exportType string, args []string) {
-	// Note: Card exports are currently not fully integrated
-	// This requires initialization of Scryfall client, 17Lands client,
-	// unified service, and query interface
-	fmt.Println("Card data export functionality requires card integration services.")
-	fmt.Println("This feature is part of the Card Data Integration (Hybrid) project.")
-	fmt.Println("\nPlanned usage:")
-	fmt.Println("  export cards --set BLB --format csv")
-	fmt.Println("  export cards --set BLB --json --include-stats")
-	fmt.Println("  export card-meta --set BLB --top 20 --markdown")
-	fmt.Println("  export card-set --set BLB --format PremierDraft --csv")
-	fmt.Println("\nThis functionality will be available once card services are fully initialized in the CLI.")
+	// Parse export options from CLI args
+	var (
+		setCode       string
+		draftFormat   string
+		outputFormat  string
+		outputPath    string
+		includeStats  bool
+		topN          int
+		sortBy        string
+		filterRarity  string
+		filterColors  string
+		showAge       bool
+		minSample     int
+		onlyWithStats bool
+		prettyJSON    bool
+	)
+
+	// Parse flags
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--set", "-s":
+			if i+1 < len(args) {
+				setCode = args[i+1]
+				i++
+			}
+		case "--format", "-f":
+			if i+1 < len(args) {
+				draftFormat = args[i+1]
+				i++
+			}
+		case "--csv":
+			outputFormat = "csv"
+		case "--json":
+			outputFormat = "json"
+		case "--markdown", "--md":
+			outputFormat = "markdown"
+		case "-o", "--output":
+			if i+1 < len(args) {
+				outputPath = args[i+1]
+				i++
+			}
+		case "--include-stats":
+			includeStats = true
+		case "--top":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil {
+					topN = n
+				}
+				i++
+			}
+		case "--sort":
+			if i+1 < len(args) {
+				sortBy = args[i+1]
+				i++
+			}
+		case "--rarity":
+			if i+1 < len(args) {
+				filterRarity = args[i+1]
+				i++
+			}
+		case "--colors":
+			if i+1 < len(args) {
+				filterColors = args[i+1]
+				i++
+			}
+		case "--show-age":
+			showAge = true
+		case "--min-sample":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil {
+					minSample = n
+				}
+				i++
+			}
+		case "--only-with-stats":
+			onlyWithStats = true
+		case "--pretty":
+			prettyJSON = true
+		}
+	}
+
+	// Validate required parameters
+	if setCode == "" {
+		fmt.Println("Error: --set is required")
+		fmt.Println("\nUsage:")
+		fmt.Println("  export cards --set <set_code> [options]")
+		fmt.Println("\nOptions:")
+		fmt.Println("  --set <code>           Set code (required, e.g., BLB, MKM)")
+		fmt.Println("  --format <format>      Draft format (PremierDraft, QuickDraft, etc.)")
+		fmt.Println("  --csv                  Export as CSV (default)")
+		fmt.Println("  --json                 Export as JSON")
+		fmt.Println("  --markdown, --md       Export as Markdown")
+		fmt.Println("  --include-stats        Include 17Lands draft statistics")
+		fmt.Println("  --top <N>              Export only top N cards")
+		fmt.Println("  --sort <field>         Sort by: gihwr, alsa, ata, cmc, name")
+		fmt.Println("  --rarity <list>        Filter by rarity (comma-separated)")
+		fmt.Println("  --colors <list>        Filter by colors (comma-separated)")
+		fmt.Println("  --min-sample <N>       Minimum sample size")
+		fmt.Println("  --only-with-stats      Only export cards with draft stats")
+		fmt.Println("  --show-age             Include data freshness indicators")
+		fmt.Println("  --pretty               Pretty-print JSON output")
+		fmt.Println("  -o, --output <path>    Output file path (default: stdout)")
+		fmt.Println("\nExamples:")
+		fmt.Println("  export cards --set BLB --csv")
+		fmt.Println("  export cards --set BLB --json --include-stats --pretty")
+		fmt.Println("  export card-meta --set BLB --top 20 --sort gihwr --markdown")
+		return
+	}
+
+	// Default values
+	if outputFormat == "" {
+		outputFormat = "csv"
+	}
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+	if sortBy == "" && topN > 0 {
+		sortBy = "gihwr" // Default sort for top-N queries
+	}
+
+	// Initialize card services
+	fmt.Println("Initializing card services...")
+
+	// Create storage adapters for unified service
+	metadataAdapter := &storageMetadataAdapter{storage: service}
+	statsAdapter := &storageDraftStatsAdapter{storage: service}
+
+	// Create unified service
+	unifiedService := unified.NewService(metadataAdapter, statsAdapter)
+
+	// Create query interface
+	cardQuery, err := query.NewCardQuery(query.QueryConfig{
+		UnifiedService: unifiedService,
+		Storage:        service,
+	})
+	if err != nil {
+		fmt.Printf("Error creating card query: %v\n", err)
+		return
+	}
+	defer func() { _ = cardQuery.Close() }()
+
+	// Fetch cards based on export type
+	fmt.Printf("Fetching cards for set %s...\n", setCode)
+
+	queryOpts := query.QueryOptions{
+		Format:       draftFormat,
+		IncludeStats: includeStats || onlyWithStats, // Always include stats if filtering by them
+		MaxStaleAge:  24 * time.Hour,                // Accept data up to 1 day old
+		FallbackMode: query.AllowPartial,            // Allow partial data
+	}
+
+	cards, err := cardQuery.GetSet(ctx, setCode, queryOpts)
+	if err != nil {
+		fmt.Printf("Error fetching cards: %v\n", err)
+		return
+	}
+
+	if len(cards) == 0 {
+		fmt.Printf("No cards found for set %s\n", setCode)
+		return
+	}
+
+	fmt.Printf("Found %d cards\n", len(cards))
+
+	// Build export options
+	exportOpts := export.CardExportOptions{
+		Format:        export.Format(outputFormat),
+		IncludeStats:  includeStats,
+		TopN:          topN,
+		SortBy:        sortBy,
+		ShowDataAge:   showAge,
+		MinSampleSize: minSample,
+		OnlyWithStats: onlyWithStats,
+		PrettyJSON:    prettyJSON,
+	}
+
+	// Parse filter options
+	if filterRarity != "" {
+		exportOpts.FilterRarity = strings.Split(filterRarity, ",")
+	}
+	if filterColors != "" {
+		exportOpts.FilterColors = strings.Split(filterColors, ",")
+	}
+
+	// Export to output
+	var output io.Writer
+	if outputPath != "" {
+		file, err := os.Create(outputPath)
+		if err != nil {
+			fmt.Printf("Error creating output file: %v\n", err)
+			return
+		}
+		defer func() { _ = file.Close() }()
+		output = file
+		fmt.Printf("Exporting to %s...\n", outputPath)
+	} else {
+		output = os.Stdout
+		fmt.Println() // Blank line before output
+	}
+
+	// Perform export
+	if err := export.ExportCards(output, cards, exportOpts); err != nil {
+		fmt.Printf("Error exporting cards: %v\n", err)
+		return
+	}
+
+	if outputPath != "" {
+		fmt.Printf("✓ Export complete: %s\n", outputPath)
+	}
 }
 
 // printTrendsHelp prints help for the trends/chart command.
