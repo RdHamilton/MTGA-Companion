@@ -2369,6 +2369,34 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		return
 	}
 
+	// Handle match history exports
+	if exportType == "matches" || exportType == "match-history" {
+		filter := models.StatsFilter{
+			StartDate: startDate,
+			EndDate:   endDate,
+			Format:    formatFilter,
+		}
+
+		opts := export.Options{
+			Format:     format,
+			FilePath:   outputPath,
+			Overwrite:  overwrite,
+			PrettyJSON: prettyJSON,
+		}
+
+		if outputPath == "" {
+			opts.FilePath = filepath.Join("exports", export.GenerateFilename("matches", format))
+		}
+
+		if err := export.ExportMatchHistory(ctx, service, filter, opts); err != nil {
+			fmt.Printf("Export failed: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Match history export successful: %s\n", opts.FilePath)
+		return
+	}
+
 	// Handle card data exports (requires card integration services)
 	if exportType == "cards" || exportType == "card-set" || exportType == "card-meta" {
 		handleCardExport(service, ctx, exportType, args[1:])
