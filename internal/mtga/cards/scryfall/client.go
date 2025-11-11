@@ -111,6 +111,19 @@ func (c *Client) GetSets(ctx context.Context) (*SetList, error) {
 	return &sets, nil
 }
 
+// GetMigrations retrieves a list of card migrations.
+// Migrations represent cards that have been merged or deleted by Scryfall.
+func (c *Client) GetMigrations(ctx context.Context) (*MigrationList, error) {
+	url := fmt.Sprintf("%s/migrations", baseURL)
+
+	var migrations MigrationList
+	if err := c.doRequest(ctx, url, &migrations); err != nil {
+		return nil, fmt.Errorf("failed to get migrations: %w", err)
+	}
+
+	return &migrations, nil
+}
+
 // doRequest performs an HTTP request with rate limiting and retry logic.
 func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
 	var lastErr error

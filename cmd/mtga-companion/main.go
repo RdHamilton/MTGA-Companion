@@ -22,6 +22,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/draftdata"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/imagecache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/importer"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/migrations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/query"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
@@ -39,6 +40,19 @@ var (
 	useFileEvents = flag.Bool("use-file-events", true, "Use file system events (fsnotify) for monitoring")
 	useGUI        = flag.Bool("gui", false, "Launch GUI mode instead of CLI")
 )
+
+// getDBPath returns the database path from environment variable or default location.
+func getDBPath() string {
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+	}
+	return dbPath
+}
 
 func main() {
 	// Parse flags before checking for subcommands
@@ -3545,6 +3559,12 @@ func runCardsCommand() {
 		runCardsCacheClear()
 	case "cache-stats":
 		runCardsCacheStats()
+	case "check-migrations":
+		runCardsCheckMigrations()
+	case "apply-migrations":
+		runCardsApplyMigrations()
+	case "migration-stats":
+		runCardsMigrationStats()
 	default:
 		fmt.Printf("Unknown cards command: %s\n\n", command)
 		printCardsUsage()
@@ -3631,12 +3651,15 @@ func printCardsUsage() {
 	fmt.Println("  mtga-companion cards <command> [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  import           Import card data from Scryfall bulk data")
-	fmt.Println("  check-updates    Check for available card data updates")
-	fmt.Println("  update           Apply card data updates (incremental)")
-	fmt.Println("  auto-update      Automatically check and apply bulk data updates")
-	fmt.Println("  cache-clear      Clear the image cache")
-	fmt.Println("  cache-stats      Show image cache statistics")
+	fmt.Println("  import              Import card data from Scryfall bulk data")
+	fmt.Println("  check-updates       Check for available card data updates")
+	fmt.Println("  update              Apply card data updates (incremental)")
+	fmt.Println("  auto-update         Automatically check and apply bulk data updates")
+	fmt.Println("  cache-clear         Clear the image cache")
+	fmt.Println("  cache-stats         Show image cache statistics")
+	fmt.Println("  check-migrations    Check for new Scryfall card migrations")
+	fmt.Println("  apply-migrations    Apply Scryfall card migrations")
+	fmt.Println("  migration-stats     Show migration statistics")
 	fmt.Println()
 	fmt.Println("Import Flags:")
 	fmt.Println("  --force        Force re-download of bulk data file")
@@ -4039,6 +4062,203 @@ func runCardsCacheStats() {
 		fmt.Printf("Usage:           %.1f%%\n", percentUsed)
 	} else {
 		fmt.Println("Max size:        Unlimited")
+	}
+}
+
+func runCardsCheckMigrations() {
+	// Define flags for check-migrations command
+	checkFlags := flag.NewFlagSet("check-migrations", flag.ExitOnError)
+	verbose := checkFlags.Bool("verbose", false, "Enable verbose output")
+
+	if err := checkFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path
+	dbPath := getDBPath()
+
+	// Open database with auto-migrate
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx := context.Background()
+
+	// Create storage service
+	svc := storage.NewService(db)
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Fetch migrations from Scryfall
+	fmt.Println("Checking for Scryfall migrations...")
+	migrationList, err := scryfallClient.GetMigrations(ctx)
+	if err != nil {
+		log.Fatalf("Error fetching migrations: %v", err)
+	}
+
+	// Get already processed migration IDs
+	processedIDs, err := svc.GetProcessedMigrationIDs(ctx)
+	if err != nil {
+		log.Fatalf("Error getting processed migrations: %v", err)
+	}
+
+	processedMap := make(map[string]bool)
+	for _, id := range processedIDs {
+		processedMap[id] = true
+	}
+
+	// Count new migrations
+	newMigrations := 0
+	mergeCount := 0
+	deleteCount := 0
+
+	for _, migration := range migrationList.Data {
+		if !processedMap[migration.ID] {
+			newMigrations++
+			switch migration.MigrationStrategy {
+			case "merge":
+				mergeCount++
+				if *verbose {
+					newID := ""
+					if migration.NewScryfallID != nil {
+						newID = *migration.NewScryfallID
+					}
+					fmt.Printf("  [MERGE] %s -> %s (%s)\n", migration.OldScryfallID, newID, migration.Note)
+				}
+			case "delete":
+				deleteCount++
+				if *verbose {
+					fmt.Printf("  [DELETE] %s (%s)\n", migration.OldScryfallID, migration.Note)
+				}
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Printf("Total migrations from Scryfall: %d\n", len(migrationList.Data))
+	fmt.Printf("Already processed:              %d\n", len(processedIDs))
+	fmt.Printf("New migrations:                 %d\n", newMigrations)
+	fmt.Printf("  - Merges:                     %d\n", mergeCount)
+	fmt.Printf("  - Deletes:                    %d\n", deleteCount)
+
+	if newMigrations > 0 {
+		fmt.Println()
+		fmt.Println("Run 'cards apply-migrations' to apply these migrations.")
+	}
+}
+
+func runCardsApplyMigrations() {
+	// Define flags for apply-migrations command
+	applyFlags := flag.NewFlagSet("apply-migrations", flag.ExitOnError)
+	verbose := applyFlags.Bool("verbose", false, "Enable verbose output")
+
+	if err := applyFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Get database path
+	dbPath := getDBPath()
+
+	// Open database with auto-migrate
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx := context.Background()
+
+	// Create storage service
+	svc := storage.NewService(db)
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create migration checker
+	checkerOptions := migrations.DefaultCheckerOptions()
+	if *verbose {
+		checkerOptions.VerboseProgress = func(msg string) {
+			fmt.Println(msg)
+		}
+	}
+
+	checker := migrations.NewChecker(scryfallClient, svc, checkerOptions)
+
+	// Check and apply migrations
+	fmt.Println("Applying Scryfall migrations...")
+	result, err := checker.CheckAndApply(ctx)
+	if err != nil {
+		log.Fatalf("Error applying migrations: %v", err)
+	}
+
+	fmt.Println()
+	fmt.Println("Migration Results")
+	fmt.Println("=================")
+	fmt.Printf("Total migrations checked:  %d\n", result.TotalMigrations)
+	fmt.Printf("New migrations applied:    %d\n", result.NewMigrations)
+	fmt.Printf("  - Merges:                %d\n", result.MergeCount)
+	fmt.Printf("  - Deletes:               %d\n", result.DeleteCount)
+	fmt.Printf("Cards updated:             %d\n", result.CardsUpdated)
+	fmt.Printf("Cards deleted:             %d\n", result.CardsDeleted)
+
+	if len(result.Errors) > 0 {
+		fmt.Printf("\nErrors encountered:        %d\n", len(result.Errors))
+		for i, err := range result.Errors {
+			fmt.Printf("  %d. %v\n", i+1, err)
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("✓ Migration application completed!")
+}
+
+func runCardsMigrationStats() {
+	// No flags for migration-stats
+	if len(os.Args) > 3 {
+		fmt.Println("migration-stats command takes no arguments")
+		os.Exit(1)
+	}
+
+	// Get database path
+	dbPath := getDBPath()
+
+	// Open database with auto-migrate
+	config := storage.DefaultConfig(dbPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	ctx := context.Background()
+
+	// Create storage service
+	svc := storage.NewService(db)
+
+	// Get migration stats
+	stats, err := svc.GetMigrationStats(ctx)
+	if err != nil {
+		log.Fatalf("Error getting migration stats: %v", err)
+	}
+
+	fmt.Println("Migration Statistics")
+	fmt.Println("====================")
+	fmt.Printf("Total migrations processed: %d\n", stats.TotalMigrations)
+	fmt.Printf("  - Merges:                 %d\n", stats.MergeCount)
+	fmt.Printf("  - Deletes:                %d\n", stats.DeleteCount)
+
+	if stats.LastProcessedAt != nil {
+		fmt.Printf("Last processed:             %s\n", stats.LastProcessedAt.Format("2006-01-02 15:04:05"))
+	} else {
+		fmt.Println("Last processed:             Never")
 	}
 }
 
