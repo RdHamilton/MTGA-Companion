@@ -550,6 +550,15 @@ func (o *Overlay) isDraftComplete() bool {
 	return len(o.currentState.Picks) >= 45
 }
 
+// Reset clears the current draft state and prepares for the next draft.
+func (o *Overlay) Reset() {
+	o.currentState = nil
+	if o.parser != nil {
+		o.parser.Reset()
+	}
+	fmt.Println("[INFO] Draft overlay reset, ready for next draft")
+}
+
 // handleDraftComplete processes draft completion and builds deck recommendations.
 func (o *Overlay) handleDraftComplete() {
 	if o.currentState == nil {
@@ -560,6 +569,17 @@ func (o *Overlay) handleDraftComplete() {
 	o.currentState.Event.InProgress = false
 	endTime := time.Now()
 	o.currentState.Event.EndTime = &endTime
+
+	fmt.Printf("[INFO] Draft complete! %d picks made\n", len(o.currentState.Picks))
+
+	// Send draft end notification first
+	if o.updateCallback != nil {
+		o.updateCallback(&OverlayUpdate{
+			Type:       UpdateTypeDraftEnd,
+			DraftState: o.currentState,
+			Timestamp:  time.Now(),
+		})
+	}
 
 	// Build deck recommendations
 	recommendation, err := BuildDeck(
