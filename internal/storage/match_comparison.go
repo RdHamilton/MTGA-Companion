@@ -10,20 +10,20 @@ import (
 
 // ComparisonGroup represents a labeled group of matches for comparison.
 type ComparisonGroup struct {
-	Label      string              // Human-readable label for this group
-	Filter     models.StatsFilter  // Filter defining this group
-	Statistics *models.Statistics  // Aggregated statistics for this group
-	MatchCount int                 // Number of matches in this group
+	Label      string             // Human-readable label for this group
+	Filter     models.StatsFilter // Filter defining this group
+	Statistics *models.Statistics // Aggregated statistics for this group
+	MatchCount int                // Number of matches in this group
 }
 
 // ComparisonResult represents the result of comparing two or more groups.
 type ComparisonResult struct {
-	Groups          []*ComparisonGroup
-	BestGroup       *ComparisonGroup // Group with highest win rate
-	WorstGroup      *ComparisonGroup // Group with lowest win rate
-	WinRateDiff     float64          // Difference between best and worst
-	TotalMatches    int              // Total matches across all groups
-	ComparisonDate  time.Time        // When comparison was performed
+	Groups         []*ComparisonGroup
+	BestGroup      *ComparisonGroup // Group with highest win rate
+	WorstGroup     *ComparisonGroup // Group with lowest win rate
+	WinRateDiff    float64          // Difference between best and worst
+	TotalMatches   int              // Total matches across all groups
+	ComparisonDate time.Time        // When comparison was performed
 }
 
 // ComparisonDiff represents the difference between two specific groups.

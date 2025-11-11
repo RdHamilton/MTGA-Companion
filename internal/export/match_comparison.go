@@ -10,26 +10,26 @@ import (
 
 // ComparisonExportRow represents a row in the comparison export.
 type ComparisonExportRow struct {
-	Group          string  `csv:"Group" json:"group"`
-	TotalMatches   int     `csv:"Total Matches" json:"total_matches"`
-	MatchesWon     int     `csv:"Matches Won" json:"matches_won"`
-	MatchesLost    int     `csv:"Matches Lost" json:"matches_lost"`
-	WinRate        float64 `csv:"Win Rate" json:"win_rate"`
-	TotalGames     int     `csv:"Total Games" json:"total_games"`
-	GamesWon       int     `csv:"Games Won" json:"games_won"`
-	GamesLost      int     `csv:"Games Lost" json:"games_lost"`
-	GameWinRate    float64 `csv:"Game Win Rate" json:"game_win_rate"`
+	Group        string  `csv:"Group" json:"group"`
+	TotalMatches int     `csv:"Total Matches" json:"total_matches"`
+	MatchesWon   int     `csv:"Matches Won" json:"matches_won"`
+	MatchesLost  int     `csv:"Matches Lost" json:"matches_lost"`
+	WinRate      float64 `csv:"Win Rate" json:"win_rate"`
+	TotalGames   int     `csv:"Total Games" json:"total_games"`
+	GamesWon     int     `csv:"Games Won" json:"games_won"`
+	GamesLost    int     `csv:"Games Lost" json:"games_lost"`
+	GameWinRate  float64 `csv:"Game Win Rate" json:"game_win_rate"`
 }
 
 // ComparisonSummary provides overall comparison insights.
 type ComparisonSummary struct {
-	BestGroup       string  `json:"best_group"`
-	BestWinRate     float64 `json:"best_win_rate"`
-	WorstGroup      string  `json:"worst_group"`
-	WorstWinRate    float64 `json:"worst_win_rate"`
-	WinRateDiff     float64 `json:"win_rate_difference"`
-	TotalMatches    int     `json:"total_matches"`
-	GroupsCompared  int     `json:"groups_compared"`
+	BestGroup      string  `json:"best_group"`
+	BestWinRate    float64 `json:"best_win_rate"`
+	WorstGroup     string  `json:"worst_group"`
+	WorstWinRate   float64 `json:"worst_win_rate"`
+	WinRateDiff    float64 `json:"win_rate_difference"`
+	TotalMatches   int     `json:"total_matches"`
+	GroupsCompared int     `json:"groups_compared"`
 }
 
 // ComparisonExport combines comparison data with summary.
