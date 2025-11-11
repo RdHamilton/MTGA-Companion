@@ -262,9 +262,24 @@ func (o *Overlay) processLogLine(line string) {
 	// Parse timestamp (simplified - actual MTGA logs have timestamps)
 	timestamp := time.Now()
 
+	// Debug: show first 200 chars of non-empty lines
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) > 0 {
+		preview := trimmed
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		fmt.Printf("[DEBUG] Processing line: %s\n", preview)
+	}
+
 	// Parse log entry
 	event, err := o.parser.ParseLogEntry(line, timestamp)
-	if err != nil || event == nil {
+	if err != nil {
+		fmt.Printf("[DEBUG] Parse error: %v\n", err)
+		return
+	}
+	if event == nil {
+		fmt.Printf("[DEBUG] Parsed as nil (not a draft event)\n")
 		return
 	}
 
