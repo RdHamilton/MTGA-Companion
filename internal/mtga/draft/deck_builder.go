@@ -58,11 +58,11 @@ type ManaCurveAnalysis struct {
 
 // DeckStrengthAnalysis evaluates the overall deck quality.
 type DeckStrengthAnalysis struct {
-	OverallRating float64 // 0-100
-	CreatureQuality float64
-	RemovalCount int
+	OverallRating      float64 // 0-100
+	CreatureQuality    float64
+	RemovalCount       int
 	CardAdvantageCount int
-	Grade string // A+, A, B+, B, C+, C, D, F
+	Grade              string // A+, A, B+, B, C+, C, D, F
 }
 
 // BuildDeck analyzes drafted cards and recommends an optimal 40-card deck.
