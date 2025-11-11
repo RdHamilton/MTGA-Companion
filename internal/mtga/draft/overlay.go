@@ -206,6 +206,12 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 	// If draft is marked as in progress and we have a pack, resume it
 	if o.currentState.Event.InProgress && o.currentState.CurrentPack != nil {
+		fmt.Printf("[DEBUG] Found active draft! Pack %d, Pick %d, %d cards in pack, %d picks made\n",
+			o.currentState.Event.CurrentPack,
+			o.currentState.Event.CurrentPick,
+			len(o.currentState.CurrentPack.CardIDs),
+			len(o.currentState.Picks))
+
 		// Send draft start update
 		if o.updateCallback != nil {
 			o.updateCallback(&OverlayUpdate{
@@ -290,8 +296,11 @@ func (o *Overlay) processLogLine(line string) {
 // handlePackEvent processes a new pack event.
 func (o *Overlay) handlePackEvent() {
 	if o.currentState.CurrentPack == nil {
+		fmt.Println("[DEBUG] No current pack in state")
 		return
 	}
+
+	fmt.Printf("[DEBUG] Current pack has %d cards\n", len(o.currentState.CurrentPack.CardIDs))
 
 	// Update color suggestion based on picks so far
 	o.updateColorSuggestion()
@@ -302,11 +311,16 @@ func (o *Overlay) handlePackEvent() {
 		colorFilter = strings.Join(o.selectedColors, "")
 	}
 
+	fmt.Printf("[DEBUG] Getting ratings with color filter: %s\n", colorFilter)
+
 	// Get ratings for the pack
 	packRatings, err := o.ratingsProvider.GetPackRatings(o.currentState.CurrentPack, colorFilter)
 	if err != nil {
+		fmt.Printf("[DEBUG] Error getting pack ratings: %v\n", err)
 		return
 	}
+
+	fmt.Printf("[DEBUG] Got ratings for %d cards\n", len(packRatings.CardRatings))
 
 	o.currentRatings = packRatings
 
