@@ -106,7 +106,8 @@ func ExportTimePeriodComparison(ctx context.Context, service *storage.Service, p
 	Label string
 	Start time.Time
 	End   time.Time
-}, baseFilter storage.ComparisonGroup, opts Options) error {
+}, baseFilter storage.ComparisonGroup, opts Options,
+) error {
 	result, err := service.CompareTimePeriods(ctx, periods, baseFilter.Filter)
 	if err != nil {
 		return fmt.Errorf("failed to compare time periods: %w", err)

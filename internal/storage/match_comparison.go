@@ -141,7 +141,8 @@ func (s *Service) CompareTimePeriods(ctx context.Context, periods []struct {
 	Label string
 	Start time.Time
 	End   time.Time
-}, baseFilter models.StatsFilter) (*ComparisonResult, error) {
+}, baseFilter models.StatsFilter,
+) (*ComparisonResult, error) {
 	groups := make([]ComparisonGroup, 0, len(periods))
 
 	for _, period := range periods {
