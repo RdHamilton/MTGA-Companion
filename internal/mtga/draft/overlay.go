@@ -149,6 +149,8 @@ func (o *Overlay) Stop() {
 // scanForActiveDraft scans the log file history for an active draft.
 // Returns nil if active draft found and state restored, error otherwise.
 func (o *Overlay) scanForActiveDraft(file *os.File) error {
+	fmt.Println("[DEBUG] Scanning log history for active draft...")
+
 	// Seek to beginning of file
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to seek to start of log: %w", err)
@@ -224,16 +226,21 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 // processNewLogLines reads and processes any new lines from the log.
 func (o *Overlay) processNewLogLines(reader *bufio.Reader) error {
+	linesRead := 0
 	for {
 		line, err := reader.ReadString('\n')
 		if err == io.EOF {
 			// No more lines to read
+			if linesRead > 0 {
+				fmt.Printf("[DEBUG] Read %d new lines from log\n", linesRead)
+			}
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 
+		linesRead++
 		// Process the log line
 		o.processLogLine(line)
 	}
@@ -250,11 +257,15 @@ func (o *Overlay) processLogLine(line string) {
 		return
 	}
 
+	// Debug: print detected events
+	fmt.Printf("[DEBUG] Detected event: %s\n", event.Type)
+
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	// Update parser state
 	if err := o.parser.UpdateState(event); err != nil {
+		fmt.Printf("[DEBUG] Error updating state: %v\n", err)
 		return
 	}
 
@@ -267,8 +278,11 @@ func (o *Overlay) processLogLine(line string) {
 	// Handle different event types
 	switch {
 	case IsPackEvent(event.Type):
+		fmt.Printf("[DEBUG] Handling pack event - Pack %d, Pick %d\n",
+			o.currentState.Event.CurrentPack, o.currentState.Event.CurrentPick)
 		o.handlePackEvent()
 	case IsPickEvent(event.Type):
+		fmt.Printf("[DEBUG] Handling pick event\n")
 		o.handlePickEvent()
 	}
 }
