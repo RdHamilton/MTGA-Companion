@@ -190,7 +190,9 @@ type DownloadParams struct {
 // fetchCardMetadata fetches card metadata from Scryfall.
 func (d *Downloader) fetchCardMetadata(ctx context.Context, setCode string) (map[int]*scryfall.Card, error) {
 	// Search for all cards in the set using the 'e:' (expansion) query
-	query := fmt.Sprintf("e:%s unique:prints", setCode)
+	// Note: We don't use unique:prints as it's not valid Scryfall syntax
+	// Instead we filter by ArenaID presence to get MTGA-relevant cards
+	query := fmt.Sprintf("e:%s", setCode)
 	result, err := d.scryfallClient.SearchCards(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search cards from Scryfall: %w", err)
