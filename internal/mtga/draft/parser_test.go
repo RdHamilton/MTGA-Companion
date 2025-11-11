@@ -539,11 +539,13 @@ func TestParserUpdateStateWithPicks(t *testing.T) {
 func TestParserUpdateStateQuickDraft(t *testing.T) {
 	p := NewParser()
 
-	// Quick Draft uses DraftPack events
+	// Quick Draft uses DraftPack events with PackNumber and PickNumber from MTGA
 	for i := 1; i <= 3; i++ {
 		draftPackData, _ := json.Marshal(DraftPackPayload{
-			DraftPack:   []int{1, 2, 3, 4, 5},
+			DraftPack:   FlexibleIntArray{1, 2, 3, 4, 5},
 			DraftStatus: "PickNext",
+			PackNumber:  1,
+			PickNumber:  i, // Sequential pick numbers
 		})
 
 		err := p.UpdateState(&LogEvent{

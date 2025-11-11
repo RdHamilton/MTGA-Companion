@@ -132,7 +132,11 @@ func (o *Overlay) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() {
+		if closeErr := watcher.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Watch the log file for changes
 	if err := watcher.Add(o.logPath); err != nil {
