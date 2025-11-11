@@ -111,8 +111,10 @@ func (o *Overlay) Start(ctx context.Context) error {
 	// If resume is enabled, scan log history for active draft
 	if o.resumeEnabled {
 		if err := o.scanForActiveDraft(file); err != nil {
-			// Log error but continue - we'll just wait for new draft
-			fmt.Printf("Failed to scan for active draft: %v\n", err)
+			// No active draft found - continue monitoring for new events
+			fmt.Printf("[INFO] No active draft found in log history. Waiting for new draft...\n")
+		} else {
+			fmt.Printf("[INFO] Successfully resumed active draft!\n")
 		}
 	}
 
@@ -120,6 +122,9 @@ func (o *Overlay) Start(ctx context.Context) error {
 	if _, err := file.Seek(0, io.SeekEnd); err != nil {
 		return fmt.Errorf("failed to seek to end of log: %w", err)
 	}
+
+	fmt.Println("[INFO] Monitoring log file for draft events...")
+	fmt.Println()
 
 	reader := bufio.NewReader(file)
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -149,7 +154,7 @@ func (o *Overlay) Stop() {
 // scanForActiveDraft scans the log file history for an active draft.
 // Returns nil if active draft found and state restored, error otherwise.
 func (o *Overlay) scanForActiveDraft(file *os.File) error {
-	fmt.Println("[DEBUG] Scanning log history for active draft...")
+	fmt.Println("[INFO] Scanning log history for active draft...")
 
 	// Seek to beginning of file
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -194,8 +199,6 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 		// Continue parsing all events to build up complete draft state
 	}
-
-	fmt.Printf("[DEBUG] Scanned %d lines, draft found: %v\n", lineNumber, draftStartFound)
 
 	// If we found a draft and have a current state, check if it's still active
 	o.mu.Lock()

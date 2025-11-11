@@ -61,7 +61,7 @@ func (dow *DraftOverlayWindow) Run() {
 	dow.window.SetFixedSize(true)
 
 	// Create UI components
-	dow.statusLabel = widget.NewLabel("Waiting for draft...")
+	dow.statusLabel = widget.NewLabel("Ready - waiting for draft...")
 	dow.colorLabel = widget.NewLabel("")
 	dow.packContainer = container.NewVBox()
 
@@ -139,8 +139,8 @@ func (dow *DraftOverlayWindow) handleUpdate(update *draft.OverlayUpdate) {
 
 // handleDraftStart updates UI when draft starts.
 func (dow *DraftOverlayWindow) handleDraftStart(update *draft.OverlayUpdate) {
-	dow.statusLabel.SetText("Draft in progress")
-	dow.colorLabel.SetText("Waiting for picks...")
+	dow.statusLabel.SetText("Draft detected! Waiting for first pack...")
+	dow.colorLabel.SetText("")
 	dow.packContainer.RemoveAll()
 }
 
