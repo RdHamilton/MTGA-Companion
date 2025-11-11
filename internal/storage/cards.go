@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/fuzzy"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 )
 
@@ -565,4 +566,88 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 	}
 
 	return sets, nil
+}
+
+// FuzzySearchCards performs fuzzy search on card names with typo tolerance.
+// Returns results ranked by similarity score.
+func (s *Service) FuzzySearchCards(ctx context.Context, query string, minScore int) ([]*Card, error) {
+	// Get all card names from database
+	sqlQuery := `
+		SELECT id, arena_id, name, mana_cost, cmc, type_line, oracle_text,
+			colors, color_identity, rarity, set_code, collector_number,
+			power, toughness, loyalty, image_uris, layout, card_faces,
+			legalities, released_at, cached_at, last_updated
+		FROM cards
+		ORDER BY name
+	`
+
+	rows, err := s.db.Conn().QueryContext(ctx, sqlQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query cards: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Load all cards
+	var allCards []*Card
+	cardNames := make([]string, 0)
+
+	for rows.Next() {
+		var card Card
+		var colorsJSON, colorIdentityJSON, imageURIsJSON, cardFacesJSON, legalitiesJSON string
+
+		err := rows.Scan(
+			&card.ID, &card.ArenaID, &card.Name, &card.ManaCost, &card.CMC, &card.TypeLine, &card.OracleText,
+			&colorsJSON, &colorIdentityJSON, &card.Rarity, &card.SetCode, &card.CollectorNumber,
+			&card.Power, &card.Toughness, &card.Loyalty, &imageURIsJSON, &card.Layout, &cardFacesJSON,
+			&legalitiesJSON, &card.ReleasedAt, &card.CachedAt, &card.LastUpdated,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan card: %w", err)
+		}
+
+		// Deserialize JSON fields
+		if err := json.Unmarshal([]byte(colorsJSON), &card.Colors); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal colors: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(colorIdentityJSON), &card.ColorIdentity); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal color_identity: %w", err)
+		}
+
+		if imageURIsJSON != "" && imageURIsJSON != "null" {
+			if err := json.Unmarshal([]byte(imageURIsJSON), &card.ImageURIs); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal image_uris: %w", err)
+			}
+		}
+
+		if cardFacesJSON != "" && cardFacesJSON != "null" && cardFacesJSON != "[]" {
+			if err := json.Unmarshal([]byte(cardFacesJSON), &card.CardFaces); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal card_faces: %w", err)
+			}
+		}
+
+		if err := json.Unmarshal([]byte(legalitiesJSON), &card.Legalities); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal legalities: %w", err)
+		}
+
+		allCards = append(allCards, &card)
+		cardNames = append(cardNames, card.Name)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating cards: %w", err)
+	}
+
+	// Perform fuzzy search
+	options := fuzzy.DefaultSearchOptions()
+	options.MinScore = minScore
+	results := fuzzy.Search(query, cardNames, options)
+
+	// Build result cards in order
+	resultCards := make([]*Card, 0, len(results))
+	for _, result := range results {
+		resultCards = append(resultCards, allCards[result.Index])
+	}
+
+	return resultCards, nil
 }
