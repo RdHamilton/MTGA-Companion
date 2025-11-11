@@ -1983,18 +1983,18 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	overwrite := true
 	var startDate, endDate *time.Time
 	var formatFilter *string
-	var formats []string         // Multiple format filter
-	var eventName *string        // Event name filter
-	var eventNames []string      // Multiple event names
-	var opponentName *string     // Opponent name filter
-	var opponentID *string       // Opponent ID filter
-	var result *string           // Result filter (win/loss)
-	var rankClass *string        // Rank class filter
-	var resultReason *string     // Result reason filter
-	periodType := "daily"        // Default for trend exports
-	recentDays := 30             // Default for result comparison exports
-	recentMatches := 30          // Default for prediction analysis window
-	projectionMatches := 10      // Default for prediction projection
+	var formats []string     // Multiple format filter
+	var eventName *string    // Event name filter
+	var eventNames []string  // Multiple event names
+	var opponentName *string // Opponent name filter
+	var opponentID *string   // Opponent ID filter
+	var result *string       // Result filter (win/loss)
+	var rankClass *string    // Rank class filter
+	var resultReason *string // Result reason filter
+	periodType := "daily"    // Default for trend exports
+	recentDays := 30         // Default for result comparison exports
+	recentMatches := 30      // Default for prediction analysis window
+	projectionMatches := 10  // Default for prediction projection
 
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
