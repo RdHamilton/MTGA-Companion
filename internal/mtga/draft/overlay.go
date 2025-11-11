@@ -77,7 +77,7 @@ func NewOverlay(config OverlayConfig) *Overlay {
 	ratingsProvider := NewRatingsProvider(config.SetFile, config.BayesianConfig)
 
 	if config.PollInterval == 0 {
-		config.PollInterval = 50 * time.Millisecond // Fast polling for responsive overlay
+		config.PollInterval = 20 * time.Millisecond // Very fast polling for minimal latency
 	}
 
 	if config.LookbackHours == 0 {
@@ -127,8 +127,8 @@ func (o *Overlay) Start(ctx context.Context) error {
 	fmt.Println()
 
 	reader := bufio.NewReader(file)
-	// Poll every 50ms for fast response time
-	ticker := time.NewTicker(50 * time.Millisecond)
+	// Poll every 20ms for minimal latency (note: MTGA log writing itself may add delay)
+	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -296,8 +296,8 @@ func (o *Overlay) processLogLine(line string) {
 		return
 	}
 
-	// Debug: print detected events
-	fmt.Printf("[DEBUG] Detected event: %s\n", event.Type)
+	// Debug: print detected events with timestamp
+	fmt.Printf("[DEBUG] %s - Detected event: %s\n", time.Now().Format("15:04:05.000"), event.Type)
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -353,7 +353,7 @@ func (o *Overlay) handlePackEvent() {
 		return
 	}
 
-	fmt.Printf("[DEBUG] Got ratings for %d cards\n", len(packRatings.CardRatings))
+	fmt.Printf("[DEBUG] %s - Got ratings for %d cards, sending to UI\n", time.Now().Format("15:04:05.000"), len(packRatings.CardRatings))
 
 	o.currentRatings = packRatings
 

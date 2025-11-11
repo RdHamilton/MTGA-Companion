@@ -245,11 +245,12 @@ func ParseDraftPack(data json.RawMessage) (*Pack, error) {
 		return nil, nil
 	}
 
-	// For Quick Draft, we don't get explicit pack/pick numbers in the event
-	// They need to be tracked separately
+	// BotDraft responses include actual pack/pick numbers
 	return &Pack{
-		CardIDs:   []int(payload.DraftPack), // Convert FlexibleIntArray to []int
-		Timestamp: time.Now(),
+		PackNumber: payload.PackNumber,
+		PickNumber: payload.PickNumber,
+		CardIDs:    []int(payload.DraftPack), // Convert FlexibleIntArray to []int
+		Timestamp:  time.Now(),
 	}, nil
 }
 
@@ -361,15 +362,9 @@ func (p *Parser) UpdateState(event *LogEvent) error {
 			return err
 		}
 		if pack != nil {
-			// Increment pick number for Quick Draft
-			p.currentState.Event.CurrentPick++
-			if p.currentState.Event.CurrentPick > 15 {
-				p.currentState.Event.CurrentPack++
-				p.currentState.Event.CurrentPick = 1
-			}
-
-			pack.PackNumber = p.currentState.Event.CurrentPack
-			pack.PickNumber = p.currentState.Event.CurrentPick
+			// Use pack/pick numbers from MTGA response (they're accurate)
+			p.currentState.Event.CurrentPack = pack.PackNumber
+			p.currentState.Event.CurrentPick = pack.PickNumber
 
 			p.currentState.CurrentPack = pack
 			p.currentState.AllPacks = append(p.currentState.AllPacks, *pack)

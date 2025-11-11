@@ -133,6 +133,8 @@ type DraftNotifyPayload struct {
 type DraftPackPayload struct {
 	DraftPack   FlexibleIntArray `json:"DraftPack"`
 	DraftStatus string           `json:"DraftStatus"` // "PickNext" indicates player's turn
+	PackNumber  int              `json:"PackNumber"`  // Pack number from MTGA
+	PickNumber  int              `json:"PickNumber"`  // Pick number from MTGA
 }
 
 // MakePickPayload represents pick events.
