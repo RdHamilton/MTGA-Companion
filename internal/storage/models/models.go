@@ -148,11 +148,21 @@ type DraftPick struct {
 
 // StatsFilter provides filtering options for statistics queries.
 type StatsFilter struct {
-	AccountID *int // Filter by account ID, nil means all accounts
-	StartDate *time.Time
-	EndDate   *time.Time
-	Format    *string
-	DeckID    *string
+	AccountID    *int // Filter by account ID, nil means all accounts
+	StartDate    *time.Time
+	EndDate      *time.Time
+	Format       *string  // Single format filter (for backward compatibility)
+	Formats      []string // Multiple format filter (e.g., ["Standard", "Historic"])
+	DeckID       *string
+	EventName    *string  // Filter by event name (exact match)
+	EventNames   []string // Multiple event names (OR logic)
+	OpponentName *string  // Filter by opponent name (exact match)
+	OpponentID   *string  // Filter by opponent ID
+	Result       *string  // Filter by result ("win" or "loss")
+	RankClass    *string  // Filter by rank class (e.g., "Mythic", "Diamond")
+	RankMinClass *string  // Minimum rank class
+	RankMaxClass *string  // Maximum rank class
+	ResultReason *string  // Filter by result reason (e.g., "concede", "timeout")
 }
 
 // Statistics represents aggregated statistics.
