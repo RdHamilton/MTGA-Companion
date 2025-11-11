@@ -12,37 +12,15 @@ Phase 2 integrates 17Lands draft statistics with Phase 1's Scryfall card metadat
 - ✅ #212 - Update mechanism for new sets (PR #227)
 - ✅ #213 - Card lookup integration (PR #228)
 
-### Phase 2 (11% Complete)
-- ✅ #214 - 17Lands client library (PR #229) ⭐ JUST COMPLETED
+### Phase 2 (22% Complete)
+- ✅ #214 - 17Lands client library (PR #229)
+- ✅ #215 - Database schema for draft statistics (PR #230) ⭐ JUST COMPLETED
 
-## Phase 2 Remaining Tasks (8 tasks)
+## Phase 2 Remaining Tasks (7 tasks)
 
-### Next Up: #215 - Database Schema for Draft Statistics
-**Branch**: `feature/17lands-database-schema` (already created)
+### Next Up: #216 - Periodic Updates for Active Draft Sets
+**Dependencies**: #214 ✅, #215 ✅
 **Status**: Ready to implement
-**What's needed**:
-- Migration 000007 for draft statistics tables
-- Tables: `draft_card_ratings`, `draft_color_ratings`
-- Data access layer in storage package
-- Unique constraints, indices
-- Batch insert support
-
-**Key tables**:
-```sql
-draft_card_ratings:
-- arena_id, expansion, format, colors
-- gihwr, ohwr, gpwr, alsa, ata (17Lands metrics)
-- cached_at, last_updated (staleness tracking)
-- UNIQUE(arena_id, expansion, format, colors, start_date, end_date)
-
-draft_color_ratings:
-- expansion, event_type, color_combination
-- win_rate, game_count
-- cached_at (staleness tracking)
-```
-
-### #216 - Periodic Updates for Active Draft Sets
-**Dependencies**: #214, #215
 **What's needed**:
 - Scheduler for active draft sets (weekly updates)
 - Identify "active" sets (current Standard rotation)
@@ -97,9 +75,11 @@ draft_color_ratings:
 - CLI integration
 
 ## Current Branch State
-- **Main branch**: Up to date with all Phase 1 + #214
-- **Active branch**: `feature/17lands-database-schema`
-- **Last PR**: #229 (17Lands client library)
+- **Main branch**: Up to date with all Phase 1
+- **Open PRs**:
+  - #229 (17Lands client library - #214)
+  - #230 (Database schema for draft statistics - #215) ⭐ JUST CREATED
+- **Last completed**: #215 - Database schema for draft statistics
 
 ## Architecture Notes
 
@@ -116,22 +96,22 @@ draft_color_ratings:
 
 ## Next Steps for Continuation
 
-1. **Complete #215** (Database Schema):
-   - Create migration 000007
-   - Implement data access layer
-   - Add tests for storage methods
-
-2. **Complete #216** (Periodic Updates):
+1. **Complete #216** (Periodic Updates):
    - Create updater service
-   - Add scheduler
+   - Add scheduler for active draft sets
    - CLI commands for manual updates
+   - Configuration for update frequency
 
-3. **Complete #217** (Graceful Fallback):
+2. **Complete #217** (Graceful Fallback):
    - Circuit breaker implementation
    - Health monitoring
    - Fallback logic
 
-4. Continue through remaining tasks in order
+3. **Complete #218** (Historical Data Retention):
+   - Retention policy
+   - Cleanup job for old data
+
+4. Continue through remaining tasks (#219-#222) in order
 
 ## Key Files to Know
 
@@ -143,7 +123,9 @@ draft_color_ratings:
 
 ### Phase 2 (17Lands)
 - `internal/mtga/cards/seventeenlands/` - 17Lands client ✅
-- `internal/storage/migrations/000007_*` - Draft stats schema (TO DO)
+- `internal/storage/migrations/000007_*` - Draft stats schema ✅
+- `internal/storage/draft_statistics.go` - Data access layer ✅
+- `internal/storage/draft_statistics_test.go` - Comprehensive tests ✅
 - (More to be added as Phase 2 progresses)
 
 ## Testing Strategy
