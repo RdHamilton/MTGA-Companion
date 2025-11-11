@@ -92,7 +92,6 @@ func TestGetCardRatings_APISuccess(t *testing.T) {
 		Expansion: "BLB",
 		Format:    "PremierDraft",
 	})
-
 	// Verify
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -155,7 +154,6 @@ func TestGetCardRatings_APIFailure_CacheHit(t *testing.T) {
 		Expansion: "BLB",
 		Format:    "PremierDraft",
 	})
-
 	// Verify
 	if err != nil {
 		t.Fatalf("Expected no error (cache fallback), got: %v", err)
@@ -318,7 +316,6 @@ func TestGetCardRatings_NetworkTimeout(t *testing.T) {
 		Expansion: "BLB",
 		Format:    "PremierDraft",
 	})
-
 	// Should fall back to cache
 	if err != nil {
 		t.Fatalf("Expected cache fallback, got error: %v", err)
@@ -365,7 +362,6 @@ func TestGetColorRatings_Fallback(t *testing.T) {
 		Expansion: "BLB",
 		EventType: "PremierDraft",
 	})
-
 	// Verify fallback worked
 	if err != nil {
 		t.Fatalf("Expected cache fallback, got error: %v", err)
@@ -417,7 +413,6 @@ func TestCacheSaveFailure(t *testing.T) {
 		Expansion: "BLB",
 		Format:    "PremierDraft",
 	})
-
 	// Should still succeed even though caching failed
 	if err != nil {
 		t.Fatalf("Expected success despite cache save failure, got: %v", err)
