@@ -201,7 +201,7 @@ func ParseCardsInPack(data json.RawMessage) (*Pack, error) {
 	return &Pack{
 		PackNumber: 1, // CardsInPack is always P1P1
 		PickNumber: 1,
-		CardIDs:    payload.CardsInPack,
+		CardIDs:    []int(payload.CardsInPack), // Convert FlexibleIntArray to []int
 		Timestamp:  time.Now(),
 	}, nil
 }
@@ -216,7 +216,7 @@ func ParseDraftNotify(data json.RawMessage) (*Pack, *Pick, error) {
 	pack := &Pack{
 		PackNumber: payload.PackNumber,
 		PickNumber: payload.PickNumber,
-		CardIDs:    payload.DraftPack,
+		CardIDs:    []int(payload.DraftPack), // Convert FlexibleIntArray to []int
 		Timestamp:  time.Now(),
 	}
 
@@ -248,7 +248,7 @@ func ParseDraftPack(data json.RawMessage) (*Pack, error) {
 	// For Quick Draft, we don't get explicit pack/pick numbers in the event
 	// They need to be tracked separately
 	return &Pack{
-		CardIDs:   payload.DraftPack,
+		CardIDs:   []int(payload.DraftPack), // Convert FlexibleIntArray to []int
 		Timestamp: time.Now(),
 	}, nil
 }

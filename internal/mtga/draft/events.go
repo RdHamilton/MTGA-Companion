@@ -2,8 +2,42 @@ package draft
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 )
+
+// FlexibleIntArray can unmarshal from JSON arrays of either strings or integers.
+type FlexibleIntArray []int
+
+// UnmarshalJSON implements custom unmarshaling to handle both string and int arrays.
+func (f *FlexibleIntArray) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as []int first
+	var intArray []int
+	if err := json.Unmarshal(data, &intArray); err == nil {
+		*f = FlexibleIntArray(intArray)
+		return nil
+	}
+
+	// If that fails, try as []string and convert
+	var stringArray []string
+	if err := json.Unmarshal(data, &stringArray); err != nil {
+		return fmt.Errorf("cannot unmarshal as int or string array: %w", err)
+	}
+
+	// Convert strings to ints
+	intArray = make([]int, len(stringArray))
+	for i, s := range stringArray {
+		val, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("cannot convert string %q to int: %w", s, err)
+		}
+		intArray[i] = val
+	}
+
+	*f = FlexibleIntArray(intArray)
+	return nil
+}
 
 // DraftType represents the type of draft event.
 type DraftType string
@@ -84,21 +118,21 @@ const (
 
 // CardsInPackPayload represents the "CardsInPack" log entry.
 type CardsInPackPayload struct {
-	CardsInPack []int `json:"CardsInPack"`
+	CardsInPack FlexibleIntArray `json:"CardsInPack"`
 }
 
 // DraftNotifyPayload represents the "Draft.Notify" log entry.
 type DraftNotifyPayload struct {
-	DraftPack  []int `json:"DraftPack"`
-	PackNumber int   `json:"PackNumber"`
-	PickNumber int   `json:"PickNumber"`
-	SelfPick   int   `json:"SelfPick"`
+	DraftPack  FlexibleIntArray `json:"DraftPack"`
+	PackNumber int              `json:"PackNumber"`
+	PickNumber int              `json:"PickNumber"`
+	SelfPick   int              `json:"SelfPick"`
 }
 
 // DraftPackPayload represents the "DraftPack" log entry (Quick Draft).
 type DraftPackPayload struct {
-	DraftPack   []int  `json:"DraftPack"`
-	DraftStatus string `json:"DraftStatus"` // "PickNext" indicates player's turn
+	DraftPack   FlexibleIntArray `json:"DraftPack"`
+	DraftStatus string           `json:"DraftStatus"` // "PickNext" indicates player's turn
 }
 
 // MakePickPayload represents pick events.

@@ -167,6 +167,7 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 	draftStartFound := false
 
 	// Scan through entire log file
+	botDraftLinesFound := 0
 	for {
 		line, err := reader.ReadString('\n')
 		if err == io.EOF {
@@ -178,15 +179,36 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 		lineNumber++
 
+		// Track BotDraft lines for debugging
+		if strings.Contains(line, `"CurrentModule":"BotDraft"`) {
+			botDraftLinesFound++
+			if botDraftLinesFound <= 3 {
+				preview := line
+				if len(preview) > 150 {
+					preview = preview[:150] + "..."
+				}
+				fmt.Printf("[DEBUG] Found BotDraft line during scan: %s\n", preview)
+			}
+		}
+
 		// Parse log entry
 		event, parseErr := o.parser.ParseLogEntry(line, time.Now())
-		if parseErr != nil || event == nil {
+		if parseErr != nil {
+			continue
+		}
+
+		if event != nil {
+			fmt.Printf("[DEBUG] Resume scan parsed event: %s\n", event.Type)
+		}
+
+		if event == nil {
 			continue
 		}
 
 		// Track if we've found a draft start (not sealed)
 		if IsPackEvent(event.Type) && event.Type != LogEventGrantCardPool && event.Type != LogEventCoursesCardPool {
 			draftStartFound = true
+			fmt.Printf("[DEBUG] Draft start detected during resume scan! Event type: %s\n", event.Type)
 		}
 
 		// Update parser state
