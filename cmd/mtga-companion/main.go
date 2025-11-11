@@ -3204,11 +3204,11 @@ func runCardsImport() {
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create storage service
 	service := storage.NewService(db)
-	defer service.Close()
+	defer func() { _ = service.Close() }()
 
 	// Create Scryfall client
 	scryfallClient := scryfall.NewClient()
@@ -3321,11 +3321,11 @@ func runCardsCheckUpdates() {
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create storage service
 	service := storage.NewService(db)
-	defer service.Close()
+	defer func() { _ = service.Close() }()
 
 	// Create Scryfall client
 	scryfallClient := scryfall.NewClient()
@@ -3417,11 +3417,11 @@ func runCardsUpdate() {
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create storage service
 	service := storage.NewService(db)
-	defer service.Close()
+	defer func() { _ = service.Close() }()
 
 	// Create Scryfall client
 	scryfallClient := scryfall.NewClient()
