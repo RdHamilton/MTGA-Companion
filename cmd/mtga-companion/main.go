@@ -102,6 +102,12 @@ func main() {
 		return
 	}
 
+	// Check if this is a sets command
+	if len(os.Args) > 1 && os.Args[1] == "sets" {
+		runSetsCommand()
+		return
+	}
+
 	// Initialize database
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -5072,4 +5078,259 @@ func runDraftStatsCleanup() {
 	} else {
 		fmt.Println("✓ Cleanup complete!")
 	}
+}
+
+// Sets command implementation
+func runSetsCommand() {
+	if len(os.Args) < 3 {
+		printSetsUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "list":
+		runSetsList()
+	case "download":
+		runSetsDownload()
+	case "delete":
+		runSetsDelete()
+	default:
+		fmt.Printf("Unknown sets command: %s\n\n", command)
+		printSetsUsage()
+		os.Exit(1)
+	}
+}
+
+func printSetsUsage() {
+	fmt.Println("Usage: mtga-companion sets <command> [options]")
+	fmt.Println()
+	fmt.Println("Manage draft set files with 17Lands card ratings.")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  list                     List available set files")
+	fmt.Println("  download                 Download a new set file")
+	fmt.Println("  delete                   Delete a set file")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  mtga-companion sets list")
+	fmt.Println("  mtga-companion sets download --set BLB --format PremierDraft")
+	fmt.Println("  mtga-companion sets download --set DSK --format QuickDraft --start 2024-09-24 --end 2024-11-12")
+	fmt.Println("  mtga-companion sets delete --set BLB --format PremierDraft")
+}
+
+func runSetsList() {
+	// Get home directory for sets path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+
+	setsDir := filepath.Join(homeDir, ".mtga-companion", "Sets")
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create 17Lands client
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Create downloader
+	downloader, err := seventeenlands.NewDownloader(seventeenlands.DownloaderOptions{
+		Client:         seventeenlandsClient,
+		ScryfallClient: scryfallClient,
+		SetsDir:        setsDir,
+	})
+	if err != nil {
+		log.Fatalf("Error creating downloader: %v", err)
+	}
+
+	// List set files
+	setFiles, err := downloader.ListSetFiles()
+	if err != nil {
+		log.Fatalf("Error listing set files: %v", err)
+	}
+
+	if len(setFiles) == 0 {
+		fmt.Println("No set files found.")
+		fmt.Println()
+		fmt.Println("Download a set file with: mtga-companion sets download --set <code> --format <format>")
+		return
+	}
+
+	fmt.Println("Available Set Files")
+	fmt.Println("===================")
+	fmt.Println()
+
+	for _, setFile := range setFiles {
+		fmt.Printf("Set:            %s\n", setFile.SetCode)
+		fmt.Printf("Format:         %s\n", setFile.DraftFormat)
+		fmt.Printf("Date Range:     %s to %s\n", setFile.StartDate, setFile.EndDate)
+		fmt.Printf("Collection Date: %s\n", setFile.CollectionDate.Format("2006-01-02 15:04:05"))
+		fmt.Printf("Total Cards:    %d\n", setFile.TotalCards)
+		fmt.Printf("File Size:      %.2f MB\n", float64(setFile.FileSize)/(1024*1024))
+		fmt.Printf("File Path:      %s\n", setFile.FilePath)
+		fmt.Println()
+	}
+}
+
+func runSetsDownload() {
+	// Define flags for download command
+	downloadFlags := flag.NewFlagSet("download", flag.ExitOnError)
+	setCode := downloadFlags.String("set", "", "Set code (e.g., BLB, DSK) [required]")
+	format := downloadFlags.String("format", "PremierDraft", "Draft format (PremierDraft, QuickDraft, TradDraft, Sealed)")
+	startDate := downloadFlags.String("start", "", "Start date (YYYY-MM-DD) [optional]")
+	endDate := downloadFlags.String("end", "", "End date (YYYY-MM-DD) [optional]")
+
+	if err := downloadFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	if *setCode == "" {
+		fmt.Println("Error: --set flag is required")
+		fmt.Println()
+		fmt.Println("Usage: mtga-companion sets download --set <code> --format <format> [--start YYYY-MM-DD] [--end YYYY-MM-DD]")
+		os.Exit(1)
+	}
+
+	// Get home directory for sets path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+
+	setsDir := filepath.Join(homeDir, ".mtga-companion", "Sets")
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create 17Lands client
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Create downloader with progress handler
+	downloader, err := seventeenlands.NewDownloader(seventeenlands.DownloaderOptions{
+		Client:         seventeenlandsClient,
+		ScryfallClient: scryfallClient,
+		SetsDir:        setsDir,
+		ProgressHandler: func(progress seventeenlands.DownloadProgress) {
+			// Print progress updates
+			if progress.SubTask != "" {
+				fmt.Printf("[Step %d/%d] %s - %s (%d/%d) %.0f%%\n",
+					progress.CurrentStep, progress.TotalSteps,
+					progress.StepName, progress.SubTask,
+					progress.SubTaskCurrent, progress.SubTaskTotal,
+					progress.SubTaskPercent)
+			} else {
+				fmt.Printf("[Step %d/%d] %s - %.0f%%\n",
+					progress.CurrentStep, progress.TotalSteps,
+					progress.StepName, progress.Percent)
+			}
+
+			if progress.Complete {
+				fmt.Println()
+				fmt.Println("✓ Download complete!")
+			}
+
+			if progress.Failed {
+				fmt.Println()
+				fmt.Println("✗ Download failed!")
+				for _, err := range progress.Errors {
+					fmt.Printf("  Error: %s\n", err)
+				}
+			}
+		},
+	})
+	if err != nil {
+		log.Fatalf("Error creating downloader: %v", err)
+	}
+
+	ctx := context.Background()
+
+	fmt.Printf("Downloading set file: %s %s\n", *setCode, *format)
+	if *startDate != "" || *endDate != "" {
+		fmt.Printf("Date range: %s to %s\n", *startDate, *endDate)
+	}
+	fmt.Println()
+
+	// Download set file
+	params := seventeenlands.DownloadParams{
+		SetCode:         *setCode,
+		Format:          *format,
+		StartDate:       *startDate,
+		EndDate:         *endDate,
+		Include17Lands:  true,
+		IncludeScryfall: true,
+		DownloadImages:  false,
+	}
+
+	setFile, err := downloader.DownloadSetFile(ctx, params)
+	if err != nil {
+		log.Fatalf("Error downloading set file: %v", err)
+	}
+
+	fmt.Printf("\nSet file saved with %d cards and %d color combinations\n",
+		len(setFile.CardRatings), len(setFile.ColorRatings))
+}
+
+func runSetsDelete() {
+	// Define flags for delete command
+	deleteFlags := flag.NewFlagSet("delete", flag.ExitOnError)
+	setCode := deleteFlags.String("set", "", "Set code (e.g., BLB, DSK) [required]")
+	format := deleteFlags.String("format", "PremierDraft", "Draft format (PremierDraft, QuickDraft, TradDraft, Sealed)")
+
+	if err := deleteFlags.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	if *setCode == "" {
+		fmt.Println("Error: --set flag is required")
+		fmt.Println()
+		fmt.Println("Usage: mtga-companion sets delete --set <code> --format <format>")
+		os.Exit(1)
+	}
+
+	// Get home directory for sets path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+
+	setsDir := filepath.Join(homeDir, ".mtga-companion", "Sets")
+
+	// Create Scryfall client
+	scryfallClient := scryfall.NewClient()
+
+	// Create 17Lands client
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Create downloader
+	downloader, err := seventeenlands.NewDownloader(seventeenlands.DownloaderOptions{
+		Client:         seventeenlandsClient,
+		ScryfallClient: scryfallClient,
+		SetsDir:        setsDir,
+	})
+	if err != nil {
+		log.Fatalf("Error creating downloader: %v", err)
+	}
+
+	// Confirm deletion
+	fmt.Printf("Are you sure you want to delete the set file for %s %s? (yes/no): ", *setCode, *format)
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatalf("Error reading input: %v", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "yes" && response != "y" {
+		fmt.Println("Deletion cancelled.")
+		return
+	}
+
+	// Delete set file
+	if err := downloader.DeleteSetFile(*setCode, *format); err != nil {
+		log.Fatalf("Error deleting set file: %v", err)
+	}
+
+	fmt.Printf("✓ Deleted set file: %s_%s_data.json\n", *setCode, *format)
 }
