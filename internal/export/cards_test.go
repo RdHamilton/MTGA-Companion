@@ -398,6 +398,99 @@ func TestExportCardsMarkdown(t *testing.T) {
 	}
 }
 
+func TestExportCardsArena(t *testing.T) {
+	cards := createTestCards()
+
+	tests := []struct {
+		name         string
+		opts         CardExportOptions
+		wantContains []string
+		wantLines    int
+	}{
+		{
+			name: "basic arena export",
+			opts: CardExportOptions{
+				Format: FormatArena,
+			},
+			wantContains: []string{
+				"Deck\n",
+				"1 Lightning Bolt (BLB) 123",
+				"1 Counterspell (BLB) 124",
+				"1 Grizzly Bears (BLB) 125",
+			},
+			wantLines: 6, // Deck header + 4 cards + trailing newline
+		},
+		{
+			name: "arena export with top N",
+			opts: CardExportOptions{
+				Format: FormatArena,
+				TopN:   2,
+			},
+			wantContains: []string{
+				"Deck\n",
+				"1 Lightning Bolt (BLB) 123",
+			},
+			wantLines: 4, // Deck header + 2 cards + trailing newline
+		},
+		{
+			name: "arena export with only stats",
+			opts: CardExportOptions{
+				Format:        FormatArena,
+				OnlyWithStats: true,
+			},
+			wantContains: []string{
+				"Deck\n",
+				"1 Lightning Bolt (BLB) 123",
+				"1 Counterspell (BLB) 124",
+			},
+			wantLines: 5, // Deck header + 3 cards with stats + trailing newline
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := ExportCards(&buf, cards, tt.opts)
+			if err != nil {
+				t.Fatalf("ExportCards() error = %v", err)
+			}
+
+			output := buf.String()
+
+			// Check for expected content
+			for _, want := range tt.wantContains {
+				if !strings.Contains(output, want) {
+					t.Errorf("Output missing expected string: %q\nGot:\n%s", want, output)
+				}
+			}
+
+			// Check line count
+			lines := strings.Split(output, "\n")
+			if len(lines) != tt.wantLines {
+				t.Errorf("Line count = %d, want %d\nGot:\n%s", len(lines), tt.wantLines, output)
+			}
+
+			// Verify Arena format structure
+			if !strings.HasPrefix(output, "Deck\n") {
+				t.Error("Arena export should start with 'Deck' header")
+			}
+
+			// Verify format: <quantity> <name> (<set>) <number>
+			for _, line := range lines[1:] { // Skip Deck header and empty line at end
+				if line == "" {
+					continue
+				}
+				if !strings.Contains(line, "(BLB)") {
+					t.Errorf("Card line missing set code: %q", line)
+				}
+				if !strings.HasPrefix(line, "1 ") {
+					t.Errorf("Card line should start with quantity: %q", line)
+				}
+			}
+		})
+	}
+}
+
 func TestFilterCards(t *testing.T) {
 	cards := createTestCards()
 

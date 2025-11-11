@@ -19,6 +19,10 @@ const (
 	FormatCSV Format = "csv"
 	// FormatJSON represents JSON export format.
 	FormatJSON Format = "json"
+	// FormatMarkdown represents Markdown export format.
+	FormatMarkdown Format = "markdown"
+	// FormatArena represents MTG Arena deck format.
+	FormatArena Format = "arena"
 )
 
 // Options holds configuration for export operations.
