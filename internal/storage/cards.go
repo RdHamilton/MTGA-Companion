@@ -253,7 +253,7 @@ func (s *Service) SearchCards(ctx context.Context, query string) ([]*Card, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to search cards: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cards []*Card
 	for rows.Next() {
@@ -321,7 +321,7 @@ func (s *Service) GetCardsBySet(ctx context.Context, setCode string) ([]*Card, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cards by set: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cards []*Card
 	for rows.Next() {
@@ -392,7 +392,7 @@ func (s *Service) GetStaleCards(ctx context.Context, olderThan time.Duration) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stale cards: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cards []*Card
 	for rows.Next() {
@@ -507,7 +507,7 @@ func (s *Service) GetAllSets(ctx context.Context) ([]*Set, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sets []*Set
 	for rows.Next() {
@@ -545,7 +545,7 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stale sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sets []*Set
 	for rows.Next() {

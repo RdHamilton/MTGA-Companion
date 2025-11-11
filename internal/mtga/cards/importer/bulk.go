@@ -127,7 +127,7 @@ func (bi *BulkImporter) Import(ctx context.Context) (*ImportStats, error) {
 	defer func() {
 		if !bi.options.Verbose {
 			// Clean up the downloaded file after import
-			os.Remove(filePath)
+			_ = os.Remove(filePath)
 		}
 	}()
 	stats.DownloadTime = time.Since(downloadStart)
@@ -197,7 +197,7 @@ func (bi *BulkImporter) downloadBulkFile(ctx context.Context, bulkInfo *scryfall
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -213,16 +213,16 @@ func (bi *BulkImporter) downloadBulkFile(ctx context.Context, bulkInfo *scryfall
 	// Copy with progress
 	written, err := io.Copy(tmpFile, resp.Body)
 	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Rename to final name
 	if err := os.Rename(tmpPath, filePath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to rename file: %w", err)
 	}
 
@@ -239,14 +239,14 @@ func (bi *BulkImporter) processBulkFile(ctx context.Context, filePath string) (p
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Create gzip reader for compressed file
 	gzReader, err := gzip.NewReader(file)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gzReader.Close()
+	defer func() { _ = gzReader.Close() }()
 
 	// Create buffered scanner for line-by-line reading
 	scanner := bufio.NewScanner(gzReader)

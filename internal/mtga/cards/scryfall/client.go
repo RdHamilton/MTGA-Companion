@@ -147,7 +147,7 @@ func (c *Client) doRequest(ctx context.Context, url string, result interface{}) 
 		}
 
 		// Handle response
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Check status code
 		switch resp.StatusCode {
