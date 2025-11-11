@@ -92,7 +92,11 @@ func (o *Overlay) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Seek to end of file to only process new entries
 	if _, err := file.Seek(0, io.SeekEnd); err != nil {

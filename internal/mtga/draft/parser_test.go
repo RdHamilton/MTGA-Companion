@@ -551,7 +551,6 @@ func TestParserUpdateStateQuickDraft(t *testing.T) {
 			Type:      LogEventDraftPack,
 			Data:      json.RawMessage(draftPackData),
 		})
-
 		if err != nil {
 			t.Fatalf("UpdateState() error = %v", err)
 		}
@@ -587,7 +586,6 @@ func TestParserUpdateStateSealed(t *testing.T) {
 		Type:      LogEventGrantCardPool,
 		Data:      json.RawMessage(grantData),
 	})
-
 	if err != nil {
 		t.Fatalf("UpdateState() error = %v", err)
 	}
@@ -668,7 +666,6 @@ func TestParseLogEntry(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
 			event, err := p.ParseLogEntry(tt.line, time.Now())
-
 			if err != nil {
 				t.Fatalf("ParseLogEntry() error = %v", err)
 			}

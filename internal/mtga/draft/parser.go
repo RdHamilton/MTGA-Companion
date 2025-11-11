@@ -137,9 +137,10 @@ func extractJSON(line string) string {
 			continue
 		}
 
-		if c == '{' {
+		switch c {
+		case '{':
 			depth++
-		} else if c == '}' {
+		case '}':
 			depth--
 			if depth == 0 {
 				return line[start : i+1]
