@@ -204,3 +204,23 @@ func IsNotFound(err error) bool {
 	_, ok := err.(*NotFoundError)
 	return ok
 }
+
+// Migration represents a card migration from Scryfall.
+// Migrations occur when Scryfall merges duplicate cards or removes invalid entries.
+type Migration struct {
+	ID                string    `json:"id"`
+	URI               string    `json:"uri"`
+	PerformedAt       time.Time `json:"performed_at"`
+	MigrationStrategy string    `json:"migration_strategy"` // "merge" or "delete"
+	OldScryfallID     string    `json:"old_scryfall_id"`
+	NewScryfallID     *string   `json:"new_scryfall_id,omitempty"` // Only present for merge strategy
+	Note              string    `json:"note"`
+}
+
+// MigrationList represents a list of migrations from Scryfall.
+type MigrationList struct {
+	Object   string      `json:"object"`
+	HasMore  bool        `json:"has_more"`
+	NextPage string      `json:"next_page,omitempty"`
+	Data     []Migration `json:"data"`
+}
