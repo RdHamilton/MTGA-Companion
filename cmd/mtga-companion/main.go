@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -3494,6 +3495,14 @@ func runDraftStatsCommand() {
 		runDraftStatsUpdate()
 	case "check":
 		runDraftStatsCheck()
+	case "history":
+		runDraftStatsHistory()
+	case "trends":
+		runDraftStatsTrends()
+	case "compare":
+		runDraftStatsCompare()
+	case "cleanup":
+		runDraftStatsCleanup()
 	default:
 		fmt.Printf("Unknown draft-stats command: %s\n\n", command)
 		printDraftStatsUsage()
@@ -3507,17 +3516,48 @@ func printDraftStatsUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  update        Update draft statistics from 17Lands")
 	fmt.Println("  check         Check for stale draft statistics")
+	fmt.Println("  history       View rating history for a card")
+	fmt.Println("  trends        View win rate trends for a set")
+	fmt.Println("  compare       Compare early vs late draft meta")
+	fmt.Println("  cleanup       Clean up old snapshots")
 	fmt.Println()
 	fmt.Println("Update Options:")
 	fmt.Println("  --set <code>  Update specific set (e.g., --set BLB)")
 	fmt.Println("  --all         Update all sets (not just stale ones)")
 	fmt.Println("  --force       Force update even if data is fresh")
 	fmt.Println()
+	fmt.Println("History Options:")
+	fmt.Println("  --arena-id <id>  Card's Arena ID (required)")
+	fmt.Println("  --set <code>     Expansion code (required)")
+	fmt.Println("  --format <fmt>   Output format: csv, json (default: json)")
+	fmt.Println("  --output <file>  Write to file instead of stdout")
+	fmt.Println()
+	fmt.Println("Trends Options:")
+	fmt.Println("  --set <code>     Expansion code (required)")
+	fmt.Println("  --arena-id <id>  Specific card (optional, shows all if omitted)")
+	fmt.Println("  --days <n>       Number of days to include (default: 30)")
+	fmt.Println("  --format <fmt>   Output format: csv, json (default: json)")
+	fmt.Println("  --output <file>  Write to file instead of stdout")
+	fmt.Println()
+	fmt.Println("Compare Options:")
+	fmt.Println("  --set <code>     Expansion code (required)")
+	fmt.Println("  --early <days>   Early period length in days (default: 14)")
+	fmt.Println("  --late <days>    Late period length in days (default: 7)")
+	fmt.Println("  --format <fmt>   Output format: csv, json (default: json)")
+	fmt.Println("  --output <file>  Write to file instead of stdout")
+	fmt.Println()
+	fmt.Println("Cleanup Options:")
+	fmt.Println("  --dry-run        Show what would be deleted without deleting")
+	fmt.Println("  --min-age <days> Minimum age before deletion (default: 90)")
+	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  mtga-companion draft-stats update")
 	fmt.Println("  mtga-companion draft-stats update --set BLB")
-	fmt.Println("  mtga-companion draft-stats update --all")
 	fmt.Println("  mtga-companion draft-stats check")
+	fmt.Println("  mtga-companion draft-stats history --arena-id 12345 --set BLB")
+	fmt.Println("  mtga-companion draft-stats trends --set BLB --days 30")
+	fmt.Println("  mtga-companion draft-stats compare --set BLB")
+	fmt.Println("  mtga-companion draft-stats cleanup --dry-run")
 }
 
 func runDraftStatsUpdate() {
@@ -3696,4 +3736,325 @@ func runDraftStatsCheck() {
 
 	fmt.Println()
 	fmt.Println("Run 'mtga-companion draft-stats update' to refresh stale data.")
+}
+
+func runDraftStatsHistory() {
+	// Parse flags
+	fs := flag.NewFlagSet("draft-stats history", flag.ExitOnError)
+	arenaID := fs.Int("arena-id", 0, "Card's Arena ID")
+	setCode := fs.String("set", "", "Expansion code")
+	format := fs.String("format", "json", "Output format: csv, json")
+	output := fs.String("output", "", "Output file path (optional)")
+
+	if err := fs.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Validate required flags
+	if *arenaID == 0 {
+		fmt.Println("Error: --arena-id is required")
+		fmt.Println()
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+	if *setCode == "" {
+		fmt.Println("Error: --set is required")
+		fmt.Println()
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+
+	// Open database
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(homeDir, ".mtga-companion", "data.db")
+	}
+	config := storage.DefaultConfig(dbPath)
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := storage.NewService(db)
+	ctx := context.Background()
+
+	// Get rating history
+	history, err := service.GetRatingHistory(ctx, *arenaID, *setCode)
+	if err != nil {
+		log.Fatalf("Error getting rating history: %v", err)
+	}
+
+	if len(history) == 0 {
+		fmt.Printf("No rating history found for Arena ID %d in set %s\n", *arenaID, *setCode)
+		return
+	}
+
+	// Determine output writer
+	var writer io.Writer = os.Stdout
+	if *output != "" {
+		file, err := os.Create(*output)
+		if err != nil {
+			log.Fatalf("Error creating output file: %v", err)
+		}
+		defer func() { _ = file.Close() }()
+		writer = file
+	}
+
+	// Export history
+	if err := export.ExportRatingHistory(writer, history, *format); err != nil {
+		log.Fatalf("Error exporting history: %v", err)
+	}
+
+	if *output != "" {
+		fmt.Printf("✓ Rating history exported to %s (%d snapshots)\n", *output, len(history))
+	}
+}
+
+func runDraftStatsTrends() {
+	// Parse flags
+	fs := flag.NewFlagSet("draft-stats trends", flag.ExitOnError)
+	setCode := fs.String("set", "", "Expansion code")
+	arenaID := fs.Int("arena-id", 0, "Card's Arena ID (optional)")
+	days := fs.Int("days", 30, "Number of days to include")
+	format := fs.String("format", "json", "Output format: csv, json")
+	output := fs.String("output", "", "Output file path (optional)")
+
+	if err := fs.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Validate required flags
+	if *setCode == "" {
+		fmt.Println("Error: --set is required")
+		fmt.Println()
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+
+	// Open database
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(homeDir, ".mtga-companion", "data.db")
+	}
+	config := storage.DefaultConfig(dbPath)
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := storage.NewService(db)
+	ctx := context.Background()
+
+	// Get trend data
+	if *arenaID > 0 {
+		// Single card trend
+		trend, err := service.GetCardWinRateTrend(ctx, *arenaID, *setCode, *days)
+		if err != nil {
+			log.Fatalf("Error getting card trend: %v", err)
+		}
+
+		if len(trend.Points) == 0 {
+			fmt.Printf("No trend data found for Arena ID %d in set %s\n", *arenaID, *setCode)
+			return
+		}
+
+		// Determine output writer
+		var writer io.Writer = os.Stdout
+		if *output != "" {
+			file, err := os.Create(*output)
+			if err != nil {
+				log.Fatalf("Error creating output file: %v", err)
+			}
+			defer func() { _ = file.Close() }()
+			writer = file
+		}
+
+		// Export trend
+		if err := export.ExportCardTrend(writer, trend, *format); err != nil {
+			log.Fatalf("Error exporting trend: %v", err)
+		}
+
+		if *output != "" {
+			fmt.Printf("✓ Card trend exported to %s (%d data points)\n", *output, len(trend.Points))
+		}
+	} else {
+		// All cards in expansion
+		trends, err := service.GetExpansionTrends(ctx, *setCode, *days)
+		if err != nil {
+			log.Fatalf("Error getting expansion trends: %v", err)
+		}
+
+		if len(trends) == 0 {
+			fmt.Printf("No trend data found for set %s\n", *setCode)
+			return
+		}
+
+		fmt.Printf("Found trends for %d cards in %s\n", len(trends), *setCode)
+		fmt.Println("Use --arena-id <id> to view a specific card's trend")
+		fmt.Println()
+
+		// Show summary
+		for arenaID, trend := range trends {
+			fmt.Printf("  Arena ID %d: %d data points\n", arenaID, len(trend.Points))
+		}
+	}
+}
+
+func runDraftStatsCompare() {
+	// Parse flags
+	fs := flag.NewFlagSet("draft-stats compare", flag.ExitOnError)
+	setCode := fs.String("set", "", "Expansion code")
+	earlyDays := fs.Int("early", 14, "Early period length in days")
+	lateDays := fs.Int("late", 7, "Late period length in days")
+	format := fs.String("format", "json", "Output format: csv, json")
+	output := fs.String("output", "", "Output file path (optional)")
+
+	if err := fs.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Validate required flags
+	if *setCode == "" {
+		fmt.Println("Error: --set is required")
+		fmt.Println()
+		printDraftStatsUsage()
+		os.Exit(1)
+	}
+
+	// Open database
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(homeDir, ".mtga-companion", "data.db")
+	}
+	config := storage.DefaultConfig(dbPath)
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := storage.NewService(db)
+	ctx := context.Background()
+
+	// Compare meta periods
+	comp, err := service.CompareMetaPeriods(ctx, *setCode, *earlyDays, *lateDays)
+	if err != nil {
+		log.Fatalf("Error comparing meta periods: %v", err)
+	}
+
+	// Determine output writer
+	var writer io.Writer = os.Stdout
+	if *output != "" {
+		file, err := os.Create(*output)
+		if err != nil {
+			log.Fatalf("Error creating output file: %v", err)
+		}
+		defer func() { _ = file.Close() }()
+		writer = file
+	}
+
+	// Export comparison
+	if err := export.ExportMetaComparison(writer, comp, *format); err != nil {
+		log.Fatalf("Error exporting comparison: %v", err)
+	}
+
+	if *output != "" {
+		fmt.Printf("✓ Meta comparison exported to %s\n", *output)
+		fmt.Printf("  Early period: %d cards\n", comp.EarlyCards)
+		fmt.Printf("  Late period: %d cards\n", comp.LateCards)
+		fmt.Printf("  Top improvers: %d\n", len(comp.TopImprovers))
+		fmt.Printf("  Top decliners: %d\n", len(comp.TopDecliners))
+	}
+}
+
+func runDraftStatsCleanup() {
+	// Parse flags
+	fs := flag.NewFlagSet("draft-stats cleanup", flag.ExitOnError)
+	dryRun := fs.Bool("dry-run", false, "Show what would be deleted without deleting")
+	minAge := fs.Int("min-age", 90, "Minimum age in days before deletion")
+
+	if err := fs.Parse(os.Args[3:]); err != nil {
+		log.Fatalf("Error parsing flags: %v", err)
+	}
+
+	// Open database
+	dbPath := os.Getenv("MTGA_DB_PATH")
+	if dbPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Error getting home directory: %v", err)
+		}
+		dbPath = filepath.Join(homeDir, ".mtga-companion", "data.db")
+	}
+	config := storage.DefaultConfig(dbPath)
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	service := storage.NewService(db)
+	ctx := context.Background()
+
+	// Configure retention policy
+	policy := storage.DefaultRetentionPolicy()
+	policy.MinimumAge = time.Duration(*minAge) * 24 * time.Hour
+
+	if *dryRun {
+		fmt.Println("DRY RUN: Analyzing snapshots for cleanup...")
+		fmt.Println()
+	} else {
+		fmt.Println("Cleaning up old draft statistics snapshots...")
+		fmt.Println()
+	}
+
+	// Run cleanup
+	result, err := service.CleanupOldSnapshots(ctx, policy, *dryRun)
+	if err != nil {
+		log.Fatalf("Error during cleanup: %v", err)
+	}
+
+	// Display results
+	fmt.Printf("Cleanup Results:\n")
+	fmt.Printf("================\n")
+	fmt.Printf("Total snapshots:    %d\n", result.TotalSnapshots)
+	fmt.Printf("Removed snapshots:  %d\n", result.RemovedSnapshots)
+	fmt.Printf("Retained snapshots: %d\n", result.RetainedSnapshots)
+	if !result.OldestSnapshot.IsZero() {
+		fmt.Printf("Oldest snapshot:    %s\n", result.OldestSnapshot.Format("2006-01-02"))
+	}
+	if !result.NewestSnapshot.IsZero() {
+		fmt.Printf("Newest snapshot:    %s\n", result.NewestSnapshot.Format("2006-01-02"))
+	}
+	fmt.Println()
+
+	if len(result.RemovedBySet) > 0 {
+		fmt.Println("Per-Set Breakdown:")
+		for set, count := range result.RemovedBySet {
+			retained := result.RetainedBySet[set]
+			fmt.Printf("  %s: %d removed, %d retained\n", set, count, retained)
+		}
+		fmt.Println()
+	}
+
+	if *dryRun {
+		fmt.Println("This was a dry run. No snapshots were actually deleted.")
+		fmt.Println("Run without --dry-run to perform actual cleanup.")
+	} else {
+		fmt.Println("✓ Cleanup complete!")
+	}
 }
