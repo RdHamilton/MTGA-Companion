@@ -77,7 +77,7 @@ func NewOverlay(config OverlayConfig) *Overlay {
 	ratingsProvider := NewRatingsProvider(config.SetFile, config.BayesianConfig)
 
 	if config.PollInterval == 0 {
-		config.PollInterval = 500 * time.Millisecond
+		config.PollInterval = 50 * time.Millisecond // Fast polling for responsive overlay
 	}
 
 	if config.LookbackHours == 0 {
@@ -127,7 +127,8 @@ func (o *Overlay) Start(ctx context.Context) error {
 	fmt.Println()
 
 	reader := bufio.NewReader(file)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	// Poll every 50ms for fast response time
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -259,21 +260,16 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 // processNewLogLines reads and processes any new lines from the log.
 func (o *Overlay) processNewLogLines(reader *bufio.Reader) error {
-	linesRead := 0
 	for {
 		line, err := reader.ReadString('\n')
 		if err == io.EOF {
 			// No more lines to read
-			if linesRead > 0 {
-				fmt.Printf("[DEBUG] Read %d new lines from log\n", linesRead)
-			}
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 
-		linesRead++
 		// Process the log line
 		o.processLogLine(line)
 	}
@@ -284,16 +280,6 @@ func (o *Overlay) processLogLine(line string) {
 	// Parse timestamp (simplified - actual MTGA logs have timestamps)
 	timestamp := time.Now()
 
-	// Debug: show first 200 chars of non-empty lines
-	trimmed := strings.TrimSpace(line)
-	if len(trimmed) > 0 {
-		preview := trimmed
-		if len(preview) > 200 {
-			preview = preview[:200] + "..."
-		}
-		fmt.Printf("[DEBUG] Processing line: %s\n", preview)
-	}
-
 	// Parse log entry
 	event, err := o.parser.ParseLogEntry(line, timestamp)
 	if err != nil {
@@ -301,8 +287,7 @@ func (o *Overlay) processLogLine(line string) {
 		return
 	}
 	if event == nil {
-		fmt.Printf("[DEBUG] Parsed as nil (not a draft event)\n")
-		return
+		return // Silently skip non-draft lines
 	}
 
 	// Skip Sealed events (they interfere with active drafts)
