@@ -87,9 +87,17 @@ func (sg *SetGuide) LoadSet(ctx context.Context, setCode, format string) error {
 	}
 
 	// Fetch from 17Lands
+	// Use last 365 days as default date range for color ratings
+	// This ensures we get data even for older sets
+	endDate := time.Now().Format("2006-01-02")
+	startDate := time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+
 	params := seventeenlands.QueryParams{
 		Expansion: setCode,
 		Format:    format,
+		EventType: format, // EventType is required for color ratings
+		StartDate: startDate,
+		EndDate:   endDate,
 	}
 
 	ratings, err := sg.client.GetCardRatings(ctx, params)
@@ -99,7 +107,9 @@ func (sg *SetGuide) LoadSet(ctx context.Context, setCode, format string) error {
 
 	colorRatings, err := sg.client.GetColorRatings(ctx, params)
 	if err != nil {
-		return fmt.Errorf("failed to fetch color ratings: %w", err)
+		// Color ratings are optional - log warning but don't fail
+		fmt.Printf("Warning: failed to fetch color ratings: %v\n", err)
+		colorRatings = []seventeenlands.ColorRating{}
 	}
 
 	// Build set file
@@ -342,16 +352,17 @@ func (sg *SetGuide) saveToCache(cacheKey string, setFile *seventeenlands.SetFile
 // Helper functions
 
 func calculateTier(gihwr float64) string {
+	// GIHWR is a decimal (e.g., 0.60 = 60%), so compare against decimal values
 	switch {
-	case gihwr >= 60.0:
+	case gihwr >= 0.60:
 		return "S"
-	case gihwr >= 57.0:
+	case gihwr >= 0.57:
 		return "A"
-	case gihwr >= 54.0:
+	case gihwr >= 0.54:
 		return "B"
-	case gihwr >= 50.0:
+	case gihwr >= 0.50:
 		return "C"
-	case gihwr >= 45.0:
+	case gihwr >= 0.45:
 		return "D"
 	default:
 		return "F"
@@ -365,7 +376,7 @@ func categorizeCard(name string, gihwr float64) string {
 	if contains([]string{"Murder", "Destroy", "Exile", "Kill", "Strike", "Bolt"}, nameLower) {
 		return "Removal"
 	}
-	if gihwr >= 60.0 {
+	if gihwr >= 0.60 { // GIHWR is decimal, so 0.60 = 60%
 		return "Bomb"
 	}
 	if contains([]string{"Evolving", "Wilds", "Terramorphic"}, nameLower) {

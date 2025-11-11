@@ -5658,6 +5658,25 @@ func runSetGuideColors() {
 		log.Fatalf("Error getting color ratings: %v", err)
 	}
 
+	// Check if we have any two-color pair data
+	hasTwoColorData := false
+	for colors := range colorRatings {
+		if len(colors) == 2 && colorRatings[colors] > 0 {
+			hasTwoColorData = true
+			break
+		}
+	}
+
+	if !hasTwoColorData {
+		fmt.Printf("═══ %s Color Pair Win Rates ═══\n\n", setCode)
+		fmt.Println("No color pair data currently available for this set/format combination.")
+		fmt.Println("\nThis may be because:")
+		fmt.Println("  • The set is not currently being actively drafted")
+		fmt.Println("  • Insufficient data in the selected date range")
+		fmt.Println("\nTry using 'set-guide overview' to see top archetypes based on available data.")
+		return
+	}
+
 	// Display color ratings
 	fmt.Print(setguide.FormatColorPairs(colorRatings))
 }

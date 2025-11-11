@@ -36,7 +36,7 @@ func FormatSetOverview(overview *SetOverview) string {
 				break
 			}
 			sb.WriteString(fmt.Sprintf("  %2d. %-30s [%s] - %.1f%% (%s)\n",
-				i+1, card.Name, card.Color, card.GIHWR, card.Tier))
+				i+1, card.Name, card.Color, card.GIHWR*100, card.Tier))
 		}
 	}
 
@@ -48,7 +48,7 @@ func FormatSetOverview(overview *SetOverview) string {
 				break
 			}
 			sb.WriteString(fmt.Sprintf("  %2d. %-30s [%s] - %.1f%% (%s)\n",
-				i+1, card.Name, card.Color, card.GIHWR, card.Tier))
+				i+1, card.Name, card.Color, card.GIHWR*100, card.Tier))
 		}
 	}
 
@@ -60,7 +60,7 @@ func FormatSetOverview(overview *SetOverview) string {
 				break
 			}
 			sb.WriteString(fmt.Sprintf("  • %s [%s] (%.1f%% GIHWR)\n",
-				card.Name, card.Rarity, card.GIHWR))
+				card.Name, card.Rarity, card.GIHWR*100))
 		}
 	}
 
@@ -83,7 +83,7 @@ func FormatTierList(tiers []CardTier, title string) string {
 			truncate(card.Name, 30),
 			card.Color,
 			card.Rarity,
-			card.GIHWR,
+			card.GIHWR*100, // Convert decimal to percentage
 			card.ALSA,
 			card.Tier))
 	}
