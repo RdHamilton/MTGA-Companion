@@ -110,7 +110,7 @@ func (c *Cache) downloadAndCache(imageURL, cachePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to download image: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to download image: status %d", resp.StatusCode)
@@ -126,13 +126,13 @@ func (c *Cache) downloadAndCache(imageURL, cachePath string) (string, error) {
 	// Download to temp file
 	size, err := io.Copy(tempFile, resp.Body)
 	if err != nil {
-		tempFile.Close()
-		os.Remove(tempPath)
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("failed to save image: %w", err)
 	}
 
 	if err := tempFile.Close(); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("failed to close temp file: %w", err)
 	}
 
@@ -140,14 +140,14 @@ func (c *Cache) downloadAndCache(imageURL, cachePath string) (string, error) {
 	c.mu.Lock()
 	if err := c.ensureSpace(size); err != nil {
 		c.mu.Unlock()
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("failed to ensure cache space: %w", err)
 	}
 
 	// Move temp file to final location
 	if err := os.Rename(tempPath, cachePath); err != nil {
 		c.mu.Unlock()
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("failed to move cached file: %w", err)
 	}
 
