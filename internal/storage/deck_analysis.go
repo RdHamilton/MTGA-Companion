@@ -212,7 +212,8 @@ func analyzeTypes(card *Card, quantity int, breakdown *TypeBreakdown) {
 func countBasicLands(cards []*struct {
 	CardID   int
 	Quantity int
-}, s *Service, ctx context.Context) int {
+}, s *Service, ctx context.Context,
+) int {
 	basicLandNames := map[string]bool{
 		"Plains":   true,
 		"Island":   true,
