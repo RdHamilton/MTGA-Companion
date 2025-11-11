@@ -23,6 +23,7 @@ type DraftOverlayWindow struct {
 	packContainer *fyne.Container
 	colorLabel    *widget.Label
 	statusLabel   *widget.Label
+	updateChan    chan *draft.OverlayUpdate
 }
 
 // NewDraftOverlayWindow creates a new draft overlay window.
@@ -30,13 +31,19 @@ func NewDraftOverlayWindow(overlayConfig draft.OverlayConfig) *DraftOverlayWindo
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dow := &DraftOverlayWindow{
-		app:    app.New(),
-		ctx:    ctx,
-		cancel: cancel,
+		app:        app.New(),
+		ctx:        ctx,
+		cancel:     cancel,
+		updateChan: make(chan *draft.OverlayUpdate, 10),
 	}
 
-	// Set update callback
-	overlayConfig.UpdateCallback = dow.handleUpdate
+	// Set update callback to send to channel for thread-safe UI updates
+	overlayConfig.UpdateCallback = func(update *draft.OverlayUpdate) {
+		select {
+		case dow.updateChan <- update:
+		case <-dow.ctx.Done():
+		}
+	}
 
 	// Create overlay controller
 	dow.overlay = draft.NewOverlay(overlayConfig)
@@ -53,7 +60,7 @@ func (dow *DraftOverlayWindow) Run() {
 	dow.window.SetFixedSize(true)
 
 	// Create UI components
-	dow.statusLabel = widget.NewLabel("Waiting for draft...")
+	dow.statusLabel = widget.NewLabel("Ready - waiting for draft...")
 	dow.colorLabel = widget.NewLabel("")
 	dow.packContainer = container.NewVBox()
 
@@ -78,9 +85,25 @@ func (dow *DraftOverlayWindow) Run() {
 		}
 	}()
 
+	// Process updates from channel in background, queue to UI thread
+	go func() {
+		for {
+			select {
+			case update := <-dow.updateChan:
+				// Queue update to Fyne's UI thread
+				fyne.DoAndWait(func() {
+					dow.handleUpdate(update)
+				})
+			case <-dow.ctx.Done():
+				return
+			}
+		}
+	}()
+
 	// Handle window close
 	dow.window.SetOnClosed(func() {
 		dow.cancel()
+		close(dow.updateChan)
 	})
 
 	dow.window.ShowAndRun()
@@ -102,8 +125,8 @@ func (dow *DraftOverlayWindow) handleUpdate(update *draft.OverlayUpdate) {
 
 // handleDraftStart updates UI when draft starts.
 func (dow *DraftOverlayWindow) handleDraftStart(update *draft.OverlayUpdate) {
-	dow.statusLabel.SetText("Draft in progress")
-	dow.colorLabel.SetText("Waiting for picks...")
+	dow.statusLabel.SetText("Draft detected! Waiting for first pack...")
+	dow.colorLabel.SetText("")
 	dow.packContainer.RemoveAll()
 }
 

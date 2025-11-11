@@ -78,14 +78,21 @@ func (rp *RatingsProvider) GetPackRatings(pack *Pack, colorFilter string) (*Pack
 	}
 
 	cardRatings := make([]*CardRating, 0, len(pack.CardIDs))
+	notFound := 0
 
 	for _, cardID := range pack.CardIDs {
 		rating, err := rp.GetCardRating(cardID, colorFilter)
 		if err != nil {
 			// Card not found in set file - skip it
+			notFound++
+			fmt.Printf("[DEBUG] Card ID %d not found in set file: %v\n", cardID, err)
 			continue
 		}
 		cardRatings = append(cardRatings, rating)
+	}
+
+	if notFound > 0 {
+		fmt.Printf("[DEBUG] %d cards not found in set file out of %d total\n", notFound, len(pack.CardIDs))
 	}
 
 	return &PackRatings{

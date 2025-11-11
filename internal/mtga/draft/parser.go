@@ -42,6 +42,11 @@ func (p *Parser) ParseLogEntry(line string, timestamp time.Time) (*LogEvent, err
 // detectEventType detects the type of draft event from a log line.
 // Returns the event type and the JSON payload string.
 func (p *Parser) detectEventType(line string) (LogEventType, string) {
+	// Check for BotDraft module (Quick Draft with escaped Payload)
+	if strings.Contains(line, `"CurrentModule":"BotDraft"`) {
+		return p.extractBotDraftPayload(line)
+	}
+
 	// CardsInPack event (Premier Draft P1P1)
 	if strings.Contains(line, `"CardsInPack"`) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
@@ -56,7 +61,7 @@ func (p *Parser) detectEventType(line string) (LogEventType, string) {
 		}
 	}
 
-	// DraftPack event (Quick Draft)
+	// DraftPack event (Quick Draft - direct format, not BotDraft module)
 	if strings.Contains(line, `"DraftPack"`) && strings.Contains(line, `"DraftStatus"`) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
 			return LogEventDraftPack, jsonStr
@@ -96,6 +101,41 @@ func (p *Parser) detectEventType(line string) (LogEventType, string) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
 			return LogEventCoursesCardPool, jsonStr
 		}
+	}
+
+	return "", ""
+}
+
+// extractBotDraftPayload extracts and unescapes the Payload from BotDraft module logs.
+// BotDraft logs have format: {"CurrentModule":"BotDraft","Payload":"{escaped JSON}"}
+func (p *Parser) extractBotDraftPayload(line string) (LogEventType, string) {
+	// Extract outer JSON
+	outerJSON := extractJSON(line)
+	if outerJSON == "" {
+		return "", ""
+	}
+
+	// Parse outer JSON to get Payload field
+	var envelope struct {
+		CurrentModule string `json:"CurrentModule"`
+		Payload       string `json:"Payload"`
+	}
+
+	if err := json.Unmarshal([]byte(outerJSON), &envelope); err != nil {
+		return "", ""
+	}
+
+	// Payload contains escaped JSON - it's already a string, so we can use it directly
+	payloadJSON := envelope.Payload
+
+	// Determine event type based on content
+	if strings.Contains(payloadJSON, `"DraftPack"`) && strings.Contains(payloadJSON, `"DraftStatus"`) {
+		return LogEventDraftPack, payloadJSON
+	}
+
+	// Check for pick events (the response after making a pick)
+	if strings.Contains(payloadJSON, `"PickInfo"`) {
+		return LogEventBotDraftPick, payloadJSON
 	}
 
 	return "", ""
@@ -161,7 +201,7 @@ func ParseCardsInPack(data json.RawMessage) (*Pack, error) {
 	return &Pack{
 		PackNumber: 1, // CardsInPack is always P1P1
 		PickNumber: 1,
-		CardIDs:    payload.CardsInPack,
+		CardIDs:    []int(payload.CardsInPack), // Convert FlexibleIntArray to []int
 		Timestamp:  time.Now(),
 	}, nil
 }
@@ -176,7 +216,7 @@ func ParseDraftNotify(data json.RawMessage) (*Pack, *Pick, error) {
 	pack := &Pack{
 		PackNumber: payload.PackNumber,
 		PickNumber: payload.PickNumber,
-		CardIDs:    payload.DraftPack,
+		CardIDs:    []int(payload.DraftPack), // Convert FlexibleIntArray to []int
 		Timestamp:  time.Now(),
 	}
 
@@ -205,11 +245,12 @@ func ParseDraftPack(data json.RawMessage) (*Pack, error) {
 		return nil, nil
 	}
 
-	// For Quick Draft, we don't get explicit pack/pick numbers in the event
-	// They need to be tracked separately
+	// BotDraft responses include actual pack/pick numbers
 	return &Pack{
-		CardIDs:   payload.DraftPack,
-		Timestamp: time.Now(),
+		PackNumber: payload.PackNumber,
+		PickNumber: payload.PickNumber,
+		CardIDs:    []int(payload.DraftPack), // Convert FlexibleIntArray to []int
+		Timestamp:  time.Now(),
 	}, nil
 }
 
@@ -321,15 +362,9 @@ func (p *Parser) UpdateState(event *LogEvent) error {
 			return err
 		}
 		if pack != nil {
-			// Increment pick number for Quick Draft
-			p.currentState.Event.CurrentPick++
-			if p.currentState.Event.CurrentPick > 15 {
-				p.currentState.Event.CurrentPack++
-				p.currentState.Event.CurrentPick = 1
-			}
-
-			pack.PackNumber = p.currentState.Event.CurrentPack
-			pack.PickNumber = p.currentState.Event.CurrentPick
+			// Use pack/pick numbers from MTGA response (they're accurate)
+			p.currentState.Event.CurrentPack = pack.PackNumber
+			p.currentState.Event.CurrentPick = pack.PickNumber
 
 			p.currentState.CurrentPack = pack
 			p.currentState.AllPacks = append(p.currentState.AllPacks, *pack)

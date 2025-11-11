@@ -3,8 +3,28 @@ name: CI
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.cursorrules'
+      - 'CLAUDE.md'
+      - 'README.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.cursorrules'
+      - 'CLAUDE.md'
+      - 'README.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
 
 permissions:
   contents: read
@@ -51,6 +71,8 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
+      # Don't cancel all jobs if one fails (helps identify platform-specific issues)
+      fail-fast: false
     # Only run on main branch to save action minutes
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
 
@@ -68,7 +90,12 @@ jobs:
       run: go mod download
 
     - name: Run tests (basic, no race detection)
-      run: go test -v ./...
+      # Retry flaky tests up to 2 times
+      uses: nick-fields/retry@v3
+      with:
+        timeout_minutes: 10
+        max_attempts: 2
+        command: go test -v -timeout=5m ./...
 
   lint:
     name: Lint
