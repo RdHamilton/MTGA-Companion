@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -85,12 +86,28 @@ func (dow *DraftOverlayWindow) Run() {
 		}
 	}()
 
-	// Process updates from channel on UI thread (thread-safe)
+	// Process updates from channel using a timer to stay on UI thread
 	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
 		for {
 			select {
-			case update := <-dow.updateChan:
-				dow.handleUpdate(update)
+			case <-ticker.C:
+				// Drain all pending updates in a Fyne-safe way
+			drainLoop:
+				for {
+					select {
+					case update := <-dow.updateChan:
+						// Process on UI thread
+						func(u *draft.OverlayUpdate) {
+							dow.window.Canvas().Refresh(dow.window.Content())
+							dow.handleUpdate(u)
+						}(update)
+					default:
+						break drainLoop
+					}
+				}
 			case <-dow.ctx.Done():
 				return
 			}

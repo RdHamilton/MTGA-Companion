@@ -179,8 +179,8 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 			continue
 		}
 
-		// Track if we've found a draft start
-		if IsPackEvent(event.Type) && !draftStartFound {
+		// Track if we've found a draft start (not sealed)
+		if IsPackEvent(event.Type) && event.Type != LogEventGrantCardPool && event.Type != LogEventCoursesCardPool {
 			draftStartFound = true
 		}
 
@@ -194,6 +194,8 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 		// Continue parsing all events to build up complete draft state
 	}
+
+	fmt.Printf("[DEBUG] Scanned %d lines, draft found: %v\n", lineNumber, draftStartFound)
 
 	// If we found a draft and have a current state, check if it's still active
 	o.mu.Lock()
@@ -260,6 +262,12 @@ func (o *Overlay) processLogLine(line string) {
 	// Parse log entry
 	event, err := o.parser.ParseLogEntry(line, timestamp)
 	if err != nil || event == nil {
+		return
+	}
+
+	// Skip Sealed events (they interfere with active drafts)
+	if event.Type == LogEventGrantCardPool || event.Type == LogEventCoursesCardPool {
+		fmt.Printf("[DEBUG] Skipping Sealed event: %s\n", event.Type)
 		return
 	}
 
