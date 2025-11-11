@@ -57,7 +57,7 @@ func NewDownloader(options DownloaderOptions) (*Downloader, error) {
 		return nil, fmt.Errorf("17Lands client is required")
 	}
 	if options.ScryfallClient == nil {
-		return nil, fmt.Errorf("Scryfall client is required")
+		return nil, fmt.Errorf("scryfall client is required")
 	}
 
 	setsDir := options.SetsDir
@@ -66,7 +66,7 @@ func NewDownloader(options DownloaderOptions) (*Downloader, error) {
 	}
 
 	// Ensure sets directory exists
-	if err := os.MkdirAll(setsDir, 0755); err != nil {
+	if err := os.MkdirAll(setsDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create sets directory: %w", err)
 	}
 
@@ -402,7 +402,7 @@ func (d *Downloader) SaveSetFile(setFile *SetFile, setCode, format string) error
 		return fmt.Errorf("failed to marshal set file: %w", err)
 	}
 
-	if err := os.WriteFile(filepath, data, 0644); err != nil {
+	if err := os.WriteFile(filepath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write set file: %w", err)
 	}
 
