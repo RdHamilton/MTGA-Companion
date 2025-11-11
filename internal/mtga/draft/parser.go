@@ -42,6 +42,11 @@ func (p *Parser) ParseLogEntry(line string, timestamp time.Time) (*LogEvent, err
 // detectEventType detects the type of draft event from a log line.
 // Returns the event type and the JSON payload string.
 func (p *Parser) detectEventType(line string) (LogEventType, string) {
+	// Check for BotDraft module (Quick Draft with escaped Payload)
+	if strings.Contains(line, `"CurrentModule":"BotDraft"`) {
+		return p.extractBotDraftPayload(line)
+	}
+
 	// CardsInPack event (Premier Draft P1P1)
 	if strings.Contains(line, `"CardsInPack"`) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
@@ -56,7 +61,7 @@ func (p *Parser) detectEventType(line string) (LogEventType, string) {
 		}
 	}
 
-	// DraftPack event (Quick Draft)
+	// DraftPack event (Quick Draft - direct format, not BotDraft module)
 	if strings.Contains(line, `"DraftPack"`) && strings.Contains(line, `"DraftStatus"`) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
 			return LogEventDraftPack, jsonStr
@@ -96,6 +101,41 @@ func (p *Parser) detectEventType(line string) (LogEventType, string) {
 		if jsonStr := extractJSON(line); jsonStr != "" {
 			return LogEventCoursesCardPool, jsonStr
 		}
+	}
+
+	return "", ""
+}
+
+// extractBotDraftPayload extracts and unescapes the Payload from BotDraft module logs.
+// BotDraft logs have format: {"CurrentModule":"BotDraft","Payload":"{escaped JSON}"}
+func (p *Parser) extractBotDraftPayload(line string) (LogEventType, string) {
+	// Extract outer JSON
+	outerJSON := extractJSON(line)
+	if outerJSON == "" {
+		return "", ""
+	}
+
+	// Parse outer JSON to get Payload field
+	var envelope struct {
+		CurrentModule string `json:"CurrentModule"`
+		Payload       string `json:"Payload"`
+	}
+
+	if err := json.Unmarshal([]byte(outerJSON), &envelope); err != nil {
+		return "", ""
+	}
+
+	// Payload contains escaped JSON - it's already a string, so we can use it directly
+	payloadJSON := envelope.Payload
+
+	// Determine event type based on content
+	if strings.Contains(payloadJSON, `"DraftPack"`) && strings.Contains(payloadJSON, `"DraftStatus"`) {
+		return LogEventDraftPack, payloadJSON
+	}
+
+	// Check for pick events (the response after making a pick)
+	if strings.Contains(payloadJSON, `"PickInfo"`) {
+		return LogEventBotDraftPick, payloadJSON
 	}
 
 	return "", ""
