@@ -236,7 +236,7 @@ func (st *StalenessTracker) getStatisticsStaleness(ctx context.Context) (*statis
 	if err != nil {
 		return &result, nil // Return counts even if sets query fails
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var setCode string
@@ -265,7 +265,7 @@ func (st *StalenessTracker) GetStaleCards(ctx context.Context, limit int) ([]Ref
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []RefreshItem
 	for rows.Next() {
@@ -308,7 +308,7 @@ func (st *StalenessTracker) GetStaleStats(ctx context.Context) ([]RefreshItem, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []RefreshItem
 	for rows.Next() {
