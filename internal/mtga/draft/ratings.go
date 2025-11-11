@@ -156,6 +156,22 @@ func (rp *RatingsProvider) GetCardRating(cardID int, colorFilter string) (*CardR
 	return rating, nil
 }
 
+// getCardData retrieves the full card data for a card ID.
+// This is used internally by the deck builder to access DeckColors information.
+func (rp *RatingsProvider) getCardData(cardID int) *seventeenlands.CardRatingData {
+	if rp.setFile == nil {
+		return nil
+	}
+
+	cardKey := fmt.Sprintf("%d", cardID)
+	cardData, ok := rp.setFile.CardRatings[cardKey]
+	if !ok {
+		return nil
+	}
+
+	return cardData
+}
+
 // calculateBayesianGIHWR applies Bayesian averaging to GIHWR.
 // Formula: (PriorWeight * PriorMean + GIH * ObservedWR) / (PriorWeight + GIH)
 func (rp *RatingsProvider) calculateBayesianGIHWR(observedGIHWR float64, gih int) float64 {
