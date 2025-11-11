@@ -45,13 +45,13 @@ type Updater struct {
 // NewUpdater creates a new draft data updater.
 func NewUpdater(config UpdaterConfig) (*Updater, error) {
 	if config.ScryfallClient == nil {
-		return nil, fmt.Errorf("ScryfallClient is required")
+		return nil, fmt.Errorf("scryfallClient is required")
 	}
 	if config.SeventeenLandsClient == nil {
-		return nil, fmt.Errorf("SeventeenLandsClient is required")
+		return nil, fmt.Errorf("seventeenLandsClient is required")
 	}
 	if config.Storage == nil {
-		return nil, fmt.Errorf("Storage is required")
+		return nil, fmt.Errorf("storage is required")
 	}
 
 	// Set defaults
