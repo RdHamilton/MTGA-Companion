@@ -23,6 +23,7 @@ type DraftOverlayWindow struct {
 	packContainer *fyne.Container
 	colorLabel    *widget.Label
 	statusLabel   *widget.Label
+	updateChan    chan *draft.OverlayUpdate
 }
 
 // NewDraftOverlayWindow creates a new draft overlay window.
@@ -30,13 +31,19 @@ func NewDraftOverlayWindow(overlayConfig draft.OverlayConfig) *DraftOverlayWindo
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dow := &DraftOverlayWindow{
-		app:    app.New(),
-		ctx:    ctx,
-		cancel: cancel,
+		app:        app.New(),
+		ctx:        ctx,
+		cancel:     cancel,
+		updateChan: make(chan *draft.OverlayUpdate, 10),
 	}
 
-	// Set update callback
-	overlayConfig.UpdateCallback = dow.handleUpdate
+	// Set update callback to send to channel for thread-safe UI updates
+	overlayConfig.UpdateCallback = func(update *draft.OverlayUpdate) {
+		select {
+		case dow.updateChan <- update:
+		case <-dow.ctx.Done():
+		}
+	}
 
 	// Create overlay controller
 	dow.overlay = draft.NewOverlay(overlayConfig)
@@ -78,9 +85,22 @@ func (dow *DraftOverlayWindow) Run() {
 		}
 	}()
 
+	// Process updates from channel on UI thread (thread-safe)
+	go func() {
+		for {
+			select {
+			case update := <-dow.updateChan:
+				dow.handleUpdate(update)
+			case <-dow.ctx.Done():
+				return
+			}
+		}
+	}()
+
 	// Handle window close
 	dow.window.SetOnClosed(func() {
 		dow.cancel()
+		close(dow.updateChan)
 	})
 
 	dow.window.ShowAndRun()

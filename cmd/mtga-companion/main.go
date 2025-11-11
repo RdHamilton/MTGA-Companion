@@ -39,6 +39,15 @@ var (
 	enableMetrics = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
 	useFileEvents = flag.Bool("use-file-events", true, "Use file system events (fsnotify) for monitoring")
 	useGUI        = flag.Bool("gui", false, "Launch GUI mode instead of CLI")
+
+	// Draft Overlay flags
+	draftOverlay    = flag.Bool("draft-overlay", false, "Launch draft overlay mode")
+	setFilePath     = flag.String("set-file", "", "Path to 17Lands set file for draft overlay")
+	logPath         = flag.String("log-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
+	overlaySetCode  = flag.String("overlay-set", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
+	overlayFormat   = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
+	overlayResume   = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
+	overlayLookback = flag.Int("overlay-lookback", 24, "How many hours back to scan for active draft (default: 24)")
 )
 
 // getDBPath returns the database path from environment variable or default location.
@@ -64,6 +73,12 @@ func main() {
 	}
 	if *pollInterval > 1*time.Minute {
 		log.Fatalf("Poll interval must be at most 1 minute, got %v", *pollInterval)
+	}
+
+	// Check if draft overlay mode is requested
+	if *draftOverlay {
+		runDraftOverlay()
+		return
 	}
 
 	// Check if this is a migration command

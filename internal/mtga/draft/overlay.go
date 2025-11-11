@@ -24,6 +24,8 @@ type Overlay struct {
 	logPath         string
 	updateCallback  func(*OverlayUpdate)
 	stopChan        chan struct{}
+	resumeEnabled   bool
+	lookbackHours   int
 	mu              sync.RWMutex
 }
 
@@ -35,6 +37,8 @@ type OverlayConfig struct {
 	ColorConfig    ColorAffinityConfig
 	UpdateCallback func(*OverlayUpdate)
 	PollInterval   time.Duration // How often to check log for updates
+	ResumeEnabled  bool          // Whether to scan log history for active draft
+	LookbackHours  int           // How many hours back to scan (default: 24)
 }
 
 // OverlayUpdate represents an update to send to the UI.
@@ -76,6 +80,10 @@ func NewOverlay(config OverlayConfig) *Overlay {
 		config.PollInterval = 500 * time.Millisecond
 	}
 
+	if config.LookbackHours == 0 {
+		config.LookbackHours = 24 // Default to last 24 hours
+	}
+
 	return &Overlay{
 		parser:          parser,
 		ratingsProvider: ratingsProvider,
@@ -83,6 +91,8 @@ func NewOverlay(config OverlayConfig) *Overlay {
 		logPath:         config.LogPath,
 		updateCallback:  config.UpdateCallback,
 		stopChan:        make(chan struct{}),
+		resumeEnabled:   config.ResumeEnabled,
+		lookbackHours:   config.LookbackHours,
 	}
 }
 
@@ -97,6 +107,14 @@ func (o *Overlay) Start(ctx context.Context) error {
 			err = closeErr
 		}
 	}()
+
+	// If resume is enabled, scan log history for active draft
+	if o.resumeEnabled {
+		if err := o.scanForActiveDraft(file); err != nil {
+			// Log error but continue - we'll just wait for new draft
+			fmt.Printf("Failed to scan for active draft: %v\n", err)
+		}
+	}
 
 	// Seek to end of file to only process new entries
 	if _, err := file.Seek(0, io.SeekEnd); err != nil {
@@ -126,6 +144,78 @@ func (o *Overlay) Start(ctx context.Context) error {
 // Stop stops the overlay monitoring.
 func (o *Overlay) Stop() {
 	close(o.stopChan)
+}
+
+// scanForActiveDraft scans the log file history for an active draft.
+// Returns nil if active draft found and state restored, error otherwise.
+func (o *Overlay) scanForActiveDraft(file *os.File) error {
+	// Seek to beginning of file
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to start of log: %w", err)
+	}
+
+	scanner := bufio.NewScanner(file)
+	lineNumber := 0
+	draftStartFound := false
+
+	// Scan through entire log file
+	for scanner.Scan() {
+		lineNumber++
+		line := scanner.Text()
+
+		// Parse log entry
+		event, err := o.parser.ParseLogEntry(line, time.Now())
+		if err != nil || event == nil {
+			continue
+		}
+
+		// Track if we've found a draft start
+		if IsPackEvent(event.Type) && !draftStartFound {
+			draftStartFound = true
+		}
+
+		// Update parser state
+		o.mu.Lock()
+		if err := o.parser.UpdateState(event); err != nil {
+			o.mu.Unlock()
+			continue
+		}
+		o.mu.Unlock()
+
+		// Continue parsing all events to build up complete draft state
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error scanning log file: %w", err)
+	}
+
+	// If we found a draft and have a current state, check if it's still active
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	o.currentState = o.parser.GetCurrentState()
+	if o.currentState == nil || !draftStartFound {
+		return fmt.Errorf("no active draft found")
+	}
+
+	// If draft is marked as in progress and we have a pack, resume it
+	if o.currentState.Event.InProgress && o.currentState.CurrentPack != nil {
+		// Send draft start update
+		if o.updateCallback != nil {
+			o.updateCallback(&OverlayUpdate{
+				Type:       UpdateTypeDraftStart,
+				DraftState: o.currentState,
+				Timestamp:  time.Now(),
+			})
+		}
+
+		// Trigger pack event to show current pack ratings
+		o.handlePackEvent()
+
+		return nil
+	}
+
+	return fmt.Errorf("draft found but not in progress")
 }
 
 // processNewLogLines reads and processes any new lines from the log.
