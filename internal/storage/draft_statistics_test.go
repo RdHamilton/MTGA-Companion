@@ -226,7 +226,7 @@ func TestGetStaleCardRatings(t *testing.T) {
 	}
 
 	// Wait for timestamps to differ (SQLite CURRENT_TIMESTAMP has 1-second resolution)
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	ratings2 := []seventeenlands.CardRating{
 		{MTGAID: 2, GIHWR: 0.55, GamesPlayed: 200},
@@ -236,8 +236,9 @@ func TestGetStaleCardRatings(t *testing.T) {
 		t.Fatalf("SaveCardRatings failed: %v", err)
 	}
 
-	// Check for stale ratings (older than 1 second - should find first one)
-	stale, err := svc.GetStaleCardRatings(ctx, 1*time.Second)
+	// Check for stale ratings (older than 2 seconds - should find first one only)
+	// First rating is 3+ seconds old, second rating is fresh
+	stale, err := svc.GetStaleCardRatings(ctx, 2*time.Second)
 	if err != nil {
 		t.Fatalf("GetStaleCardRatings failed: %v", err)
 	}
