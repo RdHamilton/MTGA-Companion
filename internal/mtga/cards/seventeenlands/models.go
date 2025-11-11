@@ -105,10 +105,11 @@ type ClientStats struct {
 
 // Error types for 17Lands API
 const (
-	ErrRateLimited   = "rate_limited"
-	ErrUnavailable   = "unavailable"
-	ErrInvalidParams = "invalid_params"
-	ErrParseError    = "parse_error"
+	ErrRateLimited      = "rate_limited"
+	ErrUnavailable      = "unavailable"
+	ErrInvalidParams    = "invalid_params"
+	ErrParseError       = "parse_error"
+	ErrStatsUnavailable = "stats_unavailable" // No data available (API failed, no cache)
 )
 
 // APIError represents an error from the 17Lands API.

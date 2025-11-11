@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,9 +16,6 @@ import (
 )
 
 const (
-	// APIBase is the base URL for 17Lands API
-	APIBase = "https://www.17lands.com"
-
 	// Request timeout
 	DefaultTimeout = 30 * time.Second
 
@@ -27,13 +25,33 @@ const (
 	BackoffFactor  = 2.0
 )
 
+// APIBase is the base URL for 17Lands API (variable for testing).
+var APIBase = "https://www.17lands.com"
+
 // Conservative rate limit: 1 request per second
 var DefaultRateLimit = rate.Every(1 * time.Second)
+
+// CacheStorage defines the interface for caching 17Lands data.
+// Implementations should store and retrieve draft statistics for fallback when API is unavailable.
+type CacheStorage interface {
+	// SaveCardRatings caches card ratings
+	SaveCardRatings(ctx context.Context, ratings []CardRating, expansion, format, colors, startDate, endDate string) error
+
+	// GetCardRatingsForSet retrieves cached card ratings for a set
+	GetCardRatingsForSet(ctx context.Context, expansion, format, colors string) ([]CardRating, time.Time, error)
+
+	// SaveColorRatings caches color ratings
+	SaveColorRatings(ctx context.Context, ratings []ColorRating, expansion, eventType, startDate, endDate string) error
+
+	// GetColorRatings retrieves cached color ratings
+	GetColorRatings(ctx context.Context, expansion, eventType string) ([]ColorRating, time.Time, error)
+}
 
 // Client provides access to 17Lands draft statistics.
 type Client struct {
 	httpClient *http.Client
 	limiter    *rate.Limiter
+	cache      CacheStorage // Optional cache for fallback
 	stats      *ClientStats
 	statsMu    sync.RWMutex
 
@@ -53,6 +71,9 @@ type ClientOptions struct {
 
 	// HTTPClient allows custom HTTP client
 	HTTPClient *http.Client
+
+	// Cache provides fallback storage when API is unavailable (optional)
+	Cache CacheStorage
 }
 
 // DefaultClientOptions returns conservative default options.
@@ -82,12 +103,14 @@ func NewClient(options ClientOptions) *Client {
 	return &Client{
 		httpClient: httpClient,
 		limiter:    rate.NewLimiter(options.RateLimit, 1),
+		cache:      options.Cache,
 		stats:      &ClientStats{},
 		backoff:    InitialBackoff,
 	}
 }
 
 // GetCardRatings fetches card performance statistics for a set.
+// If the API is unavailable, falls back to cached data.
 func (c *Client) GetCardRatings(ctx context.Context, params QueryParams) ([]CardRating, error) {
 	// Validate required parameters
 	if params.Expansion == "" {
@@ -115,16 +138,43 @@ func (c *Client) GetCardRatings(ctx context.Context, params QueryParams) ([]Card
 	if params.EndDate != "" {
 		queryParams.Set("end_date", params.EndDate)
 	}
+
+	// Prepare colors for cache key
+	colors := ""
 	if len(params.Colors) > 0 {
-		queryParams.Set("colors", strings.Join(params.Colors, ""))
+		colors = strings.Join(params.Colors, "")
+		queryParams.Set("colors", colors)
 	}
 
 	fullURL := endpoint + "?" + queryParams.Encode()
 
-	// Make request
+	// Try API request
 	body, err := c.doRequest(ctx, fullURL)
 	if err != nil {
-		return nil, err
+		// API failed - try cache fallback if available
+		if c.cache != nil {
+			log.Printf("[17Lands] API unavailable, attempting cache fallback: %v", err)
+			cached, cachedAt, cacheErr := c.cache.GetCardRatingsForSet(ctx, params.Expansion, params.Format, colors)
+			if cacheErr == nil && len(cached) > 0 {
+				age := time.Since(cachedAt)
+				log.Printf("[17Lands] Using cached card ratings (age: %v, count: %d)", age, len(cached))
+
+				// Update stats
+				c.updateStats(func(s *ClientStats) {
+					s.CachedResponses++
+				})
+
+				return cached, nil
+			}
+			log.Printf("[17Lands] Cache miss or empty: %v", cacheErr)
+		}
+
+		// No cache available or cache failed
+		return nil, &APIError{
+			Type:    ErrStatsUnavailable,
+			Message: "17Lands API unavailable and no cached data available",
+			Err:     err,
+		}
 	}
 
 	// Parse response
@@ -137,10 +187,19 @@ func (c *Client) GetCardRatings(ctx context.Context, params QueryParams) ([]Card
 		}
 	}
 
+	// Cache successful response if cache is available
+	if c.cache != nil && len(ratings) > 0 {
+		if err := c.cache.SaveCardRatings(ctx, ratings, params.Expansion, params.Format, colors, params.StartDate, params.EndDate); err != nil {
+			log.Printf("[17Lands] Failed to cache card ratings: %v", err)
+			// Don't fail the request if caching fails
+		}
+	}
+
 	return ratings, nil
 }
 
 // GetColorRatings fetches color combination performance statistics.
+// If the API is unavailable, falls back to cached data.
 func (c *Client) GetColorRatings(ctx context.Context, params QueryParams) ([]ColorRating, error) {
 	// Validate required parameters
 	if params.Expansion == "" {
@@ -174,10 +233,33 @@ func (c *Client) GetColorRatings(ctx context.Context, params QueryParams) ([]Col
 
 	fullURL := endpoint + "?" + queryParams.Encode()
 
-	// Make request
+	// Try API request
 	body, err := c.doRequest(ctx, fullURL)
 	if err != nil {
-		return nil, err
+		// API failed - try cache fallback if available
+		if c.cache != nil {
+			log.Printf("[17Lands] API unavailable, attempting cache fallback: %v", err)
+			cached, cachedAt, cacheErr := c.cache.GetColorRatings(ctx, params.Expansion, params.EventType)
+			if cacheErr == nil && len(cached) > 0 {
+				age := time.Since(cachedAt)
+				log.Printf("[17Lands] Using cached color ratings (age: %v, count: %d)", age, len(cached))
+
+				// Update stats
+				c.updateStats(func(s *ClientStats) {
+					s.CachedResponses++
+				})
+
+				return cached, nil
+			}
+			log.Printf("[17Lands] Cache miss or empty: %v", cacheErr)
+		}
+
+		// No cache available or cache failed
+		return nil, &APIError{
+			Type:    ErrStatsUnavailable,
+			Message: "17Lands API unavailable and no cached data available",
+			Err:     err,
+		}
 	}
 
 	// Parse response
@@ -187,6 +269,14 @@ func (c *Client) GetColorRatings(ctx context.Context, params QueryParams) ([]Col
 			Type:    ErrParseError,
 			Message: "failed to parse color ratings response",
 			Err:     err,
+		}
+	}
+
+	// Cache successful response if cache is available
+	if c.cache != nil && len(ratings) > 0 {
+		if err := c.cache.SaveColorRatings(ctx, ratings, params.Expansion, params.EventType, params.StartDate, params.EndDate); err != nil {
+			log.Printf("[17Lands] Failed to cache color ratings: %v", err)
+			// Don't fail the request if caching fails
 		}
 	}
 
