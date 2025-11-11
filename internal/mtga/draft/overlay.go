@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 )
 
@@ -123,12 +124,25 @@ func (o *Overlay) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to seek to end of log: %w", err)
 	}
 
-	fmt.Println("[INFO] Monitoring log file for draft events...")
+	fmt.Println("[INFO] Monitoring log file for draft events (using file system notifications)...")
 	fmt.Println()
 
+	// Create file watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create file watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// Watch the log file for changes
+	if err := watcher.Add(o.logPath); err != nil {
+		return fmt.Errorf("failed to watch log file: %w", err)
+	}
+
 	reader := bufio.NewReader(file)
-	// Poll every 20ms for minimal latency (note: MTGA log writing itself may add delay)
-	ticker := time.NewTicker(20 * time.Millisecond)
+
+	// Also keep a ticker as backup (in case file events are delayed)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -137,10 +151,18 @@ func (o *Overlay) Start(ctx context.Context) error {
 			return ctx.Err()
 		case <-o.stopChan:
 			return nil
+		case event := <-watcher.Events:
+			// File was modified - read new content immediately
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				if err := o.processNewLogLines(reader); err != nil {
+					continue
+				}
+			}
+		case err := <-watcher.Errors:
+			fmt.Printf("[WARN] File watcher error: %v\n", err)
 		case <-ticker.C:
-			// Read new lines from the log
+			// Backup polling in case file events are missed
 			if err := o.processNewLogLines(reader); err != nil {
-				// Log error but continue monitoring
 				continue
 			}
 		}
