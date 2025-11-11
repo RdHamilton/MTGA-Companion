@@ -37,6 +37,9 @@ type MatchRepository interface {
 	// If accountID is 0, returns the latest match for all accounts.
 	GetLatestMatch(ctx context.Context, accountID int) (*models.Match, error)
 
+	// GetMatches retrieves matches based on the given filter with advanced filtering support.
+	GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error)
+
 	// GetStats calculates statistics based on the given filter.
 	GetStats(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error)
 
@@ -61,6 +64,105 @@ type matchRepository struct {
 // NewMatchRepository creates a new match repository.
 func NewMatchRepository(db *sql.DB) MatchRepository {
 	return &matchRepository{db: db}
+}
+
+// buildFilterWhereClause constructs a WHERE clause and args from a StatsFilter.
+// This supports advanced filtering including multiple formats, rank ranges, opponent filters, etc.
+func buildFilterWhereClause(filter models.StatsFilter) (where string, args []interface{}) {
+	where = "WHERE 1=1"
+	args = make([]interface{}, 0)
+
+	// Account filter
+	if filter.AccountID != nil && *filter.AccountID > 0 {
+		where += " AND account_id = ?"
+		args = append(args, *filter.AccountID)
+	}
+
+	// Date range filters
+	if filter.StartDate != nil {
+		where += " AND timestamp >= ?"
+		args = append(args, *filter.StartDate)
+	}
+	if filter.EndDate != nil {
+		where += " AND timestamp <= ?"
+		args = append(args, *filter.EndDate)
+	}
+
+	// Format filters (support both single and multiple)
+	if len(filter.Formats) > 0 {
+		// Multiple formats with OR logic
+		placeholders := ""
+		for i, format := range filter.Formats {
+			if i > 0 {
+				placeholders += ", "
+			}
+			placeholders += "?"
+			args = append(args, format)
+		}
+		where += fmt.Sprintf(" AND format IN (%s)", placeholders)
+	} else if filter.Format != nil {
+		// Single format (backward compatibility)
+		where += " AND format = ?"
+		args = append(args, *filter.Format)
+	}
+
+	// Deck filter
+	if filter.DeckID != nil {
+		where += " AND deck_id = ?"
+		args = append(args, *filter.DeckID)
+	}
+
+	// Event filters
+	if len(filter.EventNames) > 0 {
+		// Multiple event names with OR logic
+		placeholders := ""
+		for i, eventName := range filter.EventNames {
+			if i > 0 {
+				placeholders += ", "
+			}
+			placeholders += "?"
+			args = append(args, eventName)
+		}
+		where += fmt.Sprintf(" AND event_name IN (%s)", placeholders)
+	} else if filter.EventName != nil {
+		// Single event name
+		where += " AND event_name = ?"
+		args = append(args, *filter.EventName)
+	}
+
+	// Opponent filters
+	if filter.OpponentName != nil {
+		where += " AND opponent_name = ?"
+		args = append(args, *filter.OpponentName)
+	}
+	if filter.OpponentID != nil {
+		where += " AND opponent_id = ?"
+		args = append(args, *filter.OpponentID)
+	}
+
+	// Result filter
+	if filter.Result != nil {
+		where += " AND result = ?"
+		args = append(args, *filter.Result)
+	}
+
+	// Result reason filter
+	if filter.ResultReason != nil {
+		where += " AND result_reason = ?"
+		args = append(args, *filter.ResultReason)
+	}
+
+	// Rank filters (uses LIKE for rank_before or rank_after)
+	if filter.RankClass != nil {
+		where += " AND (rank_before LIKE ? OR rank_after LIKE ?)"
+		rankPattern := "%" + *filter.RankClass + "%"
+		args = append(args, rankPattern, rankPattern)
+	}
+	// Note: RankMinClass and RankMaxClass would require parsing rank strings
+	// which is complex (Bronze < Silver < Gold < Platinum < Diamond < Mythic)
+	// Deferring this for now as it requires rank comparison logic
+
+	return where, args
 }
 
 // Create inserts a new match into the database.
@@ -306,32 +408,71 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string, accoun
 	return matches, nil
 }
 
+// GetMatches retrieves matches based on the given filter with advanced filtering support.
+func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
+	// Build WHERE clause using the new filter builder
+	where, args := buildFilterWhereClause(filter)
+
+	query := fmt.Sprintf(`
+		SELECT
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
+			player_wins, opponent_wins, player_team_id, deck_id,
+			rank_before, rank_after, format, result, result_reason,
+			opponent_name, opponent_id, created_at
+		FROM matches
+		%s
+		ORDER BY timestamp DESC
+	`, where)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filtered matches: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
+
+	var matches []*models.Match
+	for rows.Next() {
+		match := &models.Match{}
+		err := rows.Scan(
+			&match.ID,
+			&match.AccountID,
+			&match.EventID,
+			&match.EventName,
+			&match.Timestamp,
+			&match.DurationSeconds,
+			&match.PlayerWins,
+			&match.OpponentWins,
+			&match.PlayerTeamID,
+			&match.DeckID,
+			&match.RankBefore,
+			&match.RankAfter,
+			&match.Format,
+			&match.Result,
+			&match.ResultReason,
+			&match.OpponentName,
+			&match.OpponentID,
+			&match.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan match: %w", err)
+		}
+		matches = append(matches, match)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating matches: %w", err)
+	}
+
+	return matches, nil
+}
+
 // GetStats calculates statistics based on the given filter.
 func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error) {
-	// Build WHERE clause based on filter
-	where := "WHERE 1=1"
-	args := make([]interface{}, 0)
-
-	if filter.AccountID != nil && *filter.AccountID > 0 {
-		where += " AND account_id = ?"
-		args = append(args, *filter.AccountID)
-	}
-	if filter.StartDate != nil {
-		where += " AND timestamp >= ?"
-		args = append(args, *filter.StartDate)
-	}
-	if filter.EndDate != nil {
-		where += " AND timestamp <= ?"
-		args = append(args, *filter.EndDate)
-	}
-	if filter.Format != nil {
-		where += " AND format = ?"
-		args = append(args, *filter.Format)
-	}
-	if filter.DeckID != nil {
-		where += " AND deck_id = ?"
-		args = append(args, *filter.DeckID)
-	}
+	// Build WHERE clause using the new filter builder
+	where, args := buildFilterWhereClause(filter)
 
 	// Query for match statistics
 	matchQuery := fmt.Sprintf(`

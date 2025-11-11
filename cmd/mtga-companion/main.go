@@ -1983,10 +1983,18 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 	overwrite := true
 	var startDate, endDate *time.Time
 	var formatFilter *string
-	periodType := "daily"   // Default for trend exports
-	recentDays := 30        // Default for result comparison exports
-	recentMatches := 30     // Default for prediction analysis window
-	projectionMatches := 10 // Default for prediction projection
+	var formats []string         // Multiple format filter
+	var eventName *string        // Event name filter
+	var eventNames []string      // Multiple event names
+	var opponentName *string     // Opponent name filter
+	var opponentID *string       // Opponent ID filter
+	var result *string           // Result filter (win/loss)
+	var rankClass *string        // Rank class filter
+	var resultReason *string     // Result reason filter
+	periodType := "daily"        // Default for trend exports
+	recentDays := 30             // Default for result comparison exports
+	recentMatches := 30          // Default for prediction analysis window
+	projectionMatches := 10      // Default for prediction projection
 
 	// Parse flags from args
 	for i := 1; i < len(args); i++ {
@@ -2018,6 +2026,48 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		case "-format", "--format":
 			if i+1 < len(args) {
 				formatFilter = &args[i+1]
+				i++
+			}
+		case "-formats", "--formats":
+			// Parse comma-separated list of formats
+			if i+1 < len(args) {
+				formats = strings.Split(args[i+1], ",")
+				i++
+			}
+		case "-event", "--event":
+			if i+1 < len(args) {
+				eventName = &args[i+1]
+				i++
+			}
+		case "-events", "--events":
+			// Parse comma-separated list of events
+			if i+1 < len(args) {
+				eventNames = strings.Split(args[i+1], ",")
+				i++
+			}
+		case "-opponent", "--opponent":
+			if i+1 < len(args) {
+				opponentName = &args[i+1]
+				i++
+			}
+		case "-opponent-id", "--opponent-id":
+			if i+1 < len(args) {
+				opponentID = &args[i+1]
+				i++
+			}
+		case "-result", "--result":
+			if i+1 < len(args) {
+				result = &args[i+1]
+				i++
+			}
+		case "-rank", "--rank":
+			if i+1 < len(args) {
+				rankClass = &args[i+1]
+				i++
+			}
+		case "-reason", "--reason":
+			if i+1 < len(args) {
+				resultReason = &args[i+1]
 				i++
 			}
 		case "-period", "--period":
@@ -2327,9 +2377,17 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 
 	// Create filter for statistics exports
 	filter := models.StatsFilter{
-		StartDate: startDate,
-		EndDate:   endDate,
-		Format:    formatFilter,
+		StartDate:    startDate,
+		EndDate:      endDate,
+		Format:       formatFilter,
+		Formats:      formats,
+		EventName:    eventName,
+		EventNames:   eventNames,
+		OpponentName: opponentName,
+		OpponentID:   opponentID,
+		Result:       result,
+		RankClass:    rankClass,
+		ResultReason: resultReason,
 	}
 
 	// Execute export based on type
@@ -3208,12 +3266,23 @@ func printExportHelp() {
 	fmt.Println("  -start, --start-date <date>       - Start date (YYYY-MM-DD)")
 	fmt.Println("  -end, --end-date <date>           - End date (YYYY-MM-DD)")
 	fmt.Println("  -format, --format <format>        - Filter by format (constructed/limited)")
+	fmt.Println("  -formats, --formats <list>        - Filter by multiple formats (comma-separated)")
+	fmt.Println("  -event, --event <name>            - Filter by event name")
+	fmt.Println("  -events, --events <list>          - Filter by multiple events (comma-separated)")
+	fmt.Println("  -opponent, --opponent <name>      - Filter by opponent name")
+	fmt.Println("  -opponent-id, --opponent-id <id>  - Filter by opponent ID")
+	fmt.Println("  -result, --result <win|loss>      - Filter by match result")
+	fmt.Println("  -rank, --rank <class>             - Filter by rank class (e.g., Mythic, Diamond)")
+	fmt.Println("  -reason, --reason <reason>        - Filter by result reason (e.g., concede, timeout)")
 	fmt.Println("  -period, --period <type>          - Period type: daily, weekly, monthly (default: daily)")
 	fmt.Println("  -recent, --recent-days <days>     - Recent period in days (default: 30)")
 	fmt.Println("  -window, --recent-matches <num>   - Recent matches for prediction analysis (default: 30)")
 	fmt.Println("  -project, --projection <num>      - Matches ahead to project (default: 10)")
 	fmt.Println("\nExamples:")
 	fmt.Println("  export matches -json              - Export all matches as JSON")
+	fmt.Println("  export matches -formats Standard,Historic -json - Export matches from multiple formats")
+	fmt.Println("  export matches -rank Mythic -result win -json - Export all Mythic wins")
+	fmt.Println("  export matches -opponent \"PlayerName\" -csv  - Export matches vs specific opponent")
 	fmt.Println("  export stats -csv -o stats.csv")
 	fmt.Println("  export trends -start 2024-01-01 -end 2024-12-31 -period daily")
 	fmt.Println("  export results -json              - Export result breakdown as JSON")

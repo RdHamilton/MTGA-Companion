@@ -426,47 +426,22 @@ func (s *Service) GetRecentMatches(ctx context.Context, days int) ([]*Match, err
 	return s.matches.GetByDateRange(ctx, start, end, s.currentAccountID)
 }
 
-// GetMatches retrieves matches based on the given filter.
+// GetMatches retrieves matches based on the given filter with advanced filtering support.
+// This method now supports multiple formats, rank filters, opponent filters, and more.
 func (s *Service) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
 	// Use account filter if specified, otherwise use current account
-	accountID := s.currentAccountID
-	if filter.AccountID != nil {
-		if *filter.AccountID == 0 {
-			// 0 means all accounts
-			accountID = 0
-		} else {
-			accountID = *filter.AccountID
-		}
+	if filter.AccountID == nil {
+		accountID := s.currentAccountID
+		filter.AccountID = &accountID
+	} else if *filter.AccountID == 0 {
+		// 0 means all accounts - keep as nil
+		filter.AccountID = nil
 	}
 
-	var start, end time.Time
-	if filter.StartDate != nil {
-		start = *filter.StartDate
-	} else {
-		// Default to all time if no start date
-		start = time.Time{}
-	}
-	if filter.EndDate != nil {
-		end = *filter.EndDate
-	} else {
-		// Default to now if no end date
-		end = time.Now()
-	}
-
-	matches, err := s.matches.GetByDateRange(ctx, start, end, accountID)
+	// Use the repository's GetMatches method which supports advanced filtering
+	matches, err := s.matches.GetMatches(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matches: %w", err)
-	}
-
-	// Filter by format if specified
-	if filter.Format != nil {
-		filtered := []*models.Match{}
-		for _, match := range matches {
-			if match.Format == *filter.Format {
-				filtered = append(filtered, match)
-			}
-		}
-		return filtered, nil
 	}
 
 	return matches, nil
