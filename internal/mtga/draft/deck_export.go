@@ -16,7 +16,7 @@ func ExportDeckToArena(recommendation *DeckRecommendation) string {
 	var sb strings.Builder
 
 	// Write deck header
-	sb.WriteString(fmt.Sprintf("Deck\n"))
+	sb.WriteString("Deck\n")
 
 	// Write main deck cards
 	cardCounts := make(map[string]int)
@@ -58,7 +58,7 @@ func ExportDeckToFile(recommendation *DeckRecommendation, filename string) error
 		return fmt.Errorf("no deck data to export")
 	}
 
-	return os.WriteFile(filename, []byte(deckString), 0644)
+	return os.WriteFile(filename, []byte(deckString), 0o644)
 }
 
 // getBasicLandName returns the basic land name for a color.

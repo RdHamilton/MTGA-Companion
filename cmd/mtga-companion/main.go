@@ -29,6 +29,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/unified"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/setguide"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/viewer"
@@ -120,6 +121,12 @@ func main() {
 	// Check if this is a sets command
 	if len(os.Args) > 1 && os.Args[1] == "sets" {
 		runSetsCommand()
+		return
+	}
+
+	// Check if this is a set-guide command
+	if len(os.Args) > 1 && os.Args[1] == "set-guide" {
+		runSetGuideCommand()
 		return
 	}
 
@@ -5348,4 +5355,328 @@ func runSetsDelete() {
 	}
 
 	fmt.Printf("✓ Deleted set file: %s_%s_data.json\n", *setCode, *format)
+}
+
+// Set Guide Commands
+
+func runSetGuideCommand() {
+	if len(os.Args) < 3 {
+		printSetGuideUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[2]
+
+	switch command {
+	case "overview":
+		runSetGuideOverview()
+	case "tier-list":
+		runSetGuideTierList()
+	case "archetypes":
+		runSetGuideArchetypes()
+	case "colors":
+		runSetGuideColors()
+	default:
+		fmt.Printf("Unknown set-guide command: %s\n\n", command)
+		printSetGuideUsage()
+		os.Exit(1)
+	}
+}
+
+func printSetGuideUsage() {
+	fmt.Println("Usage: mtga-companion set-guide <command> [options]")
+	fmt.Println()
+	fmt.Println("Pre-draft preparation and set analysis using 17Lands data.")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  overview <set-code>                          Show set overview with top cards and archetypes")
+	fmt.Println("  tier-list <set-code> [options]               Show card tier list sorted by GIHWR")
+	fmt.Println("  archetypes <set-code>                        Show draft archetypes for the set")
+	fmt.Println("  colors <set-code>                            Show color pair win rates")
+	fmt.Println()
+	fmt.Println("Tier List Options:")
+	fmt.Println("  --rarity <common|uncommon|rare|mythic>       Filter by rarity")
+	fmt.Println("  --color <W|U|B|R|G>                          Filter by color")
+	fmt.Println("  --limit <number>                             Limit number of results (default: 50)")
+	fmt.Println("  --format <format>                            Draft format (default: PremierDraft)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  mtga-companion set-guide overview BLB")
+	fmt.Println("  mtga-companion set-guide tier-list BLB")
+	fmt.Println("  mtga-companion set-guide tier-list BLB --rarity common --limit 10")
+	fmt.Println("  mtga-companion set-guide tier-list DSK --color U --limit 20")
+	fmt.Println("  mtga-companion set-guide archetypes BLB")
+	fmt.Println("  mtga-companion set-guide colors BLB")
+	fmt.Println()
+	fmt.Println("Supported Set Codes:")
+	fmt.Println("  BLB - Bloomburrow")
+	fmt.Println("  DSK - Duskmourn: House of Horror")
+	fmt.Println("  MKM - Murders at Karlov Manor")
+	fmt.Println("  LCI - The Lost Caverns of Ixalan")
+	fmt.Println("  WOE - Wilds of Eldraine")
+	fmt.Println("  ONE - Phyrexia: All Will Be One")
+}
+
+func runSetGuideOverview() {
+	if len(os.Args) < 4 {
+		fmt.Println("Error: set code required")
+		fmt.Println("Usage: mtga-companion set-guide overview <set-code>")
+		fmt.Println("Example: mtga-companion set-guide overview BLB")
+		os.Exit(1)
+	}
+
+	setCode := strings.ToUpper(os.Args[3])
+	format := "PremierDraft"
+
+	// Parse optional format flag
+	for i := 4; i < len(os.Args); i++ {
+		if os.Args[i] == "--format" && i+1 < len(os.Args) {
+			format = os.Args[i+1]
+			i++
+		}
+	}
+
+	// Create 17Lands client
+	client := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Get cache directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+	cacheDir := filepath.Join(homeDir, ".mtga-companion", "sets")
+
+	// Create set guide
+	guide := setguide.NewSetGuide(client, cacheDir)
+
+	// Load set
+	ctx := context.Background()
+	fmt.Printf("Loading %s (%s) data from 17Lands...\n", setCode, format)
+	if err := guide.LoadSet(ctx, setCode, format); err != nil {
+		log.Fatalf("Error loading set: %v", err)
+	}
+
+	// Get overview
+	overview, err := guide.GetSetOverview(setCode)
+	if err != nil {
+		log.Fatalf("Error getting set overview: %v", err)
+	}
+
+	// Display overview
+	fmt.Print(setguide.FormatSetOverview(overview))
+}
+
+func runSetGuideTierList() {
+	if len(os.Args) < 4 {
+		fmt.Println("Error: set code required")
+		fmt.Println("Usage: mtga-companion set-guide tier-list <set-code> [options]")
+		fmt.Println("Example: mtga-companion set-guide tier-list BLB --rarity common --limit 10")
+		os.Exit(1)
+	}
+
+	setCode := strings.ToUpper(os.Args[3])
+	format := "PremierDraft"
+
+	// Parse options
+	opts := setguide.TierListOptions{
+		Limit: 50, // Default limit
+	}
+
+	for i := 4; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--rarity":
+			if i+1 < len(os.Args) {
+				opts.Rarity = os.Args[i+1]
+				i++
+			}
+		case "--color":
+			if i+1 < len(os.Args) {
+				opts.Color = strings.ToUpper(os.Args[i+1])
+				i++
+			}
+		case "--limit":
+			if i+1 < len(os.Args) {
+				limit, err := strconv.Atoi(os.Args[i+1])
+				if err != nil {
+					log.Fatalf("Invalid limit: %s", os.Args[i+1])
+				}
+				opts.Limit = limit
+				i++
+			}
+		case "--format":
+			if i+1 < len(os.Args) {
+				format = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	// Create 17Lands client
+	client := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Get cache directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+	cacheDir := filepath.Join(homeDir, ".mtga-companion", "sets")
+
+	// Create set guide
+	guide := setguide.NewSetGuide(client, cacheDir)
+
+	// Load set
+	ctx := context.Background()
+	fmt.Printf("Loading %s (%s) data from 17Lands...\n", setCode, format)
+	if err := guide.LoadSet(ctx, setCode, format); err != nil {
+		log.Fatalf("Error loading set: %v", err)
+	}
+
+	// Get tier list
+	tiers, err := guide.GetTierList(setCode, opts)
+	if err != nil {
+		log.Fatalf("Error getting tier list: %v", err)
+	}
+
+	// Build title
+	title := fmt.Sprintf("%s Tier List", setCode)
+	if opts.Rarity != "" {
+		// Capitalize first letter of rarity
+		rarity := opts.Rarity
+		if len(rarity) > 0 {
+			rarity = strings.ToUpper(rarity[:1]) + rarity[1:]
+		}
+		title = fmt.Sprintf("%s - %s", title, rarity)
+	}
+	if opts.Color != "" {
+		title = fmt.Sprintf("%s - %s", title, opts.Color)
+	}
+
+	// Display tier list
+	fmt.Print(setguide.FormatTierList(tiers, title))
+}
+
+func runSetGuideArchetypes() {
+	if len(os.Args) < 4 {
+		fmt.Println("Error: set code required")
+		fmt.Println("Usage: mtga-companion set-guide archetypes <set-code>")
+		fmt.Println("Example: mtga-companion set-guide archetypes BLB")
+		os.Exit(1)
+	}
+
+	setCode := strings.ToUpper(os.Args[3])
+	format := "PremierDraft"
+
+	// Parse optional format flag
+	for i := 4; i < len(os.Args); i++ {
+		if os.Args[i] == "--format" && i+1 < len(os.Args) {
+			format = os.Args[i+1]
+			i++
+		}
+	}
+
+	// Create 17Lands client
+	client := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Get cache directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+	cacheDir := filepath.Join(homeDir, ".mtga-companion", "sets")
+
+	// Create set guide
+	guide := setguide.NewSetGuide(client, cacheDir)
+
+	// Load set
+	ctx := context.Background()
+	fmt.Printf("Loading %s (%s) data from 17Lands...\n", setCode, format)
+	if err := guide.LoadSet(ctx, setCode, format); err != nil {
+		log.Fatalf("Error loading set: %v", err)
+	}
+
+	// Get archetypes
+	archetypes, err := guide.GetArchetypes(setCode)
+	if err != nil {
+		// If no archetypes defined, show helpful message
+		fmt.Printf("No archetypes currently defined for %s.\n", setCode)
+		fmt.Println("\nArchetype definitions are coming soon!")
+		fmt.Println("In the meantime, use 'set-guide colors' to see color pair win rates.")
+		return
+	}
+
+	// Display archetypes
+	for i, arch := range archetypes {
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Print(setguide.FormatArchetype(arch))
+	}
+}
+
+func runSetGuideColors() {
+	if len(os.Args) < 4 {
+		fmt.Println("Error: set code required")
+		fmt.Println("Usage: mtga-companion set-guide colors <set-code>")
+		fmt.Println("Example: mtga-companion set-guide colors BLB")
+		os.Exit(1)
+	}
+
+	setCode := strings.ToUpper(os.Args[3])
+	format := "PremierDraft"
+
+	// Parse optional format flag
+	for i := 4; i < len(os.Args); i++ {
+		if os.Args[i] == "--format" && i+1 < len(os.Args) {
+			format = os.Args[i+1]
+			i++
+		}
+	}
+
+	// Create 17Lands client
+	client := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+
+	// Get cache directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error getting home directory: %v", err)
+	}
+	cacheDir := filepath.Join(homeDir, ".mtga-companion", "sets")
+
+	// Create set guide
+	guide := setguide.NewSetGuide(client, cacheDir)
+
+	// Load set
+	ctx := context.Background()
+	fmt.Printf("Loading %s (%s) data from 17Lands...\n", setCode, format)
+	if err := guide.LoadSet(ctx, setCode, format); err != nil {
+		log.Fatalf("Error loading set: %v", err)
+	}
+
+	// Get color ratings
+	colorRatings, err := guide.GetColorRatings(setCode)
+	if err != nil {
+		log.Fatalf("Error getting color ratings: %v", err)
+	}
+
+	// Check if we have any two-color pair data
+	hasTwoColorData := false
+	for colors := range colorRatings {
+		if len(colors) == 2 && colorRatings[colors] > 0 {
+			hasTwoColorData = true
+			break
+		}
+	}
+
+	if !hasTwoColorData {
+		fmt.Printf("═══ %s Color Pair Win Rates ═══\n\n", setCode)
+		fmt.Println("No color pair data currently available for this set/format combination.")
+		fmt.Println("\nThis may be because:")
+		fmt.Println("  • The set is not currently being actively drafted")
+		fmt.Println("  • Insufficient data in the selected date range")
+		fmt.Println("\nTry using 'set-guide overview' to see top archetypes based on available data.")
+		return
+	}
+
+	// Display color ratings
+	fmt.Print(setguide.FormatColorPairs(colorRatings))
 }

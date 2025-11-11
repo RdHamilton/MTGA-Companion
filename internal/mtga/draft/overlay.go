@@ -58,12 +58,12 @@ type OverlayUpdate struct {
 type UpdateType string
 
 const (
-	UpdateTypeDraftStart   UpdateType = "draft_start"
-	UpdateTypeNewPack      UpdateType = "new_pack"
-	UpdateTypePickMade     UpdateType = "pick_made"
-	UpdateTypeDraftEnd     UpdateType = "draft_end"
-	UpdateTypeColorRec     UpdateType = "color_recommendation"
-	UpdateTypeDeckBuilder  UpdateType = "deck_builder"
+	UpdateTypeDraftStart  UpdateType = "draft_start"
+	UpdateTypeNewPack     UpdateType = "new_pack"
+	UpdateTypePickMade    UpdateType = "pick_made"
+	UpdateTypeDraftEnd    UpdateType = "draft_end"
+	UpdateTypeColorRec    UpdateType = "color_recommendation"
+	UpdateTypeDeckBuilder UpdateType = "deck_builder"
 )
 
 // ColorSuggestion represents suggested colors for the draft.
@@ -567,7 +567,6 @@ func (o *Overlay) handleDraftComplete() {
 		o.ratingsProvider,
 		o.colorConfig,
 	)
-
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to build deck recommendations: %v\n", err)
 		return
