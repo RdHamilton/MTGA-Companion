@@ -2317,6 +2317,12 @@ func handleExportCommand(service *storage.Service, ctx context.Context, args []s
 		return
 	}
 
+	// Handle card data exports (requires card integration services)
+	if exportType == "cards" || exportType == "card-set" || exportType == "card-meta" {
+		handleCardExport(service, ctx, exportType, args[1:])
+		return
+	}
+
 	// Create filter for statistics exports
 	filter := models.StatsFilter{
 		StartDate: startDate,
@@ -2799,6 +2805,21 @@ func rankToNumericValue(rankClass *string, rankLevel *int) float64 {
 	return baseValue
 }
 
+// handleCardExport handles card data export commands.
+func handleCardExport(service *storage.Service, ctx context.Context, exportType string, args []string) {
+	// Note: Card exports are currently not fully integrated
+	// This requires initialization of Scryfall client, 17Lands client,
+	// unified service, and query interface
+	fmt.Println("Card data export functionality requires card integration services.")
+	fmt.Println("This feature is part of the Card Data Integration (Hybrid) project.")
+	fmt.Println("\nPlanned usage:")
+	fmt.Println("  export cards --set BLB --format csv")
+	fmt.Println("  export cards --set BLB --json --include-stats")
+	fmt.Println("  export card-meta --set BLB --top 20 --markdown")
+	fmt.Println("  export card-set --set BLB --format PremierDraft --csv")
+	fmt.Println("\nThis functionality will be available once card services are fully initialized in the CLI.")
+}
+
 // printTrendsHelp prints help for the trends/chart command.
 func printTrendsHelp() {
 	fmt.Println("\nChart Commands:")
@@ -2934,6 +2955,9 @@ func printExportHelp() {
 	fmt.Println("  export predict-summary [options]  - Prediction summary with insights")
 	fmt.Println("  export rank-timeline [options]    - Export rank progression timeline")
 	fmt.Println("  export timeline-summary [options] - Export rank progression summary")
+	fmt.Println("  export cards [options]            - Export card data with statistics (requires card services)")
+	fmt.Println("  export card-set [options]         - Export all cards in a set with stats")
+	fmt.Println("  export card-meta [options]        - Export meta snapshot for a set")
 	fmt.Println("  export deck/decks [options]       - Export deck lists")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -json                             - Export as JSON (default: CSV)")
@@ -2967,6 +2991,9 @@ func printExportHelp() {
 	fmt.Println("  export timeline-summary -format constructed -start 2024-01-01")
 	fmt.Println("  export daily -start 2024-01-01 -end 2024-01-31")
 	fmt.Println("  export matches -format constructed -json")
+	fmt.Println("  export cards --set BLB --csv      - Export BLB cards (coming soon)")
+	fmt.Println("  export cards --set BLB --json --include-stats - Export with 17Lands stats")
+	fmt.Println("  export card-meta --set BLB --top 20 --markdown - Export top 20 cards")
 	fmt.Println("  export decks -all -arena          - Export all decks in Arena format")
 	fmt.Println("  export deck <deck_id> -json       - Export specific deck as JSON")
 }
