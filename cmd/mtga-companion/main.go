@@ -2883,6 +2883,8 @@ func handleCardExport(service *storage.Service, ctx context.Context, exportType 
 			outputFormat = "json"
 		case "--markdown", "--md":
 			outputFormat = "markdown"
+		case "--arena":
+			outputFormat = "arena"
 		case "-o", "--output":
 			if i+1 < len(args) {
 				outputPath = args[i+1]
@@ -2939,6 +2941,7 @@ func handleCardExport(service *storage.Service, ctx context.Context, exportType 
 		fmt.Println("  --csv                  Export as CSV (default)")
 		fmt.Println("  --json                 Export as JSON")
 		fmt.Println("  --markdown, --md       Export as Markdown")
+		fmt.Println("  --arena                Export as MTG Arena deck format")
 		fmt.Println("  --include-stats        Include 17Lands draft statistics")
 		fmt.Println("  --top <N>              Export only top N cards")
 		fmt.Println("  --sort <field>         Sort by: gihwr, alsa, ata, cmc, name")
@@ -2952,6 +2955,7 @@ func handleCardExport(service *storage.Service, ctx context.Context, exportType 
 		fmt.Println("\nExamples:")
 		fmt.Println("  export cards --set BLB --csv")
 		fmt.Println("  export cards --set BLB --json --include-stats --pretty")
+		fmt.Println("  export cards --set BLB --top 20 --sort gihwr --arena")
 		fmt.Println("  export card-meta --set BLB --top 20 --sort gihwr --markdown")
 		return
 	}

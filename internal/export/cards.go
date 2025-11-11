@@ -131,8 +131,10 @@ func ExportCards(w io.Writer, cards []*unified.UnifiedCard, opts CardExportOptio
 		return exportCardsCSV(w, rows, opts)
 	case FormatJSON:
 		return exportCardsJSON(w, exportData, opts)
-	case "markdown", "md":
+	case FormatMarkdown, "md":
 		return exportCardsMarkdown(w, exportData, opts)
+	case FormatArena:
+		return exportCardsArena(w, rows, opts)
 	default:
 		return fmt.Errorf("unsupported export format: %s", opts.Format)
 	}
@@ -407,6 +409,36 @@ func exportCardsMarkdown(w io.Writer, data *CardExportData, opts CardExportOptio
 				row.Colors,
 			))
 		}
+	}
+
+	_, err := w.Write(buf.Bytes())
+	return err
+}
+
+// exportCardsArena exports cards in MTG Arena deck format.
+func exportCardsArena(w io.Writer, rows []*CardExportRow, opts CardExportOptions) error {
+	var buf bytes.Buffer
+
+	// Write deck header
+	buf.WriteString("Deck\n")
+
+	// Write cards in Arena format: <quantity> <name> (<set>) <number>
+	for _, row := range rows {
+		quantity := 1 // Default quantity for card list exports
+
+		// Handle missing collector number gracefully
+		collectorNum := row.CollectorNumber
+		if collectorNum == "" {
+			collectorNum = "0" // Default if missing
+		}
+
+		// Format: 1 Lightning Bolt (BLB) 123
+		buf.WriteString(fmt.Sprintf("%d %s (%s) %s\n",
+			quantity,
+			row.Name,
+			strings.ToUpper(row.SetCode),
+			collectorNum,
+		))
 	}
 
 	_, err := w.Write(buf.Bytes())
