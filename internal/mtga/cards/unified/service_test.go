@@ -136,10 +136,10 @@ func TestGetCard_WithoutStats(t *testing.T) {
 	metadata := &mockMetadataProvider{
 		cards: map[int]*storage.Card{
 			arenaID: {
-				ID:       "test-id",
-				ArenaID:  &arenaID,
-				Name:     "Test Card",
-				SetCode:  "BLB",
+				ID:      "test-id",
+				ArenaID: &arenaID,
+				Name:    "Test Card",
+				SetCode: "BLB",
 			},
 		},
 	}

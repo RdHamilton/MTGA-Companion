@@ -23,7 +23,7 @@ type DraftStatsProvider interface {
 
 // Service composes card data from multiple sources.
 type Service struct {
-	metadata CardMetadataProvider
+	metadata   CardMetadataProvider
 	draftstats DraftStatsProvider
 }
 

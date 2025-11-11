@@ -9,9 +9,9 @@ import (
 // UnifiedCard combines Scryfall metadata with 17Lands draft statistics.
 type UnifiedCard struct {
 	// Core identity (Scryfall)
-	ID              string
-	ArenaID         int
-	Name            string
+	ID      string
+	ArenaID int
+	Name    string
 
 	// Card metadata (Scryfall)
 	ManaCost        string
@@ -33,44 +33,44 @@ type UnifiedCard struct {
 	ReleasedAt      string
 
 	// Draft statistics (17Lands) - nil if unavailable
-	DraftStats      *DraftStatistics
+	DraftStats *DraftStatistics
 
 	// Data freshness tracking
-	MetadataAge     time.Duration // Age of Scryfall data
-	StatsAge        time.Duration // Age of 17Lands data
-	MetadataSource  DataSource    // Where metadata came from
-	StatsSource     DataSource    // Where stats came from
+	MetadataAge    time.Duration // Age of Scryfall data
+	StatsAge       time.Duration // Age of 17Lands data
+	MetadataSource DataSource    // Where metadata came from
+	StatsSource    DataSource    // Where stats came from
 }
 
 // DraftStatistics contains 17Lands draft performance data for a card.
 type DraftStatistics struct {
 	// Win rate metrics
-	GIHWR       float64   // Games in Hand Win Rate
-	OHWR        float64   // Opening Hand Win Rate
-	GPWR        float64   // Game Present Win Rate
-	GDWR        float64   // Game Drawn Win Rate
-	IHDWR       float64   // In Hand Drawn Win Rate
+	GIHWR float64 // Games in Hand Win Rate
+	OHWR  float64 // Opening Hand Win Rate
+	GPWR  float64 // Game Present Win Rate
+	GDWR  float64 // Game Drawn Win Rate
+	IHDWR float64 // In Hand Drawn Win Rate
 
 	// Improvement metrics
-	GIHWRDelta  float64   // GIH Win Rate Delta (improvement)
-	OHWRDelta   float64   // OH Win Rate Delta
-	GDWRDelta   float64   // GD Win Rate Delta
-	IHDWRDelta  float64   // IHD Win Rate Delta
+	GIHWRDelta float64 // GIH Win Rate Delta (improvement)
+	OHWRDelta  float64 // OH Win Rate Delta
+	GDWRDelta  float64 // GD Win Rate Delta
+	IHDWRDelta float64 // IHD Win Rate Delta
 
 	// Draft metrics
-	ALSA        float64   // Average Last Seen At (pick position)
-	ATA         float64   // Average Taken At (pick position)
+	ALSA float64 // Average Last Seen At (pick position)
+	ATA  float64 // Average Taken At (pick position)
 
 	// Sample sizes
-	GIH         int       // Games in Hand count
-	OH          int       // Opening Hand count
-	GP          int       // Game Present count
-	GD          int       // Game Drawn count
-	IHD         int       // In Hand Drawn count
+	GIH int // Games in Hand count
+	OH  int // Opening Hand count
+	GP  int // Game Present count
+	GD  int // Game Drawn count
+	IHD int // In Hand Drawn count
 
 	// Deck metrics
-	GamesPlayed int       // Total games with this card
-	NumDecks    int       // Number of decks containing this card
+	GamesPlayed int // Total games with this card
+	NumDecks    int // Number of decks containing this card
 
 	// Metadata
 	Format      string    // PremierDraft, QuickDraft, TradDraft, etc.
@@ -84,10 +84,10 @@ type DraftStatistics struct {
 type DataSource int
 
 const (
-	SourceUnknown DataSource = iota
-	SourceAPI                // Fresh from API
-	SourceCache              // From local cache
-	SourceFallback           // Fallback/partial data
+	SourceUnknown  DataSource = iota
+	SourceAPI                 // Fresh from API
+	SourceCache               // From local cache
+	SourceFallback            // Fallback/partial data
 )
 
 func (ds DataSource) String() string {
