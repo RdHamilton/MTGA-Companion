@@ -154,18 +154,26 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 		return fmt.Errorf("failed to seek to start of log: %w", err)
 	}
 
-	scanner := bufio.NewScanner(file)
+	// Use bufio.Reader instead of Scanner to handle long lines
+	reader := bufio.NewReader(file)
 	lineNumber := 0
 	draftStartFound := false
 
 	// Scan through entire log file
-	for scanner.Scan() {
+	for {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading log file: %w", err)
+		}
+
 		lineNumber++
-		line := scanner.Text()
 
 		// Parse log entry
-		event, err := o.parser.ParseLogEntry(line, time.Now())
-		if err != nil || event == nil {
+		event, parseErr := o.parser.ParseLogEntry(line, time.Now())
+		if parseErr != nil || event == nil {
 			continue
 		}
 
@@ -183,10 +191,6 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 		o.mu.Unlock()
 
 		// Continue parsing all events to build up complete draft state
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error scanning log file: %w", err)
 	}
 
 	// If we found a draft and have a current state, check if it's still active
