@@ -351,18 +351,24 @@ func (v *MatchHistoryViewer) getPageMatch(index int) *storage.Match {
 
 // refreshList refreshes the match list and pagination controls.
 func (v *MatchHistoryViewer) refreshList() {
-	v.matchList.Refresh()
-	v.pageLabel.SetText(fmt.Sprintf("Page %d of %d", v.currentPage+1, v.totalPages))
+	if v.matchList != nil {
+		v.matchList.Refresh()
+	}
+	if v.pageLabel != nil {
+		v.pageLabel.SetText(fmt.Sprintf("Page %d of %d", v.currentPage+1, v.totalPages))
+	}
 	v.updateStatusLabel()
 }
 
 // updateStatusLabel updates the status label with match counts.
 func (v *MatchHistoryViewer) updateStatusLabel() {
-	v.statusLabel.SetText(fmt.Sprintf(
-		"Showing %d of %d total matches",
-		len(v.filteredMatches),
-		len(v.allMatches),
-	))
+	if v.statusLabel != nil {
+		v.statusLabel.SetText(fmt.Sprintf(
+			"Showing %d of %d total matches",
+			len(v.filteredMatches),
+			len(v.allMatches),
+		))
+	}
 }
 
 // showMatchDetail shows a detail dialog for the selected match.
