@@ -279,6 +279,33 @@ func (dow *DraftOverlayWindow) handleDeckBuilder(update *draft.OverlayUpdate) {
 		dow.packContainer.Add(widget.NewLabel(fmt.Sprintf("... and %d more", len(rec.Sideboard)-10)))
 	}
 
+	dow.packContainer.Add(widget.NewSeparator())
+
+	// Add action buttons
+	buttonContainer := container.NewHBox(
+		widget.NewButton("Close & Wait for Next Draft", func() {
+			// Reset overlay state
+			if dow.overlay != nil {
+				dow.overlay.Reset()
+			}
+			// Clear display and show waiting state
+			dow.statusLabel.SetText("Waiting for draft...")
+			dow.colorLabel.SetText("")
+			dow.packContainer.RemoveAll()
+			dow.packContainer.Add(widget.NewLabel("Ready for next draft. Start a draft in MTGA..."))
+			dow.packContainer.Refresh()
+		}),
+		widget.NewButton("Export Deck", func() {
+			// Export deck to clipboard
+			deckString := draft.ExportDeckToArena(rec)
+			dow.app.Clipboard().SetContent(deckString)
+
+			// Show confirmation
+			dow.statusLabel.SetText("Deck copied to clipboard!")
+		}),
+	)
+	dow.packContainer.Add(buttonContainer)
+
 	dow.packContainer.Refresh()
 }
 
