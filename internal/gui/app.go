@@ -41,6 +41,7 @@ func (a *App) Run() {
 		container.NewTabItem("Statistics", a.createStatsView()),
 		container.NewTabItem("Match History", a.createMatchesView()),
 		container.NewTabItem("Charts", a.createChartsView()),
+		container.NewTabItem("Settings", a.createSettingsView()),
 	)
 
 	a.window.SetContent(tabs)
