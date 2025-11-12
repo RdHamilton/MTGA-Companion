@@ -2,9 +2,11 @@ package gui
 
 import (
 	"fmt"
+	"image/color"
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -209,7 +211,13 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 		}, a.window)
 	})
 
-	// Layout: form in center with padding and scrolling, restore button at bottom
+	// Create transparent spacers for left and right margins
+	leftSpacer := canvas.NewRectangle(color.Transparent)
+	leftSpacer.SetMinSize(fyne.NewSize(20, 0))
+	rightSpacer := canvas.NewRectangle(color.Transparent)
+	rightSpacer.SetMinSize(fyne.NewSize(20, 0))
+
+	// Layout: form in center with margins, restore button at bottom
 	return container.NewBorder(
 		nil,
 		container.NewPadded(
@@ -218,7 +226,8 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 				restoreButton,
 			),
 		),
-		nil, nil,
+		leftSpacer,
+		rightSpacer,
 		container.NewScroll(
 			container.NewPadded(form),
 		),
