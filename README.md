@@ -246,3 +246,38 @@ MTGA-Companion is not affiliated with, endorsed by, or sponsored by Wizards of t
 
 - Wizards of the Coast for MTG Arena and its detailed logging support
 - The MTGA community for documentation on log formats and structure
+
+## CLI Flag Migration (v0.2.0)
+
+As of v0.2.0, CLI flags have been standardized for consistency. Old flags are still supported but deprecated.
+
+### Quick Reference
+
+| Old Flag (Deprecated) | New Flag | Shorthand |
+|-----------------------|----------|-----------|
+| `-gui` | `-gui-mode` | `-g` |
+| `-debug` | `-debug-mode` | `-d` |
+| `-cache` | `-cache-enabled` | |
+| `-poll-interval` | `-log-poll-interval` | |
+| `-use-file-events` | `-log-use-fsnotify` | |
+| `-draft-overlay` | `-draft-overlay-mode` | |
+| `-set-file` | `-overlay-set-file` | |
+| `-log-path` | `-log-file-path` | |
+| `-overlay-set` | `-overlay-set-code` | |
+| `-overlay-lookback` | `-overlay-lookback-hours` | |
+
+**Note:** Deprecated flags will show a warning and will be removed in v2.0.0. See `FLAG_MIGRATION.md` for complete details.
+
+### Examples
+
+```bash
+# Old syntax (still works, shows warning)
+./bin/mtga-companion -debug -gui
+
+# New syntax (recommended)
+./bin/mtga-companion -debug-mode -gui-mode
+
+# New syntax with shortcuts
+./bin/mtga-companion -d -g
+```
+
