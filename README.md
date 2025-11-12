@@ -6,7 +6,28 @@ A companion application and overlay system for Magic: The Gathering Arena (MTGA)
 
 - **Log Reading**: Automatically locates and reads MTGA Player.log files on both macOS and Windows
 - **JSON Parsing**: Parses JSON game events from the log file for analysis
+- **Draft Tracking**: Record and analyze all your draft picks
+- **Statistics**: Comprehensive win rate tracking and analytics
+- **Export System**: Export your data in CSV or JSON formats
+- **Card Data Integration**: 17Lands draft statistics and Scryfall metadata
+- **Database Storage**: Local SQLite database with migration support
 - **Cross-Platform**: Works on both Mac and PC where MTGA is supported
+
+## Documentation
+
+📚 **[Complete Documentation Wiki →](https://github.com/RdHamilton/MTGA-Companion/wiki)**
+
+- **[Installation Guide](https://github.com/RdHamilton/MTGA-Companion/wiki/Installation)** - Setup instructions for macOS and Windows
+- **[Usage Guide](https://github.com/RdHamilton/MTGA-Companion/wiki/Usage-Guide)** - How to use all features
+- **[CLI Commands](https://github.com/RdHamilton/MTGA-Companion/wiki/CLI-Commands)** - Complete command reference
+- **[Configuration](https://github.com/RdHamilton/MTGA-Companion/wiki/Configuration)** - Configuration options
+- **[Troubleshooting](https://github.com/RdHamilton/MTGA-Companion/wiki/Troubleshooting)** - Common issues and solutions
+
+### Technical Documentation
+
+- **[Architecture](https://github.com/RdHamilton/MTGA-Companion/wiki/Architecture)** - System design and architecture
+- **[Database Schema](https://github.com/RdHamilton/MTGA-Companion/wiki/Database-Schema)** - Database structure
+- **[Development](https://github.com/RdHamilton/MTGA-Companion/wiki/Development)** - Development setup and guidelines
 
 ## Prerequisites
 
@@ -178,12 +199,40 @@ Press `Command + Shift + .` in Finder to show hidden files and folders.
 
 Ensure you have read permissions for the MTGA log directory. Try running as administrator if needed.
 
+## Technology Stack
+
+MTGA-Companion is built with:
+
+### Core Technologies
+
+- **[Go 1.23+](https://go.dev/)** - Programming language
+- **[SQLite 3](https://www.sqlite.org/)** - Local database storage
+- **[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)** - Pure Go SQLite driver
+
+### Libraries & Tools
+
+- **[golang-migrate/migrate](https://github.com/golang-migrate/migrate)** - Database migration management
+- **[fsnotify](https://github.com/fsnotify/fsnotify)** - Cross-platform file system notifications
+
+### Data Sources
+
+- **[17Lands](https://www.17lands.com/)** - Draft statistics and card ratings
+- **[Scryfall](https://scryfall.com/)** - Card metadata and images
+
+### Future/In Development
+
+- **[Fyne](https://fyne.io/)** - GUI framework (in development)
+
+For a complete list of dependencies, see [`go.mod`](go.mod).
+
 ## Contributing
 
 Contributions are welcome! Please ensure:
 - Code follows Go best practices (see `CLAUDE.md`)
 - All tests pass (`./scripts/test.sh`)
 - Code is formatted (`./scripts/dev.sh fmt`)
+
+See the [Development Guide](https://github.com/RdHamilton/MTGA-Companion/wiki/Development) for detailed contribution guidelines.
 
 ## License
 
