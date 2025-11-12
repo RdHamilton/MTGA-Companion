@@ -94,7 +94,21 @@ func (d *FormatDistributionDashboard) createFilterControls() fyne.CanvasObject {
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
 
-	// Chart type selector
+	// Refresh button
+	refreshButton := widget.NewButton("Refresh", func() {
+		d.refresh()
+	})
+
+	// Layout controls - just date range and refresh at top
+	return container.NewVBox(
+		container.NewVBox(dateRangeLabel, dateRangeSelect),
+		container.NewHBox(refreshButton),
+		widget.NewSeparator(),
+	)
+}
+
+// createChartTypeSelector creates the chart type selector for the bottom.
+func (d *FormatDistributionDashboard) createChartTypeSelector() fyne.CanvasObject {
 	chartTypeLabel := widget.NewLabelWithStyle("Chart Type", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	chartTypeSelect := widget.NewSelect(
 		[]string{"Pie Chart", "Bar Chart"},
@@ -109,19 +123,9 @@ func (d *FormatDistributionDashboard) createFilterControls() fyne.CanvasObject {
 	)
 	chartTypeSelect.Selected = "Pie Chart"
 
-	// Refresh button
-	refreshButton := widget.NewButton("Refresh", func() {
-		d.refresh()
-	})
-
-	// Layout controls
 	return container.NewVBox(
-		container.NewGridWithColumns(2,
-			container.NewVBox(dateRangeLabel, dateRangeSelect),
-			container.NewVBox(chartTypeLabel, chartTypeSelect),
-		),
-		container.NewHBox(refreshButton),
 		widget.NewSeparator(),
+		container.NewHBox(chartTypeLabel, chartTypeSelect),
 	)
 }
 
@@ -201,11 +205,15 @@ func (d *FormatDistributionDashboard) createChartView() fyne.CanvasObject {
 	// Create summary
 	summary := d.createSummary(formats, totalMatches)
 
-	// Layout
+	// Create chart type selector
+	chartTypeSelector := d.createChartTypeSelector()
+
+	// Layout with proper spacing
 	return container.NewVBox(
-		chart,
-		widget.NewSeparator(),
 		summary,
+		widget.NewSeparator(),
+		container.NewPadded(chart),
+		chartTypeSelector,
 	)
 }
 
