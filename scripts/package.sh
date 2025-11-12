@@ -22,9 +22,12 @@ esac
 echo -e "${GREEN}==> Detected platform: ${PLATFORM}${NC}"
 
 # Check if fyne command is available
+FYNE_CMD="fyne"
 if ! command -v fyne &> /dev/null; then
     echo -e "${YELLOW}fyne command not found. Installing...${NC}"
     go install fyne.io/fyne/v2/cmd/fyne@latest
+    # Use full path if not in PATH
+    FYNE_CMD="$HOME/go/bin/fyne"
 fi
 
 # Check if Icon.png exists
@@ -54,12 +57,19 @@ esac
 
 # Package application
 echo -e "${GREEN}==> Packaging application${NC}"
+
+# Get absolute path for icon if it exists
+ICON_PATH=""
+if [ -f "Icon.png" ]; then
+    ICON_PATH="$(pwd)/Icon.png"
+fi
+
 case "${PLATFORM}" in
     linux)
-        if [ -f "Icon.png" ]; then
-            fyne package -os linux -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+        if [ -n "$ICON_PATH" ]; then
+            $FYNE_CMD package -os linux -icon "$ICON_PATH" -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         else
-            fyne package -os linux -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+            $FYNE_CMD package -os linux -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         fi
 
         # Create tar.gz
@@ -68,10 +78,10 @@ case "${PLATFORM}" in
         ;;
 
     darwin)
-        if [ -f "Icon.png" ]; then
-            fyne package -os darwin -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+        if [ -n "$ICON_PATH" ]; then
+            $FYNE_CMD package -os darwin -icon "$ICON_PATH" -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         else
-            fyne package -os darwin -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+            $FYNE_CMD package -os darwin -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         fi
 
         # Create tar.gz with .app bundle
@@ -80,10 +90,10 @@ case "${PLATFORM}" in
         ;;
 
     windows)
-        if [ -f "Icon.png" ]; then
-            fyne package -os windows -icon Icon.png -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion
+        if [ -n "$ICON_PATH" ]; then
+            $FYNE_CMD package -os windows -icon "$ICON_PATH" -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         else
-            fyne package -os windows -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion
+            $FYNE_CMD package -os windows -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion -src cmd/mtga-companion
         fi
 
         # Create zip

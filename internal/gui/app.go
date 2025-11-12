@@ -36,6 +36,9 @@ func (a *App) Run() {
 	a.window = a.app.NewWindow("MTGA Companion")
 	a.window.Resize(fyne.NewSize(800, 600))
 
+	// Show onboarding for first-time users
+	a.showOnboarding()
+
 	// Create tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),
