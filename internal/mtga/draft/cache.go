@@ -9,12 +9,12 @@ import (
 // CardRatingsCache provides in-memory caching for card ratings.
 // This reduces redundant lookups during an active draft session.
 type CardRatingsCache struct {
-	entries  map[string]*cacheEntry
-	mu       sync.RWMutex
-	ttl      time.Duration
-	enabled  bool
-	maxSize  int
-	stats    CacheStats
+	entries     map[string]*cacheEntry
+	mu          sync.RWMutex
+	ttl         time.Duration
+	enabled     bool
+	maxSize     int
+	stats       CacheStats
 	lastCleanup time.Time
 }
 
@@ -26,11 +26,11 @@ type cacheEntry struct {
 
 // CacheStats tracks cache performance metrics.
 type CacheStats struct {
-	Hits       int64
-	Misses     int64
-	Evictions  int64
-	Size       int
-	TotalSize  int
+	Hits      int64
+	Misses    int64
+	Evictions int64
+	Size      int
+	TotalSize int
 }
 
 // NewCardRatingsCache creates a new card ratings cache.
