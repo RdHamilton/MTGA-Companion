@@ -1,0 +1,182 @@
+name: Release GUI Application
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Install Fyne tools
+      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+    - name: Build Windows executable
+      run: |
+        go build -v -ldflags="-H windowsgui" -o mtga-companion.exe ./cmd/mtga-companion
+
+    - name: Package Windows application
+      run: |
+        fyne package -os windows -icon Icon.png -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion
+
+    - name: Create distribution archive
+      run: |
+        mkdir -p dist
+        Compress-Archive -Path mtga-companion.exe, README.md, LICENSE -DestinationPath dist/mtga-companion-windows-amd64.zip
+
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: dist/*.zip
+        retention-days: 7
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Install Fyne tools
+      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+    - name: Build macOS application
+      run: |
+        go build -v -o mtga-companion ./cmd/mtga-companion
+
+    - name: Package macOS application
+      run: |
+        fyne package -os darwin -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+
+    - name: Create DMG (optional)
+      run: |
+        # Create a simple directory structure for DMG
+        mkdir -p dist
+        cp -r "MTGA Companion.app" dist/
+        cp README.md dist/
+
+        # Create tar.gz for now (DMG creation requires additional tools)
+        tar -czf dist/mtga-companion-macos-universal.tar.gz -C dist "MTGA Companion.app" README.md
+
+    - name: Upload macOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-build
+        path: dist/*.tar.gz
+        retention-days: 7
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+
+    - name: Install Fyne tools
+      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+    - name: Build Linux executable
+      run: |
+        go build -v -o mtga-companion ./cmd/mtga-companion
+
+    - name: Package Linux application
+      run: |
+        fyne package -os linux -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+
+    - name: Create distribution archive
+      run: |
+        mkdir -p dist
+        tar -czf dist/mtga-companion-linux-amd64.tar.gz mtga-companion README.md LICENSE
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-build
+        path: dist/*.tar.gz
+        retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release files
+      run: |
+        mkdir -p release
+        find artifacts -type f -name "*.zip" -o -name "*.tar.gz" | xargs -I {} cp {} release/
+        ls -lh release/
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        echo "## What's Changed" > changelog.md
+        git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"* %s (%h)" >> changelog.md || echo "* Initial release" >> changelog.md
+        echo "" >> changelog.md
+        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo 'v0.0.0')...${{ github.ref_name }}" >> changelog.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: release/*
+        body_path: changelog.md
+        draft: false
+        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

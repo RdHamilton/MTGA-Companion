@@ -58,15 +58,60 @@ Detailed logging allows MTG Arena to output game events and data in JSON format 
 
 ## Installation
 
-### From Source
+### Option 1: Download Pre-built Binary (Recommended)
 
-1. Clone the repository:
+Download the latest release for your platform from the [Releases page](https://github.com/RdHamilton/MTGA-Companion/releases):
+
+#### Windows
+
+1. Download `mtga-companion-windows-amd64.zip`
+2. Extract the ZIP file to a folder of your choice (e.g., `C:\Program Files\MTGA-Companion\`)
+3. Run `mtga-companion.exe` to launch the application
+4. **(Optional)** Right-click `mtga-companion.exe` → "Send to" → "Desktop (create shortcut)" for easy access
+
+#### macOS
+
+1. Download `mtga-companion-macos-universal.tar.gz`
+2. Extract the archive (double-click in Finder)
+3. Drag `MTGA Companion.app` to your Applications folder
+4. **First launch**: Right-click the app → "Open" (to bypass Gatekeeper since the app is not code-signed)
+5. Subsequent launches: Double-click the app normally
+
+**Note**: You may need to grant permissions in System Preferences → Security & Privacy if macOS blocks the app.
+
+#### Linux
+
+1. Download `mtga-companion-linux-amd64.tar.gz`
+2. Extract the archive:
    ```bash
-   git clone https://github.com/ramonehamilton/MTGA-Companion.git
+   tar -xzf mtga-companion-linux-amd64.tar.gz
+   ```
+3. Make the binary executable:
+   ```bash
+   chmod +x mtga-companion
+   ```
+4. Run the application:
+   ```bash
+   ./mtga-companion
+   ```
+5. **(Optional)** Move to system path for global access:
+   ```bash
+   sudo mv mtga-companion /usr/local/bin/
+   ```
+
+### Option 2: Build From Source
+
+If you want to build the application yourself or contribute to development:
+
+1. **Prerequisites**: Install [Go 1.22+](https://go.dev/dl/)
+
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/RdHamilton/MTGA-Companion.git
    cd MTGA-Companion
    ```
 
-2. Build the application:
+3. Build the application:
    ```bash
    go build -o bin/mtga-companion ./cmd/mtga-companion
    ```
@@ -76,10 +121,16 @@ Detailed logging allows MTG Arena to output game events and data in JSON format 
    ./scripts/dev.sh build
    ```
 
-3. Run the application:
+4. Run the application:
    ```bash
    ./bin/mtga-companion
    ```
+
+5. **(Optional)** Create a distribution package:
+   ```bash
+   ./scripts/package.sh
+   ```
+   Packaged files will be in the `dist/` directory.
 
 ## Player.log File Locations
 
