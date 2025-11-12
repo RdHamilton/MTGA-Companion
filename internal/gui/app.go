@@ -41,27 +41,39 @@ func (a *App) Run() {
 		container.NewTabItem("Statistics", a.createStatsView()),
 		container.NewTabItem("Match History", a.createMatchesView()),
 		container.NewTabItem("Charts", a.createChartsView()),
+		container.NewTabItem("Settings", a.createSettingsView()),
 	)
 
 	a.window.SetContent(tabs)
 	a.window.ShowAndRun()
 }
 
-// createStatsView creates the statistics view.
+// createStatsView creates the statistics view with material design principles.
 func (a *App) createStatsView() fyne.CanvasObject {
 	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
 	if err != nil {
-		return widget.NewLabel(fmt.Sprintf("Error: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("Error loading statistics"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
-	content := fmt.Sprintf(`Overall Statistics
-==================
+	// Create rich text with markdown for better formatting
+	content := fmt.Sprintf(`## Overall Statistics
 
-Matches: %d (%d-%d)
-Win Rate: %.1f%%
+### Match Statistics
+- **Total Matches**: %d
+- **Wins**: %d
+- **Losses**: %d
+- **Win Rate**: %.1f%%
 
-Games: %d (%d-%d)
-Game Win Rate: %.1f%%
+### Game Statistics
+- **Total Games**: %d
+- **Wins**: %d
+- **Losses**: %d
+- **Game Win Rate**: %.1f%%
 `,
 		stats.TotalMatches, stats.MatchesWon, stats.MatchesLost,
 		stats.WinRate*100,
@@ -69,18 +81,29 @@ Game Win Rate: %.1f%%
 		stats.GameWinRate*100,
 	)
 
-	label := widget.NewLabel(content)
-	label.Wrapping = fyne.TextWrapWord
+	richText := widget.NewRichTextFromMarkdown(content)
 
-	refreshBtn := widget.NewButton("Refresh", func() {
+	refreshBtn := widget.NewButton("Refresh Statistics", func() {
 		a.window.SetContent(container.NewAppTabs(
 			container.NewTabItem("Statistics", a.createStatsView()),
 			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
+			container.NewTabItem("Settings", a.createSettingsView()),
 		))
 	})
 
-	return container.NewBorder(nil, refreshBtn, nil, nil, container.NewScroll(label))
+	// Layout: stats in center with padding, refresh button at bottom
+	return container.NewBorder(
+		nil,
+		container.NewVBox(
+			widget.NewSeparator(),
+			refreshBtn,
+		),
+		nil, nil,
+		container.NewScroll(
+			container.NewPadded(richText),
+		),
+	)
 }
 
 // createMatchesView creates the enhanced match history view.
@@ -101,7 +124,7 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	return chartTabs
 }
 
-// createWinRateTrendView creates the win rate trend chart view.
+// createWinRateTrendView creates the win rate trend chart view with material design.
 func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	// Date range selector
 	now := time.Now()
@@ -110,7 +133,12 @@ func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	// Get trend data for last 30 days
 	analysis, err := a.service.GetTrendAnalysis(a.ctx, thirtyDaysAgo, now, "weekly", nil)
 	if err != nil || len(analysis.Periods) == 0 {
-		return widget.NewLabel(fmt.Sprintf("No chart data available: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No chart data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Prepare data points
@@ -131,29 +159,29 @@ func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	// Create chart
 	chart := charts.CreateFyneLineChart(dataPoints, config)
 
-	// Add summary info
-	summaryText := fmt.Sprintf(`
-Period: %s to %s
-Trend: %s`,
+	// Add summary info with markdown formatting
+	summaryContent := fmt.Sprintf(`### Win Rate Trend Analysis
+
+**Period**: %s to %s
+**Trend**: %s`,
 		thirtyDaysAgo.Format("2006-01-02"),
 		now.Format("2006-01-02"),
 		analysis.Trend,
 	)
 
 	if analysis.TrendValue != 0 {
-		summaryText += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
+		summaryContent += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
 	}
 
 	if analysis.Overall != nil {
-		summaryText += fmt.Sprintf(`
-Overall Win Rate: %.1f%% (%d matches)`,
+		summaryContent += fmt.Sprintf(`
+**Overall Win Rate**: %.1f%% (%d matches)`,
 			analysis.Overall.WinRate,
 			analysis.Overall.TotalMatches,
 		)
 	}
 
-	summary := widget.NewLabel(summaryText)
-	summary.Wrapping = fyne.TextWrapWord
+	summary := widget.NewRichTextFromMarkdown(summaryContent)
 
 	// Create chart type selector
 	chartTypeSelect := widget.NewSelect([]string{"Line Chart", "Bar Chart"}, func(selected string) {
@@ -162,23 +190,28 @@ Overall Win Rate: %.1f%% (%d matches)`,
 			container.NewTabItem("Statistics", a.createStatsView()),
 			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
+			container.NewTabItem("Settings", a.createSettingsView()),
 		))
 	})
 	chartTypeSelect.Selected = "Line Chart"
 
 	// Layout: selector at top, chart in middle, summary at bottom
 	return container.NewBorder(
-		container.NewVBox(
-			widget.NewLabel("Chart Type:"),
-			chartTypeSelect,
-			widget.NewSeparator(),
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewLabelWithStyle("Chart Type", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				chartTypeSelect,
+				widget.NewSeparator(),
+			),
 		),
-		container.NewVBox(
-			widget.NewSeparator(),
-			summary,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewSeparator(),
+				summary,
+			),
 		),
 		nil, nil,
-		container.NewScroll(chart),
+		container.NewScroll(container.NewPadded(chart)),
 	)
 }
 
@@ -196,7 +229,12 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 
 	matches, err := a.service.GetMatches(a.ctx, filter)
 	if err != nil || len(matches) == 0 {
-		return widget.NewLabel(fmt.Sprintf("No match data available: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No match data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Calculate breakdowns
@@ -207,26 +245,27 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 	winData := a.breakdownToDataPoints(winBreakdown)
 	lossData := a.breakdownToDataPoints(lossBreakdown)
 
-	// Create chart configs
+	// Create chart configs with larger size
 	winConfig := charts.DefaultFyneChartConfig()
 	winConfig.Title = "Wins Breakdown"
-	winConfig.Width = 750
-	winConfig.Height = 350
+	winConfig.Width = 900
+	winConfig.Height = 450
 
 	lossConfig := charts.DefaultFyneChartConfig()
 	lossConfig.Title = "Losses Breakdown"
-	lossConfig.Width = 750
-	lossConfig.Height = 350
+	lossConfig.Width = 900
+	lossConfig.Height = 450
 
 	// Create charts
 	winChart := charts.CreateFynePieChartBreakdown(winData, winConfig)
 	lossChart := charts.CreateFynePieChartBreakdown(lossData, lossConfig)
 
-	// Summary
-	summaryText := fmt.Sprintf(`
-Period: %s to %s
-Total Matches: %d
-Wins: %d | Losses: %d`,
+	// Summary with markdown formatting
+	summaryContent := fmt.Sprintf(`### Result Breakdown Analysis
+
+**Period**: %s to %s
+**Total Matches**: %d
+**Wins**: %d | **Losses**: %d`,
 		thirtyDaysAgo.Format("2006-01-02"),
 		now.Format("2006-01-02"),
 		len(matches),
@@ -234,21 +273,24 @@ Wins: %d | Losses: %d`,
 		lossBreakdown["Total"],
 	)
 
-	summary := widget.NewLabel(summaryText)
-	summary.Wrapping = fyne.TextWrapWord
+	summary := widget.NewRichTextFromMarkdown(summaryContent)
 
-	// Layout: summary at top, both charts below
+	// Layout: summary at top, both charts below with padding
 	return container.NewBorder(
-		container.NewVBox(
-			summary,
-			widget.NewSeparator(),
+		container.NewPadded(
+			container.NewVBox(
+				summary,
+				widget.NewSeparator(),
+			),
 		),
 		nil, nil, nil,
 		container.NewScroll(
-			container.NewVBox(
-				winChart,
-				widget.NewSeparator(),
-				lossChart,
+			container.NewPadded(
+				container.NewVBox(
+					winChart,
+					widget.NewSeparator(),
+					lossChart,
+				),
 			),
 		),
 	)
@@ -354,7 +396,12 @@ func (a *App) createRankProgressionView() fyne.CanvasObject {
 	// Get rank progression timeline for constructed
 	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
 	if err != nil || len(timeline.Entries) == 0 {
-		return widget.NewLabel(fmt.Sprintf("No rank progression data available: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No rank progression data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Convert timeline entries to chart data points
@@ -375,15 +422,16 @@ func (a *App) createRankProgressionView() fyne.CanvasObject {
 	// Create chart
 	chart := charts.CreateFyneLineChart(dataPoints, config)
 
-	// Summary
-	summaryText := fmt.Sprintf(`
-Period: %s to %s
-Start Rank: %s
-End Rank: %s
-Highest Rank: %s
-Lowest Rank: %s
-Total Changes: %d
-Milestones: %d`,
+	// Summary with markdown formatting
+	summaryContent := fmt.Sprintf(`### Rank Progression Analysis
+
+**Period**: %s to %s
+**Start Rank**: %s
+**End Rank**: %s
+**Highest Rank**: %s
+**Lowest Rank**: %s
+**Total Changes**: %d
+**Milestones**: %d`,
 		thirtyDaysAgo.Format("2006-01-02"),
 		now.Format("2006-01-02"),
 		timeline.StartRank,
@@ -394,8 +442,7 @@ Milestones: %d`,
 		timeline.Milestones,
 	)
 
-	summary := widget.NewLabel(summaryText)
-	summary.Wrapping = fyne.TextWrapWord
+	summary := widget.NewRichTextFromMarkdown(summaryContent)
 
 	// Format selector
 	formatSelect := widget.NewSelect([]string{"Constructed", "Limited"}, func(selected string) {
@@ -404,23 +451,28 @@ Milestones: %d`,
 			container.NewTabItem("Statistics", a.createStatsView()),
 			container.NewTabItem("Match History", a.createMatchesView()),
 			container.NewTabItem("Charts", a.createChartsView()),
+			container.NewTabItem("Settings", a.createSettingsView()),
 		))
 	})
 	formatSelect.Selected = "Constructed"
 
-	// Layout: selector at top, chart in middle, summary at bottom
+	// Layout: selector at top, chart in middle, summary at bottom with padding
 	return container.NewBorder(
-		container.NewVBox(
-			widget.NewLabel("Format:"),
-			formatSelect,
-			widget.NewSeparator(),
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				formatSelect,
+				widget.NewSeparator(),
+			),
 		),
-		container.NewVBox(
-			widget.NewSeparator(),
-			summary,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewSeparator(),
+				summary,
+			),
 		),
 		nil, nil,
-		container.NewScroll(chart),
+		container.NewScroll(container.NewPadded(chart)),
 	)
 }
 
