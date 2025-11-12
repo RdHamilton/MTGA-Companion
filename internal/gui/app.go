@@ -52,12 +52,12 @@ func (a *App) Run() {
 func (a *App) createStatsView() fyne.CanvasObject {
 	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
 	if err != nil {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("Error loading statistics"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+		return a.ErrorView("Error Loading Statistics", err, a.createStatsView)
+	}
+
+	if stats.TotalMatches == 0 {
+		return a.NoDataView("No Statistics Available",
+			"No match data has been collected yet.")
 	}
 
 	// Create rich text with markdown for better formatting
@@ -157,13 +157,13 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 	}
 
 	matches, err := a.service.GetMatches(a.ctx, filter)
-	if err != nil || len(matches) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No match data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return a.ErrorView("Error Loading Match Data", err, a.createResultBreakdownView)
+	}
+
+	if len(matches) == 0 {
+		return a.NoDataView("No Match Data Available",
+			"No matches found for the selected time period.")
 	}
 
 	// Calculate breakdowns
@@ -324,13 +324,13 @@ func (a *App) createRankProgressionView() fyne.CanvasObject {
 
 	// Get rank progression timeline for constructed
 	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
-	if err != nil || len(timeline.Entries) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No rank progression data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return a.ErrorView("Error Loading Rank Data", err, a.createRankProgressionView)
+	}
+
+	if len(timeline.Entries) == 0 {
+		return a.NoDataView("No Rank Data Available",
+			"No ranked matches found for the selected time period.")
 	}
 
 	// Convert timeline entries to chart data points

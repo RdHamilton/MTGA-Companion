@@ -159,13 +159,13 @@ func (d *FormatDistributionDashboard) createChartView() fyne.CanvasObject {
 
 	// Get statistics by format
 	statsByFormat, err := d.service.GetStatsByFormat(d.ctx, filter)
-	if err != nil || len(statsByFormat) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No format data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return d.app.ErrorView("Error Loading Format Data", err, nil)
+	}
+
+	if len(statsByFormat) == 0 {
+		return d.app.NoDataView("No Format Data Available",
+			"No match data found for the selected time period.")
 	}
 
 	// Convert to data points and calculate total

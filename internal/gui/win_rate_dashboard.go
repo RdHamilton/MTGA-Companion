@@ -194,13 +194,13 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 
 	// Get trend data
 	analysis, err := d.service.GetTrendAnalysis(d.ctx, *d.startDate, *d.endDate, d.periodType, formatFilter)
-	if err != nil || len(analysis.Periods) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No chart data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return d.app.ErrorView("Error Loading Trend Data", err, nil)
+	}
+
+	if len(analysis.Periods) == 0 {
+		return d.app.NoDataView("No Trend Data Available",
+			"No match data found for the selected time period.")
 	}
 
 	// Prepare data points

@@ -188,13 +188,13 @@ func (d *DeckPerformanceDashboard) createChartView() fyne.CanvasObject {
 
 	// Get statistics by deck
 	statsByDeck, err := d.service.GetStatsByDeck(d.ctx, filter)
-	if err != nil || len(statsByDeck) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No deck performance data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return d.app.ErrorView("Error Loading Deck Data", err, nil)
+	}
+
+	if len(statsByDeck) == 0 {
+		return d.app.NoDataView("No Deck Data Available",
+			"No deck data found for the selected time period.")
 	}
 
 	// Convert to performance data
