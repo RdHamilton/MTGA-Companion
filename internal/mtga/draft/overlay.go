@@ -28,6 +28,7 @@ type Overlay struct {
 	stopChan        chan struct{}
 	resumeEnabled   bool
 	lookbackHours   int
+	logger          *Logger
 	mu              sync.RWMutex
 }
 
@@ -82,6 +83,7 @@ type ColorSuggestion struct {
 // NewOverlay creates a new draft overlay.
 func NewOverlay(config OverlayConfig) *Overlay {
 	parser := NewParser()
+	logger := NewLogger(config.DebugMode)
 
 	// Create cache if enabled
 	var cache *CardRatingsCache
@@ -91,7 +93,7 @@ func NewOverlay(config OverlayConfig) *Overlay {
 			cacheTTL = 24 * time.Hour // Default: 24 hours
 		}
 		cache = NewCardRatingsCache(cacheTTL, config.CacheMaxSize, true)
-		fmt.Printf("[INFO] Card ratings cache enabled (TTL: %v, MaxSize: %d)\n", cacheTTL, config.CacheMaxSize)
+		logger.Info("Card ratings cache enabled (TTL: %v, MaxSize: %d)", cacheTTL, config.CacheMaxSize)
 	}
 
 	ratingsProvider := NewRatingsProvider(config.SetFile, config.BayesianConfig, cache)
@@ -114,6 +116,7 @@ func NewOverlay(config OverlayConfig) *Overlay {
 		stopChan:        make(chan struct{}),
 		resumeEnabled:   config.ResumeEnabled,
 		lookbackHours:   config.LookbackHours,
+		logger:          logger,
 	}
 }
 
@@ -133,9 +136,9 @@ func (o *Overlay) Start(ctx context.Context) error {
 	if o.resumeEnabled {
 		if err := o.scanForActiveDraft(file); err != nil {
 			// No active draft found - continue monitoring for new events
-			fmt.Printf("[INFO] No active draft found in log history. Waiting for new draft...\n")
+			o.logger.Info("No active draft found in log history. Waiting for new draft...")
 		} else {
-			fmt.Printf("[INFO] Successfully resumed active draft!\n")
+			o.logger.Info("Successfully resumed active draft!")
 		}
 	}
 
@@ -144,7 +147,7 @@ func (o *Overlay) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to seek to end of log: %w", err)
 	}
 
-	fmt.Println("[INFO] Monitoring log file for draft events (using file system notifications)...")
+	o.logger.Info("Monitoring log file for draft events (using file system notifications)...")
 	fmt.Println()
 
 	// Create file watcher
@@ -201,7 +204,7 @@ func (o *Overlay) Stop() {
 // scanForActiveDraft scans the log file history for an active draft.
 // Returns nil if active draft found and state restored, error otherwise.
 func (o *Overlay) scanForActiveDraft(file *os.File) error {
-	fmt.Println("[INFO] Scanning log history for active draft...")
+	o.logger.Info("Scanning log history for active draft...")
 
 	// Seek to beginning of file
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -234,7 +237,7 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 				if len(preview) > 150 {
 					preview = preview[:150] + "..."
 				}
-				fmt.Printf("[DEBUG] Found BotDraft line during scan: %s\n", preview)
+				o.logger.Debug("Found BotDraft line during scan: %s", preview)
 			}
 		}
 
@@ -245,7 +248,7 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 		}
 
 		if event != nil {
-			fmt.Printf("[DEBUG] Resume scan parsed event: %s\n", event.Type)
+			o.logger.Debug("Resume scan parsed event: %s", event.Type)
 		}
 
 		if event == nil {
@@ -255,7 +258,7 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 		// Track if we've found a draft start (not sealed)
 		if IsPackEvent(event.Type) && event.Type != LogEventGrantCardPool && event.Type != LogEventCoursesCardPool {
 			draftStartFound = true
-			fmt.Printf("[DEBUG] Draft start detected during resume scan! Event type: %s\n", event.Type)
+			o.logger.Debug("Draft start detected during resume scan! Event type: %s", event.Type)
 		}
 
 		// Update parser state
@@ -280,7 +283,7 @@ func (o *Overlay) scanForActiveDraft(file *os.File) error {
 
 	// If draft is marked as in progress and we have a pack, resume it
 	if o.currentState.Event.InProgress && o.currentState.CurrentPack != nil {
-		fmt.Printf("[DEBUG] Found active draft! Pack %d, Pick %d, %d cards in pack, %d picks made\n",
+		o.logger.Debug("Found active draft! Pack %d, Pick %d, %d cards in pack, %d picks made",
 			o.currentState.Event.CurrentPack,
 			o.currentState.Event.CurrentPick,
 			len(o.currentState.CurrentPack.CardIDs),
@@ -329,7 +332,7 @@ func (o *Overlay) processLogLine(line string) {
 	// Parse log entry
 	event, err := o.parser.ParseLogEntry(line, timestamp)
 	if err != nil {
-		fmt.Printf("[DEBUG] Parse error: %v\n", err)
+		o.logger.Debug("Parse error: %v", err)
 		return
 	}
 	if event == nil {
@@ -338,19 +341,19 @@ func (o *Overlay) processLogLine(line string) {
 
 	// Skip Sealed events (they interfere with active drafts)
 	if event.Type == LogEventGrantCardPool || event.Type == LogEventCoursesCardPool {
-		fmt.Printf("[DEBUG] Skipping Sealed event: %s\n", event.Type)
+		o.logger.Debug("Skipping Sealed event: %s", event.Type)
 		return
 	}
 
 	// Debug: print detected events with timestamp
-	fmt.Printf("[DEBUG] %s - Detected event: %s\n", time.Now().Format("15:04:05.000"), event.Type)
+	o.logger.Debug("Detected event: %s", event.Type)
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	// Update parser state
 	if err := o.parser.UpdateState(event); err != nil {
-		fmt.Printf("[DEBUG] Error updating state: %v\n", err)
+		o.logger.Debug("Error updating state: %v", err)
 		return
 	}
 
@@ -363,11 +366,11 @@ func (o *Overlay) processLogLine(line string) {
 	// Handle different event types
 	switch {
 	case IsPackEvent(event.Type):
-		fmt.Printf("[DEBUG] Handling pack event - Pack %d, Pick %d\n",
+		o.logger.Debug("Handling pack event - Pack %d, Pick %d",
 			o.currentState.Event.CurrentPack, o.currentState.Event.CurrentPick)
 		o.handlePackEvent()
 	case IsPickEvent(event.Type):
-		fmt.Printf("[DEBUG] Handling pick event\n")
+		o.logger.Debug("Handling pick event")
 		o.handlePickEvent()
 	}
 }
@@ -375,11 +378,11 @@ func (o *Overlay) processLogLine(line string) {
 // handlePackEvent processes a new pack event.
 func (o *Overlay) handlePackEvent() {
 	if o.currentState.CurrentPack == nil {
-		fmt.Println("[DEBUG] No current pack in state")
+		o.logger.Debug("No current pack in state")
 		return
 	}
 
-	fmt.Printf("[DEBUG] Current pack has %d cards\n", len(o.currentState.CurrentPack.CardIDs))
+	o.logger.Debug("Current pack has %d cards", len(o.currentState.CurrentPack.CardIDs))
 
 	// Update color suggestion based on picks so far
 	o.updateColorSuggestion()
@@ -390,16 +393,16 @@ func (o *Overlay) handlePackEvent() {
 		colorFilter = strings.Join(o.selectedColors, "")
 	}
 
-	fmt.Printf("[DEBUG] Getting ratings with color filter: %s\n", colorFilter)
+	o.logger.Debug("Getting ratings with color filter: %s", colorFilter)
 
 	// Get ratings for the pack
 	packRatings, err := o.ratingsProvider.GetPackRatings(o.currentState.CurrentPack, colorFilter)
 	if err != nil {
-		fmt.Printf("[DEBUG] Error getting pack ratings: %v\n", err)
+		o.logger.Debug("Error getting pack ratings: %v", err)
 		return
 	}
 
-	fmt.Printf("[DEBUG] %s - Got ratings for %d cards, sending to UI\n", time.Now().Format("15:04:05.000"), len(packRatings.CardRatings))
+	o.logger.Debug("Got ratings for %d cards, sending to UI", len(packRatings.CardRatings))
 
 	o.currentRatings = packRatings
 
@@ -445,7 +448,7 @@ func (o *Overlay) handlePickEvent() {
 
 	// Check if draft is complete (45 picks = 3 packs × 15 picks)
 	if o.isDraftComplete() {
-		fmt.Println("[INFO] Draft complete! Building deck recommendations...")
+		o.logger.Info("Draft complete! Building deck recommendations...")
 		o.handleDraftComplete()
 	}
 }
@@ -625,11 +628,11 @@ func (o *Overlay) handleDraftComplete() {
 		o.colorConfig,
 	)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to build deck recommendations: %v\n", err)
+		o.logger.Error("Failed to build deck recommendations: %v", err)
 		return
 	}
 
-	fmt.Printf("[INFO] Deck recommendations: %s deck, %d main / %d sideboard, grade: %s\n",
+	o.logger.Info("Deck recommendations: %s deck, %d main / %d sideboard, grade: %s",
 		FormatColorName(recommendation.Colors),
 		len(recommendation.MainDeck),
 		len(recommendation.Sideboard),
