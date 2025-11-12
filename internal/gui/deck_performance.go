@@ -435,11 +435,16 @@ func (d *DeckPerformanceDashboard) getSortDisplayName() string {
 
 // refresh refreshes the chart view.
 func (d *DeckPerformanceDashboard) refresh() {
-	// Recreate the entire Charts tab
-	d.app.window.SetContent(container.NewAppTabs(
+	// Recreate the main tabs
+	mainTabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", d.app.createStatsView()),
 		container.NewTabItem("Match History", d.app.createMatchesView()),
 		container.NewTabItem("Charts", d.app.createChartsView()),
 		container.NewTabItem("Settings", d.app.createSettingsView()),
-	))
+	)
+
+	// Select the Charts tab (index 2)
+	mainTabs.SelectIndex(2)
+
+	d.app.window.SetContent(mainTabs)
 }
