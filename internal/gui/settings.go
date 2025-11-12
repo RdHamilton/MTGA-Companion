@@ -211,19 +211,27 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 		}, a.window)
 	})
 
+	// Add About button
+	aboutButton := widget.NewButton("About MTGA Companion", func() {
+		a.showAboutDialog()
+	})
+
 	// Create transparent spacers for left and right margins
 	leftSpacer := canvas.NewRectangle(color.Transparent)
 	leftSpacer.SetMinSize(fyne.NewSize(20, 0))
 	rightSpacer := canvas.NewRectangle(color.Transparent)
 	rightSpacer.SetMinSize(fyne.NewSize(20, 0))
 
-	// Layout: form in center with margins, restore button at bottom
+	// Layout: form in center with margins, buttons at bottom
 	return container.NewBorder(
 		nil,
 		container.NewPadded(
 			container.NewVBox(
 				widget.NewSeparator(),
-				restoreButton,
+				container.NewHBox(
+					restoreButton,
+					aboutButton,
+				),
 			),
 		),
 		leftSpacer,
