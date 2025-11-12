@@ -124,95 +124,10 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	return chartTabs
 }
 
-// createWinRateTrendView creates the win rate trend chart view with material design.
+// createWinRateTrendView creates the win rate trend chart view with enhanced filtering.
 func (a *App) createWinRateTrendView() fyne.CanvasObject {
-	// Date range selector
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
-
-	// Get trend data for last 30 days
-	analysis, err := a.service.GetTrendAnalysis(a.ctx, thirtyDaysAgo, now, "weekly", nil)
-	if err != nil || len(analysis.Periods) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No chart data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
-	}
-
-	// Prepare data points
-	dataPoints := make([]charts.DataPoint, len(analysis.Periods))
-	for i, period := range analysis.Periods {
-		dataPoints[i] = charts.DataPoint{
-			Label: period.Period.Label,
-			Value: period.WinRate,
-		}
-	}
-
-	// Create chart config
-	config := charts.DefaultFyneChartConfig()
-	config.Title = "Win Rate Trend (Last 30 Days)"
-	config.Width = 750
-	config.Height = 450
-
-	// Create chart
-	chart := charts.CreateFyneLineChart(dataPoints, config)
-
-	// Add summary info with markdown formatting
-	summaryContent := fmt.Sprintf(`### Win Rate Trend Analysis
-
-**Period**: %s to %s
-**Trend**: %s`,
-		thirtyDaysAgo.Format("2006-01-02"),
-		now.Format("2006-01-02"),
-		analysis.Trend,
-	)
-
-	if analysis.TrendValue != 0 {
-		summaryContent += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
-	}
-
-	if analysis.Overall != nil {
-		summaryContent += fmt.Sprintf(`
-**Overall Win Rate**: %.1f%% (%d matches)`,
-			analysis.Overall.WinRate,
-			analysis.Overall.TotalMatches,
-		)
-	}
-
-	summary := widget.NewRichTextFromMarkdown(summaryContent)
-
-	// Create chart type selector
-	chartTypeSelect := widget.NewSelect([]string{"Line Chart", "Bar Chart"}, func(selected string) {
-		// Recreate the entire Charts tab with the new chart type
-		a.window.SetContent(container.NewAppTabs(
-			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Match History", a.createMatchesView()),
-			container.NewTabItem("Charts", a.createChartsView()),
-			container.NewTabItem("Settings", a.createSettingsView()),
-		))
-	})
-	chartTypeSelect.Selected = "Line Chart"
-
-	// Layout: selector at top, chart in middle, summary at bottom
-	return container.NewBorder(
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewLabelWithStyle("Chart Type", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				chartTypeSelect,
-				widget.NewSeparator(),
-			),
-		),
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewSeparator(),
-				summary,
-			),
-		),
-		nil, nil,
-		container.NewScroll(container.NewPadded(chart)),
-	)
+	dashboard := NewWinRateDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
 }
 
 // createResultBreakdownView creates the result breakdown chart view.
