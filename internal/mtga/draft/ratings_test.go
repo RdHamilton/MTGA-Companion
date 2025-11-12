@@ -72,7 +72,7 @@ func TestNewRatingsProvider(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
 
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	if rp == nil {
 		t.Fatal("NewRatingsProvider() returned nil")
@@ -106,7 +106,7 @@ func TestDefaultBayesianConfig(t *testing.T) {
 func TestGetCardRating(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	tests := []struct {
 		name         string
@@ -207,7 +207,7 @@ func TestGetCardRating(t *testing.T) {
 func TestGetPackRatings(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -238,7 +238,7 @@ func TestGetPackRatings(t *testing.T) {
 func TestGetPackRatingsWithColorFilter(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -268,7 +268,7 @@ func TestGetPackRatingsWithColorFilter(t *testing.T) {
 
 func TestCalculateBayesianGIHWR(t *testing.T) {
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(createTestSetFile(), config)
+	rp := NewRatingsProvider(createTestSetFile(), config, nil)
 
 	tests := []struct {
 		name         string
@@ -315,7 +315,7 @@ func TestCalculateBayesianGIHWR(t *testing.T) {
 func TestPackRatingsSortByRating(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -355,7 +355,7 @@ func TestPackRatingsSortByRating(t *testing.T) {
 func TestPackRatingsTopN(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -393,7 +393,7 @@ func TestPackRatingsTopN(t *testing.T) {
 func TestPackRatingsGetBestPick(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -429,7 +429,7 @@ func TestPackRatingsGetBestPick(t *testing.T) {
 func TestPackRatingsFilterByColors(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -474,7 +474,7 @@ func TestPackRatingsFilterByColors(t *testing.T) {
 func TestPackRatingsGetCardByID(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,
@@ -505,7 +505,7 @@ func TestPackRatingsGetCardByID(t *testing.T) {
 
 func TestRatingsProviderNilSetFile(t *testing.T) {
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(nil, config)
+	rp := NewRatingsProvider(nil, config, nil)
 
 	_, err := rp.GetCardRating(100, "ALL")
 	if err == nil {
@@ -516,7 +516,7 @@ func TestRatingsProviderNilSetFile(t *testing.T) {
 func TestGetPackRatingsNilPack(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	_, err := rp.GetPackRatings(nil, "ALL")
 	if err == nil {
@@ -527,7 +527,7 @@ func TestGetPackRatingsNilPack(t *testing.T) {
 func TestGetPackRatingsEmptyColorFilter(t *testing.T) {
 	setFile := createTestSetFile()
 	config := DefaultBayesianConfig()
-	rp := NewRatingsProvider(setFile, config)
+	rp := NewRatingsProvider(setFile, config, nil)
 
 	pack := &Pack{
 		PackNumber: 1,

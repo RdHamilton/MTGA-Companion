@@ -18,6 +18,7 @@ import (
 type Overlay struct {
 	parser          *Parser
 	ratingsProvider *RatingsProvider
+	cache           *CardRatingsCache
 	colorConfig     ColorAffinityConfig
 	currentState    *DraftState
 	currentRatings  *PackRatings
@@ -41,6 +42,9 @@ type OverlayConfig struct {
 	PollInterval   time.Duration // How often to check log for updates
 	ResumeEnabled  bool          // Whether to scan log history for active draft
 	LookbackHours  int           // How many hours back to scan (default: 24)
+	CacheEnabled   bool          // Whether to enable in-memory caching
+	CacheTTL       time.Duration // Cache time-to-live (default: 24 hours)
+	CacheMaxSize   int           // Maximum cache entries (0 = unlimited)
 	DebugMode      bool          // Enable verbose debug logging
 }
 
@@ -79,8 +83,20 @@ type ColorSuggestion struct {
 // NewOverlay creates a new draft overlay.
 func NewOverlay(config OverlayConfig) *Overlay {
 	parser := NewParser()
-	ratingsProvider := NewRatingsProvider(config.SetFile, config.BayesianConfig)
 	logger := NewLogger(config.DebugMode)
+
+	// Create cache if enabled
+	var cache *CardRatingsCache
+	if config.CacheEnabled {
+		cacheTTL := config.CacheTTL
+		if cacheTTL == 0 {
+			cacheTTL = 24 * time.Hour // Default: 24 hours
+		}
+		cache = NewCardRatingsCache(cacheTTL, config.CacheMaxSize, true)
+		logger.Info("Card ratings cache enabled (TTL: %v, MaxSize: %d)", cacheTTL, config.CacheMaxSize)
+	}
+
+	ratingsProvider := NewRatingsProvider(config.SetFile, config.BayesianConfig, cache)
 
 	if config.PollInterval == 0 {
 		config.PollInterval = 20 * time.Millisecond // Very fast polling for minimal latency
@@ -93,6 +109,7 @@ func NewOverlay(config OverlayConfig) *Overlay {
 	return &Overlay{
 		parser:          parser,
 		ratingsProvider: ratingsProvider,
+		cache:           cache,
 		colorConfig:     config.ColorConfig,
 		logPath:         config.LogPath,
 		updateCallback:  config.UpdateCallback,
@@ -561,6 +578,25 @@ func (o *Overlay) Reset() {
 		o.parser.Reset()
 	}
 	fmt.Println("[INFO] Draft overlay reset, ready for next draft")
+}
+
+// GetCacheStats returns current cache statistics.
+// Returns nil if caching is disabled.
+func (o *Overlay) GetCacheStats() *CacheStats {
+	if o.cache == nil {
+		return nil
+	}
+	stats := o.cache.GetStats()
+	return &stats
+}
+
+// GetCacheHitRate returns the cache hit rate as a percentage.
+// Returns 0.0 if caching is disabled.
+func (o *Overlay) GetCacheHitRate() float64 {
+	if o.cache == nil {
+		return 0.0
+	}
+	return o.cache.GetHitRate()
 }
 
 // handleDraftComplete processes draft completion and builds deck recommendations.

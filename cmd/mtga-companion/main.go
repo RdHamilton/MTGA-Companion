@@ -50,6 +50,9 @@ var (
 	overlayResume   = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
 	overlayLookback = flag.Int("overlay-lookback", 24, "How many hours back to scan for active draft (default: 24)")
 	debug           = flag.Bool("debug", false, "Enable verbose debug logging")
+	cacheEnabled    = flag.Bool("cache", true, "Enable in-memory caching for card ratings (default: true)")
+	cacheTTL        = flag.Duration("cache-ttl", 24*time.Hour, "Cache time-to-live (e.g., 1h, 24h)")
+	cacheMaxSize    = flag.Int("cache-max-size", 0, "Maximum cache entries (0 = unlimited)")
 )
 
 // getDBPath returns the database path from environment variable or default location.

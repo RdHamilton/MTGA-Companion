@@ -10,6 +10,7 @@ import (
 type RatingsProvider struct {
 	setFile *seventeenlands.SetFile
 	config  BayesianConfig
+	cache   *CardRatingsCache
 }
 
 // BayesianConfig configures Bayesian averaging for ratings.
@@ -34,10 +35,12 @@ func DefaultBayesianConfig() BayesianConfig {
 }
 
 // NewRatingsProvider creates a ratings provider for a specific set.
-func NewRatingsProvider(setFile *seventeenlands.SetFile, config BayesianConfig) *RatingsProvider {
+// cache can be nil to disable caching.
+func NewRatingsProvider(setFile *seventeenlands.SetFile, config BayesianConfig, cache *CardRatingsCache) *RatingsProvider {
 	return &RatingsProvider{
 		setFile: setFile,
 		config:  config,
+		cache:   cache,
 	}
 }
 
@@ -108,6 +111,13 @@ func (rp *RatingsProvider) GetCardRating(cardID int, colorFilter string) (*CardR
 		return nil, fmt.Errorf("set file is nil")
 	}
 
+	// Check cache first
+	if rp.cache != nil {
+		if cached := rp.cache.Get(cardID, colorFilter); cached != nil {
+			return cached, nil
+		}
+	}
+
 	// Find card in set file (CardRatings is a map keyed by Arena ID as string)
 	cardKey := fmt.Sprintf("%d", cardID)
 	cardData, ok := rp.setFile.CardRatings[cardKey]
@@ -151,6 +161,11 @@ func (rp *RatingsProvider) GetCardRating(cardID int, colorFilter string) (*CardR
 	} else {
 		rating.BayesianGIHWR = deckColorRatings.GIHWR
 		rating.IsBayesianAdjust = false
+	}
+
+	// Store in cache for future lookups
+	if rp.cache != nil {
+		rp.cache.Set(cardID, colorFilter, rating)
 	}
 
 	return rating, nil
