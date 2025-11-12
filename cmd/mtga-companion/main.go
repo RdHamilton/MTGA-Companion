@@ -36,24 +36,124 @@ import (
 )
 
 var (
-	pollInterval  = flag.Duration("poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
-	enableMetrics = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
-	useFileEvents = flag.Bool("use-file-events", true, "Use file system events (fsnotify) for monitoring")
-	useGUI        = flag.Bool("gui", false, "Launch GUI mode instead of CLI")
+	// NEW STANDARDIZED FLAGS (v0.2.0+)
+	// Application mode flags
+	guiMode          = flag.Bool("gui-mode", false, "Launch GUI mode instead of CLI")
+	guiModeShort     = flag.Bool("g", false, "Launch GUI mode (shorthand for -gui-mode)")
+	debugMode        = flag.Bool("debug-mode", false, "Enable verbose debug logging")
+	debugModeShort   = flag.Bool("d", false, "Enable debug logging (shorthand for -debug-mode)")
+	draftOverlayMode = flag.Bool("draft-overlay-mode", false, "Launch draft overlay mode")
 
-	// Draft Overlay flags
-	draftOverlay    = flag.Bool("draft-overlay", false, "Launch draft overlay mode")
-	setFilePath     = flag.String("set-file", "", "Path to 17Lands set file for draft overlay")
-	logPath         = flag.String("log-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
-	overlaySetCode  = flag.String("overlay-set", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
-	overlayFormat   = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
-	overlayResume   = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
-	overlayLookback = flag.Int("overlay-lookback", 24, "How many hours back to scan for active draft (default: 24)")
-	debug           = flag.Bool("debug", false, "Enable verbose debug logging")
-	cacheEnabled    = flag.Bool("cache", true, "Enable in-memory caching for card ratings (default: true)")
-	cacheTTL        = flag.Duration("cache-ttl", 24*time.Hour, "Cache time-to-live (e.g., 1h, 24h)")
-	cacheMaxSize    = flag.Int("cache-max-size", 0, "Maximum cache entries (0 = unlimited)")
+	// Log file configuration flags
+	logFilePath       = flag.String("log-file-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
+	logPollInterval   = flag.Duration("log-poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
+	logUseFsnotify    = flag.Bool("log-use-fsnotify", true, "Use file system events (fsnotify) for monitoring")
+	enableMetrics     = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
+
+	// Cache configuration flags
+	cacheEnabled = flag.Bool("cache-enabled", true, "Enable in-memory caching for card ratings (default: true)")
+	cacheTTL     = flag.Duration("cache-ttl", 24*time.Hour, "Cache time-to-live (e.g., 1h, 24h)")
+	cacheMaxSize = flag.Int("cache-max-size", 0, "Maximum cache entries (0 = unlimited)")
+
+	// Draft overlay configuration flags
+	overlaySetFile      = flag.String("overlay-set-file", "", "Path to 17Lands set file for draft overlay")
+	overlaySetCode      = flag.String("overlay-set-code", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
+	overlayFormat       = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
+	overlayResume       = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
+	overlayLookbackHrs  = flag.Int("overlay-lookback-hours", 24, "How many hours back to scan for active draft (default: 24)")
+
+	// DEPRECATED FLAGS (v0.1.0) - Will be removed in v2.0.0
+	// These are kept for backward compatibility
+	pollInterval    = flag.Duration("poll-interval", 2*time.Second, "DEPRECATED: Use -log-poll-interval instead")
+	useFileEvents   = flag.Bool("use-file-events", true, "DEPRECATED: Use -log-use-fsnotify instead")
+	useGUI          = flag.Bool("gui", false, "DEPRECATED: Use -gui-mode or -g instead")
+	draftOverlay    = flag.Bool("draft-overlay", false, "DEPRECATED: Use -draft-overlay-mode instead")
+	setFilePath     = flag.String("set-file", "", "DEPRECATED: Use -overlay-set-file instead")
+	logPath         = flag.String("log-path", "", "DEPRECATED: Use -log-file-path instead")
+	overlaySetOld   = flag.String("overlay-set", "", "DEPRECATED: Use -overlay-set-code instead")
+	overlayLookback = flag.Int("overlay-lookback", 24, "DEPRECATED: Use -overlay-lookback-hours instead")
+	debug           = flag.Bool("debug", false, "DEPRECATED: Use -debug-mode or -d instead")
+	cacheOld        = flag.Bool("cache", true, "DEPRECATED: Use -cache-enabled instead")
 )
+
+// deprecatedFlags tracks which deprecated flags were explicitly set by the user
+var deprecatedFlags = make(map[string]string)
+
+// flagDeprecationMap maps old flag names to their new equivalents
+var flagDeprecationMap = map[string]string{
+	"gui":            "gui-mode (or -g)",
+	"debug":          "debug-mode (or -d)",
+	"cache":          "cache-enabled",
+	"poll-interval":  "log-poll-interval",
+	"use-file-events": "log-use-fsnotify",
+	"draft-overlay":  "draft-overlay-mode",
+	"set-file":       "overlay-set-file",
+	"log-path":       "log-file-path",
+	"overlay-set":    "overlay-set-code",
+	"overlay-lookback": "overlay-lookback-hours",
+}
+
+// checkDeprecatedFlags detects and warns about deprecated flag usage
+func checkDeprecatedFlags() {
+	visited := make(map[string]bool)
+
+	flag.Visit(func(f *flag.Flag) {
+		visited[f.Name] = true
+		if newFlag, ok := flagDeprecationMap[f.Name]; ok {
+			deprecatedFlags[f.Name] = newFlag
+		}
+	})
+
+	// Print deprecation warnings
+	if len(deprecatedFlags) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Warning: You are using deprecated flags:\n")
+		for oldFlag, newFlag := range deprecatedFlags {
+			fmt.Fprintf(os.Stderr, "   - Flag '-%s' is deprecated. Use '-%s' instead.\n", oldFlag, newFlag)
+		}
+		fmt.Fprintf(os.Stderr, "   Deprecated flags will be removed in v2.0.0.\n")
+		fmt.Fprintf(os.Stderr, "   See FLAG_MIGRATION.md for migration guide.\n\n")
+	}
+
+	// Map old flag values to new flags for backward compatibility
+	if visited["gui"] && !visited["gui-mode"] {
+		*guiMode = *useGUI
+	}
+	if visited["debug"] && !visited["debug-mode"] {
+		*debugMode = *debug
+	}
+	if visited["cache"] && !visited["cache-enabled"] {
+		*cacheEnabled = *cacheOld
+	}
+	if visited["poll-interval"] && !visited["log-poll-interval"] {
+		*logPollInterval = *pollInterval
+	}
+	if visited["use-file-events"] && !visited["log-use-fsnotify"] {
+		*logUseFsnotify = *useFileEvents
+	}
+	if visited["draft-overlay"] && !visited["draft-overlay-mode"] {
+		*draftOverlayMode = *draftOverlay
+	}
+	if visited["set-file"] && !visited["overlay-set-file"] {
+		*overlaySetFile = *setFilePath
+	}
+	if visited["log-path"] && !visited["log-file-path"] {
+		*logFilePath = *logPath
+	}
+	if visited["overlay-set"] && !visited["overlay-set-code"] {
+		*overlaySetCode = *overlaySetOld
+	}
+	if visited["overlay-lookback"] && !visited["overlay-lookback-hours"] {
+		*overlayLookbackHrs = *overlayLookback
+	}
+
+	// Handle shorthand flags
+	if *guiModeShort {
+		*guiMode = true
+	}
+	if *debugModeShort {
+		*debugMode = true
+	}
+}
 
 // getDBPath returns the database path from environment variable or default location.
 func getDBPath() string {
@@ -72,16 +172,19 @@ func main() {
 	// Parse flags before checking for subcommands
 	flag.Parse()
 
+	// Check for deprecated flag usage and apply backward compatibility
+	checkDeprecatedFlags()
+
 	// Validate poll interval
-	if *pollInterval < 1*time.Second {
-		log.Fatalf("Poll interval must be at least 1 second, got %v", *pollInterval)
+	if *logPollInterval < 1*time.Second {
+		log.Fatalf("Poll interval must be at least 1 second, got %v", *logPollInterval)
 	}
-	if *pollInterval > 1*time.Minute {
-		log.Fatalf("Poll interval must be at most 1 minute, got %v", *pollInterval)
+	if *logPollInterval > 1*time.Minute {
+		log.Fatalf("Poll interval must be at most 1 minute, got %v", *logPollInterval)
 	}
 
 	// Check if draft overlay mode is requested
-	if *draftOverlay {
+	if *draftOverlayMode {
 		runDraftOverlay()
 		return
 	}
@@ -170,25 +273,31 @@ func main() {
 	ctx := context.Background()
 
 	// Check if GUI mode is requested
-	if *useGUI {
+	if *guiMode {
 		guiApp := gui.NewApp(service)
 		guiApp.Run()
 		return
 	}
 
 	// Get the default log path for the current platform
-	logPath, err := logreader.DefaultLogPath()
+	defaultLogPath, err := logreader.DefaultLogPath()
 	if err != nil {
 		log.Fatalf("Error getting default log path: %v", err)
 	}
 
+	// Use custom log path if provided, otherwise use default
+	playerLogPath := *logFilePath
+	if playerLogPath == "" {
+		playerLogPath = defaultLogPath
+	}
+
 	fmt.Printf("MTGA Companion\n")
 	fmt.Printf("==============\n\n")
-	fmt.Printf("Log file: %s\n", logPath)
+	fmt.Printf("Log file: %s\n", playerLogPath)
 	fmt.Printf("Database: %s\n\n", dbPath)
 
 	// Check if the log file exists
-	exists, err := logreader.LogExists(logPath)
+	exists, err := logreader.LogExists(playerLogPath)
 	if err != nil {
 		log.Fatalf("Error checking if log exists: %v", err)
 	}
@@ -204,7 +313,7 @@ func main() {
 	}
 
 	// Create a reader
-	reader, err := logreader.NewReader(logPath)
+	reader, err := logreader.NewReader(playerLogPath)
 	if err != nil {
 		log.Fatalf("Error creating log reader: %v", err)
 	}
@@ -363,9 +472,9 @@ func main() {
 
 	// Start log file poller for real-time updates
 	fmt.Println("\nStarting log file poller for real-time updates...")
-	pollerConfig := logreader.DefaultPollerConfig(logPath)
-	pollerConfig.Interval = *pollInterval
-	pollerConfig.UseFileEvents = *useFileEvents
+	pollerConfig := logreader.DefaultPollerConfig(playerLogPath)
+	pollerConfig.Interval = *logPollInterval
+	pollerConfig.UseFileEvents = *logUseFsnotify
 	pollerConfig.EnableMetrics = *enableMetrics
 	poller, err := logreader.NewPoller(pollerConfig)
 	if err != nil {
@@ -373,7 +482,7 @@ func main() {
 		log.Println("Continuing without real-time updates...")
 		// Fall back to interactive console without poller
 		fmt.Println("\nType 'exit' to quit, or press Enter to refresh statistics.")
-		runInteractiveConsole(service, ctx, logPath, nil)
+		runInteractiveConsole(service, ctx, playerLogPath, nil)
 		return
 	}
 	defer poller.Stop()
@@ -386,12 +495,12 @@ func main() {
 	pollerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go processPollerUpdates(pollerCtx, updates, errChan, service, logPath)
+	go processPollerUpdates(pollerCtx, updates, errChan, service, playerLogPath)
 
 	// Interactive console loop
 	fmt.Println("\nType 'exit' to quit, or press Enter to refresh statistics.")
 	fmt.Println("Statistics will update automatically as new log entries are detected.")
-	runInteractiveConsole(service, ctx, logPath, poller)
+	runInteractiveConsole(service, ctx, playerLogPath, poller)
 }
 
 // displayArenaStatistics displays both current session and all-time statistics.

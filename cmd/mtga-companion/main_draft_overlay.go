@@ -22,7 +22,7 @@ func runDraftOverlay() {
 	// Determine set file path
 	setFile := getSetFileForOverlay()
 	if setFile == nil {
-		log.Fatal("No set file specified or found. Use -set-file or -overlay-set flag.")
+		log.Fatal("No set file specified or found. Use -overlay-set-file or -overlay-set-code flag.")
 	}
 
 	// Determine log path
@@ -31,7 +31,7 @@ func runDraftOverlay() {
 	fmt.Printf("Set File: %s (%s)\n", setFile.Meta.SetCode, setFile.Meta.DraftFormat)
 	fmt.Printf("Log Path: %s\n", playerLogPath)
 	fmt.Printf("Resume Mode: %v\n", *overlayResume)
-	fmt.Printf("Debug Mode: %v\n", *debug)
+	fmt.Printf("Debug Mode: %v\n", *debugMode)
 	fmt.Printf("Cache Enabled: %v", *cacheEnabled)
 	if *cacheEnabled {
 		fmt.Printf(" (TTL: %v, MaxSize: %d)", *cacheTTL, *cacheMaxSize)
@@ -46,8 +46,8 @@ func runDraftOverlay() {
 		BayesianConfig: draft.DefaultBayesianConfig(),
 		ColorConfig:    draft.DefaultColorAffinityConfig(),
 		ResumeEnabled:  *overlayResume,
-		LookbackHours:  *overlayLookback,
-		DebugMode:      *debug,
+		LookbackHours:  *overlayLookbackHrs,
+		DebugMode:      *debugMode,
 		CacheEnabled:   *cacheEnabled,
 		CacheTTL:       *cacheTTL,
 		CacheMaxSize:   *cacheMaxSize,
@@ -61,9 +61,9 @@ func runDraftOverlay() {
 // getSetFileForOverlay determines which set file to use for the overlay.
 func getSetFileForOverlay() *seventeenlands.SetFile {
 	// If explicit path provided, use it
-	if *setFilePath != "" {
-		fmt.Printf("Loading set file: %s\n", *setFilePath)
-		setFile, err := loadSetFileFromPath(*setFilePath)
+	if *overlaySetFile != "" {
+		fmt.Printf("Loading set file: %s\n", *overlaySetFile)
+		setFile, err := loadSetFileFromPath(*overlaySetFile)
 		if err != nil {
 			log.Fatalf("Error loading set file: %v", err)
 		}
@@ -135,19 +135,19 @@ func loadSetFileFromPath(path string) (*seventeenlands.SetFile, error) {
 // getLogPathForOverlay determines the MTGA Player.log path.
 func getLogPathForOverlay() string {
 	// If explicit path provided, use it
-	if *logPath != "" {
-		return *logPath
+	if *logFilePath != "" {
+		return *logFilePath
 	}
 
 	// Auto-detect platform default
 	defaultPath, err := logreader.DefaultLogPath()
 	if err != nil {
-		log.Fatalf("Error detecting log path: %v\nPlease specify with -log-path flag", err)
+		log.Fatalf("Error detecting log path: %v\nPlease specify with -log-file-path flag", err)
 	}
 
 	// Verify it exists
 	if _, err := os.Stat(defaultPath); err != nil {
-		log.Fatalf("Log file not found at %s\nPlease specify with -log-path flag", defaultPath)
+		log.Fatalf("Log file not found at %s\nPlease specify with -log-file-path flag", defaultPath)
 	}
 
 	return defaultPath
