@@ -45,10 +45,10 @@ var (
 	draftOverlayMode = flag.Bool("draft-overlay-mode", false, "Launch draft overlay mode")
 
 	// Log file configuration flags
-	logFilePath       = flag.String("log-file-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
-	logPollInterval   = flag.Duration("log-poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
-	logUseFsnotify    = flag.Bool("log-use-fsnotify", true, "Use file system events (fsnotify) for monitoring")
-	enableMetrics     = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
+	logFilePath     = flag.String("log-file-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
+	logPollInterval = flag.Duration("log-poll-interval", 2*time.Second, "Interval for polling log file (e.g., 1s, 2s, 5s)")
+	logUseFsnotify  = flag.Bool("log-use-fsnotify", true, "Use file system events (fsnotify) for monitoring")
+	enableMetrics   = flag.Bool("enable-metrics", false, "Enable poller performance metrics collection")
 
 	// Cache configuration flags
 	cacheEnabled = flag.Bool("cache-enabled", true, "Enable in-memory caching for card ratings (default: true)")
@@ -56,11 +56,11 @@ var (
 	cacheMaxSize = flag.Int("cache-max-size", 0, "Maximum cache entries (0 = unlimited)")
 
 	// Draft overlay configuration flags
-	overlaySetFile      = flag.String("overlay-set-file", "", "Path to 17Lands set file for draft overlay")
-	overlaySetCode      = flag.String("overlay-set-code", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
-	overlayFormat       = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
-	overlayResume       = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
-	overlayLookbackHrs  = flag.Int("overlay-lookback-hours", 24, "How many hours back to scan for active draft (default: 24)")
+	overlaySetFile     = flag.String("overlay-set-file", "", "Path to 17Lands set file for draft overlay")
+	overlaySetCode     = flag.String("overlay-set-code", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
+	overlayFormat      = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
+	overlayResume      = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
+	overlayLookbackHrs = flag.Int("overlay-lookback-hours", 24, "How many hours back to scan for active draft (default: 24)")
 
 	// DEPRECATED FLAGS (v0.1.0) - Will be removed in v2.0.0
 	// These are kept for backward compatibility
@@ -81,15 +81,15 @@ var deprecatedFlags = make(map[string]string)
 
 // flagDeprecationMap maps old flag names to their new equivalents
 var flagDeprecationMap = map[string]string{
-	"gui":            "gui-mode (or -g)",
-	"debug":          "debug-mode (or -d)",
-	"cache":          "cache-enabled",
-	"poll-interval":  "log-poll-interval",
-	"use-file-events": "log-use-fsnotify",
-	"draft-overlay":  "draft-overlay-mode",
-	"set-file":       "overlay-set-file",
-	"log-path":       "log-file-path",
-	"overlay-set":    "overlay-set-code",
+	"gui":              "gui-mode (or -g)",
+	"debug":            "debug-mode (or -d)",
+	"cache":            "cache-enabled",
+	"poll-interval":    "log-poll-interval",
+	"use-file-events":  "log-use-fsnotify",
+	"draft-overlay":    "draft-overlay-mode",
+	"set-file":         "overlay-set-file",
+	"log-path":         "log-file-path",
+	"overlay-set":      "overlay-set-code",
 	"overlay-lookback": "overlay-lookback-hours",
 }
 
