@@ -316,18 +316,23 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 	// Chart dimensions
 	chartWidth := config.Width
 	chartHeight := config.Height
-	leftMargin := float32(200)
-	rightMargin := float32(120)
+	leftMargin := float32(250)  // Increased for longer format names
+	rightMargin := float32(150) // Increased for value labels
 	topMargin := float32(60)
 	bottomMargin := float32(30)
 
 	plotWidth := chartWidth - leftMargin - rightMargin
 	plotHeight := chartHeight - topMargin - bottomMargin
 
-	barHeight := plotHeight / float32(len(data))
-	if barHeight > 50 {
-		barHeight = 50
+	// Calculate bar height with spacing
+	barHeight := plotHeight / float32(len(data)) * 0.8 // 80% for bar, 20% for spacing
+	if barHeight > 45 {
+		barHeight = 45
 	}
+	if barHeight < 30 {
+		barHeight = 30 // Minimum height for readability
+	}
+	barSpacing := float32(15) // Fixed spacing between bars
 
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
@@ -362,15 +367,16 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 		percentage := (point.Value / total) * 100
 		barWidth := plotWidth * float32(point.Value/total)
 
-		y := topMargin + (barHeight+10)*float32(i)
+		y := topMargin + (barHeight+barSpacing)*float32(i)
 
 		// Label text color (dark gray for better visibility)
 		labelColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
 
-		// Label (larger text)
+		// Label (larger text with better positioning)
 		label := canvas.NewText(point.Label, labelColor)
 		label.TextSize = 14
-		label.Move(fyne.NewPos(10, y+barHeight/2-9))
+		label.Alignment = fyne.TextAlignLeading
+		label.Move(fyne.NewPos(15, y+barHeight/2-9))
 		objects = append(objects, label)
 
 		// Bar

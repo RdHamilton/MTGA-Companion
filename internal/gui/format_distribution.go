@@ -167,10 +167,10 @@ func (d *FormatDistributionDashboard) createChartView() fyne.CanvasObject {
 	// Create data points for charts
 	dataPoints := make([]charts.DataPoint, len(formats))
 	for i, f := range formats {
-		percentage := float64(f.matches) / float64(totalMatches) * 100
-		label := fmt.Sprintf("%s (%.1f%%)", f.format, percentage)
+		// Use just the format name for the label
+		// The chart will display the value and calculate percentage automatically
 		dataPoints[i] = charts.DataPoint{
-			Label: label,
+			Label: f.format,
 			Value: float64(f.matches),
 		}
 	}
@@ -178,8 +178,17 @@ func (d *FormatDistributionDashboard) createChartView() fyne.CanvasObject {
 	// Create chart config
 	config := charts.DefaultFyneChartConfig()
 	config.Title = d.getChartTitle()
-	config.Width = 900
-	config.Height = 600
+
+	// Use larger dimensions for better spacing
+	if d.chartType == "pie" {
+		// Pie chart needs more width for labels and values
+		config.Width = 1000
+		config.Height = 700
+	} else {
+		// Bar chart needs more height for multiple bars
+		config.Width = 900
+		config.Height = 600
+	}
 
 	// Create chart based on type
 	var chart fyne.CanvasObject
