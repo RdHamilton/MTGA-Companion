@@ -209,14 +209,18 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 		}, a.window)
 	})
 
-	// Layout: form in center with scrolling, restore button at bottom
+	// Layout: form in center with padding and scrolling, restore button at bottom
 	return container.NewBorder(
 		nil,
-		container.NewVBox(
-			widget.NewSeparator(),
-			restoreButton,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewSeparator(),
+				restoreButton,
+			),
 		),
 		nil, nil,
-		container.NewScroll(form),
+		container.NewScroll(
+			container.NewPadded(form),
+		),
 	)
 }
