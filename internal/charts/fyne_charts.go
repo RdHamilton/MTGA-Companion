@@ -70,6 +70,9 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
+	// Text color for all labels
+	textColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+
 	// Draw grid lines if enabled
 	if config.ShowGrid {
 		// Horizontal grid lines
@@ -83,7 +86,7 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 
 			// Y-axis label
 			value := maxVal - (valueRange / 5 * float64(i))
-			label := canvas.NewText(fmt.Sprintf("%.1f", value), color.Black)
+			label := canvas.NewText(fmt.Sprintf("%.1f", value), textColor)
 			label.TextSize = 10
 			label.Move(fyne.NewPos(5, y-7))
 			objects = append(objects, label)
@@ -132,7 +135,7 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 			labelStep = 1
 		}
 		if i%labelStep == 0 || i == len(data)-1 {
-			label := canvas.NewText(point.Label, color.Black)
+			label := canvas.NewText(point.Label, textColor)
 			label.TextSize = 9
 			label.Alignment = fyne.TextAlignCenter
 			label.Move(fyne.NewPos(x-30, topMargin+plotHeight+10))
@@ -149,17 +152,18 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 		objects = append(objects, line)
 	}
 
-	// Add title
+	// Add title with better contrast
 	if config.Title != "" {
-		title := canvas.NewText(config.Title, color.Black)
+		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 16
 		title.Alignment = fyne.TextAlignCenter
 		title.Move(fyne.NewPos(chartWidth/2-100, 10))
 		objects = append(objects, title)
 	}
 
-	// Y-axis label
-	yAxisLabel := canvas.NewText("Win Rate (%)", color.Black)
+	// Y-axis label with better visibility
+	yAxisLabel := canvas.NewText("Win Rate (%)", textColor)
 	yAxisLabel.TextSize = 12
 	yAxisLabel.Move(fyne.NewPos(10, chartHeight/2))
 	objects = append(objects, yAxisLabel)
@@ -204,6 +208,9 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
+	// Text color for all labels
+	textColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+
 	// Draw grid lines if enabled
 	if config.ShowGrid {
 		// Horizontal grid lines
@@ -217,7 +224,7 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 
 			// Y-axis label
 			value := maxVal - (valueRange / 5 * float64(i))
-			label := canvas.NewText(fmt.Sprintf("%.1f", value), color.Black)
+			label := canvas.NewText(fmt.Sprintf("%.1f", value), textColor)
 			label.TextSize = 10
 			label.Move(fyne.NewPos(5, y-7))
 			objects = append(objects, label)
@@ -251,7 +258,7 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 		objects = append(objects, bar)
 
 		// X-axis label
-		label := canvas.NewText(point.Label, color.Black)
+		label := canvas.NewText(point.Label, textColor)
 		label.TextSize = 8
 		label.Alignment = fyne.TextAlignCenter
 		label.Move(fyne.NewPos(x-10, topMargin+plotHeight+10))
@@ -259,24 +266,25 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 		objects = append(objects, label)
 
 		// Value label on top of bar
-		valueLabel := canvas.NewText(fmt.Sprintf("%.1f", point.Value), color.Black)
+		valueLabel := canvas.NewText(fmt.Sprintf("%.1f", point.Value), textColor)
 		valueLabel.TextSize = 9
 		valueLabel.Alignment = fyne.TextAlignCenter
 		valueLabel.Move(fyne.NewPos(x, y-15))
 		objects = append(objects, valueLabel)
 	}
 
-	// Add title
+	// Add title with better contrast
 	if config.Title != "" {
-		title := canvas.NewText(config.Title, color.Black)
+		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 16
 		title.Alignment = fyne.TextAlignCenter
 		title.Move(fyne.NewPos(chartWidth/2-100, 10))
 		objects = append(objects, title)
 	}
 
-	// Y-axis label
-	yAxisLabel := canvas.NewText("Win Rate (%)", color.Black)
+	// Y-axis label with better visibility
+	yAxisLabel := canvas.NewText("Win Rate (%)", textColor)
 	yAxisLabel.TextSize = 12
 	yAxisLabel.Move(fyne.NewPos(10, chartHeight/2))
 	objects = append(objects, yAxisLabel)
@@ -324,26 +332,28 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
-	// Add title
+	// Add title with better contrast
 	if config.Title != "" {
-		title := canvas.NewText(config.Title, color.Black)
+		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 16
 		title.Alignment = fyne.TextAlignCenter
 		title.Move(fyne.NewPos(chartWidth/2-100, 10))
 		objects = append(objects, title)
 	}
 
-	// Define colors for segments
+	// Define material design colors for segments (more vibrant and visually appealing)
 	colors := []color.Color{
-		color.RGBA{R: 84, G: 112, B: 198, A: 255},
-		color.RGBA{R: 145, G: 204, B: 117, A: 255},
-		color.RGBA{R: 250, G: 200, B: 88, A: 255},
-		color.RGBA{R: 238, G: 102, B: 102, A: 255},
-		color.RGBA{R: 115, G: 192, B: 222, A: 255},
-		color.RGBA{R: 59, G: 162, B: 114, A: 255},
-		color.RGBA{R: 252, G: 132, B: 82, A: 255},
-		color.RGBA{R: 154, G: 96, B: 180, A: 255},
-		color.RGBA{R: 234, G: 124, B: 204, A: 255},
+		color.RGBA{R: 66, G: 133, B: 244, A: 255}, // Blue
+		color.RGBA{R: 52, G: 168, B: 83, A: 255},  // Green
+		color.RGBA{R: 251, G: 188, B: 5, A: 255},  // Amber
+		color.RGBA{R: 234, G: 67, B: 53, A: 255},  // Red
+		color.RGBA{R: 103, G: 58, B: 183, A: 255}, // Deep Purple
+		color.RGBA{R: 0, G: 172, B: 193, A: 255},  // Cyan
+		color.RGBA{R: 255, G: 109, B: 0, A: 255},  // Deep Orange
+		color.RGBA{R: 156, G: 39, B: 176, A: 255}, // Purple
+		color.RGBA{R: 233, G: 30, B: 99, A: 255},  // Pink
+		color.RGBA{R: 0, G: 150, B: 136, A: 255},  // Teal
 	}
 
 	// Draw bars for each category
@@ -353,8 +363,11 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 
 		y := topMargin + (barHeight+10)*float32(i)
 
+		// Label text color (dark gray for better visibility)
+		labelColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+
 		// Label
-		label := canvas.NewText(point.Label, color.Black)
+		label := canvas.NewText(point.Label, labelColor)
 		label.TextSize = 11
 		label.Move(fyne.NewPos(10, y+barHeight/2-7))
 		objects = append(objects, label)
@@ -367,7 +380,7 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 
 		// Value and percentage
 		valueText := fmt.Sprintf("%.0f (%.1f%%)", point.Value, percentage)
-		valueLabel := canvas.NewText(valueText, color.Black)
+		valueLabel := canvas.NewText(valueText, labelColor)
 		valueLabel.TextSize = 10
 		valueLabel.Move(fyne.NewPos(leftMargin+barWidth+10, y+barHeight/2-7))
 		objects = append(objects, valueLabel)
