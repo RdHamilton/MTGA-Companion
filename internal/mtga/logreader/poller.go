@@ -260,6 +260,7 @@ func (p *Poller) pollWithEvents() {
 				// File was created (possibly after rotation)
 				// Check if it's our target file and read any new content
 				if event.Name == p.path {
+					fmt.Printf("[INFO] Log file recreated after rotation: %s\n", event.Name)
 					// Check for updates immediately
 					if err := p.checkForUpdates(); err != nil {
 						p.sendError(err)
@@ -268,12 +269,14 @@ func (p *Poller) pollWithEvents() {
 
 			case event.Has(fsnotify.Remove), event.Has(fsnotify.Rename):
 				// File was removed or renamed (log rotation)
+				fmt.Printf("[INFO] Log file rotation detected (%s event): %s\n", event.Op, event.Name)
 				// Reset position tracking and wait for file to be recreated
 				p.mu.Lock()
 				p.lastPos = 0
 				p.lastSize = 0
 				p.lastMod = time.Time{}
 				p.mu.Unlock()
+				fmt.Println("[INFO] Position tracking reset, waiting for new log file...")
 			}
 
 		case err, ok := <-p.watcher.Errors:
@@ -375,6 +378,7 @@ func (p *Poller) checkForUpdates() error {
 	// If file size is less than last position, assume rotation occurred
 	if stat.Size() < lastPos || (stat.Size() < lastSize && !stat.ModTime().Equal(lastMod)) {
 		// Log file was rotated, reset position
+		fmt.Printf("[INFO] Log file rotation detected (size decreased from %d to %d bytes)\n", lastSize, stat.Size())
 		p.mu.Lock()
 		p.lastPos = 0
 		p.mu.Unlock()

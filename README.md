@@ -82,6 +82,22 @@ C:\Users\{username}\AppData\LocalLow\Wizards Of The Coast\MTGA\Player.log
 
 MTGA also saves the previous session's log as `Player-prev.log` in the same directory, which can be useful for reviewing past games.
 
+### Log File Rotation
+
+MTGA may rotate log files during long gaming sessions when the log becomes large. MTGA-Companion automatically handles log rotation:
+
+- **Detection**: Monitors for file size decreases, file removal/rename events (via fsnotify)
+- **Recovery**: Automatically reopens the new log file and continues monitoring
+- **State Preservation**: Maintains draft state and game tracking across rotation events
+- **Logging**: Rotation events are logged with `[INFO]` messages for visibility
+
+**Rotation scenarios handled:**
+- Size-based rotation (when Player.log exceeds MTGA's size limit)
+- File removal and recreation
+- Manual log deletion/archival
+
+The overlay and tracking features continue working seamlessly during and after log rotation.
+
 ## Usage
 
 Run the companion app after ensuring detailed logging is enabled in MTGA:
