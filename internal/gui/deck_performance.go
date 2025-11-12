@@ -28,13 +28,14 @@ type deckPerformanceData struct {
 
 // DeckPerformanceDashboard manages the deck performance comparison view.
 type DeckPerformanceDashboard struct {
-	app       *App
-	service   *storage.Service
-	ctx       context.Context
-	startDate *time.Time
-	endDate   *time.Time
-	format    string // "all" or specific format
-	sortBy    string // "winrate", "matches", "name"
+	app         *App
+	service     *storage.Service
+	ctx         context.Context
+	startDate   *time.Time
+	endDate     *time.Time
+	format      string // "all" or specific format
+	sortBy      string // "winrate", "matches", "name"
+	updateChart func() // Function to update the chart without recreating tabs
 }
 
 // NewDeckPerformanceDashboard creates a new deck performance dashboard.
@@ -58,8 +59,21 @@ func (d *DeckPerformanceDashboard) CreateView() fyne.CanvasObject {
 	// Create filter controls
 	filterControls := d.createFilterControls()
 
-	// Create chart view
-	chartView := d.createChartView()
+	// Create a container for the chart view that we can update
+	chartContainer := container.NewVBox()
+
+	// Function to update the chart
+	updateChart := func() {
+		chartView := d.createChartView()
+		chartContainer.Objects = []fyne.CanvasObject{chartView}
+		chartContainer.Refresh()
+	}
+
+	// Store the update function so other methods can use it
+	d.updateChart = updateChart
+
+	// Initial chart render
+	updateChart()
 
 	// Layout
 	return container.NewBorder(
@@ -67,7 +81,7 @@ func (d *DeckPerformanceDashboard) CreateView() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		container.NewScroll(container.NewPadded(chartView)),
+		container.NewScroll(container.NewPadded(chartContainer)),
 	)
 }
 
@@ -96,7 +110,9 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 				d.startDate = nil
 				d.endDate = nil
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
@@ -111,7 +127,9 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 			} else {
 				d.format = selected
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	formatSelect.Selected = "All Formats"
@@ -129,14 +147,18 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 			case "Deck Name":
 				d.sortBy = "name"
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	sortBySelect.Selected = "Win Rate"
 
 	// Refresh button
 	refreshButton := widget.NewButton("Refresh", func() {
-		d.refresh()
+		if d.updateChart != nil {
+			d.updateChart()
+		}
 	})
 
 	// Layout controls
@@ -431,20 +453,4 @@ func (d *DeckPerformanceDashboard) getSortDisplayName() string {
 	default:
 		return "Unknown"
 	}
-}
-
-// refresh refreshes the chart view.
-func (d *DeckPerformanceDashboard) refresh() {
-	// Recreate the main tabs
-	mainTabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", d.app.createStatsView()),
-		container.NewTabItem("Match History", d.app.createMatchesView()),
-		container.NewTabItem("Charts", d.app.createChartsView()),
-		container.NewTabItem("Settings", d.app.createSettingsView()),
-	)
-
-	// Select the Charts tab (index 2)
-	mainTabs.SelectIndex(2)
-
-	d.app.window.SetContent(mainTabs)
 }

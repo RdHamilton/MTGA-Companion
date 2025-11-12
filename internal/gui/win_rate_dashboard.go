@@ -27,6 +27,8 @@ type WinRateDashboard struct {
 	format     string     // "all", "Constructed", "Limited", etc.
 	chartType  string     // "line", "bar"
 	periodType string     // "daily", "weekly", "monthly"
+
+	updateChart func() // Function to update the chart without recreating tabs
 }
 
 // NewWinRateDashboard creates a new win rate dashboard.
@@ -52,8 +54,21 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 	// Create filter controls
 	filterControls := d.createFilterControls()
 
-	// Create chart view
-	chartView := d.createChartView()
+	// Create a container for the chart view that we can update
+	chartContainer := container.NewVBox()
+
+	// Function to update the chart
+	updateChart := func() {
+		chartView := d.createChartView()
+		chartContainer.Objects = []fyne.CanvasObject{chartView}
+		chartContainer.Refresh()
+	}
+
+	// Store the update function so other methods can use it
+	d.updateChart = updateChart
+
+	// Initial chart render
+	updateChart()
 
 	// Layout
 	return container.NewBorder(
@@ -61,7 +76,7 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		container.NewScroll(container.NewPadded(chartView)),
+		container.NewScroll(container.NewPadded(chartContainer)),
 	)
 }
 
@@ -102,7 +117,9 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 				d.showCustomDateDialog()
 				return
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
@@ -117,7 +134,9 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 			} else {
 				d.format = selected
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	formatSelect.Selected = "All Formats"
@@ -132,7 +151,9 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 			} else {
 				d.chartType = "bar"
 			}
-			d.refresh()
+			if d.updateChart != nil {
+				d.updateChart()
+			}
 		},
 	)
 	chartTypeSelect.Selected = "Line Chart"
@@ -144,7 +165,9 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 
 	// Refresh button
 	refreshButton := widget.NewButton("Refresh", func() {
-		d.refresh()
+		if d.updateChart != nil {
+			d.updateChart()
+		}
 	})
 
 	// Layout controls in a grid
@@ -327,7 +350,9 @@ func (d *WinRateDashboard) showCustomDateDialog() {
 		d.startDate = &start
 		d.endDate = &end
 		d.periodType = d.determinePeriodType(start, end)
-		d.refresh()
+		if d.updateChart != nil {
+			d.updateChart()
+		}
 	}
 
 	// Show dialog
@@ -375,20 +400,4 @@ func (d *WinRateDashboard) getDateRangeDescription() string {
 		return "All Time"
 	}
 	return fmt.Sprintf("%s to %s", d.startDate.Format("2006-01-02"), d.endDate.Format("2006-01-02"))
-}
-
-// refresh refreshes the chart view with current filter settings.
-func (d *WinRateDashboard) refresh() {
-	// Recreate the main tabs
-	mainTabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", d.app.createStatsView()),
-		container.NewTabItem("Match History", d.app.createMatchesView()),
-		container.NewTabItem("Charts", d.app.createChartsView()),
-		container.NewTabItem("Settings", d.app.createSettingsView()),
-	)
-
-	// Select the Charts tab (index 2)
-	mainTabs.SelectIndex(2)
-
-	d.app.window.SetContent(mainTabs)
 }
