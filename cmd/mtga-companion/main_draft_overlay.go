@@ -30,7 +30,14 @@ func runDraftOverlay() {
 
 	fmt.Printf("Set File: %s (%s)\n", setFile.Meta.SetCode, setFile.Meta.DraftFormat)
 	fmt.Printf("Log Path: %s\n", playerLogPath)
-	fmt.Printf("Resume Mode: %v\n\n", *overlayResume)
+	fmt.Printf("Resume Mode: %v\n", *overlayResume)
+	fmt.Printf("Debug Mode: %v\n", *debug)
+	fmt.Printf("Cache Enabled: %v", *cacheEnabled)
+	if *cacheEnabled {
+		fmt.Printf(" (TTL: %v, MaxSize: %d)", *cacheTTL, *cacheMaxSize)
+	}
+	fmt.Println()
+	fmt.Println()
 
 	// Create overlay configuration
 	config := draft.OverlayConfig{
@@ -40,6 +47,10 @@ func runDraftOverlay() {
 		ColorConfig:    draft.DefaultColorAffinityConfig(),
 		ResumeEnabled:  *overlayResume,
 		LookbackHours:  *overlayLookback,
+		DebugMode:      *debug,
+		CacheEnabled:   *cacheEnabled,
+		CacheTTL:       *cacheTTL,
+		CacheMaxSize:   *cacheMaxSize,
 	}
 
 	// Create and run overlay window
