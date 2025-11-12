@@ -109,6 +109,7 @@ func (d *FormatDistributionDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
+	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
 	// Refresh button
 	refreshButton := widget.NewButton("Refresh", func() {
@@ -116,6 +117,7 @@ func (d *FormatDistributionDashboard) createFilterControls() fyne.CanvasObject {
 			d.updateChart()
 		}
 	})
+	AddButtonTooltip(refreshButton, TooltipRefresh)
 
 	// Layout controls - just date range and refresh at top
 	return container.NewVBox(
@@ -142,6 +144,7 @@ func (d *FormatDistributionDashboard) createChartTypeSelector() fyne.CanvasObjec
 		},
 	)
 	chartTypeSelect.Selected = "Pie Chart"
+	AddSelectTooltip(chartTypeSelect, TooltipChartType)
 
 	return container.NewVBox(
 		widget.NewSeparator(),

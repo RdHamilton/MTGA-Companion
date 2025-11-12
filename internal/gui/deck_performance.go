@@ -116,6 +116,7 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
+	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
 	// Format selector
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -133,6 +134,7 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	formatSelect.Selected = "All Formats"
+	AddSelectTooltip(formatSelect, TooltipFormat)
 
 	// Sort by selector
 	sortByLabel := widget.NewLabelWithStyle("Sort By", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -153,6 +155,7 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	sortBySelect.Selected = "Win Rate"
+	AddSelectTooltip(sortBySelect, TooltipSortBy)
 
 	// Refresh button
 	refreshButton := widget.NewButton("Refresh", func() {
@@ -160,6 +163,7 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 			d.updateChart()
 		}
 	})
+	AddButtonTooltip(refreshButton, TooltipRefresh)
 
 	// Layout controls
 	return container.NewVBox(

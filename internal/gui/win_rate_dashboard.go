@@ -123,6 +123,7 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	dateRangeSelect.Selected = "Last 30 Days"
+	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
 	// Format selector
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -140,6 +141,7 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	formatSelect.Selected = "All Formats"
+	AddSelectTooltip(formatSelect, TooltipFormat)
 
 	// Chart type selector
 	chartTypeLabel := widget.NewLabelWithStyle("Chart Type", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -157,11 +159,13 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 		},
 	)
 	chartTypeSelect.Selected = "Line Chart"
+	AddSelectTooltip(chartTypeSelect, TooltipChartType)
 
 	// Export button
 	exportButton := widget.NewButton("Export as PNG", func() {
 		d.exportChart()
 	})
+	AddButtonTooltip(exportButton, TooltipExport)
 
 	// Refresh button
 	refreshButton := widget.NewButton("Refresh", func() {
@@ -169,6 +173,7 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 			d.updateChart()
 		}
 	})
+	AddButtonTooltip(refreshButton, TooltipRefresh)
 
 	// Layout controls in a grid
 	return container.NewVBox(
