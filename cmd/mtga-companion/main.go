@@ -49,6 +49,7 @@ var (
 	overlayFormat   = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
 	overlayResume   = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
 	overlayLookback = flag.Int("overlay-lookback", 24, "How many hours back to scan for active draft (default: 24)")
+	debug           = flag.Bool("debug", false, "Enable verbose debug logging")
 )
 
 // getDBPath returns the database path from environment variable or default location.
