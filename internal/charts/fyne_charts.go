@@ -316,44 +316,45 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 	// Chart dimensions
 	chartWidth := config.Width
 	chartHeight := config.Height
-	leftMargin := float32(150)
-	rightMargin := float32(100)
-	topMargin := float32(50)
-	bottomMargin := float32(20)
+	leftMargin := float32(200)
+	rightMargin := float32(120)
+	topMargin := float32(60)
+	bottomMargin := float32(30)
 
 	plotWidth := chartWidth - leftMargin - rightMargin
 	plotHeight := chartHeight - topMargin - bottomMargin
 
 	barHeight := plotHeight / float32(len(data))
-	if barHeight > 40 {
-		barHeight = 40
+	if barHeight > 50 {
+		barHeight = 50
 	}
 
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
-	// Add title with better contrast
+	// Add title with better positioning to avoid wrapping
 	if config.Title != "" {
 		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
 		title := canvas.NewText(config.Title, titleColor)
-		title.TextSize = 16
+		title.TextSize = 18
 		title.Alignment = fyne.TextAlignCenter
-		title.Move(fyne.NewPos(chartWidth/2-100, 10))
+		title.Move(fyne.NewPos(10, 15))
+		title.Resize(fyne.NewSize(chartWidth-20, 30))
 		objects = append(objects, title)
 	}
 
-	// Define material design colors for segments (more vibrant and visually appealing)
+	// Define darker, more saturated colors for better visibility on light backgrounds
 	colors := []color.Color{
-		color.RGBA{R: 66, G: 133, B: 244, A: 255}, // Blue
-		color.RGBA{R: 52, G: 168, B: 83, A: 255},  // Green
-		color.RGBA{R: 251, G: 188, B: 5, A: 255},  // Amber
-		color.RGBA{R: 234, G: 67, B: 53, A: 255},  // Red
-		color.RGBA{R: 103, G: 58, B: 183, A: 255}, // Deep Purple
-		color.RGBA{R: 0, G: 172, B: 193, A: 255},  // Cyan
-		color.RGBA{R: 255, G: 109, B: 0, A: 255},  // Deep Orange
-		color.RGBA{R: 156, G: 39, B: 176, A: 255}, // Purple
-		color.RGBA{R: 233, G: 30, B: 99, A: 255},  // Pink
-		color.RGBA{R: 0, G: 150, B: 136, A: 255},  // Teal
+		color.RGBA{R: 30, G: 96, B: 215, A: 255},  // Darker Blue
+		color.RGBA{R: 34, G: 139, B: 34, A: 255},  // Forest Green
+		color.RGBA{R: 255, G: 140, B: 0, A: 255},  // Dark Orange
+		color.RGBA{R: 178, G: 34, B: 34, A: 255},  // Firebrick Red
+		color.RGBA{R: 75, G: 0, B: 130, A: 255},   // Indigo
+		color.RGBA{R: 0, G: 128, B: 128, A: 255},  // Teal
+		color.RGBA{R: 255, G: 69, B: 0, A: 255},   // Red Orange
+		color.RGBA{R: 128, G: 0, B: 128, A: 255},  // Purple
+		color.RGBA{R: 199, G: 21, B: 133, A: 255}, // Medium Violet Red
+		color.RGBA{R: 0, G: 100, B: 100, A: 255},  // Dark Cyan
 	}
 
 	// Draw bars for each category
@@ -366,10 +367,10 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 		// Label text color (dark gray for better visibility)
 		labelColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
 
-		// Label
+		// Label (larger text)
 		label := canvas.NewText(point.Label, labelColor)
-		label.TextSize = 11
-		label.Move(fyne.NewPos(10, y+barHeight/2-7))
+		label.TextSize = 14
+		label.Move(fyne.NewPos(10, y+barHeight/2-9))
 		objects = append(objects, label)
 
 		// Bar
@@ -378,11 +379,11 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 		bar.Move(fyne.NewPos(leftMargin, y))
 		objects = append(objects, bar)
 
-		// Value and percentage
+		// Value and percentage (larger text)
 		valueText := fmt.Sprintf("%.0f (%.1f%%)", point.Value, percentage)
 		valueLabel := canvas.NewText(valueText, labelColor)
-		valueLabel.TextSize = 10
-		valueLabel.Move(fyne.NewPos(leftMargin+barWidth+10, y+barHeight/2-7))
+		valueLabel.TextSize = 13
+		valueLabel.Move(fyne.NewPos(leftMargin+barWidth+10, y+barHeight/2-9))
 		objects = append(objects, valueLabel)
 	}
 

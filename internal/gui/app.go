@@ -245,16 +245,16 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 	winData := a.breakdownToDataPoints(winBreakdown)
 	lossData := a.breakdownToDataPoints(lossBreakdown)
 
-	// Create chart configs
+	// Create chart configs with larger size
 	winConfig := charts.DefaultFyneChartConfig()
 	winConfig.Title = "Wins Breakdown"
-	winConfig.Width = 750
-	winConfig.Height = 350
+	winConfig.Width = 900
+	winConfig.Height = 450
 
 	lossConfig := charts.DefaultFyneChartConfig()
 	lossConfig.Title = "Losses Breakdown"
-	lossConfig.Width = 750
-	lossConfig.Height = 350
+	lossConfig.Width = 900
+	lossConfig.Height = 450
 
 	// Create charts
 	winChart := charts.CreateFynePieChartBreakdown(winData, winConfig)
