@@ -117,6 +117,7 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	// Create sub-tabs for different chart types
 	chartTabs := container.NewAppTabs(
 		container.NewTabItem("Win Rate Trend", a.createWinRateTrendView()),
+		container.NewTabItem("Format Distribution", a.createFormatDistributionView()),
 		container.NewTabItem("Result Breakdown", a.createResultBreakdownView()),
 		container.NewTabItem("Rank Progression", a.createRankProgressionView()),
 	)
@@ -127,6 +128,12 @@ func (a *App) createChartsView() fyne.CanvasObject {
 // createWinRateTrendView creates the win rate trend chart view with enhanced filtering.
 func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	dashboard := NewWinRateDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
+}
+
+// createFormatDistributionView creates the format distribution chart view.
+func (a *App) createFormatDistributionView() fyne.CanvasObject {
+	dashboard := NewFormatDistributionDashboard(a, a.service, a.ctx)
 	return dashboard.CreateView()
 }
 
