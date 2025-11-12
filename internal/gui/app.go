@@ -52,9 +52,12 @@ func (a *App) Run() {
 func (a *App) createStatsView() fyne.CanvasObject {
 	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
 	if err != nil {
-		errorLabel := widget.NewLabel(fmt.Sprintf("Error loading statistics: %v", err))
-		errorLabel.Wrapping = fyne.TextWrapWord
-		return container.NewCenter(errorLabel)
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("Error loading statistics"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Create rich text with markdown for better formatting
@@ -130,9 +133,12 @@ func (a *App) createWinRateTrendView() fyne.CanvasObject {
 	// Get trend data for last 30 days
 	analysis, err := a.service.GetTrendAnalysis(a.ctx, thirtyDaysAgo, now, "weekly", nil)
 	if err != nil || len(analysis.Periods) == 0 {
-		errorLabel := widget.NewLabel(fmt.Sprintf("No chart data available: %v", err))
-		errorLabel.Wrapping = fyne.TextWrapWord
-		return container.NewCenter(errorLabel)
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No chart data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Prepare data points
@@ -223,7 +229,12 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 
 	matches, err := a.service.GetMatches(a.ctx, filter)
 	if err != nil || len(matches) == 0 {
-		return widget.NewLabel(fmt.Sprintf("No match data available: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No match data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Calculate breakdowns
@@ -385,7 +396,12 @@ func (a *App) createRankProgressionView() fyne.CanvasObject {
 	// Get rank progression timeline for constructed
 	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
 	if err != nil || len(timeline.Entries) == 0 {
-		return widget.NewLabel(fmt.Sprintf("No rank progression data available: %v", err))
+		return container.NewCenter(
+			container.NewVBox(
+				widget.NewLabel("No rank progression data available"),
+				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
+			),
+		)
 	}
 
 	// Convert timeline entries to chart data points
