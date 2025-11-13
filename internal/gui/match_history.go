@@ -67,7 +67,7 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	}
 
 	// Format filter
-	formatOptions := []string{"All Formats", "constructed", "limited", "draft", "sealed"}
+	formatOptions := []string{"All Formats", "Play", "Ladder", "constructed", "limited", "draft", "sealed"}
 	v.formatSelect = widget.NewSelect(formatOptions, func(selected string) {
 		v.filterMatches()
 		v.currentPage = 0
@@ -120,6 +120,15 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	v.statusLabel = widget.NewLabel("")
 	v.updateStatusLabel()
 
+	// Create column headers
+	headers := container.NewHBox(
+		widget.NewLabelWithStyle("Result", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Date/Time", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Event", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Score", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Opponent", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+	)
+
 	// Create match list
 	v.matchList = widget.NewList(
 		func() int {
@@ -131,6 +140,7 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 				widget.NewLabel("2025-11-10 15:04"),
 				widget.NewLabel("Event Name Here"),
 				widget.NewLabel("2-1"),
+				widget.NewLabel("Opponent"),
 			)
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
@@ -153,14 +163,24 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 
 			// Event name (truncated if needed)
 			eventName := match.EventName
-			if len(eventName) > 40 {
-				eventName = eventName[:37] + "..."
+			if len(eventName) > 30 {
+				eventName = eventName[:27] + "..."
 			}
 			box.Objects[2].(*widget.Label).SetText(eventName)
 
 			// Score
 			score := fmt.Sprintf("%d-%d", match.PlayerWins, match.OpponentWins)
 			box.Objects[3].(*widget.Label).SetText(score)
+
+			// Opponent
+			opponent := "Unknown"
+			if match.OpponentName != nil && *match.OpponentName != "" {
+				opponent = *match.OpponentName
+				if len(opponent) > 20 {
+					opponent = opponent[:17] + "..."
+				}
+			}
+			box.Objects[4].(*widget.Label).SetText(opponent)
 		},
 	)
 
@@ -226,14 +246,26 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		widget.NewSeparator(),
 	)
 
-	return container.NewBorder(
-		filtersSection,
-		container.NewVBox(
-			widget.NewSeparator(),
-			pageControls,
-		),
-		nil, nil,
+	// Combine headers and list
+	listWithHeaders := container.NewBorder(
+		container.NewVBox(headers, widget.NewSeparator()),
+		nil,
+		nil,
+		nil,
 		container.NewScroll(v.matchList),
+	)
+
+	return container.NewBorder(
+		container.NewPadded(filtersSection),
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewSeparator(),
+				pageControls,
+			),
+		),
+		nil,
+		nil,
+		listWithHeaders,
 	)
 }
 

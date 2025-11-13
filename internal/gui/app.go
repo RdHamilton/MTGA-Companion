@@ -137,11 +137,14 @@ func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
 	// Layout: stats in center with padding, refresh button at bottom
 	return container.NewBorder(
 		nil,
-		container.NewVBox(
-			widget.NewSeparator(),
-			refreshBtn,
+		container.NewPadded(
+			container.NewVBox(
+				widget.NewSeparator(),
+				refreshBtn,
+			),
 		),
-		nil, nil,
+		nil,
+		nil,
 		container.NewScroll(
 			container.NewPadded(richText),
 		),

@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
@@ -34,18 +35,18 @@ type WinRateDashboard struct {
 // NewWinRateDashboard creates a new win rate dashboard.
 func NewWinRateDashboard(app *App, service *storage.Service, ctx context.Context) *WinRateDashboard {
 	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
+	sevenDaysAgo := now.AddDate(0, 0, -7)
 
 	return &WinRateDashboard{
 		app:        app,
 		service:    service,
 		ctx:        ctx,
-		dateRange:  "30days",
-		startDate:  &thirtyDaysAgo,
+		dateRange:  "7days",
+		startDate:  &sevenDaysAgo,
 		endDate:    &now,
 		format:     "all",
 		chartType:  "line",
-		periodType: "weekly",
+		periodType: "daily",
 	}
 }
 
@@ -122,7 +123,7 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 			}
 		},
 	)
-	dateRangeSelect.Selected = "Last 30 Days"
+	dateRangeSelect.Selected = "Last 7 Days"
 	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
 	// Format selector
@@ -161,29 +162,12 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 	chartTypeSelect.Selected = "Line Chart"
 	AddSelectTooltip(chartTypeSelect, TooltipChartType)
 
-	// Export button
-	exportButton := widget.NewButton("Export as PNG", func() {
-		d.exportChart()
-	})
-	AddButtonTooltip(exportButton, TooltipExport)
-
-	// Refresh button
-	refreshButton := widget.NewButton("Refresh", func() {
-		if d.updateChart != nil {
-			d.updateChart()
-		}
-	})
-	AddButtonTooltip(refreshButton, TooltipRefresh)
-
-	// Layout controls in a grid
+	// Layout controls in a grid (removed Refresh button, Export moved below chart)
 	return container.NewVBox(
-		container.NewGridWithColumns(2,
+		container.NewGridWithColumns(3,
 			container.NewVBox(dateRangeLabel, dateRangeSelect),
 			container.NewVBox(formatLabel, formatSelect),
-		),
-		container.NewGridWithColumns(2,
 			container.NewVBox(chartTypeLabel, chartTypeSelect),
-			container.NewHBox(refreshButton, exportButton),
 		),
 		widget.NewSeparator(),
 	)
@@ -234,11 +218,22 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	// Create summary
 	summary := d.createSummary(analysis)
 
+	// Export button (smaller, below chart)
+	exportButton := widget.NewButton("Export as PNG", func() {
+		d.exportChart()
+	})
+	AddButtonTooltip(exportButton, TooltipExport)
+
 	// Layout
 	return container.NewVBox(
 		chart,
 		widget.NewSeparator(),
 		summary,
+		widget.NewSeparator(),
+		container.NewHBox(
+			layout.NewSpacer(),
+			exportButton,
+		),
 	)
 }
 
