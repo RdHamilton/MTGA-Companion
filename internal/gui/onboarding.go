@@ -59,8 +59,14 @@ func (w *OnboardingWizard) show() {
 	// Create content container that will be updated
 	w.contentBox = container.NewVBox()
 
-	// Create custom dialog (empty dismiss button label since we handle navigation with our own buttons)
-	w.dialog = dialog.NewCustom("MTGA Companion Setup", "", w.contentBox, w.app.window)
+	// Create custom dialog with "Cancel" button that skips onboarding
+	w.dialog = dialog.NewCustom("MTGA Companion Setup", "Cancel", w.contentBox, w.app.window)
+
+	// Handle cancel button - skip onboarding and close dialog
+	w.dialog.SetOnClosed(func() {
+		// Mark onboarding as completed so user can use the app
+		w.completeOnboarding()
+	})
 
 	// Render first step
 	w.renderStep()
