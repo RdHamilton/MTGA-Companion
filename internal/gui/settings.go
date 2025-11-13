@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/config"
@@ -211,9 +212,15 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 		}, a.window)
 	})
 
+	// Add Help button
+	helpButton := widget.NewButton("Help", func() {
+		a.ShowHelp()
+	})
+	helpButton.Importance = widget.HighImportance
+
 	// Add About button
-	aboutButton := widget.NewButton("About MTGA Companion", func() {
-		a.showAboutDialog()
+	aboutButton := widget.NewButton("About", func() {
+		a.ShowAbout()
 	})
 
 	// Create transparent spacers for left and right margins
@@ -230,6 +237,8 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 				widget.NewSeparator(),
 				container.NewHBox(
 					restoreButton,
+					layout.NewSpacer(),
+					helpButton,
 					aboutButton,
 				),
 			),

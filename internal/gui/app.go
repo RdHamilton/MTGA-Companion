@@ -47,6 +47,9 @@ func (a *App) Run() {
 		container.NewTabItem("Settings", a.createSettingsView()),
 	)
 
+	// Setup keyboard shortcuts
+	a.setupKeyboardShortcuts(tabs)
+
 	a.window.SetContent(tabs)
 	a.window.ShowAndRun()
 }
