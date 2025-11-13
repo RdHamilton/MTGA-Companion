@@ -50,7 +50,8 @@ type OverlayConfig struct {
 
 // AppConfig contains general application settings.
 type AppConfig struct {
-	DebugMode bool `toml:"debug_mode"` // Enable debug logging
+	DebugMode           bool `toml:"debug_mode"`           // Enable debug logging
+	OnboardingCompleted bool `toml:"onboarding_completed"` // First-run onboarding completed
 }
 
 // DefaultConfig returns the default configuration.
@@ -75,7 +76,8 @@ func DefaultConfig() *Config {
 			LookbackHrs: 24,
 		},
 		App: AppConfig{
-			DebugMode: false,
+			DebugMode:           false,
+			OnboardingCompleted: false,
 		},
 	}
 }
@@ -93,6 +95,16 @@ func configPath() (string, error) {
 	}
 
 	return filepath.Join(configDir, "config.toml"), nil
+}
+
+// ConfigPath returns the path to the configuration file (public version).
+func ConfigPath() string {
+	path, err := configPath()
+	if err != nil {
+		// Fallback to current directory if home dir not available
+		return "config.toml"
+	}
+	return path
 }
 
 // Load loads the configuration from disk. Returns default config if file doesn't exist.

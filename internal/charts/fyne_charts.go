@@ -316,30 +316,27 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 	// Chart dimensions
 	chartWidth := config.Width
 	chartHeight := config.Height
-	leftMargin := float32(200)
-	rightMargin := float32(120)
-	topMargin := float32(60)
-	bottomMargin := float32(30)
+	leftMargin := float32(100)  // Space for labels
+	rightMargin := float32(150) // Space for percentages
+	topMargin := float32(100)   // Space for title
 
 	plotWidth := chartWidth - leftMargin - rightMargin
-	plotHeight := chartHeight - topMargin - bottomMargin
 
-	barHeight := plotHeight / float32(len(data))
-	if barHeight > 50 {
-		barHeight = 50
-	}
+	// Calculate bar height with spacing
+	barHeight := float32(35)  // Fixed bar height for consistency
+	barSpacing := float32(20) // Spacing between bars
 
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
-	// Add title with better positioning to avoid wrapping
+	// Add title centered above the chart with proper spacing
 	if config.Title != "" {
 		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
 		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 18
 		title.Alignment = fyne.TextAlignCenter
-		title.Move(fyne.NewPos(10, 15))
-		title.Resize(fyne.NewSize(chartWidth-20, 30))
+		title.Move(fyne.NewPos(0, 30))
+		title.Resize(fyne.NewSize(chartWidth, 30))
 		objects = append(objects, title)
 	}
 
@@ -362,28 +359,31 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 		percentage := (point.Value / total) * 100
 		barWidth := plotWidth * float32(point.Value/total)
 
-		y := topMargin + (barHeight+10)*float32(i)
+		y := topMargin + (barHeight+barSpacing)*float32(i)
 
 		// Label text color (dark gray for better visibility)
 		labelColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
 
-		// Label (larger text)
+		// Label on the left (format name)
 		label := canvas.NewText(point.Label, labelColor)
 		label.TextSize = 14
-		label.Move(fyne.NewPos(10, y+barHeight/2-9))
+		label.Alignment = fyne.TextAlignTrailing
+		label.Move(fyne.NewPos(10, y+barHeight/2-7))
+		label.Resize(fyne.NewSize(leftMargin-20, 20))
 		objects = append(objects, label)
 
-		// Bar
+		// Bar in the middle
 		bar := canvas.NewRectangle(colors[i%len(colors)])
 		bar.Resize(fyne.NewSize(barWidth, barHeight))
 		bar.Move(fyne.NewPos(leftMargin, y))
 		objects = append(objects, bar)
 
-		// Value and percentage (larger text)
-		valueText := fmt.Sprintf("%.0f (%.1f%%)", point.Value, percentage)
-		valueLabel := canvas.NewText(valueText, labelColor)
-		valueLabel.TextSize = 13
-		valueLabel.Move(fyne.NewPos(leftMargin+barWidth+10, y+barHeight/2-9))
+		// Percentage on the right
+		percentageText := fmt.Sprintf("%.1f%%", percentage)
+		valueLabel := canvas.NewText(percentageText, labelColor)
+		valueLabel.TextSize = 14
+		valueLabel.Alignment = fyne.TextAlignLeading
+		valueLabel.Move(fyne.NewPos(leftMargin+plotWidth+15, y+barHeight/2-7))
 		objects = append(objects, valueLabel)
 	}
 

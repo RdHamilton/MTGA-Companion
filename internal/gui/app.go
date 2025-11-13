@@ -36,6 +36,9 @@ func (a *App) Run() {
 	a.window = a.app.NewWindow("MTGA Companion")
 	a.window.Resize(fyne.NewSize(800, 600))
 
+	// Show onboarding for first-time users
+	a.showOnboarding()
+
 	// Create tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),
@@ -52,12 +55,12 @@ func (a *App) Run() {
 func (a *App) createStatsView() fyne.CanvasObject {
 	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
 	if err != nil {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("Error loading statistics"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+		return a.ErrorView("Error Loading Statistics", err, a.createStatsView)
+	}
+
+	if stats.TotalMatches == 0 {
+		return a.NoDataView("No Statistics Available",
+			"No match data has been collected yet.")
 	}
 
 	// Create rich text with markdown for better formatting
@@ -117,6 +120,8 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	// Create sub-tabs for different chart types
 	chartTabs := container.NewAppTabs(
 		container.NewTabItem("Win Rate Trend", a.createWinRateTrendView()),
+		container.NewTabItem("Format Distribution", a.createFormatDistributionView()),
+		container.NewTabItem("Deck Performance", a.createDeckPerformanceView()),
 		container.NewTabItem("Result Breakdown", a.createResultBreakdownView()),
 		container.NewTabItem("Rank Progression", a.createRankProgressionView()),
 	)
@@ -124,95 +129,22 @@ func (a *App) createChartsView() fyne.CanvasObject {
 	return chartTabs
 }
 
-// createWinRateTrendView creates the win rate trend chart view with material design.
+// createWinRateTrendView creates the win rate trend chart view with enhanced filtering.
 func (a *App) createWinRateTrendView() fyne.CanvasObject {
-	// Date range selector
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
+	dashboard := NewWinRateDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
+}
 
-	// Get trend data for last 30 days
-	analysis, err := a.service.GetTrendAnalysis(a.ctx, thirtyDaysAgo, now, "weekly", nil)
-	if err != nil || len(analysis.Periods) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No chart data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
-	}
+// createFormatDistributionView creates the format distribution chart view.
+func (a *App) createFormatDistributionView() fyne.CanvasObject {
+	dashboard := NewFormatDistributionDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
+}
 
-	// Prepare data points
-	dataPoints := make([]charts.DataPoint, len(analysis.Periods))
-	for i, period := range analysis.Periods {
-		dataPoints[i] = charts.DataPoint{
-			Label: period.Period.Label,
-			Value: period.WinRate,
-		}
-	}
-
-	// Create chart config
-	config := charts.DefaultFyneChartConfig()
-	config.Title = "Win Rate Trend (Last 30 Days)"
-	config.Width = 750
-	config.Height = 450
-
-	// Create chart
-	chart := charts.CreateFyneLineChart(dataPoints, config)
-
-	// Add summary info with markdown formatting
-	summaryContent := fmt.Sprintf(`### Win Rate Trend Analysis
-
-**Period**: %s to %s
-**Trend**: %s`,
-		thirtyDaysAgo.Format("2006-01-02"),
-		now.Format("2006-01-02"),
-		analysis.Trend,
-	)
-
-	if analysis.TrendValue != 0 {
-		summaryContent += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
-	}
-
-	if analysis.Overall != nil {
-		summaryContent += fmt.Sprintf(`
-**Overall Win Rate**: %.1f%% (%d matches)`,
-			analysis.Overall.WinRate,
-			analysis.Overall.TotalMatches,
-		)
-	}
-
-	summary := widget.NewRichTextFromMarkdown(summaryContent)
-
-	// Create chart type selector
-	chartTypeSelect := widget.NewSelect([]string{"Line Chart", "Bar Chart"}, func(selected string) {
-		// Recreate the entire Charts tab with the new chart type
-		a.window.SetContent(container.NewAppTabs(
-			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Match History", a.createMatchesView()),
-			container.NewTabItem("Charts", a.createChartsView()),
-			container.NewTabItem("Settings", a.createSettingsView()),
-		))
-	})
-	chartTypeSelect.Selected = "Line Chart"
-
-	// Layout: selector at top, chart in middle, summary at bottom
-	return container.NewBorder(
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewLabelWithStyle("Chart Type", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				chartTypeSelect,
-				widget.NewSeparator(),
-			),
-		),
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewSeparator(),
-				summary,
-			),
-		),
-		nil, nil,
-		container.NewScroll(container.NewPadded(chart)),
-	)
+// createDeckPerformanceView creates the deck performance comparison chart view.
+func (a *App) createDeckPerformanceView() fyne.CanvasObject {
+	dashboard := NewDeckPerformanceDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
 }
 
 // createResultBreakdownView creates the result breakdown chart view.
@@ -228,13 +160,13 @@ func (a *App) createResultBreakdownView() fyne.CanvasObject {
 	}
 
 	matches, err := a.service.GetMatches(a.ctx, filter)
-	if err != nil || len(matches) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No match data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return a.ErrorView("Error Loading Match Data", err, a.createResultBreakdownView)
+	}
+
+	if len(matches) == 0 {
+		return a.NoDataView("No Match Data Available",
+			"No matches found for the selected time period.")
 	}
 
 	// Calculate breakdowns
@@ -395,13 +327,13 @@ func (a *App) createRankProgressionView() fyne.CanvasObject {
 
 	// Get rank progression timeline for constructed
 	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
-	if err != nil || len(timeline.Entries) == 0 {
-		return container.NewCenter(
-			container.NewVBox(
-				widget.NewLabel("No rank progression data available"),
-				widget.NewLabel(fmt.Sprintf("Error: %v", err)),
-			),
-		)
+	if err != nil {
+		return a.ErrorView("Error Loading Rank Data", err, a.createRankProgressionView)
+	}
+
+	if len(timeline.Entries) == 0 {
+		return a.NoDataView("No Rank Data Available",
+			"No ranked matches found for the selected time period.")
 	}
 
 	// Convert timeline entries to chart data points

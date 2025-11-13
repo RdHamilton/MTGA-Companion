@@ -1,0 +1,6 @@
+[Details]
+# Application metadata for Fyne packaging
+Name = "MTGA Companion"
+ID = "com.github.rdhamilton.mtga-companion"
+Version = "1.0.0"
+Build = 1
