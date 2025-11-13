@@ -13,7 +13,7 @@ type AppState struct {
 	mu sync.RWMutex
 
 	// Filter states
-	GlobalDateRange   DateRangeState   `json:"global_date_range"`
+	GlobalDateRange   DateRangeState    `json:"global_date_range"`
 	MatchHistoryState MatchHistoryState `json:"match_history"`
 	ChartsState       ChartsState       `json:"charts"`
 

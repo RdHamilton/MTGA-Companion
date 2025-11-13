@@ -105,7 +105,6 @@ func (a *App) createStatsView() fyne.CanvasObject {
 
 // buildStatsView builds the statistics display from stats data.
 func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
-
 	// Create rich text with markdown for better formatting
 	content := fmt.Sprintf(`## Overall Statistics
 
