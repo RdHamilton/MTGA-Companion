@@ -20,21 +20,50 @@ type App struct {
 	window  fyne.Window
 	service *storage.Service
 	ctx     context.Context
+	state   *AppState // Application state manager
 }
 
 // NewApp creates a new GUI application.
 func NewApp(service *storage.Service) *App {
+	// Load persisted state
+	state, err := LoadState()
+	if err != nil {
+		// If state load fails, use new state
+		state = NewAppState()
+	}
+
 	return &App{
 		app:     app.New(),
 		service: service,
 		ctx:     context.Background(),
+		state:   state,
 	}
 }
 
 // Run starts the GUI application.
 func (a *App) Run() {
 	a.window = a.app.NewWindow("MTGA Companion")
-	a.window.Resize(fyne.NewSize(800, 600))
+
+	// Apply saved window size or use defaults
+	windowSize := a.state.GetWindowSize()
+	if windowSize.Width > 0 && windowSize.Height > 0 {
+		a.window.Resize(fyne.NewSize(float32(windowSize.Width), float32(windowSize.Height)))
+	} else {
+		a.window.Resize(fyne.NewSize(800, 600))
+	}
+
+	// Save state on window close
+	a.window.SetCloseIntercept(func() {
+		// Save current window size
+		size := a.window.Content().Size()
+		a.state.UpdateWindowSize(int(size.Width), int(size.Height))
+
+		// Save state to disk
+		_ = a.state.Save()
+
+		// Close the window
+		a.window.Close()
+	})
 
 	// Show onboarding for first-time users
 	a.showOnboarding()
