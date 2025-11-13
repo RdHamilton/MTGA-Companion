@@ -162,14 +162,14 @@ MTGA Companion needs to know where your MTGA log file is located.
 ### Default Locations:
 
 **macOS**:
-` + "```" + `
+`+"```"+`
 ~/Library/Application Support/com.wizards.mtga/Logs/Logs/Player.log
-` + "```" + `
+`+"```"+`
 
 **Windows**:
-` + "```" + `
+`+"```"+`
 C:\Users\{username}\AppData\LocalLow\Wizards Of The Coast\MTGA\Player.log
-` + "```" + `
+`+"```"+`
 
 If the auto-detected path is wrong, you can change it in Settings after onboarding.`, statusText))
 

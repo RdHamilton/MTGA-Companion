@@ -20,21 +20,53 @@ type App struct {
 	window  fyne.Window
 	service *storage.Service
 	ctx     context.Context
+	state   *AppState // Application state manager
 }
 
 // NewApp creates a new GUI application.
 func NewApp(service *storage.Service) *App {
+	// Load persisted state
+	state, err := LoadState()
+	if err != nil {
+		// If state load fails, use new state
+		state = NewAppState()
+	}
+
 	return &App{
 		app:     app.New(),
 		service: service,
 		ctx:     context.Background(),
+		state:   state,
 	}
 }
 
 // Run starts the GUI application.
 func (a *App) Run() {
 	a.window = a.app.NewWindow("MTGA Companion")
-	a.window.Resize(fyne.NewSize(800, 600))
+
+	// Apply saved window size or use defaults
+	windowSize := a.state.GetWindowSize()
+	if windowSize.Width > 0 && windowSize.Height > 0 {
+		a.window.Resize(fyne.NewSize(float32(windowSize.Width), float32(windowSize.Height)))
+	} else {
+		a.window.Resize(fyne.NewSize(800, 600))
+	}
+
+	// Save state on window close
+	a.window.SetCloseIntercept(func() {
+		// Save current window size
+		size := a.window.Content().Size()
+		a.state.UpdateWindowSize(int(size.Width), int(size.Height))
+
+		// Save state to disk
+		_ = a.state.Save()
+
+		// Close the window
+		a.window.Close()
+	})
+
+	// Show onboarding for first-time users
+	a.showOnboarding()
 
 	// Show onboarding for first-time users
 	a.showOnboarding()
@@ -47,22 +79,32 @@ func (a *App) Run() {
 		container.NewTabItem("Settings", a.createSettingsView()),
 	)
 
+	// Setup keyboard shortcuts
+	a.setupKeyboardShortcuts(tabs)
+
 	a.window.SetContent(tabs)
 	a.window.ShowAndRun()
 }
 
 // createStatsView creates the statistics view with material design principles.
 func (a *App) createStatsView() fyne.CanvasObject {
-	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
-	if err != nil {
-		return a.ErrorView("Error Loading Statistics", err, a.createStatsView)
-	}
+	return a.WithLoading("Loading statistics...", func() (fyne.CanvasObject, error) {
+		stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
+		if err != nil {
+			return nil, err
+		}
 
-	if stats.TotalMatches == 0 {
-		return a.NoDataView("No Statistics Available",
-			"No match data has been collected yet.")
-	}
+		if stats.TotalMatches == 0 {
+			return a.NoDataView("No Statistics Available",
+				"No match data has been collected yet."), nil
+		}
 
+		return a.buildStatsView(stats), nil
+	})
+}
+
+// buildStatsView builds the statistics display from stats data.
+func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
 	// Create rich text with markdown for better formatting
 	content := fmt.Sprintf(`## Overall Statistics
 
