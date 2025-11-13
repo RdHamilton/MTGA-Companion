@@ -68,9 +68,6 @@ func (a *App) Run() {
 	// Show onboarding for first-time users
 	a.showOnboarding()
 
-	// Show onboarding for first-time users
-	a.showOnboarding()
-
 	// Create tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),

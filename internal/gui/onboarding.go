@@ -14,6 +14,17 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 )
 
+// OnboardingWizard manages the multi-step onboarding experience.
+type OnboardingWizard struct {
+	app           *App
+	dialog        dialog.Dialog
+	contentBox    *fyne.Container
+	currentStep   int
+	totalSteps    int
+	logPath       string
+	logPathStatus string
+}
+
 // showOnboarding displays the first-run onboarding wizard.
 func (a *App) showOnboarding() {
 	// Check if onboarding has been completed
@@ -22,13 +33,71 @@ func (a *App) showOnboarding() {
 		return // Skip if already completed
 	}
 
-	// Create multi-step onboarding dialog
-	a.showWelcomeStep()
+	wizard := &OnboardingWizard{
+		app:         a,
+		currentStep: 0,
+		totalSteps:  4,
+	}
+
+	wizard.show()
 }
 
-// showWelcomeStep shows the welcome screen.
-func (a *App) showWelcomeStep() {
-	welcomeContent := widget.NewRichTextFromMarkdown(fmt.Sprintf(`# Welcome to %s!
+// ShowOnboardingWizard allows manually triggering the onboarding wizard.
+// Used by the Settings page "Show Onboarding" button.
+func (a *App) ShowOnboardingWizard() {
+	wizard := &OnboardingWizard{
+		app:         a,
+		currentStep: 0,
+		totalSteps:  4,
+	}
+
+	wizard.show()
+}
+
+// show creates and displays the onboarding wizard dialog.
+func (w *OnboardingWizard) show() {
+	// Create content container that will be updated
+	w.contentBox = container.NewVBox()
+
+	// Create custom dialog without dismiss button
+	w.dialog = dialog.NewCustomWithoutButtons("MTGA Companion Setup", w.contentBox, w.app.window)
+
+	// Render first step
+	w.renderStep()
+
+	// Size the dialog
+	w.dialog.Resize(fyne.NewSize(700, 600))
+	w.dialog.Show()
+}
+
+// renderStep renders the current step's content.
+func (w *OnboardingWizard) renderStep() {
+	var content fyne.CanvasObject
+	var buttons fyne.CanvasObject
+
+	switch w.currentStep {
+	case 0:
+		content, buttons = w.welcomeStep()
+	case 1:
+		content, buttons = w.loggingStep()
+	case 2:
+		content, buttons = w.logFileStep()
+	case 3:
+		content, buttons = w.featuresStep()
+	}
+
+	// Update content
+	w.contentBox.Objects = []fyne.CanvasObject{
+		content,
+		widget.NewSeparator(),
+		buttons,
+	}
+	w.contentBox.Refresh()
+}
+
+// welcomeStep creates the welcome screen content.
+func (w *OnboardingWizard) welcomeStep() (fyne.CanvasObject, fyne.CanvasObject) {
+	content := widget.NewRichTextFromMarkdown(fmt.Sprintf(`# Welcome to %s!
 
 Thank you for installing MTGA Companion. This quick setup will help you get started.
 
@@ -51,30 +120,31 @@ We'll help you:
 Click **Next** to continue or **Skip** if you want to explore on your own.`, AppName))
 
 	nextButton := widget.NewButton("Next", func() {
-		a.showLoggingStep()
+		w.currentStep++
+		w.renderStep()
 	})
+	nextButton.Importance = widget.HighImportance
 
 	skipButton := widget.NewButton("Skip Tour", func() {
-		a.completeOnboarding()
+		w.completeOnboarding()
+		w.dialog.Hide()
 	})
 
-	content := container.NewVBox(
-		welcomeContent,
-		widget.NewSeparator(),
-		container.NewHBox(
-			skipButton,
-			nextButton,
-		),
+	buttons := container.NewHBox(
+		skipButton,
+		widget.NewLabel(""), // Spacer
+		nextButton,
 	)
 
-	customDialog := dialog.NewCustom("Welcome to MTGA Companion", "", content, a.window)
-	customDialog.Resize(fyne.NewSize(600, 500))
-	customDialog.Show()
+	scrollContent := container.NewScroll(content)
+	scrollContent.SetMinSize(fyne.NewSize(650, 450))
+
+	return scrollContent, buttons
 }
 
-// showLoggingStep shows instructions for enabling detailed logging.
-func (a *App) showLoggingStep() {
-	loggingContent := widget.NewRichTextFromMarkdown(`## Step 1: Enable Detailed Logging in MTGA
+// loggingStep creates the detailed logging instructions.
+func (w *OnboardingWizard) loggingStep() (fyne.CanvasObject, fyne.CanvasObject) {
+	content := widget.NewRichTextFromMarkdown(`## Step 1: Enable Detailed Logging in MTGA
 
 **IMPORTANT**: MTGA must have detailed logging enabled for this companion app to work.
 
@@ -101,9 +171,11 @@ Detailed logging allows MTGA to output game events in JSON format, enabling comp
 
 **Have you enabled detailed logging in MTGA?**`)
 
-	yesButton := widget.NewButton("Yes, I've enabled it", func() {
-		a.showLogFileStep()
+	nextButton := widget.NewButton("Yes, I've enabled it", func() {
+		w.currentStep++
+		w.renderStep()
 	})
+	nextButton.Importance = widget.HighImportance
 
 	helpButton := widget.NewButton("I need help", func() {
 		dialog.ShowInformation("Help with Detailed Logging",
@@ -111,49 +183,47 @@ Detailed logging allows MTGA to output game events in JSON format, enabling comp
 				"1. Make sure MTGA is fully updated\n"+
 				"2. Look under Options → View Account\n"+
 				"3. The setting may be labeled differently in your client\n\n"+
-				"For more help, visit:\n"+DocsURL, a.window)
+				"For more help, visit:\n"+DocsURL, w.app.window)
 	})
 
 	backButton := widget.NewButton("Back", func() {
-		a.showWelcomeStep()
+		w.currentStep--
+		w.renderStep()
 	})
 
-	content := container.NewVBox(
-		loggingContent,
-		widget.NewSeparator(),
-		container.NewHBox(
-			backButton,
-			helpButton,
-			yesButton,
-		),
+	buttons := container.NewHBox(
+		backButton,
+		helpButton,
+		widget.NewLabel(""), // Spacer
+		nextButton,
 	)
 
-	customDialog := dialog.NewCustom("Enable MTGA Detailed Logging", "", content, a.window)
-	customDialog.Resize(fyne.NewSize(600, 550))
-	customDialog.Show()
+	scrollContent := container.NewScroll(content)
+	scrollContent.SetMinSize(fyne.NewSize(650, 450))
+
+	return scrollContent, buttons
 }
 
-// showLogFileStep shows log file detection.
-func (a *App) showLogFileStep() {
+// logFileStep creates the log file detection screen.
+func (w *OnboardingWizard) logFileStep() (fyne.CanvasObject, fyne.CanvasObject) {
 	// Try to detect log file
 	logPath, err := logreader.DefaultLogPath()
 	var statusText string
-	var statusColor string
 
 	if err == nil && logPath != "" {
 		if _, err := os.Stat(logPath); err == nil {
 			statusText = fmt.Sprintf("✅ **Log file found!**\n\nPath: `%s`\n\nYou're all set! The app will automatically read from this location.", logPath)
-			statusColor = "success"
 		} else {
 			statusText = fmt.Sprintf("⚠️ **Log file detected but not accessible**\n\nPath: `%s`\n\nThe file may not exist yet. Play a match in MTGA to create it.", logPath)
-			statusColor = "warning"
 		}
 	} else {
 		statusText = "❌ **Log file not found**\n\nCouldn't auto-detect your MTGA log file. You can manually specify the path in Settings."
-		statusColor = "error"
 	}
 
-	logFileContent := widget.NewRichTextFromMarkdown(fmt.Sprintf(`## Step 2: Verify Log File Location
+	w.logPath = logPath
+	w.logPathStatus = statusText
+
+	content := widget.NewRichTextFromMarkdown(fmt.Sprintf(`## Step 2: Verify Log File Location
 
 MTGA Companion needs to know where your MTGA log file is located.
 
@@ -173,41 +243,32 @@ C:\Users\{username}\AppData\LocalLow\Wizards Of The Coast\MTGA\Player.log
 
 If the auto-detected path is wrong, you can change it in Settings after onboarding.`, statusText))
 
-	_ = statusColor // For future use with styling
-
-	continueButton := widget.NewButton("Continue", func() {
-		a.showFeaturesStep()
+	nextButton := widget.NewButton("Continue", func() {
+		w.currentStep++
+		w.renderStep()
 	})
-
-	settingsButton := widget.NewButton("Open Settings", func() {
-		// Close onboarding and navigate to Settings tab
-		a.completeOnboarding()
-		// Navigate to Settings would go here
-	})
+	nextButton.Importance = widget.HighImportance
 
 	backButton := widget.NewButton("Back", func() {
-		a.showLoggingStep()
+		w.currentStep--
+		w.renderStep()
 	})
 
-	buttons := container.NewHBox(backButton, continueButton)
-	if logPath == "" {
-		buttons = container.NewHBox(backButton, settingsButton, continueButton)
-	}
-
-	content := container.NewVBox(
-		logFileContent,
-		widget.NewSeparator(),
-		buttons,
+	buttons := container.NewHBox(
+		backButton,
+		widget.NewLabel(""), // Spacer
+		nextButton,
 	)
 
-	customDialog := dialog.NewCustom("Log File Detection", "", content, a.window)
-	customDialog.Resize(fyne.NewSize(600, 500))
-	customDialog.Show()
+	scrollContent := container.NewScroll(content)
+	scrollContent.SetMinSize(fyne.NewSize(650, 450))
+
+	return scrollContent, buttons
 }
 
-// showFeaturesStep shows a quick tour of features.
-func (a *App) showFeaturesStep() {
-	featuresContent := widget.NewRichTextFromMarkdown(`## Step 3: Feature Tour
+// featuresStep creates the features tour screen.
+func (w *OnboardingWizard) featuresStep() (fyne.CanvasObject, fyne.CanvasObject) {
+	content := widget.NewRichTextFromMarkdown(`## Step 3: Feature Tour
 
 ### Main Tabs
 
@@ -235,7 +296,8 @@ func (a *App) showFeaturesStep() {
 
 ### Getting Help
 
-- Click **About MTGA Companion** in Settings for links and info
+- Click **About** in Settings for links and info
+- Press **Ctrl/Cmd + H** to show help anytime
 - Visit our documentation for detailed guides
 - Report issues on GitHub
 
@@ -244,33 +306,34 @@ func (a *App) showFeaturesStep() {
 **You're all set!** Click **Finish** to start using MTGA Companion.`)
 
 	finishButton := widget.NewButton("Finish", func() {
-		a.completeOnboarding()
+		w.completeOnboarding()
+		w.dialog.Hide()
 		dialog.ShowInformation("Setup Complete!",
 			"Welcome to MTGA Companion!\n\n"+
 				"Play some matches in MTGA to see your statistics appear.\n"+
-				"The app monitors your log file automatically.", a.window)
+				"The app monitors your log file automatically.", w.app.window)
 	})
+	finishButton.Importance = widget.HighImportance
 
 	backButton := widget.NewButton("Back", func() {
-		a.showLogFileStep()
+		w.currentStep--
+		w.renderStep()
 	})
 
-	content := container.NewVBox(
-		featuresContent,
-		widget.NewSeparator(),
-		container.NewHBox(
-			backButton,
-			finishButton,
-		),
+	buttons := container.NewHBox(
+		backButton,
+		widget.NewLabel(""), // Spacer
+		finishButton,
 	)
 
-	customDialog := dialog.NewCustom("Quick Tour", "", content, a.window)
-	customDialog.Resize(fyne.NewSize(600, 550))
-	customDialog.Show()
+	scrollContent := container.NewScroll(content)
+	scrollContent.SetMinSize(fyne.NewSize(650, 450))
+
+	return scrollContent, buttons
 }
 
 // completeOnboarding marks onboarding as completed and saves to config.
-func (a *App) completeOnboarding() {
+func (w *OnboardingWizard) completeOnboarding() {
 	cfg, err := config.Load()
 	if err != nil {
 		cfg = config.DefaultConfig()

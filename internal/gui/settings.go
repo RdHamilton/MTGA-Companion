@@ -2,11 +2,9 @@ package gui
 
 import (
 	"fmt"
-	"image/color"
 	"strconv"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -212,24 +210,22 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 		}, a.window)
 	})
 
+	// Add Show Onboarding button
+	onboardingButton := widget.NewButton("Show Onboarding", func() {
+		a.ShowOnboardingWizard()
+	})
+
 	// Add Help button
 	helpButton := widget.NewButton("Help", func() {
 		a.ShowHelp()
 	})
-	helpButton.Importance = widget.HighImportance
 
 	// Add About button
 	aboutButton := widget.NewButton("About", func() {
 		a.ShowAbout()
 	})
 
-	// Create transparent spacers for left and right margins
-	leftSpacer := canvas.NewRectangle(color.Transparent)
-	leftSpacer.SetMinSize(fyne.NewSize(20, 0))
-	rightSpacer := canvas.NewRectangle(color.Transparent)
-	rightSpacer.SetMinSize(fyne.NewSize(20, 0))
-
-	// Layout: form in center with margins, buttons at bottom
+	// Layout: form in center with padding, buttons at bottom
 	return container.NewBorder(
 		nil,
 		container.NewPadded(
@@ -237,14 +233,15 @@ func (a *App) createSettingsView() fyne.CanvasObject {
 				widget.NewSeparator(),
 				container.NewHBox(
 					restoreButton,
+					onboardingButton,
 					layout.NewSpacer(),
 					helpButton,
 					aboutButton,
 				),
 			),
 		),
-		leftSpacer,
-		rightSpacer,
+		nil,
+		nil,
 		container.NewScroll(
 			container.NewPadded(form),
 		),
