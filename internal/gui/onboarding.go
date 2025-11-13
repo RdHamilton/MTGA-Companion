@@ -59,8 +59,8 @@ func (w *OnboardingWizard) show() {
 	// Create content container that will be updated
 	w.contentBox = container.NewVBox()
 
-	// Create custom dialog without dismiss button
-	w.dialog = dialog.NewCustomWithoutButtons("MTGA Companion Setup", w.contentBox, w.app.window)
+	// Create custom dialog (empty dismiss button label since we handle navigation with our own buttons)
+	w.dialog = dialog.NewCustom("MTGA Companion Setup", "", w.contentBox, w.app.window)
 
 	// Render first step
 	w.renderStep()
