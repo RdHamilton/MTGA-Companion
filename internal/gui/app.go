@@ -65,9 +65,6 @@ func (a *App) Run() {
 		a.window.Close()
 	})
 
-	// Show onboarding for first-time users
-	a.showOnboarding()
-
 	// Create tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Statistics", a.createStatsView()),
@@ -80,6 +77,10 @@ func (a *App) Run() {
 	a.setupKeyboardShortcuts(tabs)
 
 	a.window.SetContent(tabs)
+
+	// Show onboarding for first-time users (after window content is set)
+	a.showOnboarding()
+
 	a.window.ShowAndRun()
 }
 
