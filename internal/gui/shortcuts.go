@@ -19,7 +19,7 @@ func (a *App) setupKeyboardShortcuts(tabs *container.AppTabs) {
 	// Refresh shortcut: Ctrl/Cmd + R
 	canvas.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  fyne.KeyR,
-		Modifier: desktop.ControlModifier, // Works for both Ctrl (Windows/Linux) and Cmd (macOS)
+		Modifier: fyne.KeyModifierControl, // Works for both Ctrl (Windows/Linux) and Cmd (macOS)
 	}, func(shortcut fyne.Shortcut) {
 		a.refreshActiveTab(tabs)
 	})
@@ -27,7 +27,7 @@ func (a *App) setupKeyboardShortcuts(tabs *container.AppTabs) {
 	// Help shortcut: Ctrl/Cmd + H
 	canvas.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  fyne.KeyH,
-		Modifier: desktop.ControlModifier,
+		Modifier: fyne.KeyModifierControl,
 	}, func(shortcut fyne.Shortcut) {
 		a.ShowHelp()
 	})
@@ -35,7 +35,7 @@ func (a *App) setupKeyboardShortcuts(tabs *container.AppTabs) {
 	// Settings shortcut: Ctrl/Cmd + Comma
 	canvas.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  fyne.KeyComma,
-		Modifier: desktop.ControlModifier,
+		Modifier: fyne.KeyModifierControl,
 	}, func(shortcut fyne.Shortcut) {
 		tabs.SelectIndex(3) // Settings is the 4th tab (index 3)
 	})
