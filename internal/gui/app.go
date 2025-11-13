@@ -53,15 +53,23 @@ func (a *App) Run() {
 
 // createStatsView creates the statistics view with material design principles.
 func (a *App) createStatsView() fyne.CanvasObject {
-	stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
-	if err != nil {
-		return a.ErrorView("Error Loading Statistics", err, a.createStatsView)
-	}
+	return a.WithLoading("Loading statistics...", func() (fyne.CanvasObject, error) {
+		stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
+		if err != nil {
+			return nil, err
+		}
 
-	if stats.TotalMatches == 0 {
-		return a.NoDataView("No Statistics Available",
-			"No match data has been collected yet.")
-	}
+		if stats.TotalMatches == 0 {
+			return a.NoDataView("No Statistics Available",
+				"No match data has been collected yet."), nil
+		}
+
+		return a.buildStatsView(stats), nil
+	})
+}
+
+// buildStatsView builds the statistics display from stats data.
+func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
 
 	// Create rich text with markdown for better formatting
 	content := fmt.Sprintf(`## Overall Statistics

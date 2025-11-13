@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f3f4f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGradient)" rx="80"/>
+
+  <!-- Card shape -->
+  <rect x="96" y="96" width="320" height="320" fill="url(#cardGradient)"
+        stroke="#1e3a8a" stroke-width="4" rx="16"/>
+
+  <!-- Chart bars -->
+  <rect x="140" y="300" width="36" height="80" fill="#2563eb" rx="4"/>
+  <rect x="190" y="260" width="36" height="120" fill="#3b82f6" rx="4"/>
+  <rect x="240" y="240" width="36" height="140" fill="#60a5fa" rx="4"/>
+  <rect x="290" y="280" width="36" height="100" fill="#3b82f6" rx="4"/>
+  <rect x="340" y="260" width="36" height="120" fill="#2563eb" rx="4"/>
+
+  <!-- Chart baseline -->
+  <line x1="120" y1="390" x2="400" y2="390" stroke="#1e3a8a" stroke-width="3"/>
+
+  <!-- Initials or symbol -->
+  <text x="256" y="200" font-family="Arial, sans-serif" font-size="72"
+        font-weight="bold" fill="#2563eb" text-anchor="middle">M</text>
+  <text x="256" y="240" font-family="Arial, sans-serif" font-size="48"
+        font-weight="bold" fill="#3b82f6" text-anchor="middle">C</text>
+</svg>
