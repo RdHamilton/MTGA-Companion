@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import Footer from './Footer';
 import './Layout.css';
 
 interface LayoutProps {
@@ -80,11 +81,8 @@ const Layout = ({ children }: LayoutProps) => {
         {children}
       </div>
 
-      {/* Status Bar */}
-      <div className="status-bar">
-        <span>MTGA Companion</span>
-        <span className="status-right">Ready</span>
-      </div>
+      {/* Footer with Stats */}
+      <Footer />
     </div>
   );
 };
