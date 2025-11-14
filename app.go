@@ -5,16 +5,22 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // App struct
 type App struct {
-	ctx     context.Context
-	service *storage.Service
+	ctx        context.Context
+	service    *storage.Service
+	poller     *logreader.Poller
+	pollerStop context.CancelFunc
+	pollerMu   sync.Mutex
 }
 
 // NewApp creates a new App application struct
@@ -32,6 +38,13 @@ func (a *App) startup(ctx context.Context) {
 	if err := a.Initialize(dbPath); err != nil {
 		log.Printf("Warning: Failed to initialize database at %s: %v", dbPath, err)
 		log.Printf("You may need to configure the database path in Settings")
+		return
+	}
+
+	// Auto-start log file poller for real-time updates
+	if err := a.StartPoller(); err != nil {
+		log.Printf("Warning: Failed to start log file poller: %v", err)
+		log.Printf("Real-time updates will not be available")
 	}
 }
 
@@ -51,6 +64,10 @@ func getDefaultDBPath() string {
 
 // shutdown is called when the app shuts down
 func (a *App) shutdown(ctx context.Context) {
+	// Stop poller if running
+	a.StopPoller()
+
+	// Close database
 	if a.service != nil {
 		a.service.Close()
 	}
@@ -149,4 +166,252 @@ type AppError struct {
 
 func (e *AppError) Error() string {
 	return e.Message
+}
+
+// getMTGALogPath returns the path to the MTGA Player.log file based on platform
+func getMTGALogPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	var logPath string
+	if runtime.GOOS == "darwin" {
+		// macOS
+		logPath = filepath.Join(home, "Library", "Application Support", "com.wizards.mtga", "Logs", "Logs")
+	} else if runtime.GOOS == "windows" {
+		// Windows
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			appData = filepath.Join(home, "AppData", "Roaming")
+		}
+		logPath = filepath.Join(appData, "Wizards of the Coast", "MTGA", "Logs")
+	} else {
+		return "", &AppError{Message: "Unsupported platform for MTGA log detection"}
+	}
+
+	// Find the most recent Player.log file
+	files, err := os.ReadDir(logPath)
+	if err != nil {
+		return "", err
+	}
+
+	var newestLog string
+	var newestTime time.Time
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		// Look for Player.log or UTC_Log files
+		name := file.Name()
+		if name == "Player.log" || filepath.Ext(name) == ".log" {
+			info, err := file.Info()
+			if err != nil {
+				continue
+			}
+			if newestLog == "" || info.ModTime().After(newestTime) {
+				newestLog = filepath.Join(logPath, name)
+				newestTime = info.ModTime()
+			}
+		}
+	}
+
+	if newestLog == "" {
+		return "", &AppError{Message: "No MTGA log file found"}
+	}
+
+	return newestLog, nil
+}
+
+// StartPoller starts the log file poller for real-time updates
+func (a *App) StartPoller() error {
+	a.pollerMu.Lock()
+	defer a.pollerMu.Unlock()
+
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+
+	// Stop existing poller if running
+	if a.poller != nil {
+		return nil // Already running
+	}
+
+	// Get MTGA log path
+	logPath, err := getMTGALogPath()
+	if err != nil {
+		log.Printf("Failed to find MTGA log file: %v", err)
+		return err
+	}
+
+	log.Printf("Starting log file poller for: %s", logPath)
+
+	// Create poller config
+	config := logreader.DefaultPollerConfig(logPath)
+	config.Interval = 5 * time.Second // Poll every 5 seconds
+
+	// Create poller
+	poller, err := logreader.NewPoller(config)
+	if err != nil {
+		log.Printf("Failed to create poller: %v", err)
+		return err
+	}
+
+	a.poller = poller
+
+	// Start poller
+	updates := poller.Start()
+	errChan := poller.Errors()
+
+	// Create cancellable context
+	pollerCtx, cancel := context.WithCancel(a.ctx)
+	a.pollerStop = cancel
+
+	// Start background goroutine to process updates
+	go a.processPollerUpdates(pollerCtx, updates, errChan)
+
+	log.Println("Log file poller started successfully")
+	return nil
+}
+
+// StopPoller stops the log file poller
+func (a *App) StopPoller() {
+	a.pollerMu.Lock()
+	defer a.pollerMu.Unlock()
+
+	if a.pollerStop != nil {
+		a.pollerStop()
+		a.pollerStop = nil
+	}
+
+	if a.poller != nil {
+		a.poller.Stop()
+		a.poller = nil
+		log.Println("Log file poller stopped")
+	}
+}
+
+// processPollerUpdates processes new log entries in the background
+func (a *App) processPollerUpdates(ctx context.Context, updates <-chan *logreader.LogEntry, errChan <-chan error) {
+	var entryBuffer []*logreader.LogEntry
+	ticker := time.NewTicker(5 * time.Second) // Batch process every 5 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-updates:
+			if !ok {
+				return
+			}
+			// Buffer entries for batch processing
+			entryBuffer = append(entryBuffer, entry)
+		case err, ok := <-errChan:
+			if !ok {
+				return
+			}
+			log.Printf("Poller error: %v", err)
+		case <-ticker.C:
+			// Process buffered entries
+			if len(entryBuffer) > 0 {
+				a.processNewEntries(ctx, entryBuffer)
+				entryBuffer = nil // Clear buffer
+			}
+		}
+	}
+}
+
+// processNewEntries processes new log entries and updates statistics
+func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEntry) {
+	// Parse arena stats from new entries
+	arenaStats, err := logreader.ParseArenaStats(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse arena stats from new entries: %v", err)
+		return
+	}
+
+	// Store new stats if we have match data
+	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
+		if err := a.service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
+			log.Printf("Warning: Failed to store arena stats from poller: %v", err)
+		} else {
+			log.Printf("✓ Updated statistics: %d new matches, %d new games",
+				arenaStats.TotalMatches, arenaStats.TotalGames)
+		}
+	}
+
+	// Parse and store decks
+	deckLibrary, err := logreader.ParseDecks(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse decks from new entries: %v", err)
+	} else if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
+		log.Printf("Found %d deck(s) in new entries", len(deckLibrary.Decks))
+		// Store decks and infer deck IDs for matches
+		// (Same logic as in CLI main.go lines 340-408)
+		storedCount := 0
+		for _, deck := range deckLibrary.Decks {
+			// Convert card slices
+			mainDeck := make([]struct {
+				CardID   int
+				Quantity int
+			}, len(deck.MainDeck))
+			for i, card := range deck.MainDeck {
+				mainDeck[i].CardID = card.CardID
+				mainDeck[i].Quantity = card.Quantity
+			}
+
+			sideboard := make([]struct {
+				CardID   int
+				Quantity int
+			}, len(deck.Sideboard))
+			for i, card := range deck.Sideboard {
+				sideboard[i].CardID = card.CardID
+				sideboard[i].Quantity = card.Quantity
+			}
+
+			// Handle timestamps
+			created := deck.Created
+			if created.IsZero() && !deck.Modified.IsZero() {
+				created = deck.Modified
+			} else if created.IsZero() {
+				created = time.Now()
+			}
+
+			modified := deck.Modified
+			if modified.IsZero() {
+				modified = time.Now()
+			}
+
+			err := a.service.StoreDeckFromParser(
+				ctx,
+				deck.DeckID,
+				deck.Name,
+				deck.Format,
+				deck.Description,
+				created,
+				modified,
+				deck.LastPlayed,
+				mainDeck,
+				sideboard,
+			)
+			if err != nil {
+				log.Printf("Warning: Failed to store deck %s: %v", deck.Name, err)
+			} else {
+				storedCount++
+			}
+		}
+
+		if storedCount > 0 {
+			log.Printf("✓ Stored %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
+
+			// Infer deck IDs for matches
+			inferredCount, err := a.service.InferDeckIDsForMatches(ctx)
+			if err != nil {
+				log.Printf("Warning: Failed to infer deck IDs: %v", err)
+			} else if inferredCount > 0 {
+				log.Printf("✓ Linked %d match(es) to decks", inferredCount)
+			}
+		}
+	}
 }
