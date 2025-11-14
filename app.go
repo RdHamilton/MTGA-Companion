@@ -343,6 +343,14 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 			log.Printf("✓ Updated statistics: %d new matches, %d new games",
 				arenaStats.TotalMatches, arenaStats.TotalGames)
 			dataUpdated = true
+
+			// Try to infer deck IDs for the new matches
+			inferredCount, err := a.service.InferDeckIDsForMatches(ctx)
+			if err != nil {
+				log.Printf("Warning: Failed to infer deck IDs: %v", err)
+			} else if inferredCount > 0 {
+				log.Printf("✓ Linked %d match(es) to decks", inferredCount)
+			}
 		}
 	}
 
