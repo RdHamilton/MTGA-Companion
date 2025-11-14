@@ -1,0 +1,32 @@
+.match-count {
+  margin-bottom: 12px;
+  color: #aaaaaa;
+  font-size: 14px;
+}
+
+.result-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.result-badge.win {
+  background-color: #2d5f2d;
+  color: #7dff7d;
+}
+
+.result-badge.loss {
+  background-color: #5f2d2d;
+  color: #ff7d7d;
+}
+
+tr.result-win {
+  border-left: 3px solid #7dff7d;
+}
+
+tr.result-loss {
+  border-left: 3px solid #ff7d7d;
+}

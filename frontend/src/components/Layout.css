@@ -1,0 +1,82 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+.tab-bar {
+  display: flex;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  padding: 0;
+}
+
+.tab {
+  padding: 12px 24px;
+  text-decoration: none;
+  color: #aaaaaa;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.tab:hover {
+  color: #ffffff;
+  background-color: #3d3d3d;
+}
+
+.tab.active {
+  color: #4a9eff;
+  border-bottom-color: #4a9eff;
+  background-color: #2d2d2d;
+}
+
+.sub-tab-bar {
+  display: flex;
+  background-color: #252525;
+  border-bottom: 1px solid #3d3d3d;
+  padding: 0;
+  gap: 4px;
+}
+
+.sub-tab {
+  padding: 8px 16px;
+  text-decoration: none;
+  color: #aaaaaa;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.sub-tab:hover {
+  color: #ffffff;
+  background-color: #3d3d3d;
+}
+
+.sub-tab.active {
+  color: #ffffff;
+  background-color: #1e1e1e;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #252525;
+  border-top: 1px solid #3d3d3d;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #aaaaaa;
+}
+
+.status-right {
+  color: #4a9eff;
+}

@@ -3,15 +3,12 @@ package gui
 import (
 	"context"
 	"fmt"
-	"image/color"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
@@ -94,7 +91,7 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		container.NewScroll(container.NewPadded(chartContainer)),
+		container.NewScroll(chartContainer),
 	)
 }
 
@@ -231,7 +228,7 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	// Create chart config (no title - it's in the summary below)
 	config := charts.DefaultFyneChartConfig()
 	config.Title = "" // Remove title from chart, show in summary instead
-	config.Width = 1400 // Wider to span more of the page
+	config.Width = 1200
 	config.Height = 500
 
 	// Create chart based on type
@@ -242,14 +239,6 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 		chart = charts.CreateFyneBarChart(dataPoints, config)
 	}
 
-	// Create a spacer that reserves vertical space for the chart
-	// This ensures VBox layout positions subsequent items below the chart
-	chartSpacer := canvas.NewRectangle(color.Transparent)
-	chartSpacer.SetMinSize(fyne.NewSize(config.Width, config.Height))
-
-	// Stack the chart on top of the spacer
-	chartWithSpace := container.NewStack(chartSpacer, chart)
-
 	// Create summary
 	summary := d.createSummary(analysis)
 
@@ -259,56 +248,61 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	})
 	AddButtonTooltip(exportButton, TooltipExport)
 
-	// Layout: chart, summary, then export button below
-	return container.NewVBox(
-		chartWithSpace,
-		widget.NewSeparator(),
-		widget.NewSeparator(), // Extra separator for spacing
-		summary,
-		widget.NewSeparator(),
-		container.NewHBox(
-			layout.NewSpacer(),
-			exportButton,
+	// Create bottom row with padding
+	bottomRow := container.NewPadded(
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			exportButton, // Right side
+			summary,      // Center/Left
 		),
+	)
+
+	// Wrap chart in a Stack container with explicit size to force VBox to respect it
+	chartContainer := container.NewStack(chart)
+	chartContainer.Resize(fyne.NewSize(config.Width, config.Height))
+
+	// Layout: chart on top, separator, then summary row below
+	return container.NewVBox(
+		chartContainer,
+		widget.NewSeparator(),
+		bottomRow,
 	)
 }
 
 // createSummary creates the summary information display.
 func (d *WinRateDashboard) createSummary(analysis *storage.TrendAnalysis) fyne.CanvasObject {
-	// Build the title with chart type
-	chartTypeStr := "Line Chart"
-	if d.chartType == "bar" {
-		chartTypeStr = "Bar Chart"
+	// Build summary text on ONE line, separated by " | "
+	summaryParts := []string{
+		"Win Rate Trend Analysis",
+		fmt.Sprintf("Period: %s to %s", d.startDate.Format("2006-01-02"), d.endDate.Format("2006-01-02")),
+		fmt.Sprintf("Format: %s", d.getFormatDisplayName()),
 	}
 
-	summaryContent := fmt.Sprintf(`## Win Rate Trend Analysis
-
-**Chart Type**: %s
-**Period**: %s to %s
-**Format**: %s
-**Trend**: %s`,
-		chartTypeStr,
-		d.startDate.Format("2006-01-02"),
-		d.endDate.Format("2006-01-02"),
-		d.getFormatDisplayName(),
-		analysis.Trend,
-	)
-
+	// Add trend with value if available
+	trendText := fmt.Sprintf("Trend: %s", analysis.Trend)
 	if analysis.TrendValue != 0 {
 		// TrendValue is stored as decimal (0-1), multiply by 100 for percentage
-		summaryContent += fmt.Sprintf(" (%+.1f%%)", analysis.TrendValue*100)
+		trendText += fmt.Sprintf(" (%+.1f%%)", analysis.TrendValue*100)
 	}
+	summaryParts = append(summaryParts, trendText)
 
+	// Add overall win rate if available
 	if analysis.Overall != nil {
 		// WinRate is stored as decimal (0-1), multiply by 100 for percentage
-		summaryContent += fmt.Sprintf(`
-**Overall Win Rate**: %.1f%% (%d matches)`,
-			analysis.Overall.WinRate*100,
-			analysis.Overall.TotalMatches,
-		)
+		summaryParts = append(summaryParts,
+			fmt.Sprintf("Overall Win Rate: %.1f%% (%d matches)",
+				analysis.Overall.WinRate*100,
+				analysis.Overall.TotalMatches))
 	}
 
-	return widget.NewRichTextFromMarkdown(summaryContent)
+	// Join all parts with " | " to make single line
+	summaryText := strings.Join(summaryParts, " | ")
+	label := widget.NewLabel(summaryText)
+	label.Wrapping = fyne.TextWrapOff
+
+	return label
 }
 
 // getFormatDisplayName returns the display name for the current format filter.

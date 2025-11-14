@@ -1,0 +1,194 @@
+import { useState, useEffect } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { GetTrendAnalysis } from '../../wailsjs/go/main/App';
+import { storage } from '../../wailsjs/go/models';
+import './WinRateTrend.css';
+
+const WinRateTrend = () => {
+  const [analysis, setAnalysis] = useState<storage.TrendAnalysis | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters
+  const [dateRange, setDateRange] = useState('7days');
+  const [format, setFormat] = useState('all');
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+
+  useEffect(() => {
+    loadTrendData();
+  }, [dateRange, format]);
+
+  const loadTrendData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Calculate date range
+      const now = new Date();
+      const start = new Date();
+      let periodType = 'daily';
+
+      switch (dateRange) {
+        case '7days':
+          start.setDate(now.getDate() - 7);
+          periodType = 'daily';
+          break;
+        case '30days':
+          start.setDate(now.getDate() - 30);
+          periodType = 'weekly';
+          break;
+        case '90days':
+          start.setDate(now.getDate() - 90);
+          periodType = 'weekly';
+          break;
+        case 'all':
+          start.setFullYear(now.getFullYear() - 1);
+          periodType = 'monthly';
+          break;
+      }
+
+      // Build formats array
+      let formats: string[] | null = null;
+      if (format === 'constructed') {
+        formats = ['Ladder', 'Play'];
+      } else if (format !== 'all') {
+        formats = [format];
+      }
+
+      const data = await GetTrendAnalysis(start, now, periodType, formats || []);
+      setAnalysis(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load trend data');
+      console.error('Error loading trend data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Transform data for Recharts
+  const chartData = analysis?.Periods?.map(period => ({
+    name: period.Period.Label,
+    winRate: Math.round(period.WinRate * 100 * 10) / 10, // Convert to percentage with 1 decimal
+    matches: period.Stats?.TotalMatches || 0
+  })) || [];
+
+  return (
+    <div className="page-container">
+      {/* Filters */}
+      <div className="filter-row">
+        <div className="filter-group">
+          <label className="filter-label">Date Range</label>
+          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <option value="7days">Last 7 Days</option>
+            <option value="30days">Last 30 Days</option>
+            <option value="90days">Last 90 Days</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label className="filter-label">Format</label>
+          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            <option value="all">All Formats</option>
+            <option value="constructed">Constructed</option>
+            <option value="Ladder">Ranked (Ladder)</option>
+            <option value="Play">Play Queue</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label className="filter-label">Chart Type</label>
+          <select value={chartType} onChange={(e) => setChartType(e.target.value as 'line' | 'bar')}>
+            <option value="line">Line Chart</option>
+            <option value="bar">Bar Chart</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading && <div className="no-data">Loading trend data...</div>}
+
+      {error && <div className="error">{error}</div>}
+
+      {!loading && !error && (!analysis || chartData.length === 0) && (
+        <div className="no-data">No trend data available for the selected period</div>
+      )}
+
+      {!loading && !error && analysis && chartData.length > 0 && (
+        <>
+          {/* Chart */}
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={500}>
+              {chartType === 'line' ? (
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d3d3d" />
+                  <XAxis dataKey="name" stroke="#ffffff" />
+                  <YAxis stroke="#ffffff" domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#2d2d2d', border: '1px solid #3d3d3d' }}
+                    labelStyle={{ color: '#ffffff' }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="winRate"
+                    stroke="#4a9eff"
+                    name="Win Rate (%)"
+                    strokeWidth={2}
+                    dot={{ fill: '#4a9eff', r: 4 }}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d3d3d" />
+                  <XAxis dataKey="name" stroke="#ffffff" />
+                  <YAxis stroke="#ffffff" domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#2d2d2d', border: '1px solid #3d3d3d' }}
+                    labelStyle={{ color: '#ffffff' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="winRate" fill="#4a9eff" name="Win Rate (%)" />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+
+          {/* Summary */}
+          <div className="summary">
+            <h3>Win Rate Trend Analysis</h3>
+            <div className="summary-grid">
+              <div className="summary-item">
+                <span className="summary-label">Period:</span>
+                <span className="summary-value">
+                  {analysis.Periods[0]?.Period.StartDate?.toString().split('T')[0]} to {analysis.Periods[analysis.Periods.length - 1]?.Period.EndDate?.toString().split('T')[0]}
+                </span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Format:</span>
+                <span className="summary-value">{format === 'all' ? 'All Formats' : format}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Trend:</span>
+                <span className={`summary-value trend-${analysis.Trend}`}>
+                  {analysis.Trend} {analysis.TrendValue !== 0 && `(${analysis.TrendValue > 0 ? '+' : ''}${Math.round(analysis.TrendValue * 100 * 10) / 10}%)`}
+                </span>
+              </div>
+              {analysis.Overall && (
+                <div className="summary-item">
+                  <span className="summary-label">Overall Win Rate:</span>
+                  <span className="summary-value">
+                    {Math.round(analysis.Overall.WinRate * 100 * 10) / 10}% ({analysis.Overall.TotalMatches} matches)
+                  </span>
+                </div>
+              )}
+            </div>
+            <button onClick={() => alert('Export functionality coming soon!')}>Export as PNG</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default WinRateTrend;
