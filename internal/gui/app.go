@@ -65,12 +65,18 @@ func (a *App) Run() {
 		a.window.Close()
 	})
 
+	// Create all views
+	statsView := a.createStatsView()
+	matchesView := a.createMatchesView()
+	chartsView := a.createChartsView()
+	settingsView := a.createSettingsView()
+
 	// Create tabs
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", a.createStatsView()),
-		container.NewTabItem("Match History", a.createMatchesView()),
-		container.NewTabItem("Charts", a.createChartsView()),
-		container.NewTabItem("Settings", a.createSettingsView()),
+		container.NewTabItem("Statistics", statsView),
+		container.NewTabItem("Match History", matchesView),
+		container.NewTabItem("Charts", chartsView),
+		container.NewTabItem("Settings", settingsView),
 	)
 
 	// Setup keyboard shortcuts
@@ -78,10 +84,15 @@ func (a *App) Run() {
 
 	a.window.SetContent(tabs)
 
-	// Show onboarding for first-time users (after window content is set)
+	// Show the window first
+	a.window.Show()
+
+	// Show onboarding for first-time users (after window is visible)
+	// This must happen after Show() so the dialog has a visible parent window
 	a.showOnboarding()
 
-	a.window.ShowAndRun()
+	// Start the application event loop (blocking)
+	a.app.Run()
 }
 
 // createStatsView creates the statistics view with material design principles.
@@ -160,13 +171,20 @@ func (a *App) createMatchesView() fyne.CanvasObject {
 
 // createChartsView creates the charts view.
 func (a *App) createChartsView() fyne.CanvasObject {
+	// Create all chart views
+	winRateTrend := a.createWinRateTrendView()
+	formatDist := a.createFormatDistributionView()
+	deckPerf := a.createDeckPerformanceView()
+	resultBreakdown := a.createResultBreakdownView()
+	rankProg := a.createRankProgressionView()
+
 	// Create sub-tabs for different chart types
 	chartTabs := container.NewAppTabs(
-		container.NewTabItem("Win Rate Trend", a.createWinRateTrendView()),
-		container.NewTabItem("Format Distribution", a.createFormatDistributionView()),
-		container.NewTabItem("Deck Performance", a.createDeckPerformanceView()),
-		container.NewTabItem("Result Breakdown", a.createResultBreakdownView()),
-		container.NewTabItem("Rank Progression", a.createRankProgressionView()),
+		container.NewTabItem("Win Rate Trend", winRateTrend),
+		container.NewTabItem("Format Distribution", formatDist),
+		container.NewTabItem("Deck Performance", deckPerf),
+		container.NewTabItem("Result Breakdown", resultBreakdown),
+		container.NewTabItem("Rank Progression", rankProg),
 	)
 
 	return chartTabs
@@ -364,91 +382,8 @@ func (a *App) breakdownToDataPoints(breakdown map[string]int) []charts.DataPoint
 
 // createRankProgressionView creates the rank progression chart view.
 func (a *App) createRankProgressionView() fyne.CanvasObject {
-	// Date range (last 30 days)
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
-
-	// Get rank progression timeline for constructed
-	timeline, err := a.service.GetRankProgressionTimeline(a.ctx, "constructed", &thirtyDaysAgo, &now, storage.PeriodWeekly)
-	if err != nil {
-		return a.ErrorView("Error Loading Rank Data", err, a.createRankProgressionView)
-	}
-
-	if len(timeline.Entries) == 0 {
-		return a.NoDataView("No Rank Data Available",
-			"No ranked matches found for the selected time period.")
-	}
-
-	// Convert timeline entries to chart data points
-	dataPoints := make([]charts.DataPoint, len(timeline.Entries))
-	for i, entry := range timeline.Entries {
-		dataPoints[i] = charts.DataPoint{
-			Label: entry.Date,
-			Value: a.rankToNumericValue(entry.RankClass, entry.RankLevel),
-		}
-	}
-
-	// Create chart config
-	config := charts.DefaultFyneChartConfig()
-	config.Title = "Rank Progression - Constructed (Last 30 Days)"
-	config.Width = 750
-	config.Height = 450
-
-	// Create chart
-	chart := charts.CreateFyneLineChart(dataPoints, config)
-
-	// Summary with markdown formatting
-	summaryContent := fmt.Sprintf(`### Rank Progression Analysis
-
-**Period**: %s to %s
-**Start Rank**: %s
-**End Rank**: %s
-**Highest Rank**: %s
-**Lowest Rank**: %s
-**Total Changes**: %d
-**Milestones**: %d`,
-		thirtyDaysAgo.Format("2006-01-02"),
-		now.Format("2006-01-02"),
-		timeline.StartRank,
-		timeline.EndRank,
-		timeline.HighestRank,
-		timeline.LowestRank,
-		timeline.TotalChanges,
-		timeline.Milestones,
-	)
-
-	summary := widget.NewRichTextFromMarkdown(summaryContent)
-
-	// Format selector
-	formatSelect := widget.NewSelect([]string{"Constructed", "Limited"}, func(selected string) {
-		// Recreate the entire Charts tab with the new format
-		a.window.SetContent(container.NewAppTabs(
-			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Match History", a.createMatchesView()),
-			container.NewTabItem("Charts", a.createChartsView()),
-			container.NewTabItem("Settings", a.createSettingsView()),
-		))
-	})
-	formatSelect.Selected = "Constructed"
-
-	// Layout: selector at top, chart in middle, summary at bottom with padding
-	return container.NewBorder(
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				formatSelect,
-				widget.NewSeparator(),
-			),
-		),
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewSeparator(),
-				summary,
-			),
-		),
-		nil, nil,
-		container.NewScroll(container.NewPadded(chart)),
-	)
+	dashboard := NewRankProgressionDashboard(a, a.service, a.ctx)
+	return dashboard.CreateView()
 }
 
 // rankToNumericValue converts rank class and level to a numeric value for charting.

@@ -216,15 +216,16 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	)
 
 	// Layout: filters at top, list in middle, pagination at bottom
+	// Use more compact labels for better spacing
 	filterGrid := container.New(
 		layout.NewGridLayout(2),
-		widget.NewLabel("Format:"),
+		widget.NewLabel("Format"),
 		v.formatSelect,
-		widget.NewLabel("Result:"),
+		widget.NewLabel("Result"),
 		v.resultSelect,
-		widget.NewLabel("Start Date:"),
+		widget.NewLabel("From"),
 		v.startDateEntry,
-		widget.NewLabel("End Date:"),
+		widget.NewLabel("To"),
 		v.endDateEntry,
 	)
 
@@ -265,7 +266,7 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		),
 		nil,
 		nil,
-		listWithHeaders,
+		container.NewPadded(listWithHeaders),
 	)
 }
 
@@ -323,8 +324,13 @@ func (v *MatchHistoryViewer) filterMatches() {
 		}
 
 		// Format filter
-		if formatFilter != "All Formats" && match.Format != formatFilter {
-			continue
+		if formatFilter != "All Formats" {
+			// Map user-facing format names to database values
+			// Ladder and Play both map to "constructed"
+			mappedFormat := v.mapFormat(formatFilter)
+			if match.Format != mappedFormat {
+				continue
+			}
 		}
 
 		// Result filter
@@ -345,6 +351,17 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 	v.calculatePagination()
 	v.updateStatusLabel()
+}
+
+// mapFormat maps user-facing format names to database format values.
+// Ladder and Play both map to "constructed" format.
+func (v *MatchHistoryViewer) mapFormat(format string) string {
+	switch format {
+	case "Ladder", "Play":
+		return "constructed"
+	default:
+		return format
+	}
 }
 
 // calculatePagination calculates pagination parameters.
