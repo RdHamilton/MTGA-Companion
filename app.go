@@ -93,11 +93,21 @@ func (a *App) GetTrendAnalysis(startDate, endDate time.Time, periodType string, 
 }
 
 // GetStatsByDeck returns statistics grouped by deck
-func (a *App) GetStatsByDeck(filter models.StatsFilter) (map[string]*storage.Statistics, error) {
+func (a *App) GetStatsByDeck(filter models.StatsFilter) (map[string]*models.Statistics, error) {
 	if a.service == nil {
 		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
 	}
-	return a.service.GetStatsByDeck(a.ctx, filter)
+	log.Printf("GetStatsByDeck called with filter: %+v", filter)
+	result, err := a.service.GetStatsByDeck(a.ctx, filter)
+	if err != nil {
+		log.Printf("GetStatsByDeck error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetStatsByDeck returned %d decks", len(result))
+	for deckName, stats := range result {
+		log.Printf("  Deck: %s - Matches: %d, Wins: %d", deckName, stats.TotalMatches, stats.MatchesWon)
+	}
+	return result, nil
 }
 
 // GetRankProgressionTimeline returns rank progression timeline
