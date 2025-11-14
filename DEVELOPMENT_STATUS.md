@@ -4,10 +4,10 @@
 
 ## Current Sprint/Focus
 
-### Post-v0.3.0 Preparation
-- **Status**: PR #318 merged successfully to main ✅
-- **Next Priority**: Implement rank progression parsing (#317)
-- **Alternative**: Cut v0.3.0 release (rank progression can be v0.3.1)
+### v0.3.0 Release Preparation
+- **Status**: Rank progression parsing implemented (PR #320)
+- **Next**: Review and merge PR #320, then cut v0.3.0 release
+- **Alternative**: Add E2E testing before release
 
 ## Recently Completed
 
@@ -30,6 +30,16 @@
 - ✅ All lint errors fixed
 - ✅ All CI checks passing across Linux, macOS, and Windows
 
+### PR #320 - Rank Progression Parsing (November 2025) ✅ IMPLEMENTED
+- ✅ Parser for RankUpdated events from MTGA logs
+- ✅ Extract player rank, season, class, level, step data
+- ✅ Support for both Constructed and Limited formats
+- ✅ Real-time rank tracking via log file poller
+- ✅ Automatic storage with deduplication
+- ✅ Comprehensive test suite (11 tests, all passing)
+- ✅ Integration with existing log processing pipeline
+- ✅ All code quality checks passing
+
 ### v0.2.0 - Statistics & Analytics (Prior)
 - ✅ Comprehensive statistics engine
 - ✅ Export system (CSV/JSON)
@@ -42,26 +52,17 @@
 
 ## In Progress
 
-### 🚧 Rank Progression Parsing (#317) - HIGH PRIORITY
-**Status**: Data source research complete, needs implementation
+### 🚧 PR #320 Review - HIGH PRIORITY
+**Status**: Awaiting review and testing
 
-**Current State**:
-- Rank progression chart exists in GUI
-- Returns empty timeline (rank_history table is empty)
-- MTGA logs DO contain rank data in RankUpdated events
-- Parser needed to extract rank changes from logs
+**What's left**:
+- Review PR #320 code changes
+- Test with real MTGA log data (if available)
+- Verify rank progression chart displays correctly in GUI
+- Merge to main
 
-**Tasks**:
-1. Implement RankUpdated event parser in `internal/mtga/logreader/`
-2. Store rank snapshots in `rank_history` table
-3. Test with real MTGA rank changes
-4. Verify chart populates correctly
-
-**Acceptance Criteria**:
-- Parse RankUpdated events from MTGA logs
-- Store rank changes with timestamp
-- Support all formats (constructed, limited)
-- Chart displays rank progression over time
+**Then**:
+- Cut v0.3.0 release
 
 ### 🚧 E2E Testing Setup (#319) - MEDIUM PRIORITY
 **Status**: Identified as needed during PR #318 review
@@ -197,8 +198,8 @@
 - #316 - Fyne footer (closed, superseded by #318)
 
 ### Open Issues by Priority
-- **High**: #317 (Rank progression parsing)
-- **Medium**: #319 (E2E testing)
+- **High**: None (rank progression complete in PR #320)
+- **Medium**: #319 (E2E testing), PR #320 (rank progression - needs review)
 - **Low**: Various enhancement requests
 
 ### Active Contributors
@@ -208,17 +209,18 @@
 ## Notes for Next Session
 
 ### What we just finished:
-- ✅ PR #318 successfully merged to main
-- ✅ Wails React migration complete
-- ✅ All documentation updated
-- ✅ All CI checks passing
-- ✅ Persistent context documentation added (DEVELOPMENT_STATUS.md, ARCHITECTURE_DECISIONS.md)
+- ✅ PR #319 merged - Persistent context documentation
+- ✅ PR #320 created - Rank progression parsing implementation
+- ✅ RankUpdated event parser with comprehensive tests (11 tests)
+- ✅ Integration with log processing pipeline
+- ✅ All code quality checks passing
 
 ### What to do next:
-1. **Implement rank progression parsing** (#317) - Extract RankUpdated events from MTGA logs
-2. **Add E2E tests** (#319) - Playwright for GUI testing
-3. **Cut v0.3.0 release** - Consider releasing now or wait for rank progression
-4. **Performance testing** - Verify app performs well with large datasets
+1. **Review PR #320** - Rank progression parsing (ready for review)
+2. **Test with real MTGA logs** - Verify rank data is captured correctly (if MTGA is available)
+3. **Merge PR #320** - Complete rank progression feature
+4. **Cut v0.3.0 release** - Major release with Wails GUI + rank progression
+5. **Add E2E tests** (#319) - Playwright for GUI testing (future enhancement)
 
 ### Context for Claude:
 - We use Wails v2 (Go backend + React frontend)
