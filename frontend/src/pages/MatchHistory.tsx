@@ -47,8 +47,11 @@ const MatchHistory = () => {
           filter.StartDate = start.toISOString();
         }
         if (customEndDate) {
+          // Add 1 day to end date to make it inclusive
+          // (e.g., end date "2024-11-14" becomes "2024-11-15T00:00:00Z")
           const end = new Date(customEndDate);
-          end.setHours(23, 59, 59, 999);
+          end.setDate(end.getDate() + 1);
+          end.setHours(0, 0, 0, 0);
           filter.EndDate = end.toISOString();
         }
       } else if (dateRange !== 'all') {
@@ -69,11 +72,13 @@ const MatchHistory = () => {
 
         // Set start time to beginning of day
         start.setHours(0, 0, 0, 0);
-        // Set end time to end of day
-        now.setHours(23, 59, 59, 999);
+        // Add 1 day to end date to make it inclusive (beginning of next day)
+        const end = new Date(now);
+        end.setDate(end.getDate() + 1);
+        end.setHours(0, 0, 0, 0);
 
         filter.StartDate = start.toISOString();
-        filter.EndDate = now.toISOString();
+        filter.EndDate = end.toISOString();
       }
 
       // Format filter
