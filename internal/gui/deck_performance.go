@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // deckPerformanceData holds deck statistics for display.
@@ -118,16 +120,12 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 	dateRangeSelect.Selected = "Last 30 Days"
 	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
-	// Format selector
+	// Format selector (simplified to match actual database values)
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	formatSelect := widget.NewSelect(
-		[]string{"All Formats", "Constructed", "Limited", "Standard", "Historic", "Alchemy", "Explorer", "Timeless"},
+		[]string{"All Formats", "Constructed", "Limited"},
 		func(selected string) {
-			if selected == "All Formats" {
-				d.format = "all"
-			} else {
-				d.format = selected
-			}
+			d.format = selected
 			if d.updateChart != nil {
 				d.updateChart()
 			}
@@ -180,14 +178,21 @@ func (d *DeckPerformanceDashboard) createFilterControls() fyne.CanvasObject {
 // createChartView creates the chart visualization.
 func (d *DeckPerformanceDashboard) createChartView() fyne.CanvasObject {
 	// Create filter for date range and format
-	filter := storage.StatsFilter{
+	filter := models.StatsFilter{
 		StartDate: d.startDate,
 		EndDate:   d.endDate,
 	}
 
-	// Add format filter if not "all"
-	if d.format != "all" {
-		filter.Format = &d.format
+	// Map user-friendly format names to actual database values
+	switch d.format {
+	case "Constructed":
+		// Constructed formats: Ladder (ranked) and Play (unranked)
+		filter.Formats = []string{"Ladder", "Play"}
+	case "Limited":
+		// Limited formats: Any event containing Draft or Sealed
+		filter.Formats = d.getLimitedFormats()
+	case "All Formats":
+		// No filter
 	}
 
 	// Get statistics by deck
@@ -457,4 +462,28 @@ func (d *DeckPerformanceDashboard) getSortDisplayName() string {
 	default:
 		return "Unknown"
 	}
+}
+
+// getLimitedFormats queries the database for all draft/sealed format values.
+func (d *DeckPerformanceDashboard) getLimitedFormats() []string {
+	// Query for all distinct format values that contain "Draft" or "Sealed"
+	filter := models.StatsFilter{}
+	matches, err := d.service.GetMatches(d.ctx, filter)
+	if err != nil {
+		return []string{}
+	}
+
+	formatMap := make(map[string]bool)
+	for _, match := range matches {
+		formatLower := strings.ToLower(match.Format)
+		if strings.Contains(formatLower, "draft") || strings.Contains(formatLower, "sealed") {
+			formatMap[match.Format] = true
+		}
+	}
+
+	formats := make([]string, 0, len(formatMap))
+	for format := range formatMap {
+		formats = append(formats, format)
+	}
+	return formats
 }

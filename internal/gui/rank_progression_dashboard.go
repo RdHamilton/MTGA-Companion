@@ -37,7 +37,7 @@ func NewRankProgressionDashboard(app *App, service *storage.Service, ctx context
 		app:        app,
 		service:    service,
 		ctx:        ctx,
-		format:     "Constructed",
+		format:     "Ladder", // Default to ranked ladder
 		startDate:  &thirtyDaysAgo,
 		endDate:    &now,
 		periodType: "weekly",
@@ -77,10 +77,10 @@ func (d *RankProgressionDashboard) CreateView() fyne.CanvasObject {
 
 // createFilterControls creates the filter control panel.
 func (d *RankProgressionDashboard) createFilterControls() fyne.CanvasObject {
-	// Format selector
+	// Format selector - using actual database format values
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	formatSelect := widget.NewSelect(
-		[]string{"Constructed", "Limited", "Ladder", "Play"},
+		[]string{"Ladder", "Play"},
 		func(selected string) {
 			d.format = selected
 			if d.updateChart != nil {
@@ -131,9 +131,6 @@ func (d *RankProgressionDashboard) createFilterControls() fyne.CanvasObject {
 
 // createChartView creates the chart view with current filters.
 func (d *RankProgressionDashboard) createChartView() fyne.CanvasObject {
-	// Map format to query format (Ladder/Play -> constructed)
-	queryFormat := d.mapFormat(d.format)
-
 	// Use default dates if nil
 	startDate := d.startDate
 	endDate := d.endDate
@@ -146,8 +143,8 @@ func (d *RankProgressionDashboard) createChartView() fyne.CanvasObject {
 		endDate = &now
 	}
 
-	// Get rank progression timeline
-	timeline, err := d.service.GetRankProgressionTimeline(d.ctx, queryFormat, startDate, endDate, storage.PeriodWeekly)
+	// Get rank progression timeline using actual database format value
+	timeline, err := d.service.GetRankProgressionTimeline(d.ctx, d.format, startDate, endDate, storage.PeriodWeekly)
 	if err != nil {
 		return d.app.ErrorView("Error Loading Rank Data", err, nil)
 	}
@@ -205,19 +202,4 @@ func (d *RankProgressionDashboard) createChartView() fyne.CanvasObject {
 		widget.NewSeparator(),
 		summary,
 	)
-}
-
-// mapFormat maps user-facing format names to database format values.
-// Ladder and Play both map to "constructed" format.
-func (d *RankProgressionDashboard) mapFormat(format string) string {
-	switch format {
-	case "Ladder", "Play":
-		return "constructed"
-	case "Constructed":
-		return "constructed"
-	case "Limited":
-		return "limited"
-	default:
-		return "constructed"
-	}
 }
