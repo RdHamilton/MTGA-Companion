@@ -77,9 +77,10 @@ func (a *App) shutdown(ctx context.Context) {
 
 // Initialize initializes the application with database path
 func (a *App) Initialize(dbPath string) error {
-	db, err := storage.Open(&storage.Config{
-		Path: dbPath,
-	})
+	config := storage.DefaultConfig(dbPath)
+	config.BusyTimeout = 10 * time.Second // Increase timeout to handle concurrent poller operations
+
+	db, err := storage.Open(config)
 	if err != nil {
 		return err
 	}
@@ -363,7 +364,13 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 		// Store decks and infer deck IDs for matches
 		// (Same logic as in CLI main.go lines 340-408)
 		storedCount := 0
+		processedCount := 0
 		for _, deck := range deckLibrary.Decks {
+			// Small delay between deck operations to avoid database lock contention
+			if processedCount > 0 {
+				time.Sleep(50 * time.Millisecond)
+			}
+			processedCount++
 			// Convert card slices
 			mainDeck := make([]struct {
 				CardID   int
@@ -431,9 +438,16 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 
 	// Emit event to frontend if any data was updated
 	if dataUpdated {
+		matches := 0
+		games := 0
+		if arenaStats != nil {
+			matches = arenaStats.TotalMatches
+			games = arenaStats.TotalGames
+		}
+
 		wailsruntime.EventsEmit(a.ctx, "stats:updated", map[string]interface{}{
-			"matches": arenaStats.TotalMatches,
-			"games":   arenaStats.TotalGames,
+			"matches": matches,
+			"games":   games,
 		})
 		log.Println("📡 Emitted stats:updated event to frontend")
 	}
