@@ -43,8 +43,13 @@ const MatchHistory = () => {
             break;
         }
 
-        filter.StartDate = start.toISOString().split('T')[0];
-        filter.EndDate = now.toISOString().split('T')[0];
+        // Set start time to beginning of day
+        start.setHours(0, 0, 0, 0);
+        // Set end time to end of day
+        now.setHours(23, 59, 59, 999);
+
+        filter.StartDate = start.toISOString();
+        filter.EndDate = now.toISOString();
       }
 
       // Format filter
