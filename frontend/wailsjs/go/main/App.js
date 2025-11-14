@@ -37,3 +37,11 @@ export function GetTrendAnalysis(arg1, arg2, arg3, arg4) {
 export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
 }
+
+export function StartPoller() {
+  return window['go']['main']['App']['StartPoller']();
+}
+
+export function StopPoller() {
+  return window['go']['main']['App']['StopPoller']();
+}

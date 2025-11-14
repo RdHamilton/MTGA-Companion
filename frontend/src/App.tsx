@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import ToastContainer from './components/ToastContainer';
 import MatchHistory from './pages/MatchHistory';
 import WinRateTrend from './pages/WinRateTrend';
 import DeckPerformance from './pages/DeckPerformance';
@@ -24,6 +25,7 @@ function App() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
+      <ToastContainer />
     </Router>
   );
 }

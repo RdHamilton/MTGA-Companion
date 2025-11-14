@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetStatsByDeck } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import './DeckPerformance.css';
@@ -23,6 +24,20 @@ const DeckPerformance = () => {
 
   useEffect(() => {
     loadDeckStats();
+  }, [dateRange, customStartDate, customEndDate, format]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    const unsubscribe = EventsOn('stats:updated', () => {
+      console.log('Stats updated event received - reloading deck performance data');
+      loadDeckStats();
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [dateRange, customStartDate, customEndDate, format]);
 
   const loadDeckStats = async () => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetMatches } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import './MatchHistory.css';
@@ -28,6 +29,20 @@ const MatchHistory = () => {
 
   useEffect(() => {
     loadMatches();
+  }, [dateRange, customStartDate, customEndDate, format, result]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    const unsubscribe = EventsOn('stats:updated', () => {
+      console.log('Stats updated event received - reloading match history');
+      loadMatches();
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [dateRange, customStartDate, customEndDate, format, result]);
 
   const loadMatches = async () => {

@@ -21,3 +21,7 @@ export function GetStatsByFormat(arg1:models.StatsFilter):Promise<Record<string,
 export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:Array<string>):Promise<storage.TrendAnalysis>;
 
 export function Initialize(arg1:string):Promise<void>;
+
+export function StartPoller():Promise<void>;
+
+export function StopPoller():Promise<void>;

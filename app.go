@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -324,6 +326,8 @@ func (a *App) processPollerUpdates(ctx context.Context, updates <-chan *logreade
 
 // processNewEntries processes new log entries and updates statistics
 func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEntry) {
+	dataUpdated := false
+
 	// Parse arena stats from new entries
 	arenaStats, err := logreader.ParseArenaStats(entries)
 	if err != nil {
@@ -338,6 +342,7 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 		} else {
 			log.Printf("✓ Updated statistics: %d new matches, %d new games",
 				arenaStats.TotalMatches, arenaStats.TotalGames)
+			dataUpdated = true
 		}
 	}
 
@@ -404,6 +409,7 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 
 		if storedCount > 0 {
 			log.Printf("✓ Stored %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
+			dataUpdated = true
 
 			// Infer deck IDs for matches
 			inferredCount, err := a.service.InferDeckIDsForMatches(ctx)
@@ -413,5 +419,14 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 				log.Printf("✓ Linked %d match(es) to decks", inferredCount)
 			}
 		}
+	}
+
+	// Emit event to frontend if any data was updated
+	if dataUpdated {
+		wailsruntime.EventsEmit(a.ctx, "stats:updated", map[string]interface{}{
+			"matches": arenaStats.TotalMatches,
+			"games":   arenaStats.TotalGames,
+		})
+		log.Println("📡 Emitted stats:updated event to frontend")
 	}
 }
