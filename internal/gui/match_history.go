@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ type MatchHistoryViewer struct {
 	searchEntry    *widget.Entry
 	formatSelect   *widget.Select
 	resultSelect   *widget.Select
+	opponentSelect *widget.Select
 	startDateEntry *widget.Entry
 	endDateEntry   *widget.Entry
 	statusLabel    *widget.Label
@@ -84,11 +86,29 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	})
 	v.resultSelect.Selected = "All Results"
 
-	// Date range filters
+	// Opponent filter - will be populated after matches are loaded
+	v.opponentSelect = widget.NewSelect([]string{"All Opponents"}, func(selected string) {
+		v.filterMatches()
+		v.currentPage = 0
+		v.refreshList()
+	})
+	v.opponentSelect.Selected = "All Opponents"
+
+	// Date range filters with calendar pickers
 	v.startDateEntry = widget.NewEntry()
 	v.startDateEntry.SetPlaceHolder("YYYY-MM-DD")
 	v.endDateEntry = widget.NewEntry()
 	v.endDateEntry.SetPlaceHolder("YYYY-MM-DD")
+
+	// Start date picker button
+	startPickerBtn := widget.NewButton("📅", func() {
+		v.showDatePickerDialog("Select Start Date", v.startDateEntry)
+	})
+
+	// End date picker button
+	endPickerBtn := widget.NewButton("📅", func() {
+		v.showDatePickerDialog("Select End Date", v.endDateEntry)
+	})
 
 	dateApplyBtn := widget.NewButton("Apply Date Filter", func() {
 		v.filterMatches()
@@ -217,16 +237,22 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 
 	// Layout: filters at top, list in middle, pagination at bottom
 	// Use more compact labels for better spacing
+	// Combine date entries with calendar picker buttons
+	startDateBox := container.NewBorder(nil, nil, nil, startPickerBtn, v.startDateEntry)
+	endDateBox := container.NewBorder(nil, nil, nil, endPickerBtn, v.endDateEntry)
+
 	filterGrid := container.New(
 		layout.NewGridLayout(2),
 		widget.NewLabel("Format"),
 		v.formatSelect,
 		widget.NewLabel("Result"),
 		v.resultSelect,
+		widget.NewLabel("Opponent"),
+		v.opponentSelect,
 		widget.NewLabel("From"),
-		v.startDateEntry,
+		startDateBox,
 		widget.NewLabel("To"),
-		v.endDateEntry,
+		endDateBox,
 	)
 
 	filterButtons := container.NewHBox(
@@ -282,6 +308,10 @@ func (v *MatchHistoryViewer) loadMatches() {
 
 	v.allMatches = matches
 	v.filteredMatches = matches
+
+	// Update opponent dropdown with unique opponents
+	v.updateOpponentFilter()
+
 	v.calculatePagination()
 	v.updateStatusLabel()
 }
@@ -293,6 +323,7 @@ func (v *MatchHistoryViewer) filterMatches() {
 	searchText := strings.ToLower(v.searchEntry.Text)
 	formatFilter := v.formatSelect.Selected
 	resultFilter := v.resultSelect.Selected
+	opponentFilter := v.opponentSelect.Selected
 
 	// Parse date filters
 	var startDate, endDate *time.Time
@@ -336,6 +367,17 @@ func (v *MatchHistoryViewer) filterMatches() {
 		// Result filter
 		if resultFilter != "All Results" && match.Result != resultFilter {
 			continue
+		}
+
+		// Opponent filter
+		if opponentFilter != "All Opponents" {
+			matchOpponent := "Unknown"
+			if match.OpponentName != nil {
+				matchOpponent = *match.OpponentName
+			}
+			if matchOpponent != opponentFilter {
+				continue
+			}
 		}
 
 		// Date range filter
@@ -535,4 +577,80 @@ func (v *MatchHistoryViewer) exportMatches() {
 
 	saveDialog.SetFileName(fmt.Sprintf("mtga_matches_%s.csv", time.Now().Format("20060102_150405")))
 	saveDialog.Show()
+}
+
+// updateOpponentFilter updates the opponent dropdown with unique opponents from matches.
+func (v *MatchHistoryViewer) updateOpponentFilter() {
+	// Collect unique opponents
+	opponentSet := make(map[string]bool)
+	for _, match := range v.allMatches {
+		if match.OpponentName != nil && *match.OpponentName != "" {
+			opponentSet[*match.OpponentName] = true
+		} else {
+			opponentSet["Unknown"] = true
+		}
+	}
+
+	// Convert to sorted list
+	opponents := []string{"All Opponents"}
+	for opponent := range opponentSet {
+		opponents = append(opponents, opponent)
+	}
+
+	// Sort alphabetically (except "All Opponents" stays first)
+	sort.Strings(opponents[1:])
+
+	// Update dropdown options
+	currentSelection := v.opponentSelect.Selected
+	v.opponentSelect.Options = opponents
+
+	// Restore selection if it still exists
+	found := false
+	for _, opt := range opponents {
+		if opt == currentSelection {
+			v.opponentSelect.Selected = currentSelection
+			found = true
+			break
+		}
+	}
+	if !found {
+		v.opponentSelect.Selected = "All Opponents"
+	}
+
+	v.opponentSelect.Refresh()
+}
+
+// showDatePickerDialog shows a custom date picker dialog using a calendar widget.
+func (v *MatchHistoryViewer) showDatePickerDialog(title string, targetEntry *widget.Entry) {
+	// Parse current date if set, otherwise use today
+	var selectedDate time.Time
+	if targetEntry.Text != "" {
+		if parsed, err := time.Parse("2006-01-02", targetEntry.Text); err == nil {
+			selectedDate = parsed
+		} else {
+			selectedDate = time.Now()
+		}
+	} else {
+		selectedDate = time.Now()
+	}
+
+	// Create calendar widget
+	calendar := widget.NewCalendar(selectedDate, func(t time.Time) {
+		selectedDate = t
+	})
+
+	// Create dialog with calendar and buttons
+	content := container.NewVBox(
+		calendar,
+		widget.NewSeparator(),
+	)
+
+	confirmDialog := dialog.NewCustomConfirm(title, "Select", "Cancel", content, func(confirmed bool) {
+		if confirmed {
+			targetEntry.SetText(selectedDate.Format("2006-01-02"))
+		}
+	}, v.app.window)
+
+	confirmDialog.Resize(fyne.NewSize(400, 500))
+	confirmDialog.Show()
 }
