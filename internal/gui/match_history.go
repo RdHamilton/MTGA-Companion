@@ -140,22 +140,30 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	v.statusLabel = widget.NewLabel("")
 	v.updateStatusLabel()
 
-	// Create column headers
-	headers := container.NewHBox(
-		widget.NewLabelWithStyle("Result", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Date/Time", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Event", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Score", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Opponent", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+	// Create column headers with fixed widths for alignment
+	resultHeader := widget.NewLabelWithStyle("Result", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	dateHeader := widget.NewLabelWithStyle("Date/Time", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	eventHeader := widget.NewLabelWithStyle("Event", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	scoreHeader := widget.NewLabelWithStyle("Score", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	opponentHeader := widget.NewLabelWithStyle("Opponent", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+
+	headers := container.New(
+		layout.NewGridLayout(5),
+		resultHeader,
+		dateHeader,
+		eventHeader,
+		scoreHeader,
+		opponentHeader,
 	)
 
-	// Create match list
+	// Create match list with matching grid layout
 	v.matchList = widget.NewList(
 		func() int {
 			return v.getPageMatchCount()
 		},
 		func() fyne.CanvasObject {
-			return container.NewHBox(
+			return container.New(
+				layout.NewGridLayout(5),
 				widget.NewLabel("W"),
 				widget.NewLabel("2025-11-10 15:04"),
 				widget.NewLabel("Event Name Here"),
@@ -236,22 +244,27 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	)
 
 	// Layout: filters at top, list in middle, pagination at bottom
-	// Use more compact labels for better spacing
 	// Combine date entries with calendar picker buttons
 	startDateBox := container.NewBorder(nil, nil, nil, startPickerBtn, v.startDateEntry)
 	endDateBox := container.NewBorder(nil, nil, nil, endPickerBtn, v.endDateEntry)
 
+	// Use a more compact 4-column layout for better control
 	filterGrid := container.New(
-		layout.NewGridLayout(2),
-		widget.NewLabel("Format"),
+		layout.NewGridLayout(4),
+		// Row 1
+		widget.NewLabel("Format:"),
 		v.formatSelect,
-		widget.NewLabel("Result"),
+		widget.NewLabel("Result:"),
 		v.resultSelect,
-		widget.NewLabel("Opponent"),
+		// Row 2
+		widget.NewLabel("Opponent:"),
 		v.opponentSelect,
-		widget.NewLabel("From"),
+		widget.NewLabel("From:"),
 		startDateBox,
-		widget.NewLabel("To"),
+		// Row 3 - need fillers for alignment
+		widget.NewLabel(""),
+		widget.NewLabel(""),
+		widget.NewLabel("To:"),
 		endDateBox,
 	)
 
@@ -643,6 +656,7 @@ func (v *MatchHistoryViewer) showDatePickerDialog(title string, targetEntry *wid
 	}
 
 	// Create calendar widget
+	// Note: Calendar creation may show a brief loading indicator - this is normal Fyne behavior
 	calendar := widget.NewCalendar(selectedDate, func(t time.Time) {
 		selectedDate = t
 	})
