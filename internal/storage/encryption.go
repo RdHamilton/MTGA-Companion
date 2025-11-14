@@ -170,13 +170,17 @@ func DecryptData(encrypted []byte, config *EncryptionConfig) ([]byte, error) {
 }
 
 // EncryptFile encrypts a file and writes the encrypted data to a new file.
-func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
+func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) (err error) {
 	// Read source file
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close source file: %w", closeErr)
+		}
+	}()
 
 	plaintext, err := io.ReadAll(sourceFile)
 	if err != nil {
@@ -194,7 +198,11 @@ func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+	defer func() {
+		if closeErr := destFile.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close destination file: %w", closeErr)
+		}
+	}()
 
 	// Write magic header
 	if _, err := destFile.Write([]byte(EncryptionMagicHeader)); err != nil {
@@ -210,13 +218,17 @@ func EncryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 }
 
 // DecryptFile decrypts an encrypted file and writes the plaintext to a new file.
-func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
+func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) (err error) {
 	// Read encrypted file
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to open encrypted file: %w", err)
 	}
-	defer func() { _ = sourceFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close source file: %w", closeErr)
+		}
+	}()
 
 	data, err := io.ReadAll(sourceFile)
 	if err != nil {
@@ -247,7 +259,11 @@ func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer func() { _ = destFile.Close() }() //nolint:errcheck // Ignore error on cleanup
+	defer func() {
+		if closeErr := destFile.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close destination file: %w", closeErr)
+		}
+	}()
 
 	if _, err := destFile.Write(plaintext); err != nil {
 		return fmt.Errorf("failed to write decrypted file: %w", err)
@@ -257,12 +273,16 @@ func DecryptFile(sourcePath, destPath string, config *EncryptionConfig) error {
 }
 
 // IsEncrypted checks if a file is encrypted by checking for the magic header.
-func IsEncrypted(filePath string) (bool, error) {
+func IsEncrypted(filePath string) (encrypted bool, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = file.Close() }() //nolint:errcheck // Ignore error on cleanup
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close file: %w", closeErr)
+		}
+	}()
 
 	header := make([]byte, len(EncryptionMagicHeader))
 	n, err := file.Read(header)

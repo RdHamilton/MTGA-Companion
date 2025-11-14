@@ -228,6 +228,14 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 
 			playerTeamID, _ := firstPlayer["teamId"].(float64)
 
+			// Extract deck ID if available
+			var deckID *string
+			if deckIDStr, ok := firstPlayer["deckId"].(string); ok && deckIDStr != "" {
+				deckID = &deckIDStr
+			} else if deckIDStr, ok := firstPlayer["DeckId"].(string); ok && deckIDStr != "" {
+				deckID = &deckIDStr
+			}
+
 			// Parse result list to determine match result and games
 			resultList, ok := finalMatchResult["resultList"].([]interface{})
 			if !ok {
@@ -310,6 +318,7 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 			match := &Match{
 				ID:           matchID,
 				AccountID:    s.currentAccountID,
+				DeckID:       deckID,
 				EventID:      eventID,
 				EventName:    eventName,
 				Timestamp:    matchTime,
@@ -518,8 +527,51 @@ func (s *Service) GetStreakStats(ctx context.Context, filter models.StatsFilter)
 	return stats.CalculateStreaks(matches), nil
 }
 
+// StoreDeckFromParser stores a deck parsed from log reader.
+func (s *Service) StoreDeckFromParser(ctx context.Context, deckID, name, format, description string, created, modified time.Time, lastPlayed *time.Time, mainDeck, sideboard []struct {
+	CardID   int
+	Quantity int
+},
+) error {
+	// Convert to storage models
+	deck := &models.Deck{
+		ID:         deckID,
+		AccountID:  s.currentAccountID,
+		Name:       name,
+		Format:     format,
+		CreatedAt:  created,
+		ModifiedAt: modified,
+		LastPlayed: lastPlayed,
+	}
+
+	if description != "" {
+		deck.Description = &description
+	}
+
+	// Convert cards
+	var cards []*models.DeckCard
+	for _, card := range mainDeck {
+		cards = append(cards, &models.DeckCard{
+			DeckID:   deckID,
+			CardID:   card.CardID,
+			Quantity: card.Quantity,
+			Board:    "main",
+		})
+	}
+	for _, card := range sideboard {
+		cards = append(cards, &models.DeckCard{
+			DeckID:   deckID,
+			CardID:   card.CardID,
+			Quantity: card.Quantity,
+			Board:    "sideboard",
+		})
+	}
+
+	return s.StoreDeck(ctx, deck, cards)
+}
+
 // StoreDeck stores a complete deck with its cards.
-func (s *Service) StoreDeck(ctx context.Context, deck *Deck, cards []*DeckCard) error {
+func (s *Service) StoreDeck(ctx context.Context, deck *models.Deck, cards []*models.DeckCard) error {
 	return s.db.WithTransaction(ctx, func(tx *sql.Tx) error {
 		// Create or update the deck
 		existing, err := s.decks.GetByID(ctx, deck.ID)
@@ -555,6 +607,71 @@ func (s *Service) StoreDeck(ctx context.Context, deck *Deck, cards []*DeckCard) 
 // ListDecks returns all decks.
 func (s *Service) ListDecks(ctx context.Context) ([]*models.Deck, error) {
 	return s.decks.List(ctx)
+}
+
+// InferDeckIDsForMatches attempts to link matches to decks based on timestamp proximity.
+// This is a best-effort approach since MTGA logs don't include deck IDs in match events.
+// It links each match without a deck_id to the deck with the closest lastPlayed timestamp.
+func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
+	// Get all matches without deck IDs
+	matchesNeedingDecks, err := s.matches.GetMatchesWithoutDeckID(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get matches without deck IDs: %w", err)
+	}
+
+	if len(matchesNeedingDecks) == 0 {
+		return 0, nil
+	}
+
+	// Get all decks with LastPlayed timestamps
+	allDecks, err := s.decks.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list decks: %w", err)
+	}
+
+	// Filter to decks that have LastPlayed timestamp
+	var decksWithTimestamp []*models.Deck
+	for _, deck := range allDecks {
+		if deck.LastPlayed != nil {
+			decksWithTimestamp = append(decksWithTimestamp, deck)
+		}
+	}
+
+	if len(decksWithTimestamp) == 0 {
+		return 0, nil
+	}
+
+	updatedCount := 0
+	const maxTimeDiff = 24 * time.Hour // Only link if within 24 hours (same play session day)
+
+	for _, match := range matchesNeedingDecks {
+		var bestDeck *models.Deck
+		var minDiff time.Duration
+
+		for _, deck := range decksWithTimestamp {
+			// Calculate time difference
+			diff := match.Timestamp.Sub(*deck.LastPlayed)
+			if diff < 0 {
+				diff = -diff
+			}
+
+			// Check if this is the closest deck so far
+			if bestDeck == nil || diff < minDiff {
+				bestDeck = deck
+				minDiff = diff
+			}
+		}
+
+		// Only update if within reasonable time window
+		if bestDeck != nil && minDiff <= maxTimeDiff {
+			if err := s.matches.UpdateDeckID(ctx, match.ID, bestDeck.ID); err != nil {
+				return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
+			}
+			updatedCount++
+		}
+	}
+
+	return updatedCount, nil
 }
 
 // UpdateCollection updates the collection based on changes detected in the log.

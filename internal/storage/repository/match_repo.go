@@ -54,6 +54,12 @@ type MatchRepository interface {
 
 	// GetPerformanceMetrics calculates duration-based performance metrics.
 	GetPerformanceMetrics(ctx context.Context, filter models.StatsFilter) (*models.PerformanceMetrics, error)
+
+	// GetMatchesWithoutDeckID returns all matches that don't have a deck_id assigned.
+	GetMatchesWithoutDeckID(ctx context.Context) ([]*models.Match, error)
+
+	// UpdateDeckID updates the deck_id for a specific match.
+	UpdateDeckID(ctx context.Context, matchID, deckID string) error
 }
 
 // matchRepository is the concrete implementation of MatchRepository.
@@ -774,13 +780,14 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 	// Query for match statistics grouped by deck
 	matchQuery := fmt.Sprintf(`
 		SELECT
-			deck_id,
+			COALESCE(d.name, m.deck_id, 'Unknown Deck') as deck_name,
 			COUNT(*) as total,
-			SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
-			SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses
-		FROM matches
+			SUM(CASE WHEN m.result = 'win' THEN 1 ELSE 0 END) as wins,
+			SUM(CASE WHEN m.result = 'loss' THEN 1 ELSE 0 END) as losses
+		FROM matches m
+		LEFT JOIN decks d ON m.deck_id = d.id
 		%s
-		GROUP BY deck_id
+		GROUP BY deck_name
 		ORDER BY total DESC
 	`, where)
 
@@ -796,10 +803,10 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 	// Collect match stats by deck
 	deckStats := make(map[string]*models.Statistics)
 	for rows.Next() {
-		var deckID string
+		var deckName string
 		stats := &models.Statistics{}
 		err := rows.Scan(
-			&deckID,
+			&deckName,
 			&stats.TotalMatches,
 			&stats.MatchesWon,
 			&stats.MatchesLost,
@@ -813,7 +820,7 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 			stats.WinRate = float64(stats.MatchesWon) / float64(stats.TotalMatches)
 		}
 
-		deckStats[deckID] = stats
+		deckStats[deckName] = stats
 	}
 
 	if err = rows.Err(); err != nil {
@@ -823,14 +830,15 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 	// Query for game statistics grouped by deck (via match_id join)
 	gameQuery := fmt.Sprintf(`
 		SELECT
-			m.deck_id,
+			COALESCE(d.name, m.deck_id, 'Unknown Deck') as deck_name,
 			COUNT(*) as total,
 			SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) as wins,
 			SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) as losses
 		FROM games g
 		JOIN matches m ON g.match_id = m.id
+		LEFT JOIN decks d ON m.deck_id = d.id
 		%s
-		GROUP BY m.deck_id
+		GROUP BY deck_name
 	`, where)
 
 	gameRows, err := r.db.QueryContext(ctx, gameQuery, args...)
@@ -843,25 +851,25 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 	}()
 
 	for gameRows.Next() {
-		var deckID string
+		var deckName string
 		var totalGames, gamesWon, gamesLost int
 		err := gameRows.Scan(
-			&deckID,
+			&deckName,
 			&totalGames,
 			&gamesWon,
 			&gamesLost,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get game stats for deck %s: %w", deckID, err)
+			return nil, fmt.Errorf("failed to get game stats for deck %s: %w", deckName, err)
 		}
 
 		// Add to existing stats or create new if match stats don't exist
-		if stats, exists := deckStats[deckID]; exists {
+		if stats, exists := deckStats[deckName]; exists {
 			stats.TotalGames = totalGames
 			stats.GamesWon = gamesWon
 			stats.GamesLost = gamesLost
 		} else {
-			deckStats[deckID] = &models.Statistics{
+			deckStats[deckName] = &models.Statistics{
 				TotalGames: totalGames,
 				GamesWon:   gamesWon,
 				GamesLost:  gamesLost,
@@ -870,7 +878,7 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 
 		// Calculate game win rate
 		if totalGames > 0 {
-			deckStats[deckID].GameWinRate = float64(gamesWon) / float64(totalGames)
+			deckStats[deckName].GameWinRate = float64(gamesWon) / float64(totalGames)
 		}
 	}
 
@@ -1024,4 +1032,78 @@ func (r *matchRepository) GetPerformanceMetrics(ctx context.Context, filter mode
 	}
 
 	return metrics, nil
+}
+
+// GetMatchesWithoutDeckID returns all matches that don't have a deck_id assigned.
+func (r *matchRepository) GetMatchesWithoutDeckID(ctx context.Context) ([]*models.Match, error) {
+	query := `
+		SELECT id, account_id, event_id, event_name, timestamp, player_wins, opponent_wins,
+			   player_team_id, format, result, result_reason, created_at
+		FROM matches
+		WHERE deck_id IS NULL
+		ORDER BY timestamp DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query matches: %w", err)
+	}
+	defer rows.Close()
+
+	var matches []*models.Match
+	for rows.Next() {
+		var m models.Match
+		var resultReason sql.NullString
+
+		err := rows.Scan(
+			&m.ID,
+			&m.AccountID,
+			&m.EventID,
+			&m.EventName,
+			&m.Timestamp,
+			&m.PlayerWins,
+			&m.OpponentWins,
+			&m.PlayerTeamID,
+			&m.Format,
+			&m.Result,
+			&resultReason,
+			&m.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan match: %w", err)
+		}
+
+		if resultReason.Valid {
+			m.ResultReason = &resultReason.String
+		}
+
+		matches = append(matches, &m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating matches: %w", err)
+	}
+
+	return matches, nil
+}
+
+// UpdateDeckID updates the deck_id for a specific match.
+func (r *matchRepository) UpdateDeckID(ctx context.Context, matchID, deckID string) error {
+	query := `UPDATE matches SET deck_id = ? WHERE id = ?`
+
+	result, err := r.db.ExecContext(ctx, query, deckID, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to update match deck_id: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("match not found: %s", matchID)
+	}
+
+	return nil
 }
