@@ -478,8 +478,8 @@ func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilte
 	matchQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
-			SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses
+			COALESCE(SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END), 0) as wins,
+			COALESCE(SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END), 0) as losses
 		FROM matches
 		%s
 	`, where)
@@ -503,8 +503,8 @@ func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilte
 	gameQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) as wins,
-			SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) as losses
+			COALESCE(SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END), 0) as wins,
+			COALESCE(SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END), 0) as losses
 		FROM games g
 		INNER JOIN matches m ON g.match_id = m.id
 		%s

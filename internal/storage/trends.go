@@ -106,7 +106,7 @@ func generatePeriods(startDate, endDate time.Time, periodType string) []TrendPer
 	switch periodType {
 	case "daily":
 		current := startDate
-		for current.Before(endDate) || current.Equal(endDate) {
+		for current.Before(endDate) {
 			periodEnd := current.AddDate(0, 0, 1)
 			if periodEnd.After(endDate) {
 				periodEnd = endDate

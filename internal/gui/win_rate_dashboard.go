@@ -68,8 +68,21 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 	// Store the update function so other methods can use it
 	d.updateChart = updateChart
 
-	// Initial chart render
-	updateChart()
+	// Show loading placeholder initially
+	loadingLabel := widget.NewLabel("Loading chart data...")
+	chartContainer.Objects = []fyne.CanvasObject{
+		container.NewCenter(loadingLabel),
+	}
+
+	// Load chart asynchronously
+	go func() {
+		// Run the query in background
+		chartView := d.createChartView()
+
+		// Update UI on main thread
+		chartContainer.Objects = []fyne.CanvasObject{chartView}
+		chartContainer.Refresh()
+	}()
 
 	// Layout
 	return container.NewBorder(
