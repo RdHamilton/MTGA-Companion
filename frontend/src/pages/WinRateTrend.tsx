@@ -156,7 +156,10 @@ const WinRateTrend = () => {
 
           {/* Summary */}
           <div className="summary">
-            <h3>Win Rate Trend Analysis</h3>
+            <div className="summary-header">
+              <h3>Win Rate Trend Analysis</h3>
+              <button onClick={() => alert('Export functionality coming soon!')}>Export as PNG</button>
+            </div>
             <div className="summary-grid">
               <div className="summary-item">
                 <span className="summary-label">Period:</span>
@@ -183,7 +186,6 @@ const WinRateTrend = () => {
                 </div>
               )}
             </div>
-            <button onClick={() => alert('Export functionality coming soon!')}>Export as PNG</button>
           </div>
         </>
       )}
