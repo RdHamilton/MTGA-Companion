@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -197,7 +198,9 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	// Determine format filter
 	var formatFilter *string
 	if d.format != "all" {
-		formatFilter = &d.format
+		// Convert to lowercase to match database format values
+		formatLower := strings.ToLower(d.format)
+		formatFilter = &formatLower
 	}
 
 	// Get trend data
@@ -237,21 +240,23 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	// Create summary
 	summary := d.createSummary(analysis)
 
-	// Export button (smaller, below chart)
+	// Export button (below chart, right-aligned)
 	exportButton := widget.NewButton("Export as PNG", func() {
 		d.exportChart()
 	})
 	AddButtonTooltip(exportButton, TooltipExport)
 
-	// Layout
+	// Layout with proper spacing
 	return container.NewVBox(
-		chart,
+		container.NewPadded(chart),
 		widget.NewSeparator(),
-		summary,
+		container.NewPadded(summary),
 		widget.NewSeparator(),
-		container.NewHBox(
-			layout.NewSpacer(),
-			exportButton,
+		container.NewPadded(
+			container.NewHBox(
+				layout.NewSpacer(),
+				exportButton,
+			),
 		),
 	)
 }

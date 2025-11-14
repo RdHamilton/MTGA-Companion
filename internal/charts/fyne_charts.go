@@ -70,8 +70,8 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
-	// Text color for all labels
-	textColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+	// Text color for all labels (white for dark theme)
+	textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 
 	// Draw grid lines if enabled
 	if config.ShowGrid {
@@ -154,7 +154,7 @@ func CreateFyneLineChart(data []DataPoint, config FyneChartConfig) fyne.CanvasOb
 
 	// Add title with better contrast
 	if config.Title != "" {
-		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		titleColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 16
 		title.Alignment = fyne.TextAlignCenter
@@ -208,8 +208,8 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 	// Container for all chart elements
 	objects := []fyne.CanvasObject{}
 
-	// Text color for all labels
-	textColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+	// Text color for all labels (white for dark theme)
+	textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 
 	// Draw grid lines if enabled
 	if config.ShowGrid {
@@ -275,7 +275,7 @@ func CreateFyneBarChart(data []DataPoint, config FyneChartConfig) fyne.CanvasObj
 
 	// Add title with better contrast
 	if config.Title != "" {
-		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		titleColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 16
 		title.Alignment = fyne.TextAlignCenter
@@ -331,7 +331,7 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 
 	// Add title centered above the chart with proper spacing
 	if config.Title != "" {
-		titleColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		titleColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 		title := canvas.NewText(config.Title, titleColor)
 		title.TextSize = 18
 		title.Alignment = fyne.TextAlignCenter
@@ -361,8 +361,8 @@ func CreateFynePieChartBreakdown(data []DataPoint, config FyneChartConfig) fyne.
 
 		y := topMargin + (barHeight+barSpacing)*float32(i)
 
-		// Label text color (dark gray for better visibility)
-		labelColor := color.RGBA{R: 66, G: 66, B: 66, A: 255}
+		// Label text color (white for dark theme)
+		labelColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 
 		// Label on the left (format name)
 		label := canvas.NewText(point.Label, labelColor)
