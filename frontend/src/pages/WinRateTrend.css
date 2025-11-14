@@ -11,22 +11,27 @@
   padding: 20px;
 }
 
-.summary-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.summary h3 {
   margin-bottom: 16px;
+  color: #ffffff;
 }
 
-.summary-header h3 {
-  margin: 0;
-  color: #ffffff;
+.summary-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
+  flex: 1;
+}
+
+.export-button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .summary-item {

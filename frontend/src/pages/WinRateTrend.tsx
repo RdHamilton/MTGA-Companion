@@ -156,35 +156,35 @@ const WinRateTrend = () => {
 
           {/* Summary */}
           <div className="summary">
-            <div className="summary-header">
-              <h3>Win Rate Trend Analysis</h3>
-              <button onClick={() => alert('Export functionality coming soon!')}>Export as PNG</button>
-            </div>
-            <div className="summary-grid">
-              <div className="summary-item">
-                <span className="summary-label">Period:</span>
-                <span className="summary-value">
-                  {analysis.Periods[0]?.Period.StartDate?.toString().split('T')[0]} to {analysis.Periods[analysis.Periods.length - 1]?.Period.EndDate?.toString().split('T')[0]}
-                </span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-label">Format:</span>
-                <span className="summary-value">{format === 'all' ? 'All Formats' : format}</span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-label">Trend:</span>
-                <span className={`summary-value trend-${analysis.Trend}`}>
-                  {analysis.Trend} {analysis.TrendValue !== 0 && `(${analysis.TrendValue > 0 ? '+' : ''}${Math.round(analysis.TrendValue * 100 * 10) / 10}%)`}
-                </span>
-              </div>
-              {analysis.Overall && (
+            <h3>Win Rate Trend Analysis</h3>
+            <div className="summary-content">
+              <div className="summary-grid">
                 <div className="summary-item">
-                  <span className="summary-label">Overall Win Rate:</span>
+                  <span className="summary-label">Period:</span>
                   <span className="summary-value">
-                    {Math.round(analysis.Overall.WinRate * 100 * 10) / 10}% ({analysis.Overall.TotalMatches} matches)
+                    {analysis.Periods[0]?.Period.StartDate?.toString().split('T')[0]} to {analysis.Periods[analysis.Periods.length - 1]?.Period.EndDate?.toString().split('T')[0]}
                   </span>
                 </div>
-              )}
+                <div className="summary-item">
+                  <span className="summary-label">Format:</span>
+                  <span className="summary-value">{format === 'all' ? 'All Formats' : format}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Trend:</span>
+                  <span className={`summary-value trend-${analysis.Trend}`}>
+                    {analysis.Trend} {analysis.TrendValue !== 0 && `(${analysis.TrendValue > 0 ? '+' : ''}${Math.round(analysis.TrendValue * 100 * 10) / 10}%)`}
+                  </span>
+                </div>
+                {analysis.Overall && (
+                  <div className="summary-item">
+                    <span className="summary-label">Overall Win Rate:</span>
+                    <span className="summary-value">
+                      {Math.round(analysis.Overall.WinRate * 100 * 10) / 10}% ({analysis.Overall.TotalMatches} matches)
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button className="export-button" onClick={() => alert('Export functionality coming soon!')}>Export as PNG</button>
             </div>
           </div>
         </>
