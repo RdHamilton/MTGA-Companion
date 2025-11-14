@@ -3,10 +3,12 @@ package gui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -240,6 +242,14 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 		chart = charts.CreateFyneBarChart(dataPoints, config)
 	}
 
+	// Create a spacer that reserves vertical space for the chart
+	// This ensures VBox layout positions subsequent items below the chart
+	chartSpacer := canvas.NewRectangle(color.Transparent)
+	chartSpacer.SetMinSize(fyne.NewSize(config.Width, config.Height))
+
+	// Stack the chart on top of the spacer
+	chartWithSpace := container.NewStack(chartSpacer, chart)
+
 	// Create summary
 	summary := d.createSummary(analysis)
 
@@ -251,7 +261,7 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 
 	// Layout: chart, export button, then summary below
 	return container.NewVBox(
-		chart,
+		chartWithSpace,
 		widget.NewSeparator(),
 		container.NewPadded(
 			container.NewHBox(
