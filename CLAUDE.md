@@ -2,9 +2,91 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Maintenance Instructions
+
+**IMPORTANT**: As you work with the user, you MUST proactively maintain these documentation files:
+
+### 1. Update DEVELOPMENT_STATUS.md
+**When to update**: After completing any significant work
+
+**What to update**:
+- Move completed items from "In Progress" to "Recently Completed"
+- Update "In Progress" section when starting new work
+- Update "Next Up" if priorities change
+- Add new issues to "Known Issues" when discovered
+- Update "Notes for Next Session" at the end of each session
+- Update "Last Updated" date at the top
+
+**How to update**: Use the Edit tool to modify DEVELOPMENT_STATUS.md with the latest status
+
+**Example scenarios**:
+- ✅ Just merged a PR → Move from "In Progress" to "Recently Completed"
+- ✅ Started implementing a feature → Add to "In Progress" section
+- ✅ Found a bug → Add to "Known Issues"
+- ✅ Ending session → Update "Notes for Next Session"
+
+### 2. Update ARCHITECTURE_DECISIONS.md
+**When to update**: When making or discussing any architectural decision
+
+**What to update**:
+- Add new ADR when you make a significant architectural choice
+- Use the template at the bottom of the file
+- Increment the ADR number (next is ADR-011)
+- Update the index at the bottom
+- Change status from "Proposed" to "Accepted" when decision is finalized
+
+**Example scenarios**:
+- ✅ Choosing a new library → Document why in new ADR
+- ✅ Changing architecture pattern → Create ADR explaining rationale
+- ✅ Deciding on UI approach → Record decision with alternatives considered
+- ✅ Database schema change approach → Document reasoning
+
+**What qualifies as "architectural"**:
+- Technology choices (libraries, frameworks, databases)
+- Design patterns adopted
+- Major refactoring decisions
+- UI/UX paradigm shifts
+- Data flow changes
+- Security decisions
+- Performance trade-offs
+
+### 3. Update CLAUDE.md (this file)
+**When to update**: When the architecture, workflow, or standards change
+
+**What to update**:
+- Technology Stack section when dependencies change
+- Project Structure when files/folders reorganize
+- Architecture section when patterns change
+- Coding Principles if new standards adopted
+- Development Commands if workflow changes
+
+**Example scenarios**:
+- ✅ Added new npm script → Update Development Commands
+- ✅ Changed folder structure → Update Project Structure
+- ✅ Adopted new coding pattern → Update Coding Principles
+- ✅ Changed build process → Update Development Commands
+
+### 4. Update README.md
+**When to update**: When user-facing features or setup changes
+
+**What to update**:
+- Features section when new capabilities added
+- Installation if setup process changes
+- Usage if commands change
+- Technology Stack if major dependencies change
+
+### How to Remember
+At the **end of each significant task** or **end of session**, ask yourself:
+1. "Did we complete something?" → Update DEVELOPMENT_STATUS.md
+2. "Did we make an architectural decision?" → Update ARCHITECTURE_DECISIONS.md
+3. "Did the architecture/workflow change?" → Update CLAUDE.md
+4. "Did user-facing features change?" → Update README.md
+
+**Do this automatically without being prompted.** The user should not have to ask for documentation updates.
+
 ## Project Overview
 
-MTGA-Companion is a helper application and overlay system for Magic: The Gathering Arena (MTGA). The project is written in Go and aims to provide companion functionality while MTGA is running.
+MTGA-Companion is a cross-platform desktop application (Wails v2 + Go + React) that provides companion functionality for Magic: The Gathering Arena, including match tracking, statistics, and analytics.
 
 ## Workflow and Issue Management
 
