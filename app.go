@@ -71,7 +71,9 @@ func (a *App) shutdown(ctx context.Context) {
 
 	// Close database
 	if a.service != nil {
-		a.service.Close()
+		if err := a.service.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
 	}
 }
 
@@ -179,17 +181,18 @@ func getMTGALogPath() (string, error) {
 	}
 
 	var logPath string
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		// macOS
 		logPath = filepath.Join(home, "Library", "Application Support", "com.wizards.mtga", "Logs", "Logs")
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		// Windows
 		appData := os.Getenv("APPDATA")
 		if appData == "" {
 			appData = filepath.Join(home, "AppData", "Roaming")
 		}
 		logPath = filepath.Join(appData, "Wizards of the Coast", "MTGA", "Logs")
-	} else {
+	default:
 		return "", &AppError{Message: "Unsupported platform for MTGA log detection"}
 	}
 

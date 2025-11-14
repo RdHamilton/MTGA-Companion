@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -1048,7 +1049,11 @@ func (r *matchRepository) GetMatchesWithoutDeckID(ctx context.Context) ([]*model
 	if err != nil {
 		return nil, fmt.Errorf("failed to query matches: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var matches []*models.Match
 	for rows.Next() {
