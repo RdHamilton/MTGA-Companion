@@ -13,6 +13,8 @@ const MatchHistory = () => {
 
   // Filters
   const [dateRange, setDateRange] = useState('7days');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [format, setFormat] = useState('all');
   const [result, setResult] = useState('all');
 
@@ -26,7 +28,7 @@ const MatchHistory = () => {
 
   useEffect(() => {
     loadMatches();
-  }, [dateRange, format, result]);
+  }, [dateRange, customStartDate, customEndDate, format, result]);
 
   const loadMatches = async () => {
     try {
@@ -37,7 +39,19 @@ const MatchHistory = () => {
       const filter = new models.StatsFilter();
 
       // Date range
-      if (dateRange !== 'all') {
+      if (dateRange === 'custom') {
+        // Use custom date range if provided
+        if (customStartDate) {
+          const start = new Date(customStartDate);
+          start.setHours(0, 0, 0, 0);
+          filter.StartDate = start.toISOString();
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate);
+          end.setHours(23, 59, 59, 999);
+          filter.EndDate = end.toISOString();
+        }
+      } else if (dateRange !== 'all') {
         const now = new Date();
         const start = new Date();
 
@@ -160,8 +174,31 @@ const MatchHistory = () => {
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
               <option value="all">All Time</option>
+              <option value="custom">Custom Range</option>
             </select>
           </div>
+
+          {dateRange === 'custom' && (
+            <>
+              <div className="filter-group">
+                <label className="filter-label">Start Date</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </div>
+
+              <div className="filter-group">
+                <label className="filter-label">End Date</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           <div className="filter-group">
             <label className="filter-label">Format</label>
