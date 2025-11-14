@@ -68,17 +68,8 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 	// Store the update function so other methods can use it
 	d.updateChart = updateChart
 
-	// Show loading placeholder initially, load chart asynchronously
-	loadingLabel := widget.NewLabel("Loading chart data...")
-	chartContainer.Objects = []fyne.CanvasObject{
-		container.NewCenter(loadingLabel),
-	}
-
-	// Load chart asynchronously after view is created
-	go func() {
-		time.Sleep(100 * time.Millisecond) // Small delay to let UI render
-		updateChart()
-	}()
+	// Initial chart render
+	updateChart()
 
 	// Layout
 	return container.NewBorder(
@@ -184,6 +175,12 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 
 // createChartView creates the chart visualization based on current filters.
 func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
+	// Validate that we have date range
+	if d.startDate == nil || d.endDate == nil {
+		return d.app.NoDataView("No Date Range Selected",
+			"Please select a date range to view trend data.")
+	}
+
 	// Determine format filter
 	var formatFilter *string
 	if d.format != "all" {
