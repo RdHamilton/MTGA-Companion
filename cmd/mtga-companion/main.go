@@ -339,6 +339,75 @@ func main() {
 	arenaStats, _ := logreader.ParseArenaStats(entries)
 	deckLibrary, _ := logreader.ParseDecks(entries)
 
+	// Store decks in database
+	if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
+		fmt.Printf("Storing %d deck(s) in database...\n", len(deckLibrary.Decks))
+		storedCount := 0
+		for _, deck := range deckLibrary.Decks {
+			// Convert logreader.DeckCard to the anonymous struct format
+			mainDeck := make([]struct {
+				CardID   int
+				Quantity int
+			}, len(deck.MainDeck))
+			for i, card := range deck.MainDeck {
+				mainDeck[i].CardID = card.CardID
+				mainDeck[i].Quantity = card.Quantity
+			}
+
+			sideboard := make([]struct {
+				CardID   int
+				Quantity int
+			}, len(deck.Sideboard))
+			for i, card := range deck.Sideboard {
+				sideboard[i].CardID = card.CardID
+				sideboard[i].Quantity = card.Quantity
+			}
+
+			// Use Modified time as Created if Created is zero
+			created := deck.Created
+			if created.IsZero() && !deck.Modified.IsZero() {
+				created = deck.Modified
+			} else if created.IsZero() {
+				created = time.Now()
+			}
+
+			modified := deck.Modified
+			if modified.IsZero() {
+				modified = time.Now()
+			}
+
+			err := service.StoreDeckFromParser(
+				ctx,
+				deck.DeckID,
+				deck.Name,
+				deck.Format,
+				deck.Description,
+				created,
+				modified,
+				deck.LastPlayed,
+				mainDeck,
+				sideboard,
+			)
+			if err != nil {
+				log.Printf("Warning: Failed to store deck %s (%s): %v", deck.Name, deck.DeckID, err)
+			} else {
+				storedCount++
+			}
+		}
+		fmt.Printf("Successfully stored %d/%d deck(s).\n", storedCount, len(deckLibrary.Decks))
+
+		// After storing decks, try to infer deck IDs for matches based on timestamps
+		fmt.Println("Inferring deck IDs for matches based on timestamps...")
+		inferredCount, err := service.InferDeckIDsForMatches(ctx)
+		if err != nil {
+			log.Printf("Warning: Failed to infer deck IDs: %v", err)
+		} else if inferredCount > 0 {
+			fmt.Printf("Successfully linked %d match(es) to decks.\n", inferredCount)
+		} else {
+			fmt.Println("No matches could be linked to decks (timestamps too far apart).")
+		}
+	}
+
 	// Store arena stats persistently (with deduplication)
 	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
 		fmt.Println("Storing statistics in database...")

@@ -69,7 +69,7 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	}
 
 	// Format filter
-	formatOptions := []string{"All Formats", "Play", "Ladder", "constructed", "limited", "draft", "sealed"}
+	formatOptions := []string{"All Formats", "Constructed", "Limited", "Draft", "Sealed"}
 	v.formatSelect = widget.NewSelect(formatOptions, func(selected string) {
 		v.filterMatches()
 		v.currentPage = 0
@@ -129,33 +129,34 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		v.exportMatches()
 	})
 
-	// Refresh button
-	refreshBtn := widget.NewButton("Refresh", func() {
-		v.loadMatches()
-		v.filterMatches()
-		v.refreshList()
-	})
-
 	// Status label
 	v.statusLabel = widget.NewLabel("")
 	v.updateStatusLabel()
 
-	// Create column headers
-	headers := container.NewHBox(
-		widget.NewLabelWithStyle("Result", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Date/Time", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Event", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Score", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Opponent", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+	// Create column headers with fixed widths for alignment
+	resultHeader := widget.NewLabelWithStyle("Result", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	dateHeader := widget.NewLabelWithStyle("Date/Time", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	eventHeader := widget.NewLabelWithStyle("Event", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	scoreHeader := widget.NewLabelWithStyle("Score", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	opponentHeader := widget.NewLabelWithStyle("Opponent", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+
+	headers := container.New(
+		layout.NewGridLayout(5),
+		resultHeader,
+		dateHeader,
+		eventHeader,
+		scoreHeader,
+		opponentHeader,
 	)
 
-	// Create match list
+	// Create match list with matching grid layout
 	v.matchList = widget.NewList(
 		func() int {
 			return v.getPageMatchCount()
 		},
 		func() fyne.CanvasObject {
-			return container.NewHBox(
+			return container.New(
+				layout.NewGridLayout(5),
 				widget.NewLabel("W"),
 				widget.NewLabel("2025-11-10 15:04"),
 				widget.NewLabel("Event Name Here"),
@@ -233,34 +234,39 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		prevBtn,
 		v.pageLabel,
 		nextBtn,
+		layout.NewSpacer(),
+		exportBtn,
 	)
 
 	// Layout: filters at top, list in middle, pagination at bottom
-	// Use more compact labels for better spacing
 	// Combine date entries with calendar picker buttons
 	startDateBox := container.NewBorder(nil, nil, nil, startPickerBtn, v.startDateEntry)
 	endDateBox := container.NewBorder(nil, nil, nil, endPickerBtn, v.endDateEntry)
 
+	// Use a more compact 4-column layout for better control
 	filterGrid := container.New(
-		layout.NewGridLayout(2),
-		widget.NewLabel("Format"),
+		layout.NewGridLayout(4),
+		// Row 1
+		widget.NewLabel("Format:"),
 		v.formatSelect,
-		widget.NewLabel("Result"),
+		widget.NewLabel("Result:"),
 		v.resultSelect,
-		widget.NewLabel("Opponent"),
+		// Row 2
+		widget.NewLabel("Opponent:"),
 		v.opponentSelect,
-		widget.NewLabel("From"),
+		widget.NewLabel("From:"),
 		startDateBox,
-		widget.NewLabel("To"),
+		// Row 3 - need fillers for alignment
+		widget.NewLabel(""),
+		widget.NewLabel(""),
+		widget.NewLabel("To:"),
 		endDateBox,
 	)
 
 	filterButtons := container.NewHBox(
+		layout.NewSpacer(),
 		dateApplyBtn,
 		dateClearBtn,
-		layout.NewSpacer(),
-		exportBtn,
-		refreshBtn,
 	)
 
 	filtersSection := container.NewVBox(
@@ -268,7 +274,9 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		widget.NewSeparator(),
 		v.searchEntry,
 		filterGrid,
+		widget.NewSeparator(),
 		filterButtons,
+		widget.NewSeparator(),
 		v.statusLabel,
 		widget.NewSeparator(),
 	)
@@ -281,6 +289,9 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		nil,
 		container.NewScroll(v.matchList),
 	)
+
+	// Now that opponent select is created, populate it with actual opponents
+	v.updateOpponentFilter()
 
 	return container.NewBorder(
 		container.NewPadded(filtersSection),
@@ -329,14 +340,15 @@ func (v *MatchHistoryViewer) filterMatches() {
 	var startDate, endDate *time.Time
 	if v.startDateEntry.Text != "" {
 		if t, err := time.Parse("2006-01-02", v.startDateEntry.Text); err == nil {
+			// Start of day (00:00:00)
 			startDate = &t
 		}
 	}
 	if v.endDateEntry.Text != "" {
 		if t, err := time.Parse("2006-01-02", v.endDateEntry.Text); err == nil {
-			// Set to end of day
-			t = t.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-			endDate = &t
+			// End of day (23:59:59.999)
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			endDate = &endOfDay
 		}
 	}
 
@@ -356,10 +368,31 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 		// Format filter
 		if formatFilter != "All Formats" {
-			// Map user-facing format names to database values
-			// Ladder and Play both map to "constructed"
-			mappedFormat := v.mapFormat(formatFilter)
-			if match.Format != mappedFormat {
+			matchFound := false
+			eventName := strings.ToLower(match.EventName)
+
+			switch formatFilter {
+			case "Constructed":
+				// Constructed includes: Play, Ladder, Ranked, Standard, Historic, Explorer, Alchemy, Timeless
+				if !strings.Contains(eventName, "draft") && !strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			case "Limited":
+				// Limited includes: Draft and Sealed
+				if strings.Contains(eventName, "draft") || strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			case "Draft":
+				if strings.Contains(eventName, "draft") {
+					matchFound = true
+				}
+			case "Sealed":
+				if strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			}
+
+			if !matchFound {
 				continue
 			}
 		}
@@ -371,11 +404,12 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 		// Opponent filter
 		if opponentFilter != "All Opponents" {
-			matchOpponent := "Unknown"
-			if match.OpponentName != nil {
+			matchOpponent := ""
+			if match.OpponentName != nil && *match.OpponentName != "" {
 				matchOpponent = *match.OpponentName
 			}
-			if matchOpponent != opponentFilter {
+			// Skip this match if it doesn't have a valid opponent name or doesn't match filter
+			if matchOpponent == "" || matchOpponent != opponentFilter {
 				continue
 			}
 		}
@@ -393,17 +427,6 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 	v.calculatePagination()
 	v.updateStatusLabel()
-}
-
-// mapFormat maps user-facing format names to database format values.
-// Ladder and Play both map to "constructed" format.
-func (v *MatchHistoryViewer) mapFormat(format string) string {
-	switch format {
-	case "Ladder", "Play":
-		return "constructed"
-	default:
-		return format
-	}
 }
 
 // calculatePagination calculates pagination parameters.
@@ -581,14 +604,18 @@ func (v *MatchHistoryViewer) exportMatches() {
 
 // updateOpponentFilter updates the opponent dropdown with unique opponents from matches.
 func (v *MatchHistoryViewer) updateOpponentFilter() {
+	// Skip if opponent select hasn't been created yet (during initialization)
+	if v.opponentSelect == nil {
+		return
+	}
+
 	// Collect unique opponents
 	opponentSet := make(map[string]bool)
 	for _, match := range v.allMatches {
 		if match.OpponentName != nil && *match.OpponentName != "" {
 			opponentSet[*match.OpponentName] = true
-		} else {
-			opponentSet["Unknown"] = true
 		}
+		// Don't add "Unknown" to the list - only show actual opponent names
 	}
 
 	// Convert to sorted list
@@ -634,22 +661,27 @@ func (v *MatchHistoryViewer) showDatePickerDialog(title string, targetEntry *wid
 		selectedDate = time.Now()
 	}
 
-	// Create calendar widget
+	// Variable to hold the dialog reference
+	var confirmDialog dialog.Dialog
+
+	// Create calendar widget with auto-select on click
 	calendar := widget.NewCalendar(selectedDate, func(t time.Time) {
 		selectedDate = t
+		// Auto-select on date click - apply and close the dialog
+		targetEntry.SetText(selectedDate.Format("2006-01-02"))
+		if confirmDialog != nil {
+			confirmDialog.Hide()
+		}
 	})
 
-	// Create dialog with calendar and buttons
+	// Create dialog with calendar
 	content := container.NewVBox(
-		calendar,
+		widget.NewLabel("Click a date to select"),
 		widget.NewSeparator(),
+		calendar,
 	)
 
-	confirmDialog := dialog.NewCustomConfirm(title, "Select", "Cancel", content, func(confirmed bool) {
-		if confirmed {
-			targetEntry.SetText(selectedDate.Format("2006-01-02"))
-		}
-	}, v.app.window)
+	confirmDialog = dialog.NewCustom(title, "Cancel", content, v.app.window)
 
 	confirmDialog.Resize(fyne.NewSize(400, 500))
 	confirmDialog.Show()

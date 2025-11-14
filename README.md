@@ -1,17 +1,33 @@
 # MTGA-Companion
 
-A companion application and overlay system for Magic: The Gathering Arena (MTGA). This tool helps enhance your MTGA experience by reading and analyzing game data from MTGA's log files.
+A modern desktop companion application for Magic: The Gathering Arena (MTGA). Track your matches, analyze your performance, and enhance your MTGA experience with real-time statistics and insights.
 
 ## Features
 
-- **Log Reading**: Automatically locates and reads MTGA Player.log files on both macOS and Windows
-- **JSON Parsing**: Parses JSON game events from the log file for analysis
-- **Draft Tracking**: Record and analyze all your draft picks
-- **Statistics**: Comprehensive win rate tracking and analytics
-- **Export System**: Export your data in CSV or JSON formats
-- **Card Data Integration**: 17Lands draft statistics and Scryfall metadata
+### Desktop GUI
+- **Modern Interface**: Cross-platform desktop application with React UI
+- **Real-Time Updates**: Live statistics while you play MTGA
+- **Dark Theme**: Easy on the eyes during long gaming sessions
+- **Responsive Design**: Adapts to different window sizes
+
+### Match Tracking & Analytics
+- **Match History**: View all your matches with filtering and sorting
+- **Win Rate Trends**: Visualize performance over time
+- **Deck Performance**: Track win rates by deck
+- **Format Distribution**: See your play patterns across formats
+- **Result Breakdown**: Detailed statistics by format and time period
+
+### Data Management
+- **Log Reading**: Automatically locates and reads MTGA Player.log files
+- **Auto-Detection**: Cross-platform support for macOS and Windows log locations
+- **Real-Time Monitoring**: Poll-based log watching for instant updates
 - **Database Storage**: Local SQLite database with migration support
-- **Cross-Platform**: Works on both Mac and PC where MTGA is supported
+- **Export System**: Export statistics in CSV or JSON formats
+
+### Draft Support
+- **Draft Tracking**: Record and analyze all your draft picks
+- **Card Data Integration**: 17Lands draft statistics and Scryfall metadata
+- **Draft Overlay**: In-game overlay with pick recommendations (CLI mode)
 
 ## Documentation
 
@@ -58,79 +74,69 @@ Detailed logging allows MTG Arena to output game events and data in JSON format 
 
 ## Installation
 
-### Option 1: Download Pre-built Binary (Recommended)
+### Quick Start (Recommended)
 
 Download the latest release for your platform from the [Releases page](https://github.com/RdHamilton/MTGA-Companion/releases):
 
 #### Windows
 
-1. Download `mtga-companion-windows-amd64.zip`
-2. Extract the ZIP file to a folder of your choice (e.g., `C:\Program Files\MTGA-Companion\`)
-3. Run `mtga-companion.exe` to launch the application
-4. **(Optional)** Right-click `mtga-companion.exe` → "Send to" → "Desktop (create shortcut)" for easy access
+1. Download `MTGA-Companion-windows-amd64.exe`
+2. Run the executable - no installation required!
+3. **(Optional)** Create a shortcut to your desktop or taskbar
+
+**First Run**: Windows may show a security warning. Click "More info" → "Run anyway"
 
 #### macOS
 
-1. Download `mtga-companion-macos-universal.tar.gz`
-2. Extract the archive (double-click in Finder)
-3. Drag `MTGA Companion.app` to your Applications folder
-4. **First launch**: Right-click the app → "Open" (to bypass Gatekeeper since the app is not code-signed)
-5. Subsequent launches: Double-click the app normally
+1. Download `MTGA-Companion.app.zip`
+2. Extract and drag `MTGA-Companion.app` to your Applications folder
+3. **First launch**: Right-click the app → "Open" (to bypass Gatekeeper)
+4. Grant permissions if macOS requests access to files
 
-**Note**: You may need to grant permissions in System Preferences → Security & Privacy if macOS blocks the app.
+**Subsequent launches**: Double-click the app normally
 
 #### Linux
 
-1. Download `mtga-companion-linux-amd64.tar.gz`
-2. Extract the archive:
+1. Download `MTGA-Companion-linux-amd64`
+2. Make executable and run:
    ```bash
-   tar -xzf mtga-companion-linux-amd64.tar.gz
-   ```
-3. Make the binary executable:
-   ```bash
-   chmod +x mtga-companion
-   ```
-4. Run the application:
-   ```bash
-   ./mtga-companion
-   ```
-5. **(Optional)** Move to system path for global access:
-   ```bash
-   sudo mv mtga-companion /usr/local/bin/
+   chmod +x MTGA-Companion-linux-amd64
+   ./MTGA-Companion-linux-amd64
    ```
 
-### Option 2: Build From Source
+### Build From Source
 
-If you want to build the application yourself or contribute to development:
+**Prerequisites**:
+- [Go 1.23+](https://go.dev/dl/)
+- [Node.js 20+](https://nodejs.org/) (for frontend)
+- [Wails CLI](https://wails.io/docs/gettingstarted/installation)
 
-1. **Prerequisites**: Install [Go 1.22+](https://go.dev/dl/)
+**Install Wails**:
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/RdHamilton/MTGA-Companion.git
-   cd MTGA-Companion
-   ```
+**Clone and Build**:
+```bash
+# Clone repository
+git clone https://github.com/RdHamilton/MTGA-Companion.git
+cd MTGA-Companion
 
-3. Build the application:
-   ```bash
-   go build -o bin/mtga-companion ./cmd/mtga-companion
-   ```
+# Install frontend dependencies
+cd frontend
+npm install
+cd ..
 
-   Or use the development script:
-   ```bash
-   ./scripts/dev.sh build
-   ```
+# Build with Wails
+wails build
 
-4. Run the application:
-   ```bash
-   ./bin/mtga-companion
-   ```
+# Built app will be in build/bin/
+```
 
-5. **(Optional)** Create a distribution package:
-   ```bash
-   ./scripts/package.sh
-   ```
-   Packaged files will be in the `dist/` directory.
+**Development Mode** (with hot reload):
+```bash
+wails dev
+```
 
 ## Player.log File Locations
 
@@ -172,16 +178,55 @@ The overlay and tracking features continue working seamlessly during and after l
 
 ## Usage
 
-Run the companion app after ensuring detailed logging is enabled in MTGA:
+### GUI Application
 
-```bash
-./bin/mtga-companion
-```
+Launch the MTGA Companion desktop app:
+
+**Windows**: Double-click `MTGA-Companion.exe`
+**macOS**: Double-click `MTGA-Companion.app` from Applications
+**Linux**: Run `./MTGA-Companion-linux-amd64`
 
 The application will:
-1. Locate your Player.log file
-2. Read and parse JSON entries
-3. Display information about the log contents
+1. Automatically locate your MTGA Player.log file
+2. Initialize the database (first run creates `~/.mtga-companion/data.db`)
+3. Start monitoring the log file for new matches
+4. Display your statistics and match history in real-time
+
+### Navigation
+
+- **Match History**: View and filter all your matches
+- **Charts**: Visualize your performance data
+  - Win Rate Trend: Performance over time
+  - Deck Performance: Win rates by deck
+  - Rank Progression: Track your ladder climbing
+  - Format Distribution: Play patterns across formats
+  - Result Breakdown: Detailed statistics
+- **Settings**: Configure database path and other options
+
+### Real-Time Updates
+
+While MTGA is running and you're playing games:
+- New matches are automatically detected and added
+- Statistics update in real-time
+- Footer shows at-a-glance stats (total matches, win rate, streak)
+- Toast notifications confirm when data is updated
+
+### CLI Mode (Advanced)
+
+The CLI is still available for automation and advanced users:
+
+```bash
+# Read log and display basic info
+./mtga-companion read
+
+# Export statistics
+./mtga-companion export stats -json
+
+# Run draft overlay
+./mtga-companion -draft-overlay-mode
+```
+
+See the [CLI Commands Wiki](https://github.com/RdHamilton/MTGA-Companion/wiki/CLI-Commands) for complete reference.
 
 ## Development
 
@@ -189,20 +234,46 @@ The application will:
 
 ```
 MTGA-Companion/
-├── cmd/
-│   └── mtga-companion/      # Application entry point
-├── internal/
-│   └── mtga/
-│       └── logreader/       # Log reading and parsing logic
-├── pkg/                     # Public libraries (future)
-├── scripts/                 # Development and testing scripts
+├── main.go                  # Wails entry point
+├── app.go                   # Go backend API for frontend
+├── frontend/                # React + TypeScript frontend
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/          # Page components (routes)
+│   │   ├── App.tsx         # Root component
+│   │   └── main.tsx        # Frontend entry point
+│   ├── wailsjs/            # Auto-generated Wails bindings
+│   ├── package.json
+│   └── vite.config.ts
+├── internal/                # Private application code
+│   ├── gui/                # GUI-specific backend code
+│   ├── mtga/               # MTGA-specific logic
+│   │   ├── logreader/     # Log parsing
+│   │   └── draft/         # Draft overlay
+│   └── storage/            # Database and persistence
+│       ├── models/        # Data models
+│       └── repository/    # Data access layer
+├── cmd/                     # CLI application (legacy)
+│   └── mtga-companion/
+├── scripts/                 # Development scripts
 └── CLAUDE.md               # AI assistant guidance
 ```
 
 ### Development Workflow
 
-Use the provided scripts for common development tasks:
+**Wails Development**:
+```bash
+# Run in development mode with hot reload
+wails dev
 
+# Build production version
+wails build
+
+# Generate Go ↔ TypeScript bindings (after changing app.go)
+wails generate module
+```
+
+**Go Development** (backend):
 ```bash
 # Format, lint, and build
 ./scripts/dev.sh
@@ -218,8 +289,28 @@ Use the provided scripts for common development tasks:
 ./scripts/test.sh coverage # Generate coverage report
 ```
 
+**Frontend Development**:
+```bash
+# Install dependencies
+cd frontend
+npm install
+
+# Run frontend dev server (standalone)
+npm run dev
+
+# Build frontend for production
+npm run build
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+```
+
 ### Running Tests
 
+**Go Tests**:
 ```bash
 # Run all tests
 go test ./...
@@ -230,6 +321,12 @@ go tool cover -html=coverage.out
 
 # Run tests with race detection
 go test -race ./...
+```
+
+**Frontend Tests** (when added):
+```bash
+cd frontend
+npm test
 ```
 
 ## Troubleshooting
@@ -252,29 +349,41 @@ Ensure you have read permissions for the MTGA log directory. Try running as admi
 
 ## Technology Stack
 
-MTGA-Companion is built with:
+MTGA-Companion is built with modern technologies for performance and cross-platform compatibility:
 
-### Core Technologies
+### Desktop Application
+
+- **[Wails v2](https://wails.io/)** - Go + Web frontend framework for desktop apps
+  - Native webview (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux)
+  - No Electron overhead - smaller binary, faster startup
+  - Type-safe Go ↔ JavaScript bindings
+
+### Backend (Go)
 
 - **[Go 1.23+](https://go.dev/)** - Programming language
 - **[SQLite 3](https://www.sqlite.org/)** - Local database storage
-- **[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)** - Pure Go SQLite driver
-
-### Libraries & Tools
-
+- **[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)** - Pure Go SQLite driver (no CGo required)
 - **[golang-migrate/migrate](https://github.com/golang-migrate/migrate)** - Database migration management
 - **[fsnotify](https://github.com/fsnotify/fsnotify)** - Cross-platform file system notifications
+
+### Frontend (React + TypeScript)
+
+- **[React 18](https://react.dev/)** - UI library with hooks
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
+- **[React Router](https://reactrouter.com/)** - Client-side routing
+- **[Recharts](https://recharts.org/)** - Data visualization and charting library
+- **[Vite](https://vite.dev/)** - Fast build tool and dev server
 
 ### Data Sources
 
 - **[17Lands](https://www.17lands.com/)** - Draft statistics and card ratings
 - **[Scryfall](https://scryfall.com/)** - Card metadata and images
 
-### Future/In Development
+### Legacy CLI
 
-- **[Fyne](https://fyne.io/)** - GUI framework (in development)
+- **[Fyne](https://fyne.io/)** - GUI framework for draft overlay (CLI mode only)
 
-For a complete list of dependencies, see [`go.mod`](go.mod).
+For a complete list of dependencies, see [`go.mod`](go.mod) and [`frontend/package.json`](frontend/package.json).
 
 ## Contributing
 

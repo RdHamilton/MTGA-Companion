@@ -3,16 +3,17 @@ package gui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // WinRateDashboard manages the win rate charts view with filtering and export.
@@ -68,16 +69,20 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 	// Store the update function so other methods can use it
 	d.updateChart = updateChart
 
-	// Show loading placeholder initially, load chart asynchronously
+	// Show loading placeholder initially
 	loadingLabel := widget.NewLabel("Loading chart data...")
 	chartContainer.Objects = []fyne.CanvasObject{
 		container.NewCenter(loadingLabel),
 	}
 
-	// Load chart asynchronously after view is created
+	// Load chart asynchronously
 	go func() {
-		time.Sleep(100 * time.Millisecond) // Small delay to let UI render
-		updateChart()
+		// Run the query in background
+		chartView := d.createChartView()
+
+		// Update UI on main thread
+		chartContainer.Objects = []fyne.CanvasObject{chartView}
+		chartContainer.Refresh()
 	}()
 
 	// Layout
@@ -86,7 +91,7 @@ func (d *WinRateDashboard) CreateView() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		container.NewScroll(container.NewPadded(chartContainer)),
+		container.NewScroll(chartContainer),
 	)
 }
 
@@ -135,16 +140,12 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 	dateRangeSelect.Selected = "Last 7 Days"
 	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
-	// Format selector
+	// Format selector (simplified to match actual database values)
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	formatSelect := widget.NewSelect(
-		[]string{"All Formats", "Constructed", "Limited", "Standard", "Historic", "Alchemy", "Explorer", "Timeless"},
+		[]string{"All Formats", "Constructed", "Limited"},
 		func(selected string) {
-			if selected == "All Formats" {
-				d.format = "all"
-			} else {
-				d.format = selected
-			}
+			d.format = selected
 			if d.updateChart != nil {
 				d.updateChart()
 			}
@@ -184,14 +185,28 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 
 // createChartView creates the chart visualization based on current filters.
 func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
-	// Determine format filter
-	var formatFilter *string
-	if d.format != "all" {
-		formatFilter = &d.format
+	// Validate that we have date range
+	if d.startDate == nil || d.endDate == nil {
+		return d.app.NoDataView("No Date Range Selected",
+			"Please select a date range to view trend data.")
 	}
 
-	// Get trend data
-	analysis, err := d.service.GetTrendAnalysis(d.ctx, *d.startDate, *d.endDate, d.periodType, formatFilter)
+	// Map user-friendly format names to actual database values
+	var formatFilter []string
+	switch d.format {
+	case "Constructed":
+		// Constructed formats: Ladder (ranked) and Play (unranked)
+		formatFilter = []string{"Ladder", "Play"}
+	case "Limited":
+		// Limited formats: Any event containing Draft or Sealed
+		// Query database for all draft/sealed format values
+		formatFilter = d.getLimitedFormats()
+	case "All Formats":
+		// No filter
+	}
+
+	// Get trend data using format array
+	analysis, err := d.service.GetTrendAnalysisWithFormats(d.ctx, *d.startDate, *d.endDate, d.periodType, formatFilter)
 	if err != nil {
 		return d.app.ErrorView("Error Loading Trend Data", err, nil)
 	}
@@ -210,10 +225,10 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 		}
 	}
 
-	// Create chart config
+	// Create chart config (no title - it's in the summary below)
 	config := charts.DefaultFyneChartConfig()
-	config.Title = d.getChartTitle()
-	config.Width = 900
+	config.Title = "" // Remove title from chart, show in summary instead
+	config.Width = 1200
 	config.Height = 500
 
 	// Create chart based on type
@@ -227,77 +242,67 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	// Create summary
 	summary := d.createSummary(analysis)
 
-	// Export button (smaller, below chart)
+	// Export button (below chart, right-aligned)
 	exportButton := widget.NewButton("Export as PNG", func() {
 		d.exportChart()
 	})
 	AddButtonTooltip(exportButton, TooltipExport)
 
-	// Layout
-	return container.NewVBox(
-		chart,
-		widget.NewSeparator(),
-		summary,
-		widget.NewSeparator(),
-		container.NewHBox(
-			layout.NewSpacer(),
-			exportButton,
+	// Create bottom row with padding
+	bottomRow := container.NewPadded(
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			exportButton, // Right side
+			summary,      // Center/Left
 		),
+	)
+
+	// Wrap chart in a Stack container with explicit size to force VBox to respect it
+	chartContainer := container.NewStack(chart)
+	chartContainer.Resize(fyne.NewSize(config.Width, config.Height))
+
+	// Layout: chart on top, separator, then summary row below
+	return container.NewVBox(
+		chartContainer,
+		widget.NewSeparator(),
+		bottomRow,
 	)
 }
 
 // createSummary creates the summary information display.
 func (d *WinRateDashboard) createSummary(analysis *storage.TrendAnalysis) fyne.CanvasObject {
-	summaryContent := fmt.Sprintf(`### Win Rate Trend Analysis
+	// Build summary text on ONE line, separated by " | "
+	summaryParts := []string{
+		"Win Rate Trend Analysis",
+		fmt.Sprintf("Period: %s to %s", d.startDate.Format("2006-01-02"), d.endDate.Format("2006-01-02")),
+		fmt.Sprintf("Format: %s", d.getFormatDisplayName()),
+	}
 
-**Period**: %s to %s
-**Format**: %s
-**Trend**: %s`,
-		d.startDate.Format("2006-01-02"),
-		d.endDate.Format("2006-01-02"),
-		d.getFormatDisplayName(),
-		analysis.Trend,
-	)
-
+	// Add trend with value if available
+	trendText := fmt.Sprintf("Trend: %s", analysis.Trend)
 	if analysis.TrendValue != 0 {
-		summaryContent += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
+		// TrendValue is stored as decimal (0-1), multiply by 100 for percentage
+		trendText += fmt.Sprintf(" (%+.1f%%)", analysis.TrendValue*100)
 	}
+	summaryParts = append(summaryParts, trendText)
 
+	// Add overall win rate if available
 	if analysis.Overall != nil {
-		summaryContent += fmt.Sprintf(`
-**Overall Win Rate**: %.1f%% (%d matches)`,
-			analysis.Overall.WinRate,
-			analysis.Overall.TotalMatches,
-		)
+		// WinRate is stored as decimal (0-1), multiply by 100 for percentage
+		summaryParts = append(summaryParts,
+			fmt.Sprintf("Overall Win Rate: %.1f%% (%d matches)",
+				analysis.Overall.WinRate*100,
+				analysis.Overall.TotalMatches))
 	}
 
-	return widget.NewRichTextFromMarkdown(summaryContent)
-}
+	// Join all parts with " | " to make single line
+	summaryText := strings.Join(summaryParts, " | ")
+	label := widget.NewLabel(summaryText)
+	label.Wrapping = fyne.TextWrapOff
 
-// getChartTitle returns the appropriate chart title based on current filters.
-func (d *WinRateDashboard) getChartTitle() string {
-	title := "Win Rate Trend"
-
-	// Add format if filtered
-	if d.format != "all" {
-		title += fmt.Sprintf(" - %s", d.format)
-	}
-
-	// Add date range
-	switch d.dateRange {
-	case "7days":
-		title += " (Last 7 Days)"
-	case "30days":
-		title += " (Last 30 Days)"
-	case "90days":
-		title += " (Last 90 Days)"
-	case "alltime":
-		title += " (All Time)"
-	case "custom":
-		title += " (Custom Range)"
-	}
-
-	return title
+	return label
 }
 
 // getFormatDisplayName returns the display name for the current format filter.
@@ -409,4 +414,28 @@ func (d *WinRateDashboard) getDateRangeDescription() string {
 		return "All Time"
 	}
 	return fmt.Sprintf("%s to %s", d.startDate.Format("2006-01-02"), d.endDate.Format("2006-01-02"))
+}
+
+// getLimitedFormats queries the database for all draft/sealed format values.
+func (d *WinRateDashboard) getLimitedFormats() []string {
+	// Query for all distinct format values that contain "Draft" or "Sealed"
+	filter := models.StatsFilter{}
+	matches, err := d.service.GetMatches(d.ctx, filter)
+	if err != nil {
+		return []string{}
+	}
+
+	formatMap := make(map[string]bool)
+	for _, match := range matches {
+		formatLower := strings.ToLower(match.Format)
+		if strings.Contains(formatLower, "draft") || strings.Contains(formatLower, "sealed") {
+			formatMap[match.Format] = true
+		}
+	}
+
+	formats := make([]string, 0, len(formatMap))
+	for format := range formatMap {
+		formats = append(formats, format)
+	}
+	return formats
 }

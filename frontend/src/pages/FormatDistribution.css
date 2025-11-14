@@ -1,0 +1,89 @@
+.format-distribution-header {
+  flex-shrink: 0;
+}
+
+.format-count {
+  margin-bottom: 12px;
+  color: #aaaaaa;
+  font-size: 14px;
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.format-card {
+  background-color: #2d2d2d;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #3d3d3d;
+  transition: all 0.2s;
+}
+
+.format-card:hover {
+  border-color: #4a9eff;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.1);
+}
+
+.format-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.format-name {
+  margin: 0;
+  color: #4a9eff;
+  font-size: 18px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.format-color-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.format-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.stat:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.stat-value.win-rate {
+  color: #4a9eff;
+  font-size: 20px;
+  font-weight: 600;
+}

@@ -66,14 +66,12 @@ func (a *App) Run() {
 	})
 
 	// Create all views
-	statsView := a.createStatsView()
 	matchesView := a.createMatchesView()
 	chartsView := a.createChartsView()
 	settingsView := a.createSettingsView()
 
 	// Create tabs
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", statsView),
 		container.NewTabItem("Match History", matchesView),
 		container.NewTabItem("Charts", chartsView),
 		container.NewTabItem("Settings", settingsView),
@@ -82,7 +80,19 @@ func (a *App) Run() {
 	// Setup keyboard shortcuts
 	a.setupKeyboardShortcuts(tabs)
 
-	a.window.SetContent(tabs)
+	// Create footer with at-a-glance stats
+	footer := a.createFooter()
+
+	// Wrap tabs with footer
+	mainContent := container.NewBorder(
+		nil,    // top
+		footer, // bottom
+		nil,    // left
+		nil,    // right
+		tabs,   // center
+	)
+
+	a.window.SetContent(mainContent)
 
 	// Show the window first
 	a.window.Show()
@@ -114,19 +124,43 @@ func (a *App) createStatsView() fyne.CanvasObject {
 
 // buildStatsView builds the statistics display from stats data.
 func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
-	// Create rich text with markdown for better formatting
+	// Get additional statistics asynchronously
+	now := time.Now()
+	sevenDaysAgo := now.AddDate(0, 0, -7)
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+
+	// Recent performance (last 7 days)
+	recentStats7, _ := a.service.GetStats(a.ctx, storage.StatsFilter{
+		StartDate: &sevenDaysAgo,
+		EndDate:   &now,
+	})
+
+	// Recent performance (last 30 days)
+	recentStats30, _ := a.service.GetStats(a.ctx, storage.StatsFilter{
+		StartDate: &thirtyDaysAgo,
+		EndDate:   &now,
+	})
+
+	// Format breakdown
+	formatStats, _ := a.service.GetStatsByFormat(a.ctx, storage.StatsFilter{})
+
+	// Streak information
+	streakData, _ := a.service.GetStreakData(a.ctx, storage.StatsFilter{})
+
+	// Time pattern summary
+	timePatterns, _ := a.service.GetTimePatternSummary(a.ctx, storage.StatsFilter{})
+
+	// Build main statistics content
 	content := fmt.Sprintf(`## Overall Statistics
 
 ### Match Statistics
 - **Total Matches**: %d
-- **Wins**: %d
-- **Losses**: %d
+- **Wins**: %d | **Losses**: %d
 - **Win Rate**: %.1f%%
 
 ### Game Statistics
 - **Total Games**: %d
-- **Wins**: %d
-- **Losses**: %d
+- **Game Wins**: %d | **Game Losses**: %d
 - **Game Win Rate**: %.1f%%
 `,
 		stats.TotalMatches, stats.MatchesWon, stats.MatchesLost,
@@ -135,15 +169,109 @@ func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
 		stats.GameWinRate*100,
 	)
 
+	// Add recent performance if available
+	if recentStats7 != nil && recentStats7.TotalMatches > 0 {
+		content += fmt.Sprintf(`
+### Recent Performance (Last 7 Days)
+- **Matches**: %d (%d-%d)
+- **Win Rate**: %.1f%%
+`,
+			recentStats7.TotalMatches,
+			recentStats7.MatchesWon,
+			recentStats7.MatchesLost,
+			recentStats7.WinRate*100,
+		)
+	}
+
+	if recentStats30 != nil && recentStats30.TotalMatches > 0 {
+		content += fmt.Sprintf(`
+### Last 30 Days
+- **Matches**: %d (%d-%d)
+- **Win Rate**: %.1f%%
+`,
+			recentStats30.TotalMatches,
+			recentStats30.MatchesWon,
+			recentStats30.MatchesLost,
+			recentStats30.WinRate*100,
+		)
+	}
+
+	// Add streak information if available
+	if streakData != nil {
+		content += fmt.Sprintf(`
+### Current Streak
+- **Type**: %s streak of %d matches
+- **Longest Win Streak**: %d matches
+- **Longest Loss Streak**: %d matches
+`,
+			streakData.CurrentStreakType,
+			streakData.CurrentStreak,
+			streakData.LongestWinStreak,
+			streakData.LongestLossStreak,
+		)
+	}
+
+	// Add format breakdown if available
+	if len(formatStats) > 0 {
+		content += "\n### Performance by Format\n"
+		// Find best performing format
+		bestFormat := ""
+		bestWinRate := 0.0
+		for format, fStats := range formatStats {
+			if fStats.TotalMatches >= 3 && fStats.WinRate > bestWinRate {
+				bestFormat = format
+				bestWinRate = fStats.WinRate
+			}
+		}
+
+		for format, fStats := range formatStats {
+			if fStats.TotalMatches > 0 {
+				formatName := format
+				if format == bestFormat {
+					formatName = format + " ⭐"
+				}
+				content += fmt.Sprintf("- **%s**: %.1f%% (%d matches)\n",
+					formatName,
+					fStats.WinRate*100,
+					fStats.TotalMatches,
+				)
+			}
+		}
+	}
+
+	// Add time pattern insights if available
+	if timePatterns != nil && timePatterns.BestHourWinRate > 0 {
+		content += fmt.Sprintf(`
+### Performance Insights
+- **Best Hour**: %02d:00 (%.1f%% win rate)
+- **Best Day**: %s (%.1f%% win rate)
+- **Most Active Hour**: %02d:00
+`,
+			timePatterns.BestHour,
+			timePatterns.BestHourWinRate*100,
+			timePatterns.BestDay,
+			timePatterns.BestDayWinRate*100,
+			timePatterns.MostActiveHour,
+		)
+	}
+
 	richText := widget.NewRichTextFromMarkdown(content)
 
 	refreshBtn := widget.NewButton("Refresh Statistics", func() {
-		a.window.SetContent(container.NewAppTabs(
-			container.NewTabItem("Statistics", a.createStatsView()),
-			container.NewTabItem("Match History", a.createMatchesView()),
-			container.NewTabItem("Charts", a.createChartsView()),
-			container.NewTabItem("Settings", a.createSettingsView()),
-		))
+		// Recreate footer to update stats
+		footer := a.createFooter()
+		mainContent := container.NewBorder(
+			nil,
+			footer,
+			nil,
+			nil,
+			container.NewAppTabs(
+				container.NewTabItem("Match History", a.createMatchesView()),
+				container.NewTabItem("Charts", a.createChartsView()),
+				container.NewTabItem("Settings", a.createSettingsView()),
+			),
+		)
+		a.window.SetContent(mainContent)
 	})
 
 	// Layout: stats in center with padding, refresh button at bottom
@@ -417,4 +545,82 @@ func (a *App) rankToNumericValue(rankClass *string, rankLevel *int) float64 {
 	}
 
 	return baseValue
+}
+
+// createFooter creates a persistent footer with at-a-glance statistics.
+func (a *App) createFooter() fyne.CanvasObject {
+	// Create placeholder labels that will be updated asynchronously
+	statsLabel := widget.NewLabel("Loading stats...")
+	statsLabel.TextStyle = fyne.TextStyle{Monospace: true}
+
+	// Load stats asynchronously
+	go func() {
+		stats, err := a.service.GetStats(a.ctx, storage.StatsFilter{})
+		if err != nil {
+			statsLabel.SetText("Stats unavailable")
+			return
+		}
+
+		if stats.TotalMatches == 0 {
+			statsLabel.SetText("No matches yet - play some games to see your stats!")
+			return
+		}
+
+		// Get recent matches to determine streak
+		matches, err := a.service.GetMatches(a.ctx, storage.StatsFilter{})
+		if err != nil {
+			statsLabel.SetText("Stats unavailable")
+			return
+		}
+
+		// Calculate current streak
+		streakType := ""
+		streakCount := 0
+		if len(matches) > 0 {
+			// Matches are ordered newest first
+			lastResult := matches[0].Result
+			streakCount = 1
+			for i := 1; i < len(matches); i++ {
+				if matches[i].Result == lastResult {
+					streakCount++
+				} else {
+					break
+				}
+			}
+			if lastResult == "win" {
+				streakType = "W"
+			} else {
+				streakType = "L"
+			}
+		}
+
+		// Get last match time
+		lastMatchTime := ""
+		if len(matches) > 0 {
+			lastMatchTime = matches[0].Timestamp.Format("2006-01-02 15:04")
+		}
+
+		// Format footer stats - compact and informative
+		footerText := fmt.Sprintf("📊 Matches: %d | Win Rate: %.1f%% (%d-%d) | Streak: %s%d | Last: %s",
+			stats.TotalMatches,
+			stats.WinRate*100,
+			stats.MatchesWon,
+			stats.MatchesLost,
+			streakType,
+			streakCount,
+			lastMatchTime,
+		)
+
+		statsLabel.SetText(footerText)
+	}()
+
+	// Create footer container with padding and separator
+	return container.NewVBox(
+		widget.NewSeparator(),
+		container.NewPadded(
+			container.NewHBox(
+				statsLabel,
+			),
+		),
+	)
 }

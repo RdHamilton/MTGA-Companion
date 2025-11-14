@@ -76,7 +76,21 @@ func (s *Service) GetRankProgressionTimeline(ctx context.Context, format string,
 	}
 
 	if len(history) == 0 {
-		return nil, fmt.Errorf("no rank history found for format: %s", format)
+		// Return empty timeline instead of error to allow frontend to show user-friendly message
+		emptyTimeline := &RankTimeline{
+			Format:         format,
+			Entries:        []*RankTimelineEntry{},
+			TotalChanges:   0,
+			Milestones:     0,
+			SeasonsCovered: []int{},
+		}
+		if startDate != nil {
+			emptyTimeline.StartDate = *startDate
+		}
+		if endDate != nil {
+			emptyTimeline.EndDate = *endDate
+		}
+		return emptyTimeline, nil
 	}
 
 	// Sort by timestamp (oldest first)
