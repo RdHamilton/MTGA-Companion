@@ -42,17 +42,15 @@ const MatchHistory = () => {
       if (dateRange === 'custom') {
         // Use custom date range if provided
         if (customStartDate) {
-          const start = new Date(customStartDate);
-          start.setHours(0, 0, 0, 0);
-          filter.StartDate = start.toISOString();
+          const start = new Date(customStartDate + 'T00:00:00');
+          filter.StartDate = start;
         }
         if (customEndDate) {
           // Add 1 day to end date to make it inclusive
-          // (e.g., end date "2024-11-14" becomes "2024-11-15T00:00:00Z")
-          const end = new Date(customEndDate);
+          // (e.g., end date "2024-11-14" becomes "2024-11-15T00:00:00")
+          const end = new Date(customEndDate + 'T00:00:00');
           end.setDate(end.getDate() + 1);
-          end.setHours(0, 0, 0, 0);
-          filter.EndDate = end.toISOString();
+          filter.EndDate = end;
         }
       } else if (dateRange !== 'all') {
         const now = new Date();
@@ -77,8 +75,8 @@ const MatchHistory = () => {
         end.setDate(end.getDate() + 1);
         end.setHours(0, 0, 0, 0);
 
-        filter.StartDate = start.toISOString();
-        filter.EndDate = end.toISOString();
+        filter.StartDate = start;
+        filter.EndDate = end;
       }
 
       // Format filter
@@ -164,6 +162,17 @@ const MatchHistory = () => {
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
+  // Get today's date in YYYY-MM-DD format for max date constraint
+  const getTodayDateString = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // Get min date for end date (must be >= start date)
+  const getMinEndDate = () => {
+    return customStartDate || undefined;
+  };
+
   return (
     <div className="page-container">
       {/* Header Section - Fixed */}
@@ -190,6 +199,7 @@ const MatchHistory = () => {
                 <input
                   type="date"
                   value={customStartDate}
+                  max={getTodayDateString()}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                 />
               </div>
@@ -199,6 +209,8 @@ const MatchHistory = () => {
                 <input
                   type="date"
                   value={customEndDate}
+                  min={getMinEndDate()}
+                  max={getTodayDateString()}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                 />
               </div>
