@@ -14,6 +14,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // WinRateDashboard manages the win rate charts view with filtering and export.
@@ -140,16 +141,12 @@ func (d *WinRateDashboard) createFilterControls() fyne.CanvasObject {
 	dateRangeSelect.Selected = "Last 7 Days"
 	AddSelectTooltip(dateRangeSelect, TooltipDateRange)
 
-	// Format selector
+	// Format selector (simplified to match actual database values)
 	formatLabel := widget.NewLabelWithStyle("Format", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	formatSelect := widget.NewSelect(
-		[]string{"All Formats", "Constructed", "Limited", "Standard", "Historic", "Alchemy", "Explorer", "Timeless"},
+		[]string{"All Formats", "Constructed", "Limited"},
 		func(selected string) {
-			if selected == "All Formats" {
-				d.format = "all"
-			} else {
-				d.format = selected
-			}
+			d.format = selected
 			if d.updateChart != nil {
 				d.updateChart()
 			}
@@ -195,16 +192,22 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 			"Please select a date range to view trend data.")
 	}
 
-	// Determine format filter
-	var formatFilter *string
-	if d.format != "all" {
-		// Convert to lowercase to match database format values
-		formatLower := strings.ToLower(d.format)
-		formatFilter = &formatLower
+	// Map user-friendly format names to actual database values
+	var formatFilter []string
+	switch d.format {
+	case "Constructed":
+		// Constructed formats: Ladder (ranked) and Play (unranked)
+		formatFilter = []string{"Ladder", "Play"}
+	case "Limited":
+		// Limited formats: Any event containing Draft or Sealed
+		// Query database for all draft/sealed format values
+		formatFilter = d.getLimitedFormats()
+	case "All Formats":
+		// No filter
 	}
 
-	// Get trend data
-	analysis, err := d.service.GetTrendAnalysis(d.ctx, *d.startDate, *d.endDate, d.periodType, formatFilter)
+	// Get trend data using format array
+	analysis, err := d.service.GetTrendAnalysisWithFormats(d.ctx, *d.startDate, *d.endDate, d.periodType, formatFilter)
 	if err != nil {
 		return d.app.ErrorView("Error Loading Trend Data", err, nil)
 	}
@@ -424,4 +427,28 @@ func (d *WinRateDashboard) getDateRangeDescription() string {
 		return "All Time"
 	}
 	return fmt.Sprintf("%s to %s", d.startDate.Format("2006-01-02"), d.endDate.Format("2006-01-02"))
+}
+
+// getLimitedFormats queries the database for all draft/sealed format values.
+func (d *WinRateDashboard) getLimitedFormats() []string {
+	// Query for all distinct format values that contain "Draft" or "Sealed"
+	filter := models.StatsFilter{}
+	matches, err := d.service.GetMatches(d.ctx, filter)
+	if err != nil {
+		return []string{}
+	}
+
+	formatMap := make(map[string]bool)
+	for _, match := range matches {
+		formatLower := strings.ToLower(match.Format)
+		if strings.Contains(formatLower, "draft") || strings.Contains(formatLower, "sealed") {
+			formatMap[match.Format] = true
+		}
+	}
+
+	formats := make([]string, 0, len(formatMap))
+	for format := range formatMap {
+		formats = append(formats, format)
+	}
+	return formats
 }

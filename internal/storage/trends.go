@@ -99,6 +99,73 @@ func (s *Service) GetTrendAnalysis(ctx context.Context, startDate, endDate time.
 	return analysis, nil
 }
 
+// GetTrendAnalysisWithFormats calculates historical trend analysis for the specified date range with multiple formats.
+func (s *Service) GetTrendAnalysisWithFormats(ctx context.Context, startDate, endDate time.Time, periodType string, formats []string) (*TrendAnalysis, error) {
+	analysis := &TrendAnalysis{
+		Periods: []TrendData{},
+	}
+
+	// Generate periods based on type
+	periods := generatePeriods(startDate, endDate, periodType)
+
+	// Calculate stats for each period
+	for _, period := range periods {
+		filter := models.StatsFilter{
+			StartDate: &period.StartDate,
+			EndDate:   &period.EndDate,
+			Formats:   formats,
+		}
+
+		stats, err := s.GetStats(ctx, filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get stats for period %s: %w", period.Label, err)
+		}
+
+		if stats != nil && stats.TotalMatches > 0 {
+			trendData := TrendData{
+				Period:      period,
+				Stats:       stats,
+				WinRate:     stats.WinRate,
+				GameWinRate: stats.GameWinRate,
+			}
+			analysis.Periods = append(analysis.Periods, trendData)
+		}
+	}
+
+	// Calculate overall stats
+	overallFilter := models.StatsFilter{
+		StartDate: &startDate,
+		EndDate:   &endDate,
+		Formats:   formats,
+	}
+	overall, err := s.GetStats(ctx, overallFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get overall stats: %w", err)
+	}
+	analysis.Overall = overall
+
+	// Calculate trend
+	if len(analysis.Periods) >= 2 {
+		firstPeriod := analysis.Periods[0]
+		lastPeriod := analysis.Periods[len(analysis.Periods)-1]
+
+		if firstPeriod.Stats.TotalMatches > 0 && lastPeriod.Stats.TotalMatches > 0 {
+			trendValue := lastPeriod.WinRate - firstPeriod.WinRate
+			analysis.TrendValue = trendValue
+
+			if trendValue > 0.05 { // 5% improvement
+				analysis.Trend = "improving"
+			} else if trendValue < -0.05 { // 5% decline
+				analysis.Trend = "declining"
+			} else {
+				analysis.Trend = "stable"
+			}
+		}
+	}
+
+	return analysis, nil
+}
+
 // generatePeriods generates time periods for trend analysis.
 func generatePeriods(startDate, endDate time.Time, periodType string) []TrendPeriod {
 	var periods []TrendPeriod
