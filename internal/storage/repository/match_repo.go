@@ -757,23 +757,23 @@ func (r *matchRepository) GetStatsByFormat(ctx context.Context, filter models.St
 // GetStatsByDeck calculates statistics grouped by deck.
 func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.StatsFilter) (map[string]*models.Statistics, error) {
 	// Build WHERE clause based on filter (same as GetStats but without deck filter)
-	where := "WHERE deck_id IS NOT NULL" // Only include matches with a deck
+	where := "WHERE m.deck_id IS NOT NULL" // Only include matches with a deck
 	args := make([]interface{}, 0)
 
 	if filter.AccountID != nil && *filter.AccountID > 0 {
-		where += " AND account_id = ?"
+		where += " AND m.account_id = ?"
 		args = append(args, *filter.AccountID)
 	}
 	if filter.StartDate != nil {
-		where += " AND timestamp >= ?"
+		where += " AND m.timestamp >= ?"
 		args = append(args, *filter.StartDate)
 	}
 	if filter.EndDate != nil {
-		where += " AND timestamp <= ?"
+		where += " AND m.timestamp <= ?"
 		args = append(args, *filter.EndDate)
 	}
 	if filter.Format != nil {
-		where += " AND format = ?"
+		where += " AND m.format = ?"
 		args = append(args, *filter.Format)
 	}
 
