@@ -169,13 +169,22 @@ Once you've played some matches, data will appear here!`
 func (a *App) refreshCurrentTab(newContent fyne.CanvasObject) {
 	// Recreate the main tabs
 	mainTabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", a.createStatsView()),
 		container.NewTabItem("Match History", a.createMatchesView()),
 		container.NewTabItem("Charts", a.createChartsView()),
 		container.NewTabItem("Settings", a.createSettingsView()),
 	)
 
-	a.window.SetContent(mainTabs)
+	// Recreate footer
+	footer := a.createFooter()
+	mainContent := container.NewBorder(
+		nil,
+		footer,
+		nil,
+		nil,
+		mainTabs,
+	)
+
+	a.window.SetContent(mainContent)
 }
 
 // ShowErrorDialog displays an error dialog with helpful information.

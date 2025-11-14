@@ -66,14 +66,12 @@ func (a *App) Run() {
 	})
 
 	// Create all views
-	statsView := a.createStatsView()
 	matchesView := a.createMatchesView()
 	chartsView := a.createChartsView()
 	settingsView := a.createSettingsView()
 
 	// Create tabs
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Statistics", statsView),
 		container.NewTabItem("Match History", matchesView),
 		container.NewTabItem("Charts", chartsView),
 		container.NewTabItem("Settings", settingsView),
@@ -268,7 +266,6 @@ func (a *App) buildStatsView(stats *storage.Statistics) fyne.CanvasObject {
 			nil,
 			nil,
 			container.NewAppTabs(
-				container.NewTabItem("Statistics", a.createStatsView()),
 				container.NewTabItem("Match History", a.createMatchesView()),
 				container.NewTabItem("Charts", a.createChartsView()),
 				container.NewTabItem("Settings", a.createSettingsView()),
