@@ -610,14 +610,17 @@ func (s *Service) ListDecks(ctx context.Context) ([]*models.Deck, error) {
 }
 
 // InferDeckIDsForMatches attempts to link matches to decks based on timestamp proximity.
-// This is a best-effort approach since MTGA logs sometimes include stale deck IDs.
-// It links each match without a deck_id to the deck with the closest lastPlayed timestamp,
-// and also corrects matches where the assigned deck's lastPlayed is far from the match time.
+// This is a best-effort approach since MTGA logs don't include deck IDs in match events.
+// It links each match without a deck_id to the deck with the closest lastPlayed timestamp.
 func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 	// Get all matches without deck IDs
-	matchesWithoutDecks, err := s.matches.GetMatchesWithoutDeckID(ctx)
+	matchesNeedingDecks, err := s.matches.GetMatchesWithoutDeckID(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get matches without deck IDs: %w", err)
+	}
+
+	if len(matchesNeedingDecks) == 0 {
+		return 0, nil
 	}
 
 	// Get all decks with LastPlayed timestamps
@@ -639,11 +642,9 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 	}
 
 	updatedCount := 0
-	const maxTimeDiff = 24 * time.Hour      // Only link if within 24 hours (same play session day)
-	const staleThreshold = 15 * time.Minute // Re-infer if current deck is >15min from match but better deck is <15min
+	const maxTimeDiff = 24 * time.Hour // Only link if within 24 hours (same play session day)
 
-	// Helper function to find best deck for a match
-	findBestDeck := func(match *models.Match) (*models.Deck, time.Duration) {
+	for _, match := range matchesNeedingDecks {
 		var bestDeck *models.Deck
 		var minDiff time.Duration
 
@@ -661,73 +662,12 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 			}
 		}
 
-		return bestDeck, minDiff
-	}
-
-	// Process matches without deck IDs
-	for _, match := range matchesWithoutDecks {
-		bestDeck, minDiff := findBestDeck(match)
-
 		// Only update if within reasonable time window
 		if bestDeck != nil && minDiff <= maxTimeDiff {
 			if err := s.matches.UpdateDeckID(ctx, match.ID, bestDeck.ID); err != nil {
 				return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
 			}
 			updatedCount++
-		}
-	}
-
-	// Also check matches that HAVE deck IDs but might be stale (from MTGA logs)
-	// Only check recent matches (last 7 days) to avoid processing entire history
-	sevenDaysAgo := time.Now().Add(-7 * 24 * time.Hour)
-	filter := models.StatsFilter{
-		StartDate: &sevenDaysAgo,
-	}
-	recentMatches, err := s.GetMatches(ctx, filter)
-	if err != nil {
-		// Don't fail if we can't get recent matches, just skip this part
-		return updatedCount, nil
-	}
-
-	for _, match := range recentMatches {
-		// Skip matches without deck IDs (already handled above)
-		if match.DeckID == nil {
-			continue
-		}
-
-		// Find the current deck and calculate its time difference
-		var currentDeck *models.Deck
-		var currentDiff time.Duration
-		for _, deck := range decksWithTimestamp {
-			if deck.ID == *match.DeckID {
-				currentDeck = deck
-				currentDiff = match.Timestamp.Sub(*deck.LastPlayed)
-				if currentDiff < 0 {
-					currentDiff = -currentDiff
-				}
-				break
-			}
-		}
-
-		// If current deck wasn't found or is very far from match time, try to find better deck
-		if currentDeck == nil || currentDiff > staleThreshold {
-			bestDeck, minDiff := findBestDeck(match)
-
-			// Only update if:
-			// 1. We found a better deck
-			// 2. The better deck is significantly closer (at least 10 minutes closer)
-			// 3. The better deck is within reasonable time window
-			// 4. The better deck is different from current deck
-			if bestDeck != nil &&
-				minDiff <= maxTimeDiff &&
-				(currentDeck == nil || minDiff < currentDiff-10*time.Minute) &&
-				(currentDeck == nil || bestDeck.ID != currentDeck.ID) {
-
-				if err := s.matches.UpdateDeckID(ctx, match.ID, bestDeck.ID); err != nil {
-					return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
-				}
-				updatedCount++
-			}
 		}
 	}
 
