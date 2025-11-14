@@ -282,6 +282,9 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		container.NewScroll(v.matchList),
 	)
 
+	// Now that opponent select is created, populate it with actual opponents
+	v.updateOpponentFilter()
+
 	return container.NewBorder(
 		container.NewPadded(filtersSection),
 		container.NewPadded(
@@ -581,6 +584,11 @@ func (v *MatchHistoryViewer) exportMatches() {
 
 // updateOpponentFilter updates the opponent dropdown with unique opponents from matches.
 func (v *MatchHistoryViewer) updateOpponentFilter() {
+	// Skip if opponent select hasn't been created yet (during initialization)
+	if v.opponentSelect == nil {
+		return
+	}
+
 	// Collect unique opponents
 	opponentSet := make(map[string]bool)
 	for _, match := range v.allMatches {
