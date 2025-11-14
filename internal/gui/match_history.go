@@ -234,6 +234,8 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		prevBtn,
 		v.pageLabel,
 		nextBtn,
+		layout.NewSpacer(),
+		exportBtn,
 	)
 
 	// Layout: filters at top, list in middle, pagination at bottom
@@ -262,7 +264,6 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 	)
 
 	filterButtons := container.NewHBox(
-		exportBtn,
 		layout.NewSpacer(),
 		dateApplyBtn,
 		dateClearBtn,
@@ -273,7 +274,9 @@ func (v *MatchHistoryViewer) CreateView() fyne.CanvasObject {
 		widget.NewSeparator(),
 		v.searchEntry,
 		filterGrid,
+		widget.NewSeparator(),
 		filterButtons,
+		widget.NewSeparator(),
 		v.statusLabel,
 		widget.NewSeparator(),
 	)
@@ -365,10 +368,31 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 		// Format filter
 		if formatFilter != "All Formats" {
-			// Map user-facing format names to database values
-			// Ladder and Play both map to "constructed"
-			mappedFormat := v.mapFormat(formatFilter)
-			if match.Format != mappedFormat {
+			matchFound := false
+			eventName := strings.ToLower(match.EventName)
+
+			switch formatFilter {
+			case "Constructed":
+				// Constructed includes: Play, Ladder, Ranked, Standard, Historic, Explorer, Alchemy, Timeless
+				if !strings.Contains(eventName, "draft") && !strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			case "Limited":
+				// Limited includes: Draft and Sealed
+				if strings.Contains(eventName, "draft") || strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			case "Draft":
+				if strings.Contains(eventName, "draft") {
+					matchFound = true
+				}
+			case "Sealed":
+				if strings.Contains(eventName, "sealed") {
+					matchFound = true
+				}
+			}
+
+			if !matchFound {
 				continue
 			}
 		}
@@ -403,22 +427,6 @@ func (v *MatchHistoryViewer) filterMatches() {
 
 	v.calculatePagination()
 	v.updateStatusLabel()
-}
-
-// mapFormat maps user-facing format names to database format values.
-func (v *MatchHistoryViewer) mapFormat(format string) string {
-	switch format {
-	case "Constructed":
-		return "constructed"
-	case "Limited":
-		return "limited"
-	case "Draft":
-		return "draft"
-	case "Sealed":
-		return "sealed"
-	default:
-		return strings.ToLower(format)
-	}
 }
 
 // calculatePagination calculates pagination parameters.
