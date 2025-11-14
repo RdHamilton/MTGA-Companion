@@ -226,10 +226,10 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 		}
 	}
 
-	// Create chart config
+	// Create chart config (no title - it's in the summary below)
 	config := charts.DefaultFyneChartConfig()
-	config.Title = d.getChartTitle()
-	config.Width = 900
+	config.Title = "" // Remove title from chart, show in summary instead
+	config.Width = 1400 // Wider to span more of the page
 	config.Height = 500
 
 	// Create chart based on type
@@ -249,11 +249,9 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	})
 	AddButtonTooltip(exportButton, TooltipExport)
 
-	// Layout with proper spacing
+	// Layout: chart, export button, then summary below
 	return container.NewVBox(
-		container.NewPadded(chart),
-		widget.NewSeparator(),
-		container.NewPadded(summary),
+		chart,
 		widget.NewSeparator(),
 		container.NewPadded(
 			container.NewHBox(
@@ -261,16 +259,27 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 				exportButton,
 			),
 		),
+		widget.NewSeparator(),
+		widget.NewSeparator(), // Extra separator for spacing
+		summary,
 	)
 }
 
 // createSummary creates the summary information display.
 func (d *WinRateDashboard) createSummary(analysis *storage.TrendAnalysis) fyne.CanvasObject {
-	summaryContent := fmt.Sprintf(`### Win Rate Trend Analysis
+	// Build the title with chart type
+	chartTypeStr := "Line Chart"
+	if d.chartType == "bar" {
+		chartTypeStr = "Bar Chart"
+	}
 
+	summaryContent := fmt.Sprintf(`## Win Rate Trend Analysis
+
+**Chart Type**: %s
 **Period**: %s to %s
 **Format**: %s
 **Trend**: %s`,
+		chartTypeStr,
 		d.startDate.Format("2006-01-02"),
 		d.endDate.Format("2006-01-02"),
 		d.getFormatDisplayName(),
@@ -290,32 +299,6 @@ func (d *WinRateDashboard) createSummary(analysis *storage.TrendAnalysis) fyne.C
 	}
 
 	return widget.NewRichTextFromMarkdown(summaryContent)
-}
-
-// getChartTitle returns the appropriate chart title based on current filters.
-func (d *WinRateDashboard) getChartTitle() string {
-	title := "Win Rate Trend"
-
-	// Add format if filtered
-	if d.format != "all" {
-		title += fmt.Sprintf(" - %s", d.format)
-	}
-
-	// Add date range
-	switch d.dateRange {
-	case "7days":
-		title += " (Last 7 Days)"
-	case "30days":
-		title += " (Last 30 Days)"
-	case "90days":
-		title += " (Last 90 Days)"
-	case "alltime":
-		title += " (All Time)"
-	case "custom":
-		title += " (Custom Range)"
-	}
-
-	return title
 }
 
 // getFormatDisplayName returns the display name for the current format filter.
