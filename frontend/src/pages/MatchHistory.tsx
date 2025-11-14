@@ -147,42 +147,52 @@ const MatchHistory = () => {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Match History</h1>
+      {/* Header Section - Fixed */}
+      <div className="match-history-header">
+        <h1 className="page-title">Match History</h1>
 
-      {/* Filters */}
-      <div className="filter-row">
-        <div className="filter-group">
-          <label className="filter-label">Date Range</label>
-          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-            <option value="90days">Last 90 Days</option>
-            <option value="all">All Time</option>
-          </select>
+        {/* Filters */}
+        <div className="filter-row">
+          <div className="filter-group">
+            <label className="filter-label">Date Range</label>
+            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+              <option value="90days">Last 90 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label className="filter-label">Format</label>
+            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+              <option value="all">All Formats</option>
+              <option value="constructed">Constructed</option>
+              <option value="limited">Limited</option>
+              <option value="Ladder">Ranked (Ladder)</option>
+              <option value="Play">Play Queue</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label className="filter-label">Result</label>
+            <select value={result} onChange={(e) => setResult(e.target.value)}>
+              <option value="all">All Results</option>
+              <option value="win">Wins Only</option>
+              <option value="loss">Losses Only</option>
+            </select>
+          </div>
         </div>
 
-        <div className="filter-group">
-          <label className="filter-label">Format</label>
-          <select value={format} onChange={(e) => setFormat(e.target.value)}>
-            <option value="all">All Formats</option>
-            <option value="constructed">Constructed</option>
-            <option value="limited">Limited</option>
-            <option value="Ladder">Ranked (Ladder)</option>
-            <option value="Play">Play Queue</option>
-          </select>
-        </div>
-
-        <div className="filter-group">
-          <label className="filter-label">Result</label>
-          <select value={result} onChange={(e) => setResult(e.target.value)}>
-            <option value="all">All Results</option>
-            <option value="win">Wins Only</option>
-            <option value="loss">Losses Only</option>
-          </select>
-        </div>
+        {!loading && !error && matches.length > 0 && (
+          <div className="match-count">
+            Showing {paginatedMatches.length} of {matches.length} match{matches.length !== 1 ? 'es' : ''}
+            {totalPages > 1 && ` (Page ${page} of ${totalPages})`}
+          </div>
+        )}
       </div>
 
-      {/* Content */}
+      {/* Content - Loading/Error/Empty States */}
       {loading && <div className="no-data">Loading matches...</div>}
 
       {error && <div className="error">{error}</div>}
@@ -191,14 +201,11 @@ const MatchHistory = () => {
         <div className="no-data">No matches found for the selected filters</div>
       )}
 
+      {/* Table Container - Scrollable */}
       {!loading && !error && matches.length > 0 && (
         <>
-          <div className="match-count">
-            Showing {paginatedMatches.length} of {matches.length} match{matches.length !== 1 ? 'es' : ''}
-            {totalPages > 1 && ` (Page ${page} of ${totalPages})`}
-          </div>
-
-          <table>
+          <div className="match-history-table-container">
+            <table>
             <thead>
               <tr>
                 <th onClick={() => handleSort('Timestamp')} style={{ cursor: 'pointer' }}>
@@ -231,11 +238,13 @@ const MatchHistory = () => {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
 
-          {/* Pagination Controls */}
+          {/* Footer Section - Fixed Pagination */}
           {totalPages > 1 && (
-            <div className="pagination">
+            <div className="match-history-footer">
+              <div className="pagination">
               <button
                 onClick={() => setPage(1)}
                 disabled={page === 1}
@@ -267,6 +276,7 @@ const MatchHistory = () => {
               >
                 Last
               </button>
+              </div>
             </div>
           )}
         </>

@@ -62,8 +62,9 @@
 
 .content {
   flex: 1;
-  overflow: auto;
-  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .status-bar {
