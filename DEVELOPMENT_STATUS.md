@@ -1,42 +1,34 @@
 # Development Status
 
-**Last Updated**: 2024-11-14
+**Last Updated**: 2025-11-14
 
 ## Current Sprint/Focus
 
-### Wails React Migration ✅ COMPLETE
-- **PR**: #318 (feature/wails-react-migration)
-- **Status**: Ready for merge - all CI checks passing
-- **Completed**:
-  - Desktop GUI with React + TypeScript + Wails v2
-  - Match History page with filtering and sorting
-  - Win Rate Trend chart (line chart over time)
-  - Deck Performance chart (bar chart)
-  - Rank Progression chart (line chart)
-  - Format Distribution pie chart
-  - Result Breakdown statistics page
-  - Settings page for database configuration
-  - Real-time updates via poller + events
-  - Persistent footer with at-a-glance stats
-  - Toast notifications for updates
-  - Responsive design (800x600 to 1920x1080+)
-  - Dark theme UI
-  - CI/CD updated to build frontend
-  - All documentation updated (CLAUDE.md, README.md, frontend/README.md, Wiki)
-  - All lint errors fixed
+### Post-v0.3.0 Preparation
+- **Status**: PR #318 merged successfully to main ✅
+- **Next Priority**: Implement rank progression parsing (#317)
+- **Alternative**: Cut v0.3.0 release (rank progression can be v0.3.1)
 
 ## Recently Completed
 
-### v0.3.0 - GUI Implementation (November 2024)
-- ✅ Wails v2 desktop application
-- ✅ React 18 + TypeScript frontend
-- ✅ Real-time match tracking with live updates
-- ✅ 7 visualization pages (Match History + 6 chart types)
-- ✅ Responsive design with Material-inspired dark theme
-- ✅ Auto-polling of MTGA log files
-- ✅ Event-driven architecture (backend → frontend events)
-- ✅ Deck inference and match-deck linking
-- ✅ Footer with live statistics
+### PR #318 - Wails React Migration (November 2025) ✅ MERGED
+- ✅ Complete desktop GUI with React + TypeScript + Wails v2
+- ✅ Match History page with filtering and sorting
+- ✅ Win Rate Trend chart (line chart over time)
+- ✅ Deck Performance chart (bar chart)
+- ✅ Rank Progression chart (line chart)
+- ✅ Format Distribution pie chart
+- ✅ Result Breakdown statistics page
+- ✅ Settings page for database configuration
+- ✅ Real-time updates via poller + events
+- ✅ Persistent footer with at-a-glance stats
+- ✅ Toast notifications for updates
+- ✅ Responsive design (800x600 to 1920x1080+)
+- ✅ Dark theme UI
+- ✅ CI/CD updated to build frontend
+- ✅ All documentation updated (CLAUDE.md, README.md, frontend/README.md, Wiki)
+- ✅ All lint errors fixed
+- ✅ All CI checks passing across Linux, macOS, and Windows
 
 ### v0.2.0 - Statistics & Analytics (Prior)
 - ✅ Comprehensive statistics engine
@@ -216,17 +208,17 @@
 ## Notes for Next Session
 
 ### What we just finished:
-- Complete Wails React migration
-- All documentation updated
-- Lint errors fixed
-- CI passing
-- PR #318 ready for merge
+- ✅ PR #318 successfully merged to main
+- ✅ Wails React migration complete
+- ✅ All documentation updated
+- ✅ All CI checks passing
+- ✅ Persistent context documentation added (DEVELOPMENT_STATUS.md, ARCHITECTURE_DECISIONS.md)
 
 ### What to do next:
-1. **Merge PR #318** if you're satisfied with testing
-2. **Implement rank progression parsing** (#317) - this is the main missing feature
-3. **Add E2E tests** to prevent regressions
-4. **Cut v0.3.0 release** after rank progression is done
+1. **Implement rank progression parsing** (#317) - Extract RankUpdated events from MTGA logs
+2. **Add E2E tests** (#319) - Playwright for GUI testing
+3. **Cut v0.3.0 release** - Consider releasing now or wait for rank progression
+4. **Performance testing** - Verify app performs well with large datasets
 
 ### Context for Claude:
 - We use Wails v2 (Go backend + React frontend)
