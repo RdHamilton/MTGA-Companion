@@ -259,19 +259,17 @@ func (d *WinRateDashboard) createChartView() fyne.CanvasObject {
 	})
 	AddButtonTooltip(exportButton, TooltipExport)
 
-	// Layout: chart, export button, then summary below
+	// Layout: chart, summary, then export button below
 	return container.NewVBox(
 		chartWithSpace,
 		widget.NewSeparator(),
-		container.NewPadded(
-			container.NewHBox(
-				layout.NewSpacer(),
-				exportButton,
-			),
-		),
-		widget.NewSeparator(),
 		widget.NewSeparator(), // Extra separator for spacing
 		summary,
+		widget.NewSeparator(),
+		container.NewHBox(
+			layout.NewSpacer(),
+			exportButton,
+		),
 	)
 }
 
@@ -297,13 +295,15 @@ func (d *WinRateDashboard) createSummary(analysis *storage.TrendAnalysis) fyne.C
 	)
 
 	if analysis.TrendValue != 0 {
-		summaryContent += fmt.Sprintf(" (%.1f%%)", analysis.TrendValue)
+		// TrendValue is stored as decimal (0-1), multiply by 100 for percentage
+		summaryContent += fmt.Sprintf(" (%+.1f%%)", analysis.TrendValue*100)
 	}
 
 	if analysis.Overall != nil {
+		// WinRate is stored as decimal (0-1), multiply by 100 for percentage
 		summaryContent += fmt.Sprintf(`
 **Overall Win Rate**: %.1f%% (%d matches)`,
-			analysis.Overall.WinRate,
+			analysis.Overall.WinRate*100,
 			analysis.Overall.TotalMatches,
 		)
 	}
