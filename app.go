@@ -439,6 +439,32 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 		}
 	}
 
+	// Parse and store rank updates
+	rankUpdates, err := logreader.ParseRankUpdates(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse rank updates from new entries: %v", err)
+	} else if len(rankUpdates) > 0 {
+		log.Printf("Found %d rank update(s) in new entries", len(rankUpdates))
+		storedCount := 0
+		for _, update := range rankUpdates {
+			// Small delay between operations to avoid database lock contention
+			if storedCount > 0 {
+				time.Sleep(25 * time.Millisecond)
+			}
+
+			if err := a.service.StoreRankUpdate(ctx, update); err != nil {
+				log.Printf("Warning: Failed to store rank update: %v", err)
+			} else {
+				storedCount++
+			}
+		}
+
+		if storedCount > 0 {
+			log.Printf("✓ Stored %d/%d rank update(s)", storedCount, len(rankUpdates))
+			dataUpdated = true
+		}
+	}
+
 	// Emit event to frontend if any data was updated
 	if dataUpdated {
 		matches := 0

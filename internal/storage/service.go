@@ -924,6 +924,39 @@ func (s *Service) StoreRankSnapshot(ctx context.Context, rank *models.RankHistor
 	return s.rankHistory.Create(ctx, rank)
 }
 
+// StoreRankUpdate converts and stores a rank update from the log parser.
+func (s *Service) StoreRankUpdate(ctx context.Context, update *logreader.RankUpdate) error {
+	if update == nil {
+		return nil
+	}
+
+	// Convert to models.RankHistory
+	rank := &models.RankHistory{
+		Timestamp:     update.Timestamp,
+		Format:        update.FormatToDBFormat(), // "Constructed" -> "constructed", "Limited" -> "limited"
+		SeasonOrdinal: update.SeasonOrdinal,
+	}
+
+	// Set rank class (nullable)
+	if update.NewClass != "" {
+		rank.RankClass = &update.NewClass
+	}
+
+	// Set rank level (nullable)
+	if update.NewLevel > 0 {
+		rank.RankLevel = &update.NewLevel
+	}
+
+	// Set rank step (nullable)
+	if update.NewStep > 0 {
+		rank.RankStep = &update.NewStep
+	}
+
+	// Percentile is not available in RankUpdated events, leave as nil
+
+	return s.StoreRankSnapshot(ctx, rank)
+}
+
 // GetRankHistoryByFormat retrieves all rank history entries for a specific format.
 func (s *Service) GetRankHistoryByFormat(ctx context.Context, format string) ([]*models.RankHistory, error) {
 	return s.rankHistory.GetByFormat(ctx, s.currentAccountID, format)
