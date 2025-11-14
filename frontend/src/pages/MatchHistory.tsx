@@ -3,6 +3,9 @@ import { GetMatches } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import './MatchHistory.css';
 
+type SortField = 'Timestamp' | 'Result' | 'Format' | 'EventName';
+type SortDirection = 'asc' | 'desc';
+
 const MatchHistory = () => {
   const [matches, setMatches] = useState<models.Match[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,11 +15,18 @@ const MatchHistory = () => {
   const [dateRange, setDateRange] = useState('7days');
   const [format, setFormat] = useState('all');
   const [result, setResult] = useState('all');
-  const [opponent, setOpponent] = useState('');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+
+  // Sorting
+  const [sortField, setSortField] = useState<SortField>('Timestamp');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
     loadMatches();
-  }, [dateRange, format, result, opponent]);
+  }, [dateRange, format, result]);
 
   const loadMatches = async () => {
     try {
@@ -69,11 +79,6 @@ const MatchHistory = () => {
         filter.Result = result;
       }
 
-      // Opponent filter
-      if (opponent.trim()) {
-        filter.OpponentName = opponent.trim();
-      }
-
       const matchData = await GetMatches(filter);
       setMatches(matchData || []);
     } catch (err) {
@@ -92,14 +97,52 @@ const MatchHistory = () => {
     return `${wins}-${losses}`;
   };
 
-  const getRankDisplay = (rankBefore: string | undefined) => {
-    if (!rankBefore) return '-';
-    // Parse "Bronze_1" format
-    const parts = rankBefore.split('_');
-    if (parts.length === 2) {
-      return `${parts[0]} ${parts[1]}`;
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to descending
+      setSortField(field);
+      setSortDirection('desc');
     }
-    return rankBefore;
+    setPage(1); // Reset to first page when sorting changes
+  };
+
+  // Sort and paginate matches
+  const sortedMatches = [...matches].sort((a, b) => {
+    let aVal: any = a[sortField];
+    let bVal: any = b[sortField];
+
+    // Handle timestamp
+    if (sortField === 'Timestamp') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    }
+
+    // Handle nulls/undefined
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    // String comparison
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+
+    if (sortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+
+  const totalPages = Math.ceil(sortedMatches.length / pageSize);
+  const paginatedMatches = sortedMatches.slice((page - 1) * pageSize, page * pageSize);
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return '⇅';
+    return sortDirection === 'asc' ? '↑' : '↓';
   };
 
   return (
@@ -137,16 +180,6 @@ const MatchHistory = () => {
             <option value="loss">Losses Only</option>
           </select>
         </div>
-
-        <div className="filter-group">
-          <label className="filter-label">Opponent</label>
-          <input
-            type="text"
-            placeholder="Search opponent..."
-            value={opponent}
-            onChange={(e) => setOpponent(e.target.value)}
-          />
-        </div>
       </div>
 
       {/* Content */}
@@ -161,23 +194,30 @@ const MatchHistory = () => {
       {!loading && !error && matches.length > 0 && (
         <>
           <div className="match-count">
-            Showing {matches.length} match{matches.length !== 1 ? 'es' : ''}
+            Showing {paginatedMatches.length} of {matches.length} match{matches.length !== 1 ? 'es' : ''}
+            {totalPages > 1 && ` (Page ${page} of ${totalPages})`}
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Result</th>
-                <th>Format</th>
-                <th>Event</th>
-                <th>Opponent</th>
+                <th onClick={() => handleSort('Timestamp')} style={{ cursor: 'pointer' }}>
+                  Time {getSortIcon('Timestamp')}
+                </th>
+                <th onClick={() => handleSort('Result')} style={{ cursor: 'pointer' }}>
+                  Result {getSortIcon('Result')}
+                </th>
+                <th onClick={() => handleSort('Format')} style={{ cursor: 'pointer' }}>
+                  Format {getSortIcon('Format')}
+                </th>
+                <th onClick={() => handleSort('EventName')} style={{ cursor: 'pointer' }}>
+                  Event {getSortIcon('EventName')}
+                </th>
                 <th>Score</th>
-                <th>Rank</th>
               </tr>
             </thead>
             <tbody>
-              {matches.map((match) => (
+              {paginatedMatches.map((match) => (
                 <tr key={match.ID} className={`result-${match.Result.toLowerCase()}`}>
                   <td>{formatTimestamp(match.Timestamp)}</td>
                   <td>
@@ -187,13 +227,48 @@ const MatchHistory = () => {
                   </td>
                   <td>{match.Format}</td>
                   <td>{match.EventName}</td>
-                  <td>{match.OpponentName || 'Unknown'}</td>
                   <td>{formatScore(match.PlayerWins, match.OpponentWins)}</td>
-                  <td>{getRankDisplay(match.RankBefore)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="pagination-btn"
+              >
+                First
+              </button>
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                className="pagination-btn"
+              >
+                Previous
+              </button>
+              <span className="pagination-info">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+                className="pagination-btn"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="pagination-btn"
+              >
+                Last
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
