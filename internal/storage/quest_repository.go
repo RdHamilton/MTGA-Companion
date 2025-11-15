@@ -117,9 +117,9 @@ func (r *QuestRepository) GetQuestStats(startDate, endDate *time.Time) (*models.
 	query := `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
-			SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) as active,
-			SUM(CASE WHEN rerolled = 1 THEN 1 ELSE 0 END) as rerolled
+			COALESCE(SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END), 0) as completed,
+			COALESCE(SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN rerolled = 1 THEN 1 ELSE 0 END), 0) as rerolled
 		FROM quests
 		WHERE 1=1
 	`
