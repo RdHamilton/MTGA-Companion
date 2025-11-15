@@ -13,7 +13,118 @@ func TestParseRankUpdates(t *testing.T) {
 		validate func(t *testing.T, updates []*RankUpdate)
 	}{
 		{
-			name: "parse constructed rank update",
+			name: "parse current format - constructed rank",
+			entries: []*LogEntry{
+				{
+					IsJSON:    true,
+					Timestamp: "2025-11-14 10:30:00",
+					JSON: map[string]interface{}{
+						"constructedSeasonOrdinal": float64(83),
+						"constructedClass":         "Gold",
+						"constructedLevel":         float64(4),
+						"constructedStep":          float64(2),
+						"constructedMatchesWon":    float64(15),
+						"constructedMatchesLost":   float64(12),
+					},
+				},
+			},
+			expected: 1,
+			validate: func(t *testing.T, updates []*RankUpdate) {
+				if len(updates) != 1 {
+					t.Fatalf("expected 1 update, got %d", len(updates))
+				}
+				u := updates[0]
+				if u.RankUpdateType != "Constructed" {
+					t.Errorf("expected RankUpdateType Constructed, got %s", u.RankUpdateType)
+				}
+				if u.SeasonOrdinal != 83 {
+					t.Errorf("expected SeasonOrdinal 83, got %d", u.SeasonOrdinal)
+				}
+				if u.NewClass != "Gold" {
+					t.Errorf("expected NewClass Gold, got %s", u.NewClass)
+				}
+				if u.NewLevel != 4 {
+					t.Errorf("expected NewLevel 4, got %d", u.NewLevel)
+				}
+				if u.NewStep != 2 {
+					t.Errorf("expected NewStep 2, got %d", u.NewStep)
+				}
+			},
+		},
+		{
+			name: "parse current format - limited rank",
+			entries: []*LogEntry{
+				{
+					IsJSON:    true,
+					Timestamp: "2025-11-14 14:15:00",
+					JSON: map[string]interface{}{
+						"limitedSeasonOrdinal": float64(83),
+						"limitedClass":         "Silver",
+						"limitedLevel":         float64(3),
+						"limitedMatchesWon":    float64(7),
+						"limitedMatchesLost":   float64(9),
+					},
+				},
+			},
+			expected: 1,
+			validate: func(t *testing.T, updates []*RankUpdate) {
+				if len(updates) != 1 {
+					t.Fatalf("expected 1 update, got %d", len(updates))
+				}
+				u := updates[0]
+				if u.RankUpdateType != "Limited" {
+					t.Errorf("expected RankUpdateType Limited, got %s", u.RankUpdateType)
+				}
+				if u.NewClass != "Silver" {
+					t.Errorf("expected NewClass Silver, got %s", u.NewClass)
+				}
+				if u.NewLevel != 3 {
+					t.Errorf("expected NewLevel 3, got %d", u.NewLevel)
+				}
+			},
+		},
+		{
+			name: "parse current format - both constructed and limited",
+			entries: []*LogEntry{
+				{
+					IsJSON:    true,
+					Timestamp: "2025-11-14 10:30:00",
+					JSON: map[string]interface{}{
+						"constructedSeasonOrdinal": float64(83),
+						"constructedClass":         "Gold",
+						"constructedLevel":         float64(4),
+						"limitedSeasonOrdinal":     float64(83),
+						"limitedClass":             "Silver",
+						"limitedLevel":             float64(3),
+					},
+				},
+			},
+			expected: 2, // Should create both constructed and limited updates
+			validate: func(t *testing.T, updates []*RankUpdate) {
+				if len(updates) != 2 {
+					t.Fatalf("expected 2 updates (constructed + limited), got %d", len(updates))
+				}
+				// Check we have one of each type
+				hasConstructed := false
+				hasLimited := false
+				for _, u := range updates {
+					if u.RankUpdateType == "Constructed" {
+						hasConstructed = true
+					}
+					if u.RankUpdateType == "Limited" {
+						hasLimited = true
+					}
+				}
+				if !hasConstructed {
+					t.Error("expected constructed rank update")
+				}
+				if !hasLimited {
+					t.Error("expected limited rank update")
+				}
+			},
+		},
+		{
+			name: "LEGACY: parse constructed rank update",
 			entries: []*LogEntry{
 				{
 					IsJSON:    true,
@@ -73,7 +184,7 @@ func TestParseRankUpdates(t *testing.T) {
 			},
 		},
 		{
-			name: "parse limited rank update",
+			name: "LEGACY: parse limited rank update",
 			entries: []*LogEntry{
 				{
 					IsJSON:    true,
@@ -109,7 +220,7 @@ func TestParseRankUpdates(t *testing.T) {
 			},
 		},
 		{
-			name: "parse multiple rank updates",
+			name: "LEGACY: parse multiple rank updates",
 			entries: []*LogEntry{
 				{
 					IsJSON:    true,
