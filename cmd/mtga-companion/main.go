@@ -5869,10 +5869,18 @@ func runDaemonCommand() {
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 
 	service := storage.NewService(db)
-	defer service.Close()
+	defer func() {
+		if err := service.Close(); err != nil {
+			log.Printf("Error closing service: %v", err)
+		}
+	}()
 
 	// Create daemon configuration
 	daemonConfig := daemon.DefaultConfig()

@@ -71,7 +71,9 @@ func (s *WebSocketServer) Stop() error {
 	// Close all client connections
 	s.clientsMu.Lock()
 	for client := range s.clients {
-		client.Close()
+		if err := client.Close(); err != nil {
+			log.Printf("Error closing client connection: %v", err)
+		}
 	}
 	s.clients = make(map[*websocket.Conn]bool)
 	s.clientsMu.Unlock()
@@ -142,7 +144,9 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 		delete(s.clients, conn)
 		s.clientsMu.Unlock()
 
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Printf("Error closing client connection: %v", err)
+		}
 		log.Printf("Client disconnected (total: %d)", s.ClientCount())
 	}()
 
@@ -187,7 +191,9 @@ func (s *WebSocketServer) handleBroadcasts() {
 		for client := range s.clients {
 			if err := client.WriteJSON(event); err != nil {
 				log.Printf("Error broadcasting to client: %v", err)
-				client.Close()
+				if err := client.Close(); err != nil {
+					log.Printf("Error closing client after broadcast error: %v", err)
+				}
 				s.clientsMu.Lock()
 				delete(s.clients, client)
 				s.clientsMu.Unlock()
