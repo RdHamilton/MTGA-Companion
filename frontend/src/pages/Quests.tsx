@@ -87,7 +87,9 @@ const Quests = () => {
       }
 
       try {
+        console.log('Loading quest history with dates:', startDate, endDate, historyLimit);
         const history = await GetQuestHistory(startDate, endDate, historyLimit);
+        console.log('Quest history loaded:', history?.length || 0, 'quests');
         setQuestHistory(history || []);
       } catch (historyErr) {
         console.error('Error loading quest history:', historyErr);
@@ -177,10 +179,6 @@ const Quests = () => {
                   : 'N/A'}
               </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Rerolls Used</div>
-              <div className="stat-value">{questStats.reroll_count}</div>
-            </div>
           </div>
         )}
       </div>
@@ -208,11 +206,6 @@ const Quests = () => {
                           {quest.rewards && quest.rewards.includes('750') && ' (750 Gold)'}
                           {quest.rewards && quest.rewards.includes('500') && ' (500 Gold)'}
                         </div>
-                        {quest.can_swap && (
-                          <Tooltip content="This quest can be rerolled">
-                            <span className="reroll-badge">Rerollable</span>
-                          </Tooltip>
-                        )}
                       </div>
                       <div className="quest-card-body">
                         <div className="quest-progress-text">
