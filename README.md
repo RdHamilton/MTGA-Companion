@@ -104,6 +104,73 @@ Download the latest release for your platform from the [Releases page](https://g
    ./MTGA-Companion-linux-amd64
    ```
 
+### Daemon Mode (Recommended)
+
+**What is Daemon Mode?**
+
+MTGA Companion can run as a background service (daemon) that continuously monitors your MTGA log file and provides data to the GUI. This is the **recommended setup** because:
+
+✅ **Always Running** - Data collection continues even when GUI is closed
+✅ **Auto-Start** - Daemon starts automatically on system boot
+✅ **Reliable** - Automatic restart if it crashes
+✅ **Cleaner** - Separation of data collection (daemon) and display (GUI)
+
+**Installation**:
+
+1. Download and extract MTGA Companion for your platform (see Quick Start above)
+
+2. Install the daemon service:
+
+   **macOS/Linux**:
+   ```bash
+   cd /path/to/MTGA-Companion
+   ./mtga-companion service install
+   ./mtga-companion service start
+   ```
+
+   **Windows (as Administrator)**:
+   ```powershell
+   cd C:\Path\To\MTGA-Companion
+   .\mtga-companion.exe service install
+   .\mtga-companion.exe service start
+   ```
+
+3. Verify daemon is running:
+   ```bash
+   ./mtga-companion service status
+   ```
+
+   Expected output:
+   ```
+   Service Status:
+     Status: ✓ Running
+   ```
+
+4. Launch the GUI normally - it will automatically connect to the daemon
+
+**Service Management**:
+
+```bash
+# Check status
+./mtga-companion service status
+
+# Start/Stop
+./mtga-companion service start
+./mtga-companion service stop
+
+# Restart
+./mtga-companion service restart
+
+# Uninstall
+./mtga-companion service uninstall
+```
+
+📚 **For detailed daemon installation and troubleshooting, see [docs/DAEMON_INSTALLATION.md](docs/DAEMON_INSTALLATION.md)**
+
+**Alternative: Standalone Mode**
+
+If you prefer not to use daemon mode, the GUI includes an embedded log poller that works standalone. Simply launch the app and it will monitor logs automatically.
+
 ### Build From Source
 
 **Prerequisites**:
