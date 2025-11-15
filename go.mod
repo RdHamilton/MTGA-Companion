@@ -9,6 +9,8 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-echarts/go-echarts/v2 v2.6.7
 	github.com/golang-migrate/migrate/v4 v4.19.0
+	github.com/gorilla/websocket v1.5.3
+	github.com/kardianos/service v1.2.4
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/crypto v0.43.0
@@ -34,7 +36,6 @@ require (
 	github.com/go-text/typesetting v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -42,7 +43,6 @@ require (
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
-	github.com/kardianos/service v1.2.4 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
