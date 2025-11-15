@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GetStats } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
 import './ResultBreakdown.css';
 
 const ResultBreakdown = () => {
@@ -157,7 +158,7 @@ const ResultBreakdown = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading performance metrics...</div>}
+      {loading && <LoadingSpinner message="Loading performance metrics..." />}
 
       {error && <div className="error">{error}</div>}
 

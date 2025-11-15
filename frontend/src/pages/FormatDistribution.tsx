@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GetStatsByFormat } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
 import './FormatDistribution.css';
 
 interface FormatStats {
@@ -214,7 +215,7 @@ const FormatDistribution = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading format statistics...</div>}
+      {loading && <LoadingSpinner message="Loading format statistics..." />}
 
       {error && <div className="error">{error}</div>}
 

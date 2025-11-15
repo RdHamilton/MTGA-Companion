@@ -2,22 +2,20 @@ import { useState, useEffect } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetMatches } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './MatchHistory.css';
 
 type SortField = 'Timestamp' | 'Result' | 'Format' | 'EventName';
 type SortDirection = 'asc' | 'desc';
 
 const MatchHistory = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange, customStartDate, customEndDate, format, result } = filters.matchHistory;
+
   const [matches, setMatches] = useState<models.Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('7days');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [format, setFormat] = useState('all');
-  const [result, setResult] = useState('all');
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -198,7 +196,7 @@ const MatchHistory = () => {
         <div className="filter-row">
           <div className="filter-group">
             <label className="filter-label">Date Range</label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <select value={dateRange} onChange={(e) => updateFilters('matchHistory', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
@@ -215,7 +213,7 @@ const MatchHistory = () => {
                   type="date"
                   value={customStartDate}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={(e) => updateFilters('matchHistory', { customStartDate: e.target.value })}
                 />
               </div>
 
@@ -226,7 +224,7 @@ const MatchHistory = () => {
                   value={customEndDate}
                   min={getMinEndDate()}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={(e) => updateFilters('matchHistory', { customEndDate: e.target.value })}
                 />
               </div>
             </>
@@ -234,7 +232,7 @@ const MatchHistory = () => {
 
           <div className="filter-group">
             <label className="filter-label">Format</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            <select value={format} onChange={(e) => updateFilters('matchHistory', { format: e.target.value })}>
               <option value="all">All Formats</option>
               <option value="constructed">Constructed</option>
               <option value="limited">Limited</option>
@@ -245,7 +243,7 @@ const MatchHistory = () => {
 
           <div className="filter-group">
             <label className="filter-label">Result</label>
-            <select value={result} onChange={(e) => setResult(e.target.value)}>
+            <select value={result} onChange={(e) => updateFilters('matchHistory', { result: e.target.value })}>
               <option value="all">All Results</option>
               <option value="win">Wins Only</option>
               <option value="loss">Losses Only</option>
@@ -262,7 +260,7 @@ const MatchHistory = () => {
       </div>
 
       {/* Content - Loading/Error/Empty States */}
-      {loading && <div className="no-data">Loading matches...</div>}
+      {loading && <LoadingSpinner message="Loading matches..." />}
 
       {error && <div className="error">{error}</div>}
 

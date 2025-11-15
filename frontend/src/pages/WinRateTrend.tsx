@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GetTrendAnalysis } from '../../wailsjs/go/main/App';
 import { storage } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
 import './WinRateTrend.css';
 
 const WinRateTrend = () => {
@@ -106,7 +107,7 @@ const WinRateTrend = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading trend data...</div>}
+      {loading && <LoadingSpinner message="Loading trend data..." />}
 
       {error && <div className="error">{error}</div>}
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetStatsByDeck } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
 import './DeckPerformance.css';
 
 interface DeckStats {
@@ -229,7 +230,7 @@ const DeckPerformance = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading deck statistics...</div>}
+      {loading && <LoadingSpinner message="Loading deck statistics..." />}
 
       {error && <div className="error">{error}</div>}
 
