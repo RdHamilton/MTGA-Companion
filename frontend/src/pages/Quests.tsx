@@ -199,7 +199,11 @@ const Quests = () => {
                   return (
                     <div key={quest.id} className="quest-card">
                       <div className="quest-card-header">
-                        <div className="quest-type">{quest.quest_type || 'Daily Quest'}</div>
+                        <div className="quest-type">
+                          {quest.quest_type || 'Quest'}
+                          {quest.rewards && quest.rewards.includes('750') && ' (750 Gold)'}
+                          {quest.rewards && quest.rewards.includes('500') && ' (500 Gold)'}
+                        </div>
                         {quest.can_swap && (
                           <Tooltip content="This quest can be rerolled">
                             <span className="reroll-badge">Rerollable</span>
@@ -320,7 +324,7 @@ const Quests = () => {
                         const progress = calculateProgress(quest);
                         return (
                           <tr key={quest.id} className={quest.completed ? 'quest-completed' : 'quest-incomplete'}>
-                            <td>{quest.quest_type || 'Daily Quest'}</td>
+                            <td>{quest.quest_type || 'Quest'}</td>
                             <td>
                               <div className="progress-cell">
                                 <span>{quest.ending_progress} / {quest.goal}</span>
