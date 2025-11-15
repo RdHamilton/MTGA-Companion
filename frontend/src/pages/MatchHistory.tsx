@@ -3,6 +3,7 @@ import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetMatches } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Tooltip from '../components/Tooltip';
 import { useAppContext } from '../context/AppContext';
 import './MatchHistory.css';
 
@@ -276,18 +277,30 @@ const MatchHistory = () => {
             <thead>
               <tr>
                 <th onClick={() => handleSort('Timestamp')} style={{ cursor: 'pointer' }}>
-                  Time {getSortIcon('Timestamp')}
+                  <Tooltip content="Click to sort by match time">
+                    <span>Time {getSortIcon('Timestamp')}</span>
+                  </Tooltip>
                 </th>
                 <th onClick={() => handleSort('Result')} style={{ cursor: 'pointer' }}>
-                  Result {getSortIcon('Result')}
+                  <Tooltip content="Click to sort by win/loss">
+                    <span>Result {getSortIcon('Result')}</span>
+                  </Tooltip>
                 </th>
                 <th onClick={() => handleSort('Format')} style={{ cursor: 'pointer' }}>
-                  Format {getSortIcon('Format')}
+                  <Tooltip content="Click to sort by game format">
+                    <span>Format {getSortIcon('Format')}</span>
+                  </Tooltip>
                 </th>
                 <th onClick={() => handleSort('EventName')} style={{ cursor: 'pointer' }}>
-                  Event {getSortIcon('EventName')}
+                  <Tooltip content="Click to sort by event name">
+                    <span>Event {getSortIcon('EventName')}</span>
+                  </Tooltip>
                 </th>
-                <th>Score</th>
+                <th>
+                  <Tooltip content="Match score (Your wins - Opponent wins)">
+                    <span>Score</span>
+                  </Tooltip>
+                </th>
               </tr>
             </thead>
             <tbody>

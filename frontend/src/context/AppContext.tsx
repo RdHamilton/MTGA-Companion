@@ -22,7 +22,8 @@ interface FilterState {
     customEndDate: string;
     format: string;
     chartType: 'bar' | 'table';
-    sortBy: 'winRate' | 'matches';
+    sortBy: 'winRate' | 'matches' | 'name';
+    sortDirection: 'asc' | 'desc';
   };
   rankProgression: {
     format: string;
@@ -33,6 +34,8 @@ interface FilterState {
     customStartDate: string;
     customEndDate: string;
     chartType: 'pie' | 'bar';
+    sortBy: 'matches' | 'winRate' | 'name';
+    sortDirection: 'asc' | 'desc';
   };
   resultBreakdown: {
     dateRange: string;
@@ -63,6 +66,7 @@ const defaultFilters: FilterState = {
     format: 'all',
     chartType: 'bar',
     sortBy: 'winRate',
+    sortDirection: 'desc',
   },
   rankProgression: {
     format: 'constructed',
@@ -72,7 +76,9 @@ const defaultFilters: FilterState = {
     dateRange: '7days',
     customStartDate: '',
     customEndDate: '',
-    chartType: 'pie',
+    chartType: 'bar',
+    sortBy: 'matches',
+    sortDirection: 'desc',
   },
   resultBreakdown: {
     dateRange: '7days',

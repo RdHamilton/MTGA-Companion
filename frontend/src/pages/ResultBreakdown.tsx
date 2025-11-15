@@ -2,18 +2,16 @@ import { useState, useEffect } from 'react';
 import { GetStats } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './ResultBreakdown.css';
 
 const ResultBreakdown = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange, customStartDate, customEndDate, format } = filters.resultBreakdown;
+
   const [metrics, setMetrics] = useState<models.Statistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('7days');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [format, setFormat] = useState('all');
 
   useEffect(() => {
     loadMetrics();
@@ -110,7 +108,7 @@ const ResultBreakdown = () => {
         <div className="filter-row">
           <div className="filter-group">
             <label className="filter-label">Date Range</label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <select value={dateRange} onChange={(e) => updateFilters('resultBreakdown', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
@@ -127,7 +125,7 @@ const ResultBreakdown = () => {
                   type="date"
                   value={customStartDate}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={(e) => updateFilters('resultBreakdown', { customStartDate: e.target.value })}
                 />
               </div>
 
@@ -138,7 +136,7 @@ const ResultBreakdown = () => {
                   value={customEndDate}
                   min={getMinEndDate()}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={(e) => updateFilters('resultBreakdown', { customEndDate: e.target.value })}
                 />
               </div>
             </>
@@ -146,7 +144,7 @@ const ResultBreakdown = () => {
 
           <div className="filter-group">
             <label className="filter-label">Format</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            <select value={format} onChange={(e) => updateFilters('resultBreakdown', { format: e.target.value })}>
               <option value="all">All Formats</option>
               <option value="constructed">Constructed</option>
               <option value="limited">Limited</option>

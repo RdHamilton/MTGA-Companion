@@ -3,6 +3,7 @@ import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetStatsByDeck } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './DeckPerformance.css';
 
 interface DeckStats {
@@ -11,17 +12,12 @@ interface DeckStats {
 }
 
 const DeckPerformance = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange, customStartDate, customEndDate, format, sortBy, sortDirection } = filters.deckPerformance;
+
   const [deckStats, setDeckStats] = useState<DeckStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('7days');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [format, setFormat] = useState('all');
-  const [sortBy, setSortBy] = useState<'winRate' | 'matches' | 'name'>('winRate');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadDeckStats();
@@ -159,7 +155,7 @@ const DeckPerformance = () => {
         <div className="filter-row">
           <div className="filter-group">
             <label className="filter-label">Date Range</label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <select value={dateRange} onChange={(e) => updateFilters('deckPerformance', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
@@ -176,7 +172,7 @@ const DeckPerformance = () => {
                   type="date"
                   value={customStartDate}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={(e) => updateFilters('deckPerformance', { customStartDate: e.target.value })}
                 />
               </div>
 
@@ -187,7 +183,7 @@ const DeckPerformance = () => {
                   value={customEndDate}
                   min={getMinEndDate()}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={(e) => updateFilters('deckPerformance', { customEndDate: e.target.value })}
                 />
               </div>
             </>
@@ -195,7 +191,7 @@ const DeckPerformance = () => {
 
           <div className="filter-group">
             <label className="filter-label">Format</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            <select value={format} onChange={(e) => updateFilters('deckPerformance', { format: e.target.value })}>
               <option value="all">All Formats</option>
               <option value="constructed">Constructed</option>
               <option value="limited">Limited</option>
@@ -206,7 +202,7 @@ const DeckPerformance = () => {
 
           <div className="filter-group">
             <label className="filter-label">Sort By</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <select value={sortBy} onChange={(e) => updateFilters('deckPerformance', { sortBy: e.target.value as 'winRate' | 'matches' | 'name' })}>
               <option value="winRate">Win Rate</option>
               <option value="matches">Match Count</option>
               <option value="name">Deck Name</option>
@@ -215,7 +211,7 @@ const DeckPerformance = () => {
 
           <div className="filter-group">
             <label className="filter-label">Sort Order</label>
-            <select value={sortDirection} onChange={(e) => setSortDirection(e.target.value as any)}>
+            <select value={sortDirection} onChange={(e) => updateFilters('deckPerformance', { sortDirection: e.target.value as 'asc' | 'desc' })}>
               <option value="desc">Descending</option>
               <option value="asc">Ascending</option>
             </select>
