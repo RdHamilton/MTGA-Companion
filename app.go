@@ -571,6 +571,19 @@ func (a *App) setupEventHandlers() {
 		// Forward error event to frontend
 		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
 	})
+
+	// Handle disconnect events
+	a.ipcClient.OnDisconnect(func() {
+		log.Println("Daemon connection lost - notifying frontend")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
+	})
 }
 
 // stopDaemonClient stops the daemon IPC client if running.
