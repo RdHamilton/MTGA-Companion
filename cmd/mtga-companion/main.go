@@ -28,6 +28,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/unified"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/updater"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/setguide"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -332,109 +333,33 @@ func main() {
 
 	fmt.Printf("Found %d JSON entries in the log file.\n\n", len(entries))
 
-	// Parse all data
+	// Parse all data for display
 	profile, inventory, rank := logreader.ParseAll(entries)
 	draftHistory, _ := logreader.ParseDraftHistory(entries)
 	_, _ = logreader.ParseDraftPicks(entries) // Parse draft picks (used in refreshDraftPicks)
 	arenaStats, _ := logreader.ParseArenaStats(entries)
 	deckLibrary, _ := logreader.ParseDecks(entries)
 
-	// Store decks in database
-	if deckLibrary != nil && len(deckLibrary.Decks) > 0 {
-		fmt.Printf("Storing %d deck(s) in database...\n", len(deckLibrary.Decks))
-		storedCount := 0
-		for _, deck := range deckLibrary.Decks {
-			// Convert logreader.DeckCard to the anonymous struct format
-			mainDeck := make([]struct {
-				CardID   int
-				Quantity int
-			}, len(deck.MainDeck))
-			for i, card := range deck.MainDeck {
-				mainDeck[i].CardID = card.CardID
-				mainDeck[i].Quantity = card.Quantity
-			}
-
-			sideboard := make([]struct {
-				CardID   int
-				Quantity int
-			}, len(deck.Sideboard))
-			for i, card := range deck.Sideboard {
-				sideboard[i].CardID = card.CardID
-				sideboard[i].Quantity = card.Quantity
-			}
-
-			// Use Modified time as Created if Created is zero
-			created := deck.Created
-			if created.IsZero() && !deck.Modified.IsZero() {
-				created = deck.Modified
-			} else if created.IsZero() {
-				created = time.Now()
-			}
-
-			modified := deck.Modified
-			if modified.IsZero() {
-				modified = time.Now()
-			}
-
-			err := service.StoreDeckFromParser(
-				ctx,
-				deck.DeckID,
-				deck.Name,
-				deck.Format,
-				deck.Description,
-				created,
-				modified,
-				deck.LastPlayed,
-				mainDeck,
-				sideboard,
-			)
-			if err != nil {
-				log.Printf("Warning: Failed to store deck %s (%s): %v", deck.Name, deck.DeckID, err)
-			} else {
-				storedCount++
-			}
-		}
-		fmt.Printf("Successfully stored %d/%d deck(s).\n", storedCount, len(deckLibrary.Decks))
-
-		// After storing decks, try to infer deck IDs for matches based on timestamps
-		fmt.Println("Inferring deck IDs for matches based on timestamps...")
-		inferredCount, err := service.InferDeckIDsForMatches(ctx)
-		if err != nil {
-			log.Printf("Warning: Failed to infer deck IDs: %v", err)
-		} else if inferredCount > 0 {
-			fmt.Printf("Successfully linked %d match(es) to decks.\n", inferredCount)
-		} else {
-			fmt.Println("No matches could be linked to decks (timestamps too far apart).")
-		}
-	}
-
-	// Store arena stats persistently (with deduplication)
-	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
-		fmt.Println("Storing statistics in database...")
-		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
-			log.Printf("Warning: Failed to store arena stats: %v", err)
-		} else {
-			fmt.Println("Statistics stored successfully.")
-		}
-	}
-
-	// Store rank progression history
-	rankUpdates, err := logreader.ParseRankUpdates(entries)
+	// Process and store all log data using shared service
+	fmt.Println("Processing log data...")
+	processor := logprocessor.NewService(service)
+	result, err := processor.ProcessLogEntries(ctx, entries)
 	if err != nil {
-		log.Printf("Warning: Failed to parse rank updates: %v", err)
-	} else if len(rankUpdates) > 0 {
-		fmt.Printf("Storing %d rank update(s) in database...\n", len(rankUpdates))
-		storedCount := 0
-		for _, update := range rankUpdates {
-			if err := service.StoreRankUpdate(ctx, update); err != nil {
-				log.Printf("Warning: Failed to store rank update: %v", err)
-			} else {
-				storedCount++
-			}
-		}
-		if storedCount > 0 {
-			fmt.Printf("Successfully stored %d/%d rank update(s).\n", storedCount, len(rankUpdates))
-		}
+		log.Printf("Warning: Error processing log entries: %v", err)
+	}
+
+	// Report results
+	if result.MatchesStored > 0 || result.GamesStored > 0 {
+		fmt.Printf("✓ Stored statistics: %d matches, %d games\n", result.MatchesStored, result.GamesStored)
+	}
+	if result.DecksStored > 0 {
+		fmt.Printf("✓ Stored %d deck(s)\n", result.DecksStored)
+	}
+	if result.RanksStored > 0 {
+		fmt.Printf("✓ Stored %d rank update(s)\n", result.RanksStored)
+	}
+	if len(result.Errors) > 0 {
+		fmt.Printf("⚠ Encountered %d error(s) during processing\n", len(result.Errors))
 	}
 
 	// Display player profile
@@ -843,21 +768,23 @@ func processPollerUpdates(ctx context.Context, updates <-chan *logreader.LogEntr
 
 // processNewEntries processes new log entries and updates statistics.
 func processNewEntries(ctx context.Context, entries []*logreader.LogEntry, service *storage.Service) {
-	// Parse arena stats from new entries
-	arenaStats, err := logreader.ParseArenaStats(entries)
+	// Process all new entries using shared service
+	processor := logprocessor.NewService(service)
+	result, err := processor.ProcessLogEntries(ctx, entries)
 	if err != nil {
-		log.Printf("Warning: Failed to parse arena stats from new entries: %v", err)
+		log.Printf("Warning: Error processing new entries: %v", err)
 		return
 	}
 
-	// Store new stats if we have match data
-	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
-		if err := service.StoreArenaStats(ctx, arenaStats, entries); err != nil {
-			log.Printf("Warning: Failed to store arena stats from poller: %v", err)
-		} else {
-			log.Printf("Updated statistics: %d new matches, %d new games",
-				arenaStats.TotalMatches, arenaStats.TotalGames)
-		}
+	// Log what was updated
+	if result.MatchesStored > 0 || result.GamesStored > 0 {
+		log.Printf("Updated statistics: %d new matches, %d new games", result.MatchesStored, result.GamesStored)
+	}
+	if result.DecksStored > 0 {
+		log.Printf("Stored %d new deck(s)", result.DecksStored)
+	}
+	if result.RanksStored > 0 {
+		log.Printf("Stored %d new rank update(s)", result.RanksStored)
 	}
 }
 
