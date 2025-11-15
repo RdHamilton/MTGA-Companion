@@ -11,7 +11,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'match-history' | 'charts'>('match-history');
+  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'charts'>('match-history');
   const [connectionStatus, setConnectionStatus] = useState<any>({
     status: 'standalone',
     connected: false
@@ -58,6 +58,13 @@ const Layout = ({ children }: LayoutProps) => {
             onClick={() => setActiveTab('match-history')}
           >
             Match History
+          </Link>
+          <Link
+            to="/quests"
+            className={`tab ${activeTab === 'quests' ? 'active' : ''}`}
+            onClick={() => setActiveTab('quests')}
+          >
+            Quests
           </Link>
           <Link
             to="/charts/win-rate-trend"

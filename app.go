@@ -571,6 +571,19 @@ func (a *App) setupEventHandlers() {
 		// Forward error event to frontend
 		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
 	})
+
+	// Handle disconnect events
+	a.ipcClient.OnDisconnect(func() {
+		log.Println("Daemon connection lost - notifying frontend")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
+	})
 }
 
 // stopDaemonClient stops the daemon IPC client if running.
@@ -583,6 +596,14 @@ func (a *App) stopDaemonClient() {
 		a.ipcClient = nil
 		a.daemonMode = false
 		log.Println("Daemon client stopped")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
 	}
 }
 
@@ -681,4 +702,86 @@ func (a *App) SwitchToDaemonMode() error {
 
 	log.Println("Switched to daemon mode successfully")
 	return nil
+}
+
+// GetActiveQuests returns all active (incomplete) quests.
+func (a *App) GetActiveQuests() ([]*models.Quest, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	quests, err := a.service.Quests().GetActiveQuests()
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get active quests: %v", err)}
+	}
+
+	return quests, nil
+}
+
+// GetQuestHistory returns quest history with optional date range and limit.
+func (a *App) GetQuestHistory(startDate, endDate string, limit int) ([]*models.Quest, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	var start, end *time.Time
+
+	// Parse start date if provided
+	if startDate != "" {
+		parsedStart, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid start date format: %v", err)}
+		}
+		start = &parsedStart
+	}
+
+	// Parse end date if provided
+	if endDate != "" {
+		parsedEnd, err := time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid end date format: %v", err)}
+		}
+		end = &parsedEnd
+	}
+
+	quests, err := a.service.Quests().GetQuestHistory(start, end, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get quest history: %v", err)}
+	}
+
+	return quests, nil
+}
+
+// GetQuestStats returns quest statistics with optional date range.
+func (a *App) GetQuestStats(startDate, endDate string) (*models.QuestStats, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	var start, end *time.Time
+
+	// Parse start date if provided
+	if startDate != "" {
+		parsedStart, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid start date format: %v", err)}
+		}
+		start = &parsedStart
+	}
+
+	// Parse end date if provided
+	if endDate != "" {
+		parsedEnd, err := time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid end date format: %v", err)}
+		}
+		end = &parsedEnd
+	}
+
+	stats, err := a.service.Quests().GetQuestStats(start, end)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get quest stats: %v", err)}
+	}
+
+	return stats, nil
 }

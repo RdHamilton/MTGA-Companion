@@ -19,16 +19,21 @@ type Event struct {
 // EventHandler is a function that handles events.
 type EventHandler func(data map[string]interface{})
 
+// DisconnectHandler is a function that is called when the connection is lost.
+type DisconnectHandler func()
+
 // Client represents a WebSocket client for IPC with the daemon.
 type Client struct {
-	url         string
-	conn        *websocket.Conn
-	handlers    map[string][]EventHandler
-	handlersMu  sync.RWMutex
-	connected   bool
-	connectedMu sync.RWMutex
-	stopChan    chan struct{}
-	reconnect   bool
+	url               string
+	conn              *websocket.Conn
+	handlers          map[string][]EventHandler
+	handlersMu        sync.RWMutex
+	connected         bool
+	connectedMu       sync.RWMutex
+	stopChan          chan struct{}
+	reconnect         bool
+	disconnectHandler DisconnectHandler
+	disconnectMu      sync.RWMutex
 }
 
 // NewClient creates a new IPC client.
@@ -82,6 +87,13 @@ func (c *Client) On(eventType string, handler EventHandler) {
 	c.handlers[eventType] = append(c.handlers[eventType], handler)
 }
 
+// OnDisconnect registers a handler that is called when the connection is lost.
+func (c *Client) OnDisconnect(handler DisconnectHandler) {
+	c.disconnectMu.Lock()
+	defer c.disconnectMu.Unlock()
+	c.disconnectHandler = handler
+}
+
 // IsConnected returns whether the client is currently connected.
 func (c *Client) IsConnected() bool {
 	c.connectedMu.RLock()
@@ -115,7 +127,13 @@ func (c *Client) listen() {
 			var event Event
 			if err := c.conn.ReadJSON(&event); err != nil {
 				log.Printf("Error reading from daemon: %v", err)
+				wasConnected := c.IsConnected()
 				c.setConnected(false)
+
+				// Notify about disconnection
+				if wasConnected {
+					c.notifyDisconnect()
+				}
 
 				if c.reconnect {
 					c.attemptReconnect()
@@ -170,6 +188,17 @@ func (c *Client) dispatchEvent(event Event) {
 	// Call all handlers for this event type
 	for _, handler := range handlers {
 		go handler(event.Data)
+	}
+}
+
+// notifyDisconnect calls the disconnect handler if one is registered.
+func (c *Client) notifyDisconnect() {
+	c.disconnectMu.RLock()
+	handler := c.disconnectHandler
+	c.disconnectMu.RUnlock()
+
+	if handler != nil {
+		go handler()
 	}
 }
 

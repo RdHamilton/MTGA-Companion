@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // Service handles processing of MTGA log entries and storing results.
@@ -29,6 +30,7 @@ type ProcessResult struct {
 	GamesStored   int
 	DecksStored   int
 	RanksStored   int
+	QuestsStored  int
 	Errors        []error
 }
 
@@ -51,6 +53,11 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 
 	// Process rank updates
 	if err := s.processRankUpdates(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process quests
+	if err := s.processQuests(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -211,6 +218,58 @@ func (s *Service) processRankUpdates(ctx context.Context, entries []*logreader.L
 	if storedCount > 0 {
 		result.RanksStored = storedCount
 		log.Printf("✓ Stored %d/%d rank update(s)", storedCount, len(rankUpdates))
+	}
+
+	return nil
+}
+
+// processQuests parses and stores quests from log entries.
+func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	quests, err := logreader.ParseQuests(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse quests: %v", err)
+		return err
+	}
+
+	if len(quests) == 0 {
+		return nil
+	}
+
+	log.Printf("Found %d quest(s) in entries", len(quests))
+
+	storedCount := 0
+	for _, questData := range quests {
+		// Small delay between operations to avoid database lock contention
+		if storedCount > 0 {
+			time.Sleep(25 * time.Millisecond)
+		}
+
+		// Convert QuestData to storage model
+		quest := &models.Quest{
+			QuestID:          questData.QuestID,
+			QuestType:        questData.QuestType,
+			Goal:             questData.Goal,
+			StartingProgress: questData.StartingProgress,
+			EndingProgress:   questData.EndingProgress,
+			Completed:        questData.Completed,
+			CanSwap:          questData.CanSwap,
+			Rewards:          questData.Rewards,
+			AssignedAt:       questData.AssignedAt,
+			CompletedAt:      questData.CompletedAt,
+			Rerolled:         questData.Rerolled,
+		}
+
+		// Save quest to database
+		if err := s.storage.Quests().Save(quest); err != nil {
+			log.Printf("Warning: Failed to store quest %s: %v", questData.QuestID, err)
+		} else {
+			storedCount++
+		}
+	}
+
+	if storedCount > 0 {
+		result.QuestsStored = storedCount
+		log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
 	}
 
 	return nil

@@ -22,6 +22,7 @@ type Service struct {
 	collection       repository.CollectionRepository
 	accounts         repository.AccountRepository
 	rankHistory      repository.RankHistoryRepository
+	quests           *QuestRepository
 	currentAccountID int // Current active account ID
 }
 
@@ -35,6 +36,7 @@ func NewService(db *DB) *Service {
 		collection:  repository.NewCollectionRepository(db.Conn()),
 		accounts:    repository.NewAccountRepository(db.Conn()),
 		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
+		quests:      NewQuestRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -1476,6 +1478,11 @@ func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time
 	}
 
 	return nil
+}
+
+// Quests returns the quest repository for accessing quest data.
+func (s *Service) Quests() *QuestRepository {
+	return s.quests
 }
 
 // Close closes the database connection.
