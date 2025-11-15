@@ -4,6 +4,8 @@ import {models} from '../models';
 import {time} from '../models';
 import {storage} from '../models';
 
+export function GetConnectionStatus():Promise<Record<string, any>>;
+
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;
@@ -22,6 +24,14 @@ export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:
 
 export function Initialize(arg1:string):Promise<void>;
 
+export function ReconnectToDaemon():Promise<void>;
+
+export function SetDaemonPort(arg1:number):Promise<void>;
+
 export function StartPoller():Promise<void>;
 
 export function StopPoller():Promise<void>;
+
+export function SwitchToDaemonMode():Promise<void>;
+
+export function SwitchToStandaloneMode():Promise<void>;
