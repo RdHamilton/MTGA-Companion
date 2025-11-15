@@ -24,7 +24,7 @@ const ToastContainer = () => {
 
   useEffect(() => {
     // Listen for stats:updated events from backend
-    const unsubscribe = EventsOn('stats:updated', (data: any) => {
+    const unsubscribeStats = EventsOn('stats:updated', (data: any) => {
       const matches = data?.matches || 0;
       const games = data?.games || 0;
 
@@ -36,10 +36,34 @@ const ToastContainer = () => {
       }
     });
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
+    // Listen for rank:updated events
+    const unsubscribeRank = EventsOn('rank:updated', (data: any) => {
+      const format = data?.format || 'Ranked';
+      const tier = data?.tier || '';
+      const step = data?.step || '';
+
+      if (tier && step) {
+        addToast(
+          `Rank updated: ${format} ${tier} ${step}`,
+          'info'
+        );
       }
+    });
+
+    // Listen for quest completion events (when stats:updated includes quest data)
+    // We can enhance this later when we have dedicated quest:completed events
+    const unsubscribeQuest = EventsOn('quest:completed', (data: any) => {
+      const questType = data?.quest_type || 'Quest';
+      addToast(
+        `Quest completed: ${questType}!`,
+        'success'
+      );
+    });
+
+    return () => {
+      if (unsubscribeStats) unsubscribeStats();
+      if (unsubscribeRank) unsubscribeRank();
+      if (unsubscribeQuest) unsubscribeQuest();
     };
   }, [addToast]);
 
