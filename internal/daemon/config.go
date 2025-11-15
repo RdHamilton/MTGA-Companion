@@ -1,0 +1,36 @@
+package daemon
+
+import "time"
+
+// Config holds configuration for the daemon service.
+type Config struct {
+	// WebSocket server port
+	Port int
+
+	// Database path
+	DBPath string
+
+	// MTGA log file path (auto-detect if empty)
+	LogPath string
+
+	// Log poll interval
+	PollInterval time.Duration
+
+	// Enable file system events (fsnotify) for log watching
+	UseFSNotify bool
+
+	// Enable metrics
+	EnableMetrics bool
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() *Config {
+	return &Config{
+		Port:          9999,
+		DBPath:        "", // Will use default from storage
+		LogPath:       "", // Will auto-detect
+		PollInterval:  2 * time.Second,
+		UseFSNotify:   false,
+		EnableMetrics: false,
+	}
+}
