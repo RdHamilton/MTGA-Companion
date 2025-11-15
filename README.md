@@ -41,9 +41,12 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 
 ### Technical Documentation
 
-- **[Architecture](https://github.com/RdHamilton/MTGA-Companion/wiki/Architecture)** - System design and architecture
+- **[Architecture](docs/ARCHITECTURE.md)** - Service-based system design and architecture
+- **[Daemon API](docs/DAEMON_API.md)** - WebSocket API reference for daemon integration
+- **[Development Guide](docs/DEVELOPMENT.md)** - Development setup and contributing guidelines
+- **[Migration Guide](docs/MIGRATION_TO_SERVICE_ARCHITECTURE.md)** - Upgrading to service-based architecture
+- **[Daemon Installation](docs/DAEMON_INSTALLATION.md)** - Complete daemon service installation guide
 - **[Database Schema](https://github.com/RdHamilton/MTGA-Companion/wiki/Database-Schema)** - Database structure
-- **[Development](https://github.com/RdHamilton/MTGA-Companion/wiki/Development)** - Development setup and guidelines
 
 ## Prerequisites
 
