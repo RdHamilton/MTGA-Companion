@@ -91,10 +91,6 @@ const Quests = () => {
     }
   };
 
-  const formatTimestamp = (timestamp: any) => {
-    return new Date(timestamp).toLocaleString();
-  };
-
   const formatDate = (timestamp: any) => {
     return new Date(timestamp).toLocaleDateString();
   };
@@ -103,22 +99,6 @@ const Quests = () => {
     if (quest.goal === 0) return 0;
     const progress = (quest.ending_progress / quest.goal) * 100;
     return Math.min(progress, 100);
-  };
-
-  const formatRewards = (rewardsJson: string): string => {
-    if (!rewardsJson) return 'Unknown';
-
-    try {
-      // Try to parse as JSON if it's a JSON string
-      if (rewardsJson.startsWith('{') || rewardsJson.startsWith('[')) {
-        const rewards = JSON.parse(rewardsJson);
-        // Extract relevant reward info - adjust based on actual structure
-        return JSON.stringify(rewards);
-      }
-      return rewardsJson;
-    } catch {
-      return rewardsJson;
-    }
   };
 
   const formatCompletionTime = (assignedAt: any, completedAt: any): string => {
