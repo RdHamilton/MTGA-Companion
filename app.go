@@ -585,3 +585,100 @@ func (a *App) stopDaemonClient() {
 		log.Println("Daemon client stopped")
 	}
 }
+
+// GetConnectionStatus returns current connection status for the frontend.
+func (a *App) GetConnectionStatus() map[string]interface{} {
+	a.ipcClientMu.Lock()
+	defer a.ipcClientMu.Unlock()
+
+	status := "standalone"
+	connected := false
+
+	if a.ipcClient != nil && a.ipcClient.IsConnected() {
+		status = "connected"
+		connected = true
+	} else if a.ipcClient != nil {
+		status = "reconnecting"
+	}
+
+	return map[string]interface{}{
+		"status":    status,
+		"connected": connected,
+		"mode":      a.getDaemonModeString(),
+		"url":       a.getDaemonURL(),
+		"port":      a.daemonPort,
+	}
+}
+
+// getDaemonModeString returns the current daemon mode as a string.
+func (a *App) getDaemonModeString() string {
+	if a.daemonMode {
+		return "daemon"
+	}
+	return "standalone"
+}
+
+// getDaemonURL returns the WebSocket URL for the daemon.
+func (a *App) getDaemonURL() string {
+	return fmt.Sprintf("ws://localhost:%d", a.daemonPort)
+}
+
+// SetDaemonPort updates the daemon port and saves to config.
+func (a *App) SetDaemonPort(port int) error {
+	if port < 1024 || port > 65535 {
+		return &AppError{Message: fmt.Sprintf("Port must be between 1024 and 65535, got %d", port)}
+	}
+
+	a.daemonPort = port
+	log.Printf("Daemon port updated to %d", port)
+
+	return nil
+}
+
+// ReconnectToDaemon attempts to reconnect to the daemon.
+func (a *App) ReconnectToDaemon() error {
+	log.Println("Reconnecting to daemon...")
+
+	// Stop existing client
+	a.stopDaemonClient()
+
+	// Try to connect
+	if err := a.connectToDaemon(); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to reconnect to daemon: %v", err)}
+	}
+
+	log.Println("Successfully reconnected to daemon")
+	return nil
+}
+
+// SwitchToStandaloneMode disconnects from daemon and starts embedded poller.
+func (a *App) SwitchToStandaloneMode() error {
+	log.Println("Switching to standalone mode...")
+
+	// Stop daemon client
+	a.stopDaemonClient()
+
+	// Start embedded poller
+	if err := a.StartPoller(); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to start poller: %v", err)}
+	}
+
+	log.Println("Switched to standalone mode successfully")
+	return nil
+}
+
+// SwitchToDaemonMode stops embedded poller and connects to daemon.
+func (a *App) SwitchToDaemonMode() error {
+	log.Println("Switching to daemon mode...")
+
+	// Stop poller if running
+	a.StopPoller()
+
+	// Connect to daemon
+	if err := a.connectToDaemon(); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to connect to daemon: %v", err)}
+	}
+
+	log.Println("Switched to daemon mode successfully")
+	return nil
+}

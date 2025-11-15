@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Footer from './Footer';
+import { GetConnectionStatus } from '../../wailsjs/go/main/App';
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 import './Layout.css';
 
 interface LayoutProps {
@@ -10,34 +12,73 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'match-history' | 'charts'>('match-history');
+  const [connectionStatus, setConnectionStatus] = useState<any>({
+    status: 'standalone',
+    connected: false
+  });
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Load connection status on mount
+  useEffect(() => {
+    loadConnectionStatus();
+
+    // Listen for daemon events
+    EventsOn('daemon:status', () => {
+      loadConnectionStatus();
+    });
+
+    EventsOn('daemon:connected', () => {
+      loadConnectionStatus();
+    });
+
+    return () => {
+      EventsOff('daemon:status');
+      EventsOff('daemon:connected');
+    };
+  }, []);
+
+  const loadConnectionStatus = async () => {
+    try {
+      const status = await GetConnectionStatus();
+      setConnectionStatus(status);
+    } catch (error) {
+      console.error('Failed to load connection status:', error);
+    }
+  };
 
   return (
     <div className="app-container">
       {/* Top Navigation Tabs */}
       <div className="tab-bar">
-        <Link
-          to="/match-history"
-          className={`tab ${activeTab === 'match-history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('match-history')}
-        >
-          Match History
-        </Link>
-        <Link
-          to="/charts/win-rate-trend"
-          className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('charts')}
-        >
-          Charts
-        </Link>
-        <Link
-          to="/settings"
-          className={`tab ${isActive('/settings') ? 'active' : ''}`}
-          onClick={() => setActiveTab('match-history')}
-        >
-          Settings
-        </Link>
+        <div className="tab-links">
+          <Link
+            to="/match-history"
+            className={`tab ${activeTab === 'match-history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('match-history')}
+          >
+            Match History
+          </Link>
+          <Link
+            to="/charts/win-rate-trend"
+            className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('charts')}
+          >
+            Charts
+          </Link>
+          <Link
+            to="/settings"
+            className={`tab ${isActive('/settings') ? 'active' : ''}`}
+            onClick={() => setActiveTab('match-history')}
+          >
+            Settings
+          </Link>
+        </div>
+        <div className="connection-status-indicator">
+          <div className={`status-badge-compact status-${connectionStatus.status}`} title={connectionStatus.status}>
+            <span className="status-dot-compact"></span>
+          </div>
+        </div>
       </div>
 
       {/* Sub-navigation for Charts */}

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode } from '../../wailsjs/go/main/App';
 import './Settings.css';
 
 const Settings = () => {
@@ -9,6 +10,83 @@ const Settings = () => {
   const [showNotifications, setShowNotifications] = useState(true);
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+
+  // Daemon settings
+  const [connectionStatus, setConnectionStatus] = useState<any>({
+    status: 'standalone',
+    connected: false,
+    mode: 'standalone',
+    url: 'ws://localhost:9999',
+    port: 9999
+  });
+  const [daemonMode, setDaemonMode] = useState('auto');
+  const [daemonPort, setDaemonPortState] = useState(9999);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Load connection status on mount
+  useEffect(() => {
+    loadConnectionStatus();
+  }, []);
+
+  const loadConnectionStatus = async () => {
+    try {
+      const status = await GetConnectionStatus();
+      setConnectionStatus(status);
+      setDaemonPortState(status.port || 9999);
+    } catch (error) {
+      console.error('Failed to load connection status:', error);
+    }
+  };
+
+  const handleDaemonPortChange = async (port: number) => {
+    if (port < 1024 || port > 65535) {
+      return;
+    }
+
+    setDaemonPortState(port);
+
+    try {
+      await SetDaemonPort(port);
+      console.log('Daemon port updated to', port);
+    } catch (error) {
+      console.error('Failed to set daemon port:', error);
+      alert(`Failed to set daemon port: ${error}`);
+    }
+  };
+
+  const handleReconnect = async () => {
+    setIsReconnecting(true);
+    try {
+      await ReconnectToDaemon();
+      await loadConnectionStatus();
+      alert('Successfully reconnected to daemon');
+    } catch (error) {
+      console.error('Failed to reconnect:', error);
+      alert(`Failed to reconnect to daemon: ${error}`);
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
+
+  const handleModeChange = async (mode: string) => {
+    setDaemonMode(mode);
+
+    try {
+      if (mode === 'standalone') {
+        await SwitchToStandaloneMode();
+        await loadConnectionStatus();
+        alert('Switched to standalone mode');
+      } else if (mode === 'daemon') {
+        await SwitchToDaemonMode();
+        await loadConnectionStatus();
+        alert('Switched to daemon mode');
+      }
+      // 'auto' mode is handled automatically by the app
+    } catch (error) {
+      console.error('Failed to switch mode:', error);
+      alert(`Failed to switch mode: ${error}`);
+    }
+  };
 
   const handleSave = () => {
     // TODO: Implement backend settings save
@@ -59,6 +137,79 @@ const Settings = () => {
                 className="text-input"
               />
               <button className="browse-button">Browse...</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Daemon Connection */}
+        <div className="settings-section">
+          <h2 className="section-title">Daemon Connection</h2>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Connection Status
+              <span className="setting-description">Current connection state to the daemon service</span>
+            </label>
+            <div className="setting-control">
+              <div className={`connection-badge status-${connectionStatus.status}`}>
+                <span className="status-dot"></span>
+                {connectionStatus.status === 'connected' && 'Connected to Daemon'}
+                {connectionStatus.status === 'standalone' && 'Standalone Mode'}
+                {connectionStatus.status === 'reconnecting' && 'Reconnecting...'}
+              </div>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Connection Mode
+              <span className="setting-description">Choose how the app connects to the daemon</span>
+            </label>
+            <div className="setting-control">
+              <select
+                className="select-input"
+                value={daemonMode}
+                onChange={(e) => handleModeChange(e.target.value)}
+              >
+                <option value="auto">Auto (try daemon, fallback to standalone)</option>
+                <option value="daemon">Daemon Only</option>
+                <option value="standalone">Standalone Only (embedded poller)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Daemon Port
+              <span className="setting-description">WebSocket port for daemon connection (1024-65535)</span>
+            </label>
+            <div className="setting-control">
+              <input
+                type="number"
+                value={daemonPort}
+                onChange={(e) => handleDaemonPortChange(parseInt(e.target.value))}
+                min="1024"
+                max="65535"
+                className="number-input"
+                disabled={daemonMode === 'standalone'}
+              />
+              <span className="setting-hint">ws://localhost:{daemonPort}</span>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Reconnect
+              <span className="setting-description">Manually reconnect to the daemon service</span>
+            </label>
+            <div className="setting-control">
+              <button
+                className="action-button"
+                onClick={handleReconnect}
+                disabled={isReconnecting || daemonMode === 'standalone'}
+              >
+                {isReconnecting ? 'Reconnecting...' : 'Reconnect to Daemon'}
+              </button>
             </div>
           </div>
         </div>

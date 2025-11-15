@@ -8,9 +8,39 @@
 
 .tab-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   background-color: #2d2d2d;
   border-bottom: 1px solid #3d3d3d;
   padding: 0;
+}
+
+.tab-links {
+  display: flex;
+}
+
+.connection-status-indicator {
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.status-badge-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: all 0.3s;
+  cursor: help;
+}
+
+.status-dot-compact {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .tab {
@@ -80,4 +110,43 @@
 
 .status-right {
   color: #4a9eff;
+}
+
+/* Compact Connection Status Indicator Styles */
+.status-badge-compact.status-connected {
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.status-badge-compact.status-connected .status-dot-compact {
+  background-color: #7dff7d;
+  box-shadow: 0 0 10px rgba(125, 255, 125, 0.6);
+}
+
+.status-badge-compact.status-standalone {
+  background-color: rgba(255, 152, 0, 0.2);
+}
+
+.status-badge-compact.status-standalone .status-dot-compact {
+  background-color: #ffb74d;
+  box-shadow: 0 0 10px rgba(255, 183, 77, 0.6);
+}
+
+.status-badge-compact.status-reconnecting {
+  background-color: rgba(33, 150, 243, 0.2);
+}
+
+.status-badge-compact.status-reconnecting .status-dot-compact {
+  background-color: #64b5f6;
+  animation: pulse-compact 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-compact {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
