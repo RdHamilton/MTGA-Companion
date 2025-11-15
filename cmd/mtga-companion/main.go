@@ -9,12 +9,15 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/charts"
+	"github.com/ramonehamilton/MTGA-Companion/internal/daemon"
 	"github.com/ramonehamilton/MTGA-Companion/internal/display"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
@@ -199,6 +202,12 @@ func main() {
 	// Check if this is a backup command
 	if len(os.Args) > 1 && os.Args[1] == "backup" {
 		runBackupCommand()
+		return
+	}
+
+	// Check if this is a daemon command
+	if len(os.Args) > 1 && os.Args[1] == "daemon" {
+		runDaemonCommand()
 		return
 	}
 
@@ -5826,4 +5835,76 @@ func runSetGuideColors() {
 
 	// Display color ratings
 	fmt.Print(setguide.FormatColorPairs(colorRatings))
+}
+
+// runDaemonCommand runs the daemon mode.
+func runDaemonCommand() {
+	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
+	port := fs.Int("port", 9999, "WebSocket server port")
+	logPath := fs.String("log-path", "", "MTGA log file path (auto-detect if empty)")
+	dbPath := fs.String("db-path", "", "Database path (default: ~/.mtga-companion/data.db)")
+	pollInterval := fs.Duration("poll-interval", 2*time.Second, "Log polling interval")
+	useFSNotify := fs.Bool("use-fsnotify", false, "Use file system events for log watching")
+	enableMetrics := fs.Bool("enable-metrics", false, "Enable metrics")
+
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing daemon flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("MTGA Companion - Daemon Mode")
+	fmt.Println("=============================")
+	fmt.Println()
+
+	// Setup database path
+	finalDBPath := *dbPath
+	if finalDBPath == "" {
+		finalDBPath = getDBPath()
+	}
+
+	// Open database
+	config := storage.DefaultConfig(finalDBPath)
+	config.AutoMigrate = true
+	db, err := storage.Open(config)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	service := storage.NewService(db)
+	defer service.Close()
+
+	// Create daemon configuration
+	daemonConfig := daemon.DefaultConfig()
+	daemonConfig.Port = *port
+	daemonConfig.DBPath = finalDBPath
+	daemonConfig.LogPath = *logPath
+	daemonConfig.PollInterval = *pollInterval
+	daemonConfig.UseFSNotify = *useFSNotify
+	daemonConfig.EnableMetrics = *enableMetrics
+
+	// Create and start daemon
+	daemonService := daemon.New(daemonConfig, service)
+	if err := daemonService.Start(); err != nil {
+		log.Fatalf("Failed to start daemon: %v", err)
+	}
+
+	fmt.Println()
+	fmt.Println("Daemon is running. Press Ctrl+C to stop.")
+	fmt.Println()
+
+	// Wait for interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	<-sigChan
+
+	fmt.Println()
+	fmt.Println("Shutting down...")
+
+	// Stop daemon
+	if err := daemonService.Stop(); err != nil {
+		log.Printf("Error stopping daemon: %v", err)
+	}
+
+	fmt.Println("Daemon stopped.")
 }
