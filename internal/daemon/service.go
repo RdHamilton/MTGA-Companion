@@ -167,6 +167,7 @@ func (s *Service) processUpdates(updates <-chan *logreader.LogEntry, errChan <-c
 
 // processEntries processes a batch of log entries.
 func (s *Service) processEntries(entries []*logreader.LogEntry) {
+	log.Printf("Processing %d log entries...", len(entries))
 	result, err := s.logProcessor.ProcessLogEntries(s.ctx, entries)
 	if err != nil {
 		log.Printf("Error processing log entries: %v", err)
@@ -201,6 +202,16 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 			Type: "rank:updated",
 			Data: map[string]interface{}{
 				"count": result.RanksStored,
+			},
+		})
+	}
+
+	if result.QuestsStored > 0 {
+		log.Printf("Stored %d quest(s)", result.QuestsStored)
+		s.wsServer.Broadcast(Event{
+			Type: "quest:updated",
+			Data: map[string]interface{}{
+				"count": result.QuestsStored,
 			},
 		})
 	}

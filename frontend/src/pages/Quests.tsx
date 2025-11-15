@@ -29,15 +29,19 @@ const Quests = () => {
 
   // Listen for real-time updates
   useEffect(() => {
-    const unsubscribe = EventsOn('stats:updated', () => {
+    const unsubscribeStats = EventsOn('stats:updated', () => {
       console.log('Stats updated event received - reloading quest data');
       loadQuestData();
     });
 
+    const unsubscribeQuests = EventsOn('quest:updated', () => {
+      console.log('Quest updated event received - reloading quest data');
+      loadQuestData();
+    });
+
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribeStats) unsubscribeStats();
+      if (unsubscribeQuests) unsubscribeQuests();
     };
   }, [dateRange, customStartDate, customEndDate]);
 
