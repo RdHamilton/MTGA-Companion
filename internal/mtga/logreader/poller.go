@@ -70,6 +70,11 @@ type PollerConfig struct {
 	// EnableMetrics enables collection of performance metrics.
 	// Default: false
 	EnableMetrics bool
+
+	// ReadFromStart if true, reads the entire log file from the beginning
+	// on first start. If false, only reads new entries added after start.
+	// Default: false (only monitor new entries)
+	ReadFromStart bool
 }
 
 // DefaultPollerConfig returns a PollerConfig with sensible defaults.
@@ -114,7 +119,7 @@ func NewPoller(config *PollerConfig) (*Poller, error) {
 	}
 
 	// Initialize position tracking
-	if err := poller.initializePosition(); err != nil {
+	if err := poller.initializePosition(config.ReadFromStart); err != nil {
 		cancel()
 		return nil, fmt.Errorf("initialize position: %w", err)
 	}
@@ -122,9 +127,10 @@ func NewPoller(config *PollerConfig) (*Poller, error) {
 	return poller, nil
 }
 
-// initializePosition initializes the poller's position tracking by reading
-// to the end of the file if it exists.
-func (p *Poller) initializePosition() error {
+// initializePosition initializes the poller's position tracking.
+// If readFromStart is true, starts at beginning of file to read all existing entries.
+// If readFromStart is false, starts at end of file to only read new entries.
+func (p *Poller) initializePosition(readFromStart bool) error {
 	file, err := os.Open(p.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -147,10 +153,16 @@ func (p *Poller) initializePosition() error {
 		return fmt.Errorf("stat file: %w", err)
 	}
 
-	// Seek to end of file
-	pos, err := file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("seek to end: %w", err)
+	var pos int64
+	if readFromStart {
+		// Start at beginning to read entire log file
+		pos = 0
+	} else {
+		// Seek to end of file to only monitor new entries
+		pos, err = file.Seek(0, io.SeekEnd)
+		if err != nil {
+			return fmt.Errorf("seek to end: %w", err)
+		}
 	}
 
 	p.mu.Lock()

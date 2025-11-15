@@ -59,6 +59,7 @@ func (s *Service) Start() error {
 	pollerConfig.Interval = s.config.PollInterval
 	pollerConfig.UseFileEvents = s.config.UseFSNotify
 	pollerConfig.EnableMetrics = s.config.EnableMetrics
+	pollerConfig.ReadFromStart = true // Read entire log file on startup
 
 	poller, err := logreader.NewPoller(pollerConfig)
 	if err != nil {

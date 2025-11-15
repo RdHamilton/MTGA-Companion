@@ -523,6 +523,7 @@ func main() {
 	pollerConfig.Interval = *logPollInterval
 	pollerConfig.UseFileEvents = *logUseFsnotify
 	pollerConfig.EnableMetrics = *enableMetrics
+	pollerConfig.ReadFromStart = true // Read entire log file
 	poller, err := logreader.NewPoller(pollerConfig)
 	if err != nil {
 		log.Printf("Warning: Failed to create poller: %v", err)
