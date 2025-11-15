@@ -1,6 +1,7 @@
 package logreader
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -47,8 +48,8 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 			questsFound++
 			if questArray, ok := questsData.([]interface{}); ok {
 				for _, q := range questArray {
-					if questMap, ok := q.(map[string]interface{}); ok {
-						quest := parseQuestFromMap(questMap, timestamp)
+					if questJSON, ok := q.(map[string]interface{}); ok {
+						quest := parseQuestFromMap(questJSON, timestamp)
 						if quest != nil {
 							questMap[quest.QuestID] = quest
 						}
@@ -62,8 +63,8 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 			newQuestsFound++
 			if questArray, ok := newQuestsData.([]interface{}); ok {
 				for _, q := range questArray {
-					if questMapData, ok := q.(map[string]interface{}); ok {
-						quest := parseQuestFromMap(questMapData, timestamp)
+					if questJSON, ok := q.(map[string]interface{}); ok {
+						quest := parseQuestFromMap(questJSON, timestamp)
 						if quest != nil {
 							quest.AssignedAt = timestamp
 							questMap[quest.QuestID] = quest
@@ -99,8 +100,10 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 		return nil // Quest ID is required
 	}
 
-	// Extract quest type (from questTrack or locKey)
-	if questTrack, ok := json["questTrack"].(string); ok {
+	// Extract quest type (prefer locKey for descriptive name, fallback to questTrack)
+	if locKey, ok := json["locKey"].(string); ok {
+		quest.QuestType = locKey
+	} else if questTrack, ok := json["questTrack"].(string); ok {
 		quest.QuestType = questTrack
 	}
 
@@ -127,8 +130,16 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 	}
 
 	// Extract reward description
-	if chestDesc, ok := json["chestDescription"].(string); ok {
-		quest.Rewards = chestDesc
+	if chestDesc, ok := json["chestDescription"].(map[string]interface{}); ok {
+		// Extract gold/reward quantity from chestDescription object
+		if quantity, ok := chestDesc["quantity"].(string); ok {
+			quest.Rewards = quantity
+		} else if quantityNum, ok := chestDesc["quantity"].(float64); ok {
+			quest.Rewards = fmt.Sprintf("%.0f", quantityNum)
+		}
+	} else if chestDescStr, ok := json["chestDescription"].(string); ok {
+		// Fallback: if it's already a string
+		quest.Rewards = chestDescStr
 	}
 
 	// Check if completed (when ending progress >= goal)
