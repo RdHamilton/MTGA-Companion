@@ -45,3 +45,9 @@ CLAUDE.md
 .reference-notes.md
 .cursorrules
 Icon.png
+
+# Frontend (Vite/React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/build/
