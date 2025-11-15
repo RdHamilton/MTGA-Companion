@@ -1,0 +1,245 @@
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Content */
+.modal-content {
+  background-color: #2d2d2d;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Modal Body */
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #3d3d3d;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* About Dialog Specific */
+.about-dialog .about-section {
+  margin-bottom: 24px;
+}
+
+.about-dialog .about-section:last-child {
+  margin-bottom: 0;
+}
+
+.about-dialog .app-icon {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.about-dialog .icon-placeholder {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+}
+
+.about-dialog .app-name {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.about-dialog .app-version {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin: 0 0 20px 0;
+}
+
+.about-dialog h4 {
+  color: #4a9eff;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.about-dialog p {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+
+.about-dialog p:last-child {
+  margin-bottom: 0;
+}
+
+.about-dialog .feature-list,
+.about-dialog .credit-list {
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.8;
+}
+
+.about-dialog .feature-list li,
+.about-dialog .credit-list li {
+  margin-bottom: 4px;
+}
+
+.about-dialog .credit-list strong {
+  color: #ffffff;
+}
+
+.about-dialog .about-links {
+  margin-top: 20px;
+}
+
+.about-dialog .link-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.about-dialog .link-button {
+  display: inline-block;
+  padding: 10px 16px;
+  background-color: #3d3d3d;
+  color: #4a9eff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.about-dialog .link-button:hover {
+  background-color: #4a9eff;
+  color: #ffffff;
+  transform: translateX(4px);
+}
+
+.about-dialog .copyright {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin-top: 16px;
+}
+
+.about-dialog .disclaimer {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #4a9eff;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #3a8eef;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}

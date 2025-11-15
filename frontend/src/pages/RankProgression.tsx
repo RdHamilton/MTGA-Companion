@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GetRankProgressionTimeline } from '../../wailsjs/go/main/App';
 import { storage } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './RankProgression.css';
 
 const RANK_CLASSES = [
@@ -14,12 +16,12 @@ const RANK_CLASSES = [
 ];
 
 const RankProgression = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange } = filters.rankProgression;
+
   const [timeline, setTimeline] = useState<storage.RankTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('30days');
 
   useEffect(() => {
     loadTimeline();
@@ -145,7 +147,7 @@ const RankProgression = () => {
         <div className="filter-row">
           <div className="filter-group">
             <label className="filter-label">Date Range</label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <select value={dateRange} onChange={(e) => updateFilters('rankProgression', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
@@ -159,7 +161,7 @@ const RankProgression = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading rank progression...</div>}
+      {loading && <LoadingSpinner message="Loading rank progression..." />}
 
       {error && <div className="error">{error}</div>}
 

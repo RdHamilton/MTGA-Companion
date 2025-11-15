@@ -2,17 +2,17 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GetTrendAnalysis } from '../../wailsjs/go/main/App';
 import { storage } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './WinRateTrend.css';
 
 const WinRateTrend = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange, format, chartType } = filters.winRateTrend;
+
   const [analysis, setAnalysis] = useState<storage.TrendAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('7days');
-  const [format, setFormat] = useState('all');
-  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
 
   useEffect(() => {
     loadTrendData();
@@ -78,7 +78,7 @@ const WinRateTrend = () => {
       <div className="filter-row">
         <div className="filter-group">
           <label className="filter-label">Date Range</label>
-          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+          <select value={dateRange} onChange={(e) => updateFilters('winRateTrend', { dateRange: e.target.value })}>
             <option value="7days">Last 7 Days</option>
             <option value="30days">Last 30 Days</option>
             <option value="90days">Last 90 Days</option>
@@ -88,7 +88,7 @@ const WinRateTrend = () => {
 
         <div className="filter-group">
           <label className="filter-label">Format</label>
-          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+          <select value={format} onChange={(e) => updateFilters('winRateTrend', { format: e.target.value })}>
             <option value="all">All Formats</option>
             <option value="constructed">Constructed</option>
             <option value="Ladder">Ranked (Ladder)</option>
@@ -98,7 +98,7 @@ const WinRateTrend = () => {
 
         <div className="filter-group">
           <label className="filter-label">Chart Type</label>
-          <select value={chartType} onChange={(e) => setChartType(e.target.value as 'line' | 'bar')}>
+          <select value={chartType} onChange={(e) => updateFilters('winRateTrend', { chartType: e.target.value as 'line' | 'bar' })}>
             <option value="line">Line Chart</option>
             <option value="bar">Bar Chart</option>
           </select>
@@ -106,7 +106,7 @@ const WinRateTrend = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading trend data...</div>}
+      {loading && <LoadingSpinner message="Loading trend data..." />}
 
       {error && <div className="error">{error}</div>}
 

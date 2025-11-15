@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AboutDialog from '../components/AboutDialog';
 import './Settings.css';
 
 const Settings = () => {
@@ -7,6 +8,7 @@ const Settings = () => {
   const [refreshInterval, setRefreshInterval] = useState(30);
   const [showNotifications, setShowNotifications] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   const handleSave = () => {
     // TODO: Implement backend settings save
@@ -196,6 +198,11 @@ const Settings = () => {
               <span className="about-label">Platform:</span>
               <span className="about-value">Wails + React</span>
             </div>
+            <div className="setting-control" style={{ marginTop: '16px' }}>
+              <button className="action-button" onClick={() => setShowAbout(true)}>
+                About MTGA Companion
+              </button>
+            </div>
           </div>
         </div>
 
@@ -209,6 +216,9 @@ const Settings = () => {
           </button>
         </div>
       </div>
+
+      {/* About Dialog */}
+      <AboutDialog isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </div>
   );
 };

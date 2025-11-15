@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GetStatsByFormat } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 import './FormatDistribution.css';
 
 interface FormatStats {
@@ -12,17 +14,12 @@ interface FormatStats {
 const COLORS = ['#4a9eff', '#7dff7d', '#ff7d7d', '#ffaa00', '#aa00ff', '#00ffaa', '#ff00aa'];
 
 const FormatDistribution = () => {
+  const { filters, updateFilters } = useAppContext();
+  const { dateRange, customStartDate, customEndDate, chartType, sortBy, sortDirection } = filters.formatDistribution;
+
   const [formatStats, setFormatStats] = useState<FormatStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
-  const [dateRange, setDateRange] = useState('7days');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [chartType, setChartType] = useState<'pie' | 'bar'>('bar');
-  const [sortBy, setSortBy] = useState<'matches' | 'winRate' | 'name'>('matches');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadFormatStats();
@@ -146,7 +143,7 @@ const FormatDistribution = () => {
         <div className="filter-row">
           <div className="filter-group">
             <label className="filter-label">Date Range</label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            <select value={dateRange} onChange={(e) => updateFilters('formatDistribution', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option>
@@ -163,7 +160,7 @@ const FormatDistribution = () => {
                   type="date"
                   value={customStartDate}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={(e) => updateFilters('formatDistribution', { customStartDate: e.target.value })}
                 />
               </div>
 
@@ -174,7 +171,7 @@ const FormatDistribution = () => {
                   value={customEndDate}
                   min={getMinEndDate()}
                   max={getTodayDateString()}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={(e) => updateFilters('formatDistribution', { customEndDate: e.target.value })}
                 />
               </div>
             </>
@@ -182,7 +179,7 @@ const FormatDistribution = () => {
 
           <div className="filter-group">
             <label className="filter-label">Chart Type</label>
-            <select value={chartType} onChange={(e) => setChartType(e.target.value as 'pie' | 'bar')}>
+            <select value={chartType} onChange={(e) => updateFilters('formatDistribution', { chartType: e.target.value as 'pie' | 'bar' })}>
               <option value="bar">Bar Chart</option>
               <option value="pie">Pie Chart</option>
             </select>
@@ -190,7 +187,7 @@ const FormatDistribution = () => {
 
           <div className="filter-group">
             <label className="filter-label">Sort By</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <select value={sortBy} onChange={(e) => updateFilters('formatDistribution', { sortBy: e.target.value as 'matches' | 'winRate' | 'name' })}>
               <option value="matches">Match Count</option>
               <option value="winRate">Win Rate</option>
               <option value="name">Format Name</option>
@@ -199,7 +196,7 @@ const FormatDistribution = () => {
 
           <div className="filter-group">
             <label className="filter-label">Sort Order</label>
-            <select value={sortDirection} onChange={(e) => setSortDirection(e.target.value as any)}>
+            <select value={sortDirection} onChange={(e) => updateFilters('formatDistribution', { sortDirection: e.target.value as 'asc' | 'desc' })}>
               <option value="desc">Descending</option>
               <option value="asc">Ascending</option>
             </select>
@@ -214,7 +211,7 @@ const FormatDistribution = () => {
       </div>
 
       {/* Content */}
-      {loading && <div className="no-data">Loading format statistics...</div>}
+      {loading && <LoadingSpinner message="Loading format statistics..." />}
 
       {error && <div className="error">{error}</div>}
 
