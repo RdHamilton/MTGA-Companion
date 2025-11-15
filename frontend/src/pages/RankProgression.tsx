@@ -219,6 +219,7 @@ const RankProgression = () => {
                   tickFormatter={formatYAxis}
                   domain={[0, 24]}
                   ticks={[0, 4, 8, 12, 16, 20, 24]}
+                  width={90}
                 />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#2d2d2d', border: '1px solid #3d3d3d' }}
