@@ -418,6 +418,25 @@ func main() {
 		}
 	}
 
+	// Store rank progression history
+	rankUpdates, err := logreader.ParseRankUpdates(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse rank updates: %v", err)
+	} else if len(rankUpdates) > 0 {
+		fmt.Printf("Storing %d rank update(s) in database...\n", len(rankUpdates))
+		storedCount := 0
+		for _, update := range rankUpdates {
+			if err := service.StoreRankUpdate(ctx, update); err != nil {
+				log.Printf("Warning: Failed to store rank update: %v", err)
+			} else {
+				storedCount++
+			}
+		}
+		if storedCount > 0 {
+			fmt.Printf("Successfully stored %d/%d rank update(s).\n", storedCount, len(rankUpdates))
+		}
+	}
+
 	// Display player profile
 	if profile != nil && profile.ScreenName != "" {
 		fmt.Println("Player Profile")
