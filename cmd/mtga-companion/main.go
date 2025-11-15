@@ -205,6 +205,12 @@ func main() {
 		return
 	}
 
+	// Check if this is a service command
+	if len(os.Args) > 1 && os.Args[1] == "service" {
+		runServiceCommand()
+		return
+	}
+
 	// Check if this is a daemon command
 	if len(os.Args) > 1 && os.Args[1] == "daemon" {
 		runDaemonCommand()
