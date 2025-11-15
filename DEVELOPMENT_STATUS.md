@@ -1,15 +1,49 @@
 # Development Status
 
-**Last Updated**: 2025-11-14
+**Last Updated**: 2025-11-15
 
 ## Current Sprint/Focus
 
-### v0.3.0 Release Preparation
-- **Status**: Rank progression parsing implemented (PR #320)
-- **Next**: Review and merge PR #320, then cut v0.3.0 release
-- **Alternative**: Add E2E testing before release
+### v1.0.0 - Service-Based Architecture
+- **Status**: Epic #329 in progress - documentation phase
+- **Current Task**: #334 - Migration Guide and Documentation
+- **Completed**:
+  - ✅ #330 - Extract Shared Log Processing Service (PR #335 - merged)
+  - ✅ #331 - Add Daemon Mode and WebSocket Server (PR #336 - merged)
+  - ✅ #332 - Refactor GUI to Use IPC Client (PR #337 - merged)
+  - ✅ #338 - Add Daemon Settings and Connection Status to GUI (PR #339 - merged)
+  - ✅ #333 - Platform-Specific Service Installation Scripts (PR #340 - pending merge)
+  - 🚧 #334 - Migration Guide and Documentation (current task)
+- **Next**: Platform-specific testing (#346), v1.0 release preparation
 
 ## Recently Completed
+
+### Epic #329 - Service-Based Architecture Refactor (November 2025) ✅ IN PROGRESS
+- ✅ **PR #335** - Extract Shared Log Processing Service
+  - Refactored log processing into shared package
+  - Used by both daemon and standalone GUI
+  - Single source of truth for log parsing
+- ✅ **PR #336** - Add Daemon Mode and WebSocket Server
+  - Background daemon service for 24/7 log monitoring
+  - WebSocket server (port 9999) for real-time events
+  - Automatic crash recovery via service manager
+- ✅ **PR #337** - Refactor GUI to Use IPC Client
+  - GUI connects to daemon via WebSocket
+  - Automatic fallback to standalone mode
+  - Real-time event handling for match updates
+- ✅ **PR #339** - Add Daemon Settings and Connection Status to GUI
+  - Connection status indicator in navigation
+  - Daemon configuration in Settings page
+  - Mode switching (daemon ↔ standalone)
+- ✅ **PR #340** - Platform-Specific Service Installation
+  - Service management commands (install, start, stop, status)
+  - Cross-platform support (macOS/Windows/Linux)
+  - Auto-start on system boot
+- 🚧 **PR #341** (current) - Migration Guide and Documentation
+  - MIGRATION_TO_SERVICE_ARCHITECTURE.md
+  - ARCHITECTURE.md with diagrams
+  - DEVELOPMENT.md for developers
+  - DAEMON_API.md with WebSocket events
 
 ### PR #318 - Wails React Migration (November 2025) ✅ MERGED
 - ✅ Complete desktop GUI with React + TypeScript + Wails v2
@@ -224,8 +258,20 @@
 
 ### Context for Claude:
 - We use Wails v2 (Go backend + React frontend)
+- **Service-based architecture**: Daemon (background) + GUI (frontend)
+- **Daemon mode (recommended)**: 24/7 log monitoring, WebSocket events
+- **Standalone mode (fallback)**: GUI with embedded poller
 - Follow responsive design principles (see CLAUDE.md)
 - Material Design-inspired dark theme
 - All UI must work 800x600 to 1920x1080+
-- Real-time updates via EventsEmit/EventsOn pattern
+- Real-time updates via WebSocket events (daemon) or EventsEmit (standalone)
 - Deck inference links matches to decks via timestamp proximity
+
+### Architecture:
+- **Daemon** (`cmd/mtga-companion/daemon.go`): Background service, WebSocket server
+- **GUI** (`main.go`, `app.go`): Wails app, IPC client
+- **Shared** (`internal/mtga/logprocessor/`): Log parsing logic
+- **IPC** (`internal/ipc/`): WebSocket client/server
+- **Storage** (`internal/storage/`): SQLite database, repositories
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for complete architecture documentation.

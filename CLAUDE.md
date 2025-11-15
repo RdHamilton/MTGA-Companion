@@ -308,6 +308,85 @@ MTGA runs on both macOS and Windows. This application:
 - **Platform-specific**: Log file paths and file system operations use platform detection
 - **Native performance**: Wails uses the system's native webview (no Electron overhead)
 
+### Service-Based Architecture
+
+**Architecture Decision**: Separation of data collection (daemon) from data display (GUI)
+
+**Components**:
+
+**1. CLI Daemon** (`cmd/mtga-companion/daemon.go`):
+- Runs as background service (24/7 operation)
+- Monitors MTGA `Player.log` file continuously
+- Parses log entries and stores in database
+- Broadcasts events to connected clients via WebSocket
+- Auto-starts on system boot (macOS: launchd, Windows: Service, Linux: systemd)
+- Lightweight (~10-20 MB RAM)
+
+**2. GUI Application** (`main.go`, `app.go`):
+- Wails desktop app (Go backend + React frontend)
+- Connects to daemon via WebSocket (port 9999)
+- Receives real-time events for data updates
+- Falls back to standalone mode if daemon unavailable
+- Memory: ~50-100 MB (includes WebView)
+
+**3. Shared Components**:
+- **Log Processor** (`internal/mtga/logprocessor/`): Shared log parsing logic
+- **Storage Layer** (`internal/storage/`): Database access (SQLite)
+- **IPC Layer** (`internal/ipc/`): WebSocket client (GUI) and server (daemon)
+
+**Operating Modes**:
+
+**Daemon Mode (Recommended)**:
+```
+MTGA → Player.log → Daemon (poller + parser) → Database
+                         ↓
+                   WebSocket Server (:9999)
+                         ↓
+                    GUI (IPC Client) → User
+```
+- Data collection runs 24/7, even when GUI closed
+- GUI receives real-time updates via WebSocket events
+- Best for users who want complete match tracking
+
+**Standalone Mode (Fallback)**:
+```
+MTGA → Player.log → GUI (embedded poller + parser) → Database → User
+```
+- GUI has embedded log poller (same as daemon)
+- No WebSocket communication
+- Only collects data when GUI is running
+- Good for development and casual use
+
+**Benefits**:
+- ✅ Zero data loss (daemon runs continuously)
+- ✅ Better resource usage (lightweight daemon vs full GUI)
+- ✅ Crash-resistant (service manager auto-restarts daemon)
+- ✅ Multiple clients can connect to same daemon
+- ✅ Backward compatible (standalone mode still works)
+
+**Service Management**:
+```bash
+# Install daemon as system service
+./mtga-companion service install
+
+# Start/stop/status
+./mtga-companion service start
+./mtga-companion service stop
+./mtga-companion service status
+
+# Uninstall service
+./mtga-companion service uninstall
+```
+
+**WebSocket Events**:
+- `stats:updated` - Statistics recalculated
+- `match:new` - New match recorded
+- `draft:started` - Draft session began
+- `draft:pick` - Card picked in draft
+- See [docs/DAEMON_API.md](docs/DAEMON_API.md) for complete event reference
+
+**For complete architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
 ### Log Reader Architecture
 
 The log reader is organized to parse different sections of MTGA data:
