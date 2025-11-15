@@ -137,6 +137,18 @@ const Quests = () => {
     return `${minutes}m`;
   };
 
+  const formatQuestType = (questType: string): string => {
+    if (!questType) return 'Quest';
+
+    // Remove "Quests/Quest_" prefix
+    let formatted = questType.replace(/^Quests\/Quest_/, '');
+
+    // Replace underscores with spaces
+    formatted = formatted.replace(/_/g, ' ');
+
+    return formatted || 'Quest';
+  };
+
   // Paginate history
   const totalPages = Math.ceil(questHistory.length / pageSize);
   const paginatedHistory = questHistory.slice((page - 1) * pageSize, page * pageSize);
@@ -202,7 +214,7 @@ const Quests = () => {
                     <div key={quest.id} className="quest-card">
                       <div className="quest-card-header">
                         <div className="quest-type">
-                          {quest.quest_type || 'Quest'}
+                          {formatQuestType(quest.quest_type)}
                           {quest.rewards && quest.rewards.includes('750') && ' (750 Gold)'}
                           {quest.rewards && quest.rewards.includes('500') && ' (500 Gold)'}
                         </div>
@@ -321,7 +333,7 @@ const Quests = () => {
                         const progress = calculateProgress(quest);
                         return (
                           <tr key={quest.id} className={quest.completed ? 'quest-completed' : 'quest-incomplete'}>
-                            <td>{quest.quest_type || 'Quest'}</td>
+                            <td>{formatQuestType(quest.quest_type)}</td>
                             <td>
                               <div className="progress-cell">
                                 <span>{quest.ending_progress} / {quest.goal}</span>
