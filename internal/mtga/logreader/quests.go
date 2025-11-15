@@ -1,6 +1,7 @@
 package logreader
 
 import (
+	"log"
 	"time"
 )
 
@@ -25,6 +26,9 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 	var quests []*QuestData
 	questMap := make(map[string]*QuestData) // Track by questId to detect updates
 
+	questsFound := 0
+	newQuestsFound := 0
+
 	for _, entry := range entries {
 		if !entry.IsJSON {
 			continue
@@ -40,6 +44,7 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 		// Check for "quests" event (quest state/progress updates)
 		if questsData, ok := entry.JSON["quests"]; ok {
+			questsFound++
 			if questArray, ok := questsData.([]interface{}); ok {
 				for _, q := range questArray {
 					if questMap, ok := q.(map[string]interface{}); ok {
@@ -54,6 +59,7 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 		// Check for "newQuests" event (newly assigned quests)
 		if newQuestsData, ok := entry.JSON["newQuests"]; ok {
+			newQuestsFound++
 			if questArray, ok := newQuestsData.([]interface{}); ok {
 				for _, q := range questArray {
 					if questMapData, ok := q.(map[string]interface{}); ok {
@@ -71,6 +77,10 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 	// Convert map to slice
 	for _, quest := range questMap {
 		quests = append(quests, quest)
+	}
+
+	if questsFound > 0 || newQuestsFound > 0 {
+		log.Printf("Quest parser: Found %d 'quests' events and %d 'newQuests' events, parsed %d unique quests", questsFound, newQuestsFound, len(quests))
 	}
 
 	return quests, nil
