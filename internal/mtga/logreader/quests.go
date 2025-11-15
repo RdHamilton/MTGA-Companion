@@ -130,27 +130,3 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 
 	return quest
 }
-
-// getStringValue safely extracts a string value from a JSON map.
-func getStringValue(json map[string]interface{}, key string) string {
-	if value, ok := json[key].(string); ok {
-		return value
-	}
-	return ""
-}
-
-// getIntValue safely extracts an int value from a JSON map (handles float64).
-func getIntValue(json map[string]interface{}, key string) int {
-	if value, ok := json[key].(float64); ok {
-		return int(value)
-	}
-	return 0
-}
-
-// getBoolValue safely extracts a bool value from a JSON map.
-func getBoolValue(json map[string]interface{}, key string) bool {
-	if value, ok := json[key].(bool); ok {
-		return value
-	}
-	return false
-}

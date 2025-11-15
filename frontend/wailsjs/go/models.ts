@@ -86,6 +86,84 @@ export namespace models {
 	        this.SlowestGame = source["SlowestGame"];
 	    }
 	}
+	export class Quest {
+	    id: number;
+	    quest_id: string;
+	    quest_type: string;
+	    goal: number;
+	    starting_progress: number;
+	    ending_progress: number;
+	    completed: boolean;
+	    can_swap: boolean;
+	    rewards: string;
+	    assigned_at: time.Time;
+	    completed_at?: time.Time;
+	    rerolled: boolean;
+	    created_at: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new Quest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.quest_id = source["quest_id"];
+	        this.quest_type = source["quest_type"];
+	        this.goal = source["goal"];
+	        this.starting_progress = source["starting_progress"];
+	        this.ending_progress = source["ending_progress"];
+	        this.completed = source["completed"];
+	        this.can_swap = source["can_swap"];
+	        this.rewards = source["rewards"];
+	        this.assigned_at = this.convertValues(source["assigned_at"], time.Time);
+	        this.completed_at = this.convertValues(source["completed_at"], time.Time);
+	        this.rerolled = source["rerolled"];
+	        this.created_at = this.convertValues(source["created_at"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class QuestStats {
+	    total_quests: number;
+	    completed_quests: number;
+	    active_quests: number;
+	    completion_rate: number;
+	    total_gold_earned: number;
+	    average_completion_ms: number;
+	    reroll_count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new QuestStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_quests = source["total_quests"];
+	        this.completed_quests = source["completed_quests"];
+	        this.active_quests = source["active_quests"];
+	        this.completion_rate = source["completion_rate"];
+	        this.total_gold_earned = source["total_gold_earned"];
+	        this.average_completion_ms = source["average_completion_ms"];
+	        this.reroll_count = source["reroll_count"];
+	    }
+	}
 	export class RankProgression {
 	    CurrentRank: string;
 	    NextRank: string;

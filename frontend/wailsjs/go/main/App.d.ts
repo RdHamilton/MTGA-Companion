@@ -4,11 +4,17 @@ import {models} from '../models';
 import {time} from '../models';
 import {storage} from '../models';
 
+export function GetActiveQuests():Promise<Array<models.Quest>>;
+
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;
+
+export function GetQuestHistory(arg1:string,arg2:string,arg3:number):Promise<Array<models.Quest>>;
+
+export function GetQuestStats(arg1:string,arg2:string):Promise<models.QuestStats>;
 
 export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
