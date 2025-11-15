@@ -583,6 +583,14 @@ func (a *App) stopDaemonClient() {
 		a.ipcClient = nil
 		a.daemonMode = false
 		log.Println("Daemon client stopped")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
 	}
 }
 

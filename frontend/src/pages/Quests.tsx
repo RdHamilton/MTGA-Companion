@@ -73,16 +73,30 @@ const Quests = () => {
         endDate = now.toISOString().split('T')[0];
       }
 
-      // Load all quest data in parallel
-      const [active, history, stats] = await Promise.all([
-        GetActiveQuests(),
-        GetQuestHistory(startDate, endDate, historyLimit),
-        GetQuestStats(startDate, endDate),
-      ]);
+      // Load quest data sequentially with better error reporting
+      try {
+        const active = await GetActiveQuests();
+        setActiveQuests(active || []);
+      } catch (activeErr) {
+        console.error('Error loading active quests:', activeErr);
+        throw new Error(`Failed to load active quests: ${activeErr instanceof Error ? activeErr.message : String(activeErr)}`);
+      }
 
-      setActiveQuests(active || []);
-      setQuestHistory(history || []);
-      setQuestStats(stats);
+      try {
+        const history = await GetQuestHistory(startDate, endDate, historyLimit);
+        setQuestHistory(history || []);
+      } catch (historyErr) {
+        console.error('Error loading quest history:', historyErr);
+        throw new Error(`Failed to load quest history: ${historyErr instanceof Error ? historyErr.message : String(historyErr)}`);
+      }
+
+      try {
+        const stats = await GetQuestStats(startDate, endDate);
+        setQuestStats(stats);
+      } catch (statsErr) {
+        console.error('Error loading quest stats:', statsErr);
+        throw new Error(`Failed to load quest stats: ${statsErr instanceof Error ? statsErr.message : String(statsErr)}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load quest data');
       console.error('Error loading quest data:', err);
