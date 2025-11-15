@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -18,16 +20,22 @@ import (
 
 // App struct
 type App struct {
-	ctx        context.Context
-	service    *storage.Service
-	poller     *logreader.Poller
-	pollerStop context.CancelFunc
-	pollerMu   sync.Mutex
+	ctx         context.Context
+	service     *storage.Service
+	poller      *logreader.Poller
+	pollerStop  context.CancelFunc
+	pollerMu    sync.Mutex
+	ipcClient   *ipc.Client
+	ipcClientMu sync.Mutex
+	daemonMode  bool
+	daemonPort  int // Configurable daemon port
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{
+		daemonPort: 9999, // Default daemon port
+	}
 }
 
 // startup is called when the app starts. The context is saved
@@ -43,10 +51,18 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 
-	// Auto-start log file poller for real-time updates
-	if err := a.StartPoller(); err != nil {
-		log.Printf("Warning: Failed to start log file poller: %v", err)
-		log.Printf("Real-time updates will not be available")
+	// Try to connect to daemon first
+	if err := a.connectToDaemon(); err != nil {
+		log.Printf("Daemon not available, falling back to standalone mode: %v", err)
+
+		// Auto-start log file poller for real-time updates (fallback mode)
+		if err := a.StartPoller(); err != nil {
+			log.Printf("Warning: Failed to start log file poller: %v", err)
+			log.Printf("Real-time updates will not be available")
+		}
+	} else {
+		log.Println("Connected to daemon successfully")
+		a.daemonMode = true
 	}
 }
 
@@ -66,6 +82,9 @@ func getDefaultDBPath() string {
 
 // shutdown is called when the app shuts down
 func (a *App) shutdown(ctx context.Context) {
+	// Stop daemon client if running
+	a.stopDaemonClient()
+
 	// Stop poller if running
 	a.StopPoller()
 
@@ -479,5 +498,90 @@ func (a *App) processNewEntries(ctx context.Context, entries []*logreader.LogEnt
 			"games":   games,
 		})
 		log.Println("📡 Emitted stats:updated event to frontend")
+	}
+}
+
+// connectToDaemon attempts to connect to the daemon WebSocket server.
+func (a *App) connectToDaemon() error {
+	a.ipcClientMu.Lock()
+	defer a.ipcClientMu.Unlock()
+
+	// Create IPC client
+	wsURL := fmt.Sprintf("ws://localhost:%d", a.daemonPort)
+	a.ipcClient = ipc.NewClient(wsURL)
+
+	// Try to connect
+	if err := a.ipcClient.Connect(); err != nil {
+		a.ipcClient = nil
+		return err
+	}
+
+	// Setup event handlers
+	a.setupEventHandlers()
+
+	// Start listening for events
+	a.ipcClient.Start()
+
+	return nil
+}
+
+// setupEventHandlers registers event handlers for daemon events.
+func (a *App) setupEventHandlers() {
+	// Handle stats:updated events from daemon
+	a.ipcClient.On("stats:updated", func(data map[string]interface{}) {
+		log.Printf("Received stats:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "stats:updated", data)
+	})
+
+	// Handle rank:updated events from daemon
+	a.ipcClient.On("rank:updated", func(data map[string]interface{}) {
+		log.Printf("Received rank:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "rank:updated", data)
+	})
+
+	// Handle deck:updated events from daemon
+	a.ipcClient.On("deck:updated", func(data map[string]interface{}) {
+		log.Printf("Received deck:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "deck:updated", data)
+	})
+
+	// Handle daemon:status events
+	a.ipcClient.On("daemon:status", func(data map[string]interface{}) {
+		log.Printf("Daemon status: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "daemon:status", data)
+	})
+
+	// Handle daemon:connected events
+	a.ipcClient.On("daemon:connected", func(data map[string]interface{}) {
+		log.Printf("Daemon connected: %v", data)
+	})
+
+	// Handle daemon:error events
+	a.ipcClient.On("daemon:error", func(data map[string]interface{}) {
+		log.Printf("Daemon error: %v", data)
+
+		// Forward error event to frontend
+		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
+	})
+}
+
+// stopDaemonClient stops the daemon IPC client if running.
+func (a *App) stopDaemonClient() {
+	a.ipcClientMu.Lock()
+	defer a.ipcClientMu.Unlock()
+
+	if a.ipcClient != nil {
+		a.ipcClient.Stop()
+		a.ipcClient = nil
+		a.daemonMode = false
+		log.Println("Daemon client stopped")
 	}
 }
