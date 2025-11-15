@@ -206,5 +206,7 @@ func (s *WebSocketServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		log.Printf("Error encoding status response: %v", err)
+	}
 }
