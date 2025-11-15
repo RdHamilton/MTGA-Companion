@@ -68,7 +68,7 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active quests: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	return r.scanQuests(rows)
 }
@@ -104,7 +104,7 @@ func (r *QuestRepository) GetQuestHistory(startDate, endDate *time.Time, limit i
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quest history: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	return r.scanQuests(rows)
 }
