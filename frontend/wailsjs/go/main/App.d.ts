@@ -4,7 +4,15 @@ import {models} from '../models';
 import {time} from '../models';
 import {storage} from '../models';
 
+export function GetAchievementStats():Promise<models.AchievementStats>;
+
+export function GetAchievementsByStatus(arg1:string):Promise<Array<models.Achievement>>;
+
 export function GetActiveQuests():Promise<Array<models.Quest>>;
+
+export function GetAllAchievements():Promise<Array<models.Achievement>>;
+
+export function GetCloseToCompleteAchievements():Promise<Array<models.Achievement>>;
 
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
@@ -19,6 +27,8 @@ export function GetQuestStats(arg1:string,arg2:string):Promise<models.QuestStats
 export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
 export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.Time,arg4:storage.TimelinePeriod):Promise<storage.RankTimeline>;
+
+export function GetRecentlyCompletedAchievements(arg1:number):Promise<Array<models.Achievement>>;
 
 export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
 

@@ -8,6 +8,7 @@ import './Quests.css';
 
 const Quests = () => {
   const [activeQuests, setActiveQuests] = useState<models.Quest[]>([]);
+  const [dailyWins, setDailyWins] = useState<models.Quest | null>(null);
   const [questHistory, setQuestHistory] = useState<models.Quest[]>([]);
   const [questStats, setQuestStats] = useState<models.QuestStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +81,11 @@ const Quests = () => {
       // Load quest data sequentially with better error reporting
       try {
         const active = await GetActiveQuests();
-        setActiveQuests(active || []);
+        // Separate Daily wins from regular quests
+        const daily = active?.find(q => q.quest_type === 'Daily') || null;
+        const regular = active?.filter(q => q.quest_type !== 'Daily') || [];
+        setDailyWins(daily);
+        setActiveQuests(regular);
       } catch (activeErr) {
         console.error('Error loading active quests:', activeErr);
         throw new Error(`Failed to load active quests: ${activeErr instanceof Error ? activeErr.message : String(activeErr)}`);
@@ -201,6 +206,29 @@ const Quests = () => {
 
       {!loading && !error && (
         <>
+          {/* Daily Wins Section */}
+          {dailyWins && (
+            <div className="quests-section">
+              <h2 className="section-title">Daily Wins</h2>
+              <div className="daily-wins-card">
+                <div className="daily-wins-header">
+                  <span className="daily-wins-title">Win 15 Games</span>
+                  <span className="daily-wins-progress">{dailyWins.ending_progress} / {dailyWins.goal}</span>
+                </div>
+                <div className="daily-wins-bar">
+                  <div
+                    className="daily-wins-fill"
+                    style={{ width: `${calculateProgress(dailyWins)}%` }}
+                  />
+                </div>
+                <div className="daily-wins-footer">
+                  <span className="daily-wins-percent">{calculateProgress(dailyWins).toFixed(0)}% Complete</span>
+                  <span className="daily-wins-reward">Earn gold and XP rewards</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Active Quests Section */}
           <div className="quests-section">
             <h2 className="section-title">Active Quests</h2>

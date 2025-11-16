@@ -212,7 +212,28 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 		s.wsServer.Broadcast(Event{
 			Type: "quest:updated",
 			Data: map[string]interface{}{
-				"count": result.QuestsStored,
+				"count":     result.QuestsStored,
+				"completed": result.QuestsCompleted,
+			},
+		})
+	}
+
+	if result.QuestsCompleted > 0 {
+		log.Printf("Completed %d quest(s)", result.QuestsCompleted)
+		s.wsServer.Broadcast(Event{
+			Type: "quest:updated",
+			Data: map[string]interface{}{
+				"completed": result.QuestsCompleted,
+			},
+		})
+	}
+
+	if result.AchievementsStored > 0 {
+		log.Printf("Stored %d achievement(s)", result.AchievementsStored)
+		s.wsServer.Broadcast(Event{
+			Type: "achievement:updated",
+			Data: map[string]interface{}{
+				"count": result.AchievementsStored,
 			},
 		})
 	}

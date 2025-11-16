@@ -73,9 +73,9 @@ func getDefaultDBPath() string {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			log.Printf("Error getting home directory: %v", err)
-			return "data.db" // Fallback to current directory
+			return "mtga.db" // Fallback to current directory
 		}
-		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+		dbPath = filepath.Join(home, ".mtga-companion", "mtga.db")
 	}
 	return dbPath
 }
@@ -551,6 +551,22 @@ func (a *App) setupEventHandlers() {
 		wailsruntime.EventsEmit(a.ctx, "deck:updated", data)
 	})
 
+	// Handle quest:updated events from daemon
+	a.ipcClient.On("quest:updated", func(data map[string]interface{}) {
+		log.Printf("Received quest:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "quest:updated", data)
+	})
+
+	// Handle achievement:updated events from daemon
+	a.ipcClient.On("achievement:updated", func(data map[string]interface{}) {
+		log.Printf("Received achievement:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "achievement:updated", data)
+	})
+
 	// Handle daemon:status events
 	a.ipcClient.On("daemon:status", func(data map[string]interface{}) {
 		log.Printf("Daemon status: %v", data)
@@ -781,6 +797,76 @@ func (a *App) GetQuestStats(startDate, endDate string) (*models.QuestStats, erro
 	stats, err := a.service.Quests().GetQuestStats(start, end)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get quest stats: %v", err)}
+	}
+
+	return stats, nil
+}
+
+// GetAllAchievements returns all achievements for the current account.
+func (a *App) GetAllAchievements() ([]*models.Achievement, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	achievements, err := a.service.Achievements().GetAll(a.service.GetCurrentAccountID())
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievements: %v", err)}
+	}
+
+	return achievements, nil
+}
+
+// GetAchievementsByStatus returns achievements filtered by status (Available, InProgress, Completed).
+func (a *App) GetAchievementsByStatus(status string) ([]*models.Achievement, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	achievements, err := a.service.Achievements().GetByStatus(a.service.GetCurrentAccountID(), status)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievements by status: %v", err)}
+	}
+
+	return achievements, nil
+}
+
+// GetCloseToCompleteAchievements returns achievements that are near completion (>= 90% progress).
+func (a *App) GetCloseToCompleteAchievements() ([]*models.Achievement, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	achievements, err := a.service.Achievements().GetCloseToComplete(a.service.GetCurrentAccountID())
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get close to complete achievements: %v", err)}
+	}
+
+	return achievements, nil
+}
+
+// GetRecentlyCompletedAchievements returns achievements completed within the last N days.
+func (a *App) GetRecentlyCompletedAchievements(days int) ([]*models.Achievement, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	achievements, err := a.service.Achievements().GetRecentlyCompleted(a.service.GetCurrentAccountID(), days)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get recently completed achievements: %v", err)}
+	}
+
+	return achievements, nil
+}
+
+// GetAchievementStats returns achievement statistics.
+func (a *App) GetAchievementStats() (*models.AchievementStats, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	stats, err := a.service.Achievements().GetStats(a.service.GetCurrentAccountID())
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievement stats: %v", err)}
 	}
 
 	return stats, nil

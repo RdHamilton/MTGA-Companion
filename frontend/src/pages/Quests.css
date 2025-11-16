@@ -54,6 +54,71 @@
   color: #ffffff;
 }
 
+/* Daily Wins Section */
+.daily-wins-card {
+  background-color: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.daily-wins-card:hover {
+  border-color: #4fc3f7;
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.2);
+}
+
+.daily-wins-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.daily-wins-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.daily-wins-progress {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4fc3f7;
+}
+
+.daily-wins-bar {
+  background-color: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  height: 24px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.daily-wins-fill {
+  background: linear-gradient(90deg, #4fc3f7 0%, #29b6f6 100%);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.daily-wins-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.daily-wins-percent {
+  color: #aaaaaa;
+}
+
+.daily-wins-reward {
+  color: #ffd700;
+  font-weight: 500;
+}
+
 /* Active Quests Grid */
 .active-quests-grid {
   display: grid;
