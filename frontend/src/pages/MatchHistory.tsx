@@ -301,6 +301,11 @@ const MatchHistory = () => {
                     <span>Score</span>
                   </Tooltip>
                 </th>
+                <th>
+                  <Tooltip content="Opponent player name">
+                    <span>Opponent</span>
+                  </Tooltip>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -315,6 +320,7 @@ const MatchHistory = () => {
                   <td>{match.Format}</td>
                   <td>{match.EventName}</td>
                   <td>{formatScore(match.PlayerWins, match.OpponentWins)}</td>
+                  <td>{match.OpponentName || '—'}</td>
                 </tr>
               ))}
             </tbody>
