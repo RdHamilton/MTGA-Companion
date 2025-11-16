@@ -123,14 +123,14 @@ func main() {
 		md.WriteString("---\n\n")
 	}
 
-	// Write to documents folder
-	docsDir := filepath.Join("documents")
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
-		log.Fatalf("Failed to create documents directory: %v", err)
+	// Write to docs folder
+	docsDir := filepath.Join("docs")
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
+		log.Fatalf("Failed to create docs directory: %v", err)
 	}
 
 	outputPath := filepath.Join(docsDir, "MTGA_LOG_EVENTS.md")
-	if err := os.WriteFile(outputPath, []byte(md.String()), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(md.String()), 0o644); err != nil {
 		log.Fatalf("Failed to write documentation: %v", err)
 	}
 

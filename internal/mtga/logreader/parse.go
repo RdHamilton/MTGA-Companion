@@ -1,5 +1,22 @@
 package logreader
 
+import (
+	"runtime"
+)
+
+// GetPlatformID returns the expected platformId value for the current OS.
+// MTGA uses "Mac" for macOS and "Windows" for Windows in match events.
+func GetPlatformID() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "Mac"
+	case "windows":
+		return "Windows"
+	default:
+		return ""
+	}
+}
+
 // ParseProfile extracts player profile information from log entries.
 // It looks for authenticateResponse events that contain screenName and clientId.
 func ParseProfile(entries []*LogEntry) (*PlayerProfile, error) {
@@ -369,6 +386,9 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 	// Track seen matches to avoid double counting
 	seenMatches := make(map[string]bool)
 
+	// Determine expected platform ID based on runtime.GOOS
+	expectedPlatformID := GetPlatformID()
+
 	for _, entry := range entries {
 		if !entry.IsJSON {
 			continue
@@ -412,19 +432,43 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 				continue
 			}
 
-			// Get eventId from first player
-			firstPlayer, ok := reservedPlayers[0].(map[string]interface{})
-			if !ok {
+			// Find the actual player (not the opponent)
+			// The player is the one on the same platform as the current system
+			var actualPlayer map[string]interface{}
+			eventID := "Unknown"
+
+			for _, playerData := range reservedPlayers {
+				player, ok := playerData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Use the first player as fallback
+				if actualPlayer == nil {
+					actualPlayer = player
+				}
+
+				// Extract event ID from any player
+				if evID, ok := player["eventId"].(string); ok && evID != "" {
+					eventID = evID
+				}
+
+				// Check if this player matches our platform
+				if platformID, ok := player["platformId"].(string); ok {
+					if platformID == expectedPlatformID {
+						// Found the player on our platform - this is the actual player
+						actualPlayer = player
+						break
+					}
+				}
+			}
+
+			if actualPlayer == nil {
 				continue
 			}
 
-			eventID, _ := firstPlayer["eventId"].(string)
-			if eventID == "" {
-				eventID = "Unknown"
-			}
-
 			// Get player's team ID to determine wins/losses
-			playerTeamID, _ := firstPlayer["teamId"].(float64)
+			playerTeamID, _ := actualPlayer["teamId"].(float64)
 
 			// Parse result list
 			resultList, ok := finalMatchResult["resultList"].([]interface{})

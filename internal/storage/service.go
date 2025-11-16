@@ -23,20 +23,22 @@ type Service struct {
 	accounts         repository.AccountRepository
 	rankHistory      repository.RankHistoryRepository
 	quests           *QuestRepository
+	achievements     *AchievementRepository
 	currentAccountID int // Current active account ID
 }
 
 // NewService creates a new storage service.
 func NewService(db *DB) *Service {
 	svc := &Service{
-		db:          db,
-		matches:     repository.NewMatchRepository(db.Conn()),
-		stats:       repository.NewStatsRepository(db.Conn()),
-		decks:       repository.NewDeckRepository(db.Conn()),
-		collection:  repository.NewCollectionRepository(db.Conn()),
-		accounts:    repository.NewAccountRepository(db.Conn()),
-		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
-		quests:      NewQuestRepository(db.Conn()),
+		db:           db,
+		matches:      repository.NewMatchRepository(db.Conn()),
+		stats:        repository.NewStatsRepository(db.Conn()),
+		decks:        repository.NewDeckRepository(db.Conn()),
+		collection:   repository.NewCollectionRepository(db.Conn()),
+		accounts:     repository.NewAccountRepository(db.Conn()),
+		rankHistory:  repository.NewRankHistoryRepository(db.Conn()),
+		quests:       NewQuestRepository(db.Conn()),
+		achievements: NewAchievementRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -213,28 +215,56 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				continue
 			}
 
-			firstPlayer, ok := reservedPlayers[0].(map[string]interface{})
-			if !ok {
+			// Find the actual player (not the opponent) by matching platform
+			var actualPlayer map[string]interface{}
+			var opponentPlayer map[string]interface{}
+			eventID := "Unknown"
+			expectedPlatformID := logreader.GetPlatformID()
+
+			for _, playerData := range reservedPlayers {
+				player, ok := playerData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Use the first player as fallback
+				if actualPlayer == nil {
+					actualPlayer = player
+				}
+
+				// Extract event ID from any player
+				if evID, ok := player["eventId"].(string); ok && evID != "" {
+					eventID = evID
+				}
+
+				// Check if this player matches our platform
+				if platformID, ok := player["platformId"].(string); ok {
+					if platformID == expectedPlatformID {
+						// Found the player on our platform
+						actualPlayer = player
+					} else {
+						// This is the opponent
+						opponentPlayer = player
+					}
+				}
+			}
+
+			if actualPlayer == nil {
 				continue
 			}
 
-			eventID, _ := firstPlayer["eventId"].(string)
-			if eventID == "" {
-				eventID = "Unknown"
-			}
-
-			eventName, _ := firstPlayer["eventId"].(string)
+			eventName, _ := actualPlayer["eventId"].(string)
 			if eventName == "" {
 				eventName = eventID
 			}
 
-			playerTeamID, _ := firstPlayer["teamId"].(float64)
+			playerTeamID, _ := actualPlayer["teamId"].(float64)
 
 			// Extract deck ID if available
 			var deckID *string
-			if deckIDStr, ok := firstPlayer["deckId"].(string); ok && deckIDStr != "" {
+			if deckIDStr, ok := actualPlayer["deckId"].(string); ok && deckIDStr != "" {
 				deckID = &deckIDStr
-			} else if deckIDStr, ok := firstPlayer["DeckId"].(string); ok && deckIDStr != "" {
+			} else if deckIDStr, ok := actualPlayer["DeckId"].(string); ok && deckIDStr != "" {
 				deckID = &deckIDStr
 			}
 
@@ -316,6 +346,18 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				}
 			}
 
+			// Extract opponent information if available
+			var opponentName *string
+			var opponentID *string
+			if opponentPlayer != nil {
+				if name, ok := opponentPlayer["playerName"].(string); ok && name != "" {
+					opponentName = &name
+				}
+				if id, ok := opponentPlayer["userId"].(string); ok && id != "" {
+					opponentID = &id
+				}
+			}
+
 			// Create match record
 			match := &Match{
 				ID:           matchID,
@@ -330,6 +372,8 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				Format:       eventID,
 				Result:       matchResult,
 				ResultReason: resultReason,
+				OpponentName: opponentName,
+				OpponentID:   opponentID,
 				CreatedAt:    matchTime,
 			}
 
@@ -1483,6 +1527,11 @@ func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time
 // Quests returns the quest repository for accessing quest data.
 func (s *Service) Quests() *QuestRepository {
 	return s.quests
+}
+
+// Achievements returns the achievement repository.
+func (s *Service) Achievements() *AchievementRepository {
+	return s.achievements
 }
 
 // Close closes the database connection.
