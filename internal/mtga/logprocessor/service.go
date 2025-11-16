@@ -63,8 +63,11 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 		result.Errors = append(result.Errors, err)
 	}
 
-	// Note: GraphGetGraphState quest completion tracking disabled - unreliable
-	// Quest completion is now handled automatically in Save() when ending_progress >= goal
+	// Process graph state for progress tracking (daily wins, weekly wins, etc.)
+	// Note: We don't use this for quest COMPLETION anymore - that's handled automatically
+	if err := s.processGraphState(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
 
 	// Process achievements
 	if err := s.processAchievements(ctx, entries, result); err != nil {
@@ -281,6 +284,37 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 		result.QuestsStored = storedCount
 		log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
 	}
+
+	return nil
+}
+
+// processGraphState parses GraphGetGraphState events for progress tracking data.
+// Note: We don't use this for quest COMPLETION (handled automatically via ending_progress >= goal).
+// Instead, we use it to discover and track other progress data (daily wins, weekly wins, etc.).
+func (s *Service) processGraphState(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	graphStates, err := logreader.ParseGraphState(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse graph state: %v", err)
+		return err
+	}
+
+	if len(graphStates) == 0 {
+		return nil
+	}
+
+	// Log all unique node types we encounter for analysis
+	nodeTypesSeen := make(map[string]bool)
+	for _, state := range graphStates {
+		for _, node := range state.AllNodes {
+			if !nodeTypesSeen[node.NodeName] {
+				log.Printf("GraphState node discovered: %s (Status: %s)", node.NodeName, node.Status)
+				nodeTypesSeen[node.NodeName] = true
+			}
+		}
+	}
+
+	// TODO: Parse daily wins, weekly wins, and other progress from discovered nodes
+	// For now, we just log what's available for discovery
 
 	return nil
 }
