@@ -97,13 +97,8 @@ func (s *Service) processArenaStats(ctx context.Context, entries []*logreader.Lo
 
 		log.Printf("✓ Stored statistics: %d matches, %d games", arenaStats.TotalMatches, arenaStats.TotalGames)
 
-		// Try to infer deck IDs for the new matches
-		inferredCount, err := s.storage.InferDeckIDsForMatches(ctx)
-		if err != nil {
-			log.Printf("Warning: Failed to infer deck IDs: %v", err)
-		} else if inferredCount > 0 {
-			log.Printf("✓ Linked %d match(es) to decks", inferredCount)
-		}
+		// Note: We don't infer deck IDs here anymore - we wait until AFTER decks are processed
+		// to ensure we have the most up-to-date last_played timestamps
 	}
 
 	return nil
