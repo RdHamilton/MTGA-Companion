@@ -15,7 +15,12 @@ const ToastContainer = () => {
 
   const addToast = useCallback((message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = toastIdCounter++;
-    setToasts(prev => [...prev, { id, message, type }]);
+    console.log('[ToastContainer] addToast called:', { id, message, type });
+    setToasts(prev => {
+      const newToasts = [...prev, { id, message, type }];
+      console.log('[ToastContainer] Toast state updated. Total toasts:', newToasts.length);
+      return newToasts;
+    });
   }, []);
 
   const removeToast = useCallback((id: number) => {
@@ -25,14 +30,18 @@ const ToastContainer = () => {
   useEffect(() => {
     // Listen for stats:updated events from backend
     const unsubscribeStats = EventsOn('stats:updated', (data: any) => {
+      console.log('[ToastContainer] stats:updated event received:', data);
       const matches = data?.matches || 0;
       const games = data?.games || 0;
 
       if (matches > 0) {
+        console.log('[ToastContainer] Adding toast for matches:', matches, 'games:', games);
         addToast(
           `New match detected! ${matches} match${matches > 1 ? 'es' : ''}, ${games} game${games > 1 ? 's' : ''} - Stats updated`,
           'success'
         );
+      } else {
+        console.log('[ToastContainer] No matches to show toast for');
       }
     });
 
