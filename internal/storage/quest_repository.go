@@ -20,35 +20,86 @@ func NewQuestRepository(db *sql.DB) *QuestRepository {
 
 // Save saves a quest to the database (insert or update)
 func (r *QuestRepository) Save(quest *models.Quest) error {
+	// First, check if a quest with this quest_id already exists and is not completed
+	existingQuery := `
+		SELECT id, ending_progress FROM quests
+		WHERE quest_id = ? AND completed = 0
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var existingID int
+	var existingProgress int
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress)
+
+	if err == nil {
+		// Quest exists - update it
+		// Mark as completed if progress >= goal
+		completed := quest.EndingProgress >= quest.Goal
+		var completedAt *time.Time
+		if completed {
+			now := time.Now()
+			completedAt = &now
+		}
+
+		updateQuery := `
+			UPDATE quests
+			SET ending_progress = ?,
+				completed = ?,
+				completed_at = ?,
+				can_swap = ?
+			WHERE id = ?
+		`
+
+		_, err = r.db.Exec(updateQuery,
+			quest.EndingProgress,
+			completed,
+			completedAt,
+			quest.CanSwap,
+			existingID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update quest: %w", err)
+		}
+
+		quest.ID = existingID
+		quest.Completed = completed
+		quest.CompletedAt = completedAt
+		return nil
+	}
+
+	// Quest doesn't exist - insert it
+	// Check if it should be marked completed on insert
+	completed := quest.EndingProgress >= quest.Goal
+	var completedAt *time.Time
+	if completed {
+		now := time.Now()
+		completedAt = &now
+		quest.Completed = true
+		quest.CompletedAt = &now
+	}
+
 	query := `
 		INSERT INTO quests (
 			quest_id, quest_type, goal, starting_progress, ending_progress,
 			completed, can_swap, rewards, assigned_at, completed_at, rerolled
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(quest_id, assigned_at) DO UPDATE SET
-			ending_progress = excluded.ending_progress,
-			completed = excluded.completed,
-			can_swap = excluded.can_swap,
-			completed_at = excluded.completed_at,
-			rerolled = excluded.rerolled
 	`
 
 	result, err := r.db.Exec(query,
 		quest.QuestID, quest.QuestType, quest.Goal,
 		quest.StartingProgress, quest.EndingProgress,
-		quest.Completed, quest.CanSwap, quest.Rewards,
-		quest.AssignedAt, quest.CompletedAt, quest.Rerolled,
+		completed, quest.CanSwap, quest.Rewards,
+		quest.AssignedAt, completedAt, quest.Rerolled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save quest: %w", err)
 	}
 
-	// Get the inserted ID if this was a new quest
-	if quest.ID == 0 {
-		id, err := result.LastInsertId()
-		if err == nil {
-			quest.ID = int(id)
-		}
+	// Get the inserted ID
+	id, err := result.LastInsertId()
+	if err == nil {
+		quest.ID = int(id)
 	}
 
 	return nil
@@ -281,6 +332,89 @@ func (r *QuestRepository) MarkRerolled(questID string, assignedAt time.Time) err
 	_, err := r.db.Exec(query, questID, assignedAt)
 	if err != nil {
 		return fmt.Errorf("failed to mark quest as rerolled: %w", err)
+	}
+
+	return nil
+}
+
+// MarkQuestsCompletedByGraphState marks quests as completed based on GraphGetGraphState data.
+// It maps Quest1-7 from the graph state to actual quests by their assigned order.
+func (r *QuestRepository) MarkQuestsCompletedByGraphState(completedQuestNumbers map[int]bool, timestamp time.Time) error {
+	// Get active quests ordered by assigned_at (oldest first)
+	// This maps to Quest1-7 in the graph state
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE completed = 0
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		WHERE q.completed = 0
+		ORDER BY q.assigned_at ASC
+		LIMIT 7
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to get active quests for completion: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	quests, err := r.scanQuests(rows)
+	if err != nil {
+		return fmt.Errorf("failed to scan quests for completion: %w", err)
+	}
+
+	// Mark quests as completed based on their position (Quest1 = oldest, Quest2 = 2nd oldest, etc.)
+	for i, quest := range quests {
+		questNumber := i + 1 // Quest1 = 1, Quest2 = 2, etc.
+
+		// Check if this quest number is marked as completed in graph state
+		if completedQuestNumbers[questNumber] {
+			// Only mark as completed if it's not already completed
+			if !quest.Completed {
+				if err := r.MarkCompleted(quest.QuestID, quest.AssignedAt, timestamp); err != nil {
+					return fmt.Errorf("failed to mark quest %d (%s) as completed: %w", questNumber, quest.QuestID, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// MarkActiveQuestsCompleted marks all active quests that have reached their goal as completed.
+// This is useful when we know quests should be completed but don't have specific quest IDs.
+func (r *QuestRepository) MarkActiveQuestsCompleted(timestamp time.Time) error {
+	query := `
+		UPDATE quests
+		SET completed = 1, completed_at = ?
+		WHERE completed = 0
+		  AND ending_progress >= goal
+		  AND id IN (
+			SELECT q.id
+			FROM quests q
+			INNER JOIN (
+				SELECT quest_id, MAX(created_at) as max_created
+				FROM quests
+				WHERE completed = 0
+				GROUP BY quest_id
+			) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		  )
+	`
+
+	result, err := r.db.Exec(query, timestamp)
+	if err != nil {
+		return fmt.Errorf("failed to mark active quests as completed: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		// Log how many quests were marked completed
+		_ = rowsAffected // Prevent unused variable warning
 	}
 
 	return nil

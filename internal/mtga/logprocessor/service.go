@@ -26,12 +26,14 @@ func NewService(storage *storage.Service) *Service {
 
 // ProcessResult contains the results of processing log entries.
 type ProcessResult struct {
-	MatchesStored int
-	GamesStored   int
-	DecksStored   int
-	RanksStored   int
-	QuestsStored  int
-	Errors        []error
+	MatchesStored      int
+	GamesStored        int
+	DecksStored        int
+	RanksStored        int
+	QuestsStored       int
+	QuestsCompleted    int
+	AchievementsStored int
+	Errors             []error
 }
 
 // ProcessLogEntries processes a batch of log entries and stores all extracted data.
@@ -58,6 +60,14 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 
 	// Process quests
 	if err := s.processQuests(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Note: GraphGetGraphState quest completion tracking disabled - unreliable
+	// Quest completion is now handled automatically in Save() when ending_progress >= goal
+
+	// Process achievements
+	if err := s.processAchievements(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -270,6 +280,56 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 	if storedCount > 0 {
 		result.QuestsStored = storedCount
 		log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
+	}
+
+	return nil
+}
+
+// processAchievements parses and stores achievements from log entries.
+func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	achievements, err := logreader.ParseAchievements(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse achievements: %v", err)
+		return err
+	}
+
+	if len(achievements) == 0 {
+		return nil
+	}
+
+	log.Printf("Found %d achievement(s) in entries", len(achievements))
+
+	storedCount := 0
+	for _, achievementData := range achievements {
+		// Small delay between operations to avoid database lock contention
+		if storedCount > 0 {
+			time.Sleep(25 * time.Millisecond)
+		}
+
+		// Convert AchievementData to storage model
+		achievement := &models.Achievement{
+			AccountID:       s.storage.GetCurrentAccountID(),
+			GraphID:         achievementData.GraphID,
+			NodeID:          achievementData.NodeID,
+			Status:          achievementData.Status,
+			CurrentProgress: achievementData.CurrentProgress,
+			MaxProgress:     achievementData.MaxProgress,
+			CompletedAt:     achievementData.CompletedAt,
+			FirstSeen:       achievementData.LastUpdated,
+			LastUpdated:     achievementData.LastUpdated,
+		}
+
+		// Save achievement to database
+		if err := s.storage.Achievements().Save(achievement); err != nil {
+			log.Printf("Warning: Failed to store achievement %s:%s: %v", achievementData.GraphID, achievementData.NodeID, err)
+		} else {
+			storedCount++
+		}
+	}
+
+	if storedCount > 0 {
+		result.AchievementsStored = storedCount
+		log.Printf("✓ Stored %d/%d achievement(s)", storedCount, len(achievements))
 	}
 
 	return nil
