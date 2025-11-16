@@ -81,6 +81,29 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 		return nil
 	}
 
+	// Parse and update player profile (screen name) if found
+	profile, _ := logreader.ParseProfile(entries)
+	if profile != nil && (profile.ScreenName != "" || profile.ClientID != "") {
+		// Get current account
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update screen name and client ID if changed
+			updated := false
+			if profile.ScreenName != "" && (account.ScreenName == nil || *account.ScreenName != profile.ScreenName) {
+				account.ScreenName = &profile.ScreenName
+				updated = true
+			}
+			if profile.ClientID != "" && (account.ClientID == nil || *account.ClientID != profile.ClientID) {
+				account.ClientID = &profile.ClientID
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
+	}
+
 	// Extract match details from log entries for persistent storage
 	matchesToStore, err := s.extractMatchesFromEntries(ctx, entries)
 	if err != nil {
@@ -215,11 +238,17 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				continue
 			}
 
-			// Find the actual player (not the opponent) by matching platform
+			// Get current account's screen name for player identification
+			var playerScreenName string
+			account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+			if err == nil && account != nil && account.ScreenName != nil {
+				playerScreenName = *account.ScreenName
+			}
+
+			// Find the actual player (not the opponent) by matching screen name
 			var actualPlayer map[string]interface{}
 			var opponentPlayer map[string]interface{}
 			eventID := "Unknown"
-			expectedPlatformID := logreader.GetPlatformID()
 
 			for _, playerData := range reservedPlayers {
 				player, ok := playerData.(map[string]interface{})
@@ -237,13 +266,13 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 					eventID = evID
 				}
 
-				// Check if this player matches our platform
-				if platformID, ok := player["platformId"].(string); ok {
-					if platformID == expectedPlatformID {
-						// Found the player on our platform
+				// Match player by screen name if available
+				if playerName, ok := player["playerName"].(string); ok && playerName != "" {
+					if playerScreenName != "" && playerName == playerScreenName {
+						// Found the actual player by screen name
 						actualPlayer = player
-					} else {
-						// This is the opponent
+					} else if playerScreenName != "" && playerName != playerScreenName {
+						// This is the opponent (different screen name)
 						opponentPlayer = player
 					}
 				}

@@ -1,22 +1,5 @@
 package logreader
 
-import (
-	"runtime"
-)
-
-// GetPlatformID returns the expected platformId value for the current OS.
-// MTGA uses "Mac" for macOS and "Windows" for Windows in match events.
-func GetPlatformID() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "Mac"
-	case "windows":
-		return "Windows"
-	default:
-		return ""
-	}
-}
-
 // ParseProfile extracts player profile information from log entries.
 // It looks for authenticateResponse events that contain screenName and clientId.
 func ParseProfile(entries []*LogEntry) (*PlayerProfile, error) {
@@ -386,8 +369,12 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 	// Track seen matches to avoid double counting
 	seenMatches := make(map[string]bool)
 
-	// Determine expected platform ID based on runtime.GOOS
-	expectedPlatformID := GetPlatformID()
+	// Get player's screen name from authenticateResponse
+	var playerScreenName string
+	profile, _ := ParseProfile(entries)
+	if profile != nil && profile.ScreenName != "" {
+		playerScreenName = profile.ScreenName
+	}
 
 	for _, entry := range entries {
 		if !entry.IsJSON {
@@ -432,8 +419,7 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 				continue
 			}
 
-			// Find the actual player (not the opponent)
-			// The player is the one on the same platform as the current system
+			// Find the actual player (not the opponent) by matching screen name
 			var actualPlayer map[string]interface{}
 			eventID := "Unknown"
 
@@ -453,10 +439,10 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 					eventID = evID
 				}
 
-				// Check if this player matches our platform
-				if platformID, ok := player["platformId"].(string); ok {
-					if platformID == expectedPlatformID {
-						// Found the player on our platform - this is the actual player
+				// Match player by screen name if available
+				if playerName, ok := player["playerName"].(string); ok && playerName != "" {
+					if playerScreenName != "" && playerName == playerScreenName {
+						// Found the actual player by screen name
 						actualPlayer = player
 						break
 					}
