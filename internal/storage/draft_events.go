@@ -126,3 +126,95 @@ func (s *Service) GetAllDraftEvents(ctx context.Context) ([]*models.DraftEvent, 
 
 	return events, nil
 }
+
+// GetActiveEvents retrieves all currently active draft events for the current account.
+func (s *Service) GetActiveEvents(ctx context.Context) ([]*models.DraftEvent, error) {
+	query := `
+		SELECT id, account_id, event_name, set_code, start_time, end_time, wins, losses, status, deck_id, entry_fee, rewards, created_at
+		FROM draft_events
+		WHERE account_id = ? AND status = 'active'
+		ORDER BY start_time DESC
+	`
+
+	rows, err := s.db.Conn().QueryContext(ctx, query, s.currentAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query active draft events: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var events []*models.DraftEvent
+	for rows.Next() {
+		var event models.DraftEvent
+		err := rows.Scan(
+			&event.ID,
+			&event.AccountID,
+			&event.EventName,
+			&event.SetCode,
+			&event.StartTime,
+			&event.EndTime,
+			&event.Wins,
+			&event.Losses,
+			&event.Status,
+			&event.DeckID,
+			&event.EntryFee,
+			&event.Rewards,
+			&event.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan active draft event: %w", err)
+		}
+		events = append(events, &event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating active draft events: %w", err)
+	}
+
+	return events, nil
+}
+
+// EventWinDistribution represents the distribution of event results.
+type EventWinDistribution struct {
+	Record string `json:"record"` // e.g., "7-0", "7-1", "6-3"
+	Count  int    `json:"count"`  // Number of events with this record
+}
+
+// GetEventWinDistribution calculates the distribution of event win-loss records.
+// Returns a map of record strings (e.g., "7-0", "7-1") to counts.
+func (s *Service) GetEventWinDistribution(ctx context.Context) ([]*EventWinDistribution, error) {
+	query := `
+		SELECT
+			printf('%d-%d', wins, losses) as record,
+			COUNT(*) as count
+		FROM draft_events
+		WHERE account_id = ? AND status = 'completed'
+		GROUP BY wins, losses
+		ORDER BY wins DESC, losses ASC
+	`
+
+	rows, err := s.db.Conn().QueryContext(ctx, query, s.currentAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query event win distribution: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var distribution []*EventWinDistribution
+	for rows.Next() {
+		var record EventWinDistribution
+		err := rows.Scan(&record.Record, &record.Count)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan event win distribution: %w", err)
+		}
+		distribution = append(distribution, &record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating event win distribution: %w", err)
+	}
+
+	return distribution, nil
+}

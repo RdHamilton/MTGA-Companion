@@ -52,6 +52,60 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class DraftEvent {
+	    ID: string;
+	    AccountID: number;
+	    EventName: string;
+	    SetCode: string;
+	    StartTime: time.Time;
+	    EndTime?: time.Time;
+	    Wins: number;
+	    Losses: number;
+	    Status: string;
+	    DeckID?: string;
+	    EntryFee?: string;
+	    Rewards?: string;
+	    CreatedAt: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.AccountID = source["AccountID"];
+	        this.EventName = source["EventName"];
+	        this.SetCode = source["SetCode"];
+	        this.StartTime = this.convertValues(source["StartTime"], time.Time);
+	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
+	        this.Wins = source["Wins"];
+	        this.Losses = source["Losses"];
+	        this.Status = source["Status"];
+	        this.DeckID = source["DeckID"];
+	        this.EntryFee = source["EntryFee"];
+	        this.Rewards = source["Rewards"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Match {
 	    ID: string;
 	    AccountID: number;
@@ -351,6 +405,20 @@ export namespace models {
 
 export namespace storage {
 	
+	export class EventWinDistribution {
+	    record: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EventWinDistribution(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.record = source["record"];
+	        this.count = source["count"];
+	    }
+	}
 	export class RankTimelineEntry {
 	    timestamp: time.Time;
 	    date: string;
