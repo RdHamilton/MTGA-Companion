@@ -802,72 +802,16 @@ func (a *App) GetQuestStats(startDate, endDate string) (*models.QuestStats, erro
 	return stats, nil
 }
 
-// GetAllAchievements returns all achievements for the current account.
-func (a *App) GetAllAchievements() ([]*models.Achievement, error) {
+// GetCurrentAccount returns the current account with all fields including daily/weekly wins.
+func (a *App) GetCurrentAccount() (*models.Account, error) {
 	if a.service == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	achievements, err := a.service.Achievements().GetAll(a.service.GetCurrentAccountID())
+	account, err := a.service.GetCurrentAccount(a.ctx)
 	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievements: %v", err)}
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get current account: %v", err)}
 	}
 
-	return achievements, nil
-}
-
-// GetAchievementsByStatus returns achievements filtered by status (Available, InProgress, Completed).
-func (a *App) GetAchievementsByStatus(status string) ([]*models.Achievement, error) {
-	if a.service == nil {
-		return nil, &AppError{Message: "Database not initialized"}
-	}
-
-	achievements, err := a.service.Achievements().GetByStatus(a.service.GetCurrentAccountID(), status)
-	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievements by status: %v", err)}
-	}
-
-	return achievements, nil
-}
-
-// GetCloseToCompleteAchievements returns achievements that are near completion (>= 90% progress).
-func (a *App) GetCloseToCompleteAchievements() ([]*models.Achievement, error) {
-	if a.service == nil {
-		return nil, &AppError{Message: "Database not initialized"}
-	}
-
-	achievements, err := a.service.Achievements().GetCloseToComplete(a.service.GetCurrentAccountID())
-	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get close to complete achievements: %v", err)}
-	}
-
-	return achievements, nil
-}
-
-// GetRecentlyCompletedAchievements returns achievements completed within the last N days.
-func (a *App) GetRecentlyCompletedAchievements(days int) ([]*models.Achievement, error) {
-	if a.service == nil {
-		return nil, &AppError{Message: "Database not initialized"}
-	}
-
-	achievements, err := a.service.Achievements().GetRecentlyCompleted(a.service.GetCurrentAccountID(), days)
-	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get recently completed achievements: %v", err)}
-	}
-
-	return achievements, nil
-}
-
-// GetAchievementStats returns achievement statistics.
-func (a *App) GetAchievementStats() (*models.AchievementStats, error) {
-	if a.service == nil {
-		return nil, &AppError{Message: "Database not initialized"}
-	}
-
-	stats, err := a.service.Achievements().GetStats(a.service.GetCurrentAccountID())
-	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get achievement stats: %v", err)}
-	}
-
-	return stats, nil
+	return account, nil
 }

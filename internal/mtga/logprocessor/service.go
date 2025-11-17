@@ -315,51 +315,8 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 }
 
 // processAchievements parses and stores achievements from log entries.
+// NOTE: Achievement system temporarily disabled - removed from UI
 func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
-	achievements, err := logreader.ParseAchievements(entries)
-	if err != nil {
-		log.Printf("Warning: Failed to parse achievements: %v", err)
-		return err
-	}
-
-	if len(achievements) == 0 {
-		return nil
-	}
-
-	log.Printf("Found %d achievement(s) in entries", len(achievements))
-
-	storedCount := 0
-	for _, achievementData := range achievements {
-		// Small delay between operations to avoid database lock contention
-		if storedCount > 0 {
-			time.Sleep(25 * time.Millisecond)
-		}
-
-		// Convert AchievementData to storage model
-		achievement := &models.Achievement{
-			AccountID:       s.storage.GetCurrentAccountID(),
-			GraphID:         achievementData.GraphID,
-			NodeID:          achievementData.NodeID,
-			Status:          achievementData.Status,
-			CurrentProgress: achievementData.CurrentProgress,
-			MaxProgress:     achievementData.MaxProgress,
-			CompletedAt:     achievementData.CompletedAt,
-			FirstSeen:       achievementData.LastUpdated,
-			LastUpdated:     achievementData.LastUpdated,
-		}
-
-		// Save achievement to database
-		if err := s.storage.Achievements().Save(achievement); err != nil {
-			log.Printf("Warning: Failed to store achievement %s:%s: %v", achievementData.GraphID, achievementData.NodeID, err)
-		} else {
-			storedCount++
-		}
-	}
-
-	if storedCount > 0 {
-		result.AchievementsStored = storedCount
-		log.Printf("✓ Stored %d/%d achievement(s)", storedCount, len(achievements))
-	}
-
+	// Achievement system removed - skip processing
 	return nil
 }

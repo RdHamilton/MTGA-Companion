@@ -23,22 +23,20 @@ type Service struct {
 	accounts         repository.AccountRepository
 	rankHistory      repository.RankHistoryRepository
 	quests           *QuestRepository
-	achievements     *AchievementRepository
 	currentAccountID int // Current active account ID
 }
 
 // NewService creates a new storage service.
 func NewService(db *DB) *Service {
 	svc := &Service{
-		db:           db,
-		matches:      repository.NewMatchRepository(db.Conn()),
-		stats:        repository.NewStatsRepository(db.Conn()),
-		decks:        repository.NewDeckRepository(db.Conn()),
-		collection:   repository.NewCollectionRepository(db.Conn()),
-		accounts:     repository.NewAccountRepository(db.Conn()),
-		rankHistory:  repository.NewRankHistoryRepository(db.Conn()),
-		quests:       NewQuestRepository(db.Conn()),
-		achievements: NewAchievementRepository(db.Conn()),
+		db:          db,
+		matches:     repository.NewMatchRepository(db.Conn()),
+		stats:       repository.NewStatsRepository(db.Conn()),
+		decks:       repository.NewDeckRepository(db.Conn()),
+		collection:  repository.NewCollectionRepository(db.Conn()),
+		accounts:    repository.NewAccountRepository(db.Conn()),
+		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
+		quests:      NewQuestRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -95,6 +93,54 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 			}
 			if profile.ClientID != "" && (account.ClientID == nil || *account.ClientID != profile.ClientID) {
 				account.ClientID = &profile.ClientID
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
+	}
+
+	// Parse and update daily/weekly wins from periodic rewards
+	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
+	if periodicRewards != nil {
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update daily and weekly wins if changed
+			updated := false
+			if periodicRewards.DailyWins != account.DailyWins {
+				account.DailyWins = periodicRewards.DailyWins
+				updated = true
+			}
+			if periodicRewards.WeeklyWins != account.WeeklyWins {
+				account.WeeklyWins = periodicRewards.WeeklyWins
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
+	}
+
+	// Parse and update mastery pass progression
+	masteryPass, _ := logreader.ParseMasteryPass(entries)
+	if masteryPass != nil {
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update mastery pass data if changed
+			updated := false
+			if masteryPass.CurrentLevel != account.MasteryLevel {
+				account.MasteryLevel = masteryPass.CurrentLevel
+				updated = true
+			}
+			if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
+				account.MasteryPass = masteryPass.PassType
+				updated = true
+			}
+			if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
+				account.MasteryMax = masteryPass.MaxLevel
 				updated = true
 			}
 			if updated {
@@ -1556,11 +1602,6 @@ func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time
 // Quests returns the quest repository for accessing quest data.
 func (s *Service) Quests() *QuestRepository {
 	return s.quests
-}
-
-// Achievements returns the achievement repository.
-func (s *Service) Achievements() *AchievementRepository {
-	return s.achievements
 }
 
 // Close closes the database connection.
