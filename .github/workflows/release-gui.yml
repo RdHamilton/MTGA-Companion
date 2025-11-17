@@ -28,23 +28,26 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.24'
 
-    - name: Install Fyne tools
-      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
-    - name: Build Windows executable
-      run: |
-        go build -v -ldflags="-H windowsgui" -o mtga-companion.exe ./cmd/mtga-companion
+    - name: Install Wails CLI
+      run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-    - name: Package Windows application
-      run: |
-        fyne package -os windows -icon Icon.png -name "MTGA-Companion" -appID com.github.rdhamilton.mtga-companion
+    - name: Build Windows Application
+      run: wails build -platform windows/amd64 -clean
 
     - name: Create distribution archive
       run: |
         mkdir -p dist
-        Compress-Archive -Path mtga-companion.exe, README.md, LICENSE -DestinationPath dist/mtga-companion-windows-amd64.zip
+        cd build/bin
+        Compress-Archive -Path *.exe, ../../README.md, ../../LICENSE -DestinationPath ../../dist/mtga-companion-windows-amd64.zip
 
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v5
@@ -66,28 +69,26 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.24'
 
-    - name: Install Fyne tools
-      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
-    - name: Build macOS application
+    - name: Install Wails CLI
+      run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+    - name: Build macOS Application (Universal Binary)
+      run: wails build -platform darwin/universal -clean
+
+    - name: Create distribution archive
       run: |
-        go build -v -o mtga-companion ./cmd/mtga-companion
-
-    - name: Package macOS application
-      run: |
-        fyne package -os darwin -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
-
-    - name: Create DMG (optional)
-      run: |
-        # Create a simple directory structure for DMG
         mkdir -p dist
-        cp -r "MTGA Companion.app" dist/
-        cp README.md dist/
-
-        # Create tar.gz for now (DMG creation requires additional tools)
-        tar -czf dist/mtga-companion-macos-universal.tar.gz -C dist "MTGA Companion.app" README.md
+        cd build/bin
+        tar -czf ../../dist/mtga-companion-macos-universal.tar.gz *.app ../../README.md ../../LICENSE
 
     - name: Upload macOS artifacts
       uses: actions/upload-artifact@v5
@@ -109,28 +110,31 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.24'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+        sudo apt-get install -y gcc libgtk-3-dev libwebkit2gtk-4.0-dev
 
-    - name: Install Fyne tools
-      run: go install fyne.io/fyne/v2/cmd/fyne@latest
+    - name: Install Wails CLI
+      run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-    - name: Build Linux executable
-      run: |
-        go build -v -o mtga-companion ./cmd/mtga-companion
-
-    - name: Package Linux application
-      run: |
-        fyne package -os linux -icon Icon.png -name "MTGA Companion" -appID com.github.rdhamilton.mtga-companion
+    - name: Build Linux Application
+      run: wails build -platform linux/amd64 -clean
 
     - name: Create distribution archive
       run: |
         mkdir -p dist
-        tar -czf dist/mtga-companion-linux-amd64.tar.gz mtga-companion README.md LICENSE
+        cd build/bin
+        tar -czf ../../dist/mtga-companion-linux-amd64.tar.gz mtga-companion ../../README.md ../../LICENSE
 
     - name: Upload Linux artifacts
       uses: actions/upload-artifact@v5
@@ -159,16 +163,21 @@ jobs:
     - name: Prepare release files
       run: |
         mkdir -p release
-        find artifacts -type f -name "*.zip" -o -name "*.tar.gz" | xargs -I {} cp {} release/
+        find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) | xargs -I {} cp {} release/
         ls -lh release/
 
     - name: Generate changelog
       id: changelog
       run: |
         echo "## What's Changed" > changelog.md
-        git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"* %s (%h)" >> changelog.md || echo "* Initial release" >> changelog.md
-        echo "" >> changelog.md
-        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo 'v0.0.0')...${{ github.ref_name }}" >> changelog.md
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" >> changelog.md
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}" >> changelog.md
+        else
+          echo "* Initial release" >> changelog.md
+        fi
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
