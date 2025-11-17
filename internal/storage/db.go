@@ -4,6 +4,8 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite" // SQLite driver
@@ -69,6 +71,14 @@ func DefaultConfig(path string) *Config {
 func Open(config *Config) (*DB, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil")
+	}
+
+	// Create parent directory if it doesn't exist (unless using in-memory database)
+	if config.Path != ":memory:" {
+		dir := filepath.Dir(config.Path)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		}
 	}
 
 	// Build DSN with pragma parameters

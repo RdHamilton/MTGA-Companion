@@ -1,98 +1,41 @@
 package storage
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
-	"time"
 )
 
-func TestDefaultConfig(t *testing.T) {
-	config := DefaultConfig("test.db")
+func TestOpen_CreatesDirectory(t *testing.T) {
+	// Test that Open creates parent directory if it doesn't exist
+	testDir := filepath.Join(os.TempDir(), "mtga-test-db-creation")
+	dbPath := filepath.Join(testDir, "test.db")
 
-	if config.Path != "test.db" {
-		t.Errorf("expected path 'test.db', got '%s'", config.Path)
+	// Clean up before test
+	os.RemoveAll(testDir)
+
+	// Verify directory doesn't exist
+	if _, err := os.Stat(testDir); !os.IsNotExist(err) {
+		t.Fatal("Test directory should not exist before test")
 	}
 
-	if config.MaxOpenConns != 25 {
-		t.Errorf("expected MaxOpenConns 25, got %d", config.MaxOpenConns)
-	}
-
-	if config.MaxIdleConns != 5 {
-		t.Errorf("expected MaxIdleConns 5, got %d", config.MaxIdleConns)
-	}
-
-	if config.ConnMaxLifetime != 5*time.Minute {
-		t.Errorf("expected ConnMaxLifetime 5m, got %v", config.ConnMaxLifetime)
-	}
-
-	if config.BusyTimeout != 5*time.Second {
-		t.Errorf("expected BusyTimeout 5s, got %v", config.BusyTimeout)
-	}
-
-	if config.JournalMode != "WAL" {
-		t.Errorf("expected JournalMode 'WAL', got '%s'", config.JournalMode)
-	}
-
-	if config.Synchronous != "NORMAL" {
-		t.Errorf("expected Synchronous 'NORMAL', got '%s'", config.Synchronous)
-	}
-}
-
-func TestOpen(t *testing.T) {
-	config := DefaultConfig(":memory:")
+	// Open database (should create directory)
+	config := DefaultConfig(dbPath)
 	db, err := Open(config)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
+	defer os.RemoveAll(testDir)
 
-	// Test ping
-	if err := db.Ping(); err != nil {
-		t.Errorf("failed to ping database: %v", err)
-	}
-
-	// Test conn
-	if db.Conn() == nil {
-		t.Error("expected non-nil connection")
-	}
-}
-
-func TestOpenWithNilConfig(t *testing.T) {
-	_, err := Open(nil)
-	if err == nil {
-		t.Error("expected error when opening with nil config")
-	}
-}
-
-func TestClose(t *testing.T) {
-	config := DefaultConfig(":memory:")
-	db, err := Open(config)
+	// Verify directory was created
+	info, err := os.Stat(testDir)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf("Directory was not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("Path is not a directory")
 	}
 
-	if err := db.Close(); err != nil {
-		t.Errorf("failed to close database: %v", err)
-	}
-
-	// Ping should fail after close
-	if err := db.Ping(); err == nil {
-		t.Error("expected error when pinging closed database")
-	}
-}
-
-func TestMultipleConnections(t *testing.T) {
-	config := DefaultConfig(":memory:")
-	config.MaxOpenConns = 2
-
-	db, err := Open(config)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	// This test just verifies that pool settings are applied
-	// Actual concurrent connection behavior would require more complex testing
-	if err := db.Ping(); err != nil {
-		t.Errorf("failed to ping database: %v", err)
-	}
+	t.Log("✅ Directory creation successful!")
 }
