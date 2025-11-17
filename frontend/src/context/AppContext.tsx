@@ -7,7 +7,8 @@ interface FilterState {
     dateRange: string;
     customStartDate: string;
     customEndDate: string;
-    format: string;
+    cardFormat: string; // Standard, Historic, Alchemy, etc.
+    queueType: string; // Ladder, Play, etc.
     result: string;
   };
   // Chart filters
@@ -51,7 +52,8 @@ const defaultFilters: FilterState = {
     dateRange: '7days',
     customStartDate: '',
     customEndDate: '',
-    format: 'all',
+    cardFormat: 'all',
+    queueType: 'all',
     result: 'all',
   },
   winRateTrend: {

@@ -86,17 +86,17 @@ func buildFilterWhereClause(filter models.StatsFilter) (where string, args []int
 
 	// Account filter
 	if filter.AccountID != nil && *filter.AccountID > 0 {
-		where += " AND account_id = ?"
+		where += " AND m.account_id = ?"
 		args = append(args, *filter.AccountID)
 	}
 
 	// Date range filters
 	if filter.StartDate != nil {
-		where += " AND timestamp >= ?"
+		where += " AND m.timestamp >= ?"
 		args = append(args, *filter.StartDate)
 	}
 	if filter.EndDate != nil {
-		where += " AND timestamp <= ?"
+		where += " AND m.timestamp <= ?"
 		args = append(args, *filter.EndDate)
 	}
 
@@ -111,17 +111,23 @@ func buildFilterWhereClause(filter models.StatsFilter) (where string, args []int
 			placeholders += "?"
 			args = append(args, format)
 		}
-		where += fmt.Sprintf(" AND format IN (%s)", placeholders)
+		where += fmt.Sprintf(" AND m.format IN (%s)", placeholders)
 	} else if filter.Format != nil {
 		// Single format (backward compatibility)
-		where += " AND format = ?"
+		where += " AND m.format = ?"
 		args = append(args, *filter.Format)
 	}
 
 	// Deck filter
 	if filter.DeckID != nil {
-		where += " AND deck_id = ?"
+		where += " AND m.deck_id = ?"
 		args = append(args, *filter.DeckID)
+	}
+
+	// Deck format filter (requires JOIN with decks table)
+	if filter.DeckFormat != nil {
+		where += " AND d.format = ?"
+		args = append(args, *filter.DeckFormat)
 	}
 
 	// Event filters
@@ -135,38 +141,38 @@ func buildFilterWhereClause(filter models.StatsFilter) (where string, args []int
 			placeholders += "?"
 			args = append(args, eventName)
 		}
-		where += fmt.Sprintf(" AND event_name IN (%s)", placeholders)
+		where += fmt.Sprintf(" AND m.event_name IN (%s)", placeholders)
 	} else if filter.EventName != nil {
 		// Single event name
-		where += " AND event_name = ?"
+		where += " AND m.event_name = ?"
 		args = append(args, *filter.EventName)
 	}
 
 	// Opponent filters
 	if filter.OpponentName != nil {
-		where += " AND opponent_name = ?"
+		where += " AND m.opponent_name = ?"
 		args = append(args, *filter.OpponentName)
 	}
 	if filter.OpponentID != nil {
-		where += " AND opponent_id = ?"
+		where += " AND m.opponent_id = ?"
 		args = append(args, *filter.OpponentID)
 	}
 
 	// Result filter
 	if filter.Result != nil {
-		where += " AND result = ?"
+		where += " AND m.result = ?"
 		args = append(args, *filter.Result)
 	}
 
 	// Result reason filter
 	if filter.ResultReason != nil {
-		where += " AND result_reason = ?"
+		where += " AND m.result_reason = ?"
 		args = append(args, *filter.ResultReason)
 	}
 
 	// Rank filters (uses LIKE for rank_before or rank_after)
 	if filter.RankClass != nil {
-		where += " AND (rank_before LIKE ? OR rank_after LIKE ?)"
+		where += " AND (m.rank_before LIKE ? OR m.rank_after LIKE ?)"
 		rankPattern := "%" + *filter.RankClass + "%"
 		args = append(args, rankPattern, rankPattern)
 	}
@@ -425,16 +431,24 @@ func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFil
 	// Build WHERE clause using the new filter builder
 	where, args := buildFilterWhereClause(filter)
 
+	// Determine if we need to JOIN with decks table
+	var fromClause string
+	if filter.DeckFormat != nil {
+		fromClause = "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
+	} else {
+		fromClause = "FROM matches m"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
-			id, account_id, event_id, event_name, timestamp, duration_seconds,
-			player_wins, opponent_wins, player_team_id, deck_id,
-			rank_before, rank_after, format, result, result_reason,
-			opponent_name, opponent_id, created_at
-		FROM matches
+			m.id, m.account_id, m.event_id, m.event_name, m.timestamp, m.duration_seconds,
+			m.player_wins, m.opponent_wins, m.player_team_id, m.deck_id,
+			m.rank_before, m.rank_after, m.format, m.result, m.result_reason,
+			m.opponent_name, m.opponent_id, m.created_at
 		%s
-		ORDER BY timestamp DESC
-	`, where)
+		%s
+		ORDER BY m.timestamp DESC
+	`, fromClause, where)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

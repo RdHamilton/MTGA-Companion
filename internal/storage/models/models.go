@@ -156,8 +156,9 @@ type StatsFilter struct {
 	AccountID    *int // Filter by account ID, nil means all accounts
 	StartDate    *time.Time
 	EndDate      *time.Time
-	Format       *string  // Single format filter (for backward compatibility)
-	Formats      []string // Multiple format filter (e.g., ["Standard", "Historic"])
+	Format       *string  // Single format filter (for backward compatibility) - filters matches.format (Ladder/Play)
+	Formats      []string // Multiple format filter (e.g., ["Ladder", "Play"]) - filters matches.format
+	DeckFormat   *string  // Filter by deck format (Standard, Historic, etc.) - filters decks.format via JOIN
 	DeckID       *string
 	EventName    *string  // Filter by event name (exact match)
 	EventNames   []string // Multiple event names (OR logic)

@@ -348,6 +348,7 @@ export namespace models {
 	    EndDate?: time.Time;
 	    Format?: string;
 	    Formats: string[];
+	    DeckFormat?: string;
 	    DeckID?: string;
 	    EventName?: string;
 	    EventNames: string[];
@@ -370,6 +371,7 @@ export namespace models {
 	        this.EndDate = this.convertValues(source["EndDate"], time.Time);
 	        this.Format = source["Format"];
 	        this.Formats = source["Formats"];
+	        this.DeckFormat = source["DeckFormat"];
 	        this.DeckID = source["DeckID"];
 	        this.EventName = source["EventName"];
 	        this.EventNames = source["EventNames"];
