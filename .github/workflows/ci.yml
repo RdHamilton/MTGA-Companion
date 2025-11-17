@@ -208,6 +208,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
+    - name: Install Fyne dependencies (Linux)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
