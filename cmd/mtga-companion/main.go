@@ -41,11 +41,8 @@ import (
 var (
 	// NEW STANDARDIZED FLAGS (v0.2.0+)
 	// Application mode flags
-	guiMode          = flag.Bool("gui-mode", false, "Launch GUI mode instead of CLI")
-	guiModeShort     = flag.Bool("g", false, "Launch GUI mode (shorthand for -gui-mode)")
-	debugMode        = flag.Bool("debug-mode", false, "Enable verbose debug logging")
-	debugModeShort   = flag.Bool("d", false, "Enable debug logging (shorthand for -debug-mode)")
-	draftOverlayMode = flag.Bool("draft-overlay-mode", false, "Launch draft overlay mode")
+	debugMode      = flag.Bool("debug-mode", false, "Enable verbose debug logging")
+	debugModeShort = flag.Bool("d", false, "Enable debug logging (shorthand for -debug-mode)")
 
 	// Log file configuration flags
 	logFilePath     = flag.String("log-file-path", "", "Path to MTGA Player.log file (auto-detected if not specified)")
@@ -55,28 +52,14 @@ var (
 
 	// Cache configuration flags
 	cacheEnabled = flag.Bool("cache-enabled", true, "Enable in-memory caching for card ratings (default: true)")
-	cacheTTL     = flag.Duration("cache-ttl", 24*time.Hour, "Cache time-to-live (e.g., 1h, 24h)")
-	cacheMaxSize = flag.Int("cache-max-size", 0, "Maximum cache entries (0 = unlimited)")
-
-	// Draft overlay configuration flags
-	overlaySetFile     = flag.String("overlay-set-file", "", "Path to 17Lands set file for draft overlay")
-	overlaySetCode     = flag.String("overlay-set-code", "", "Set code for auto-loading set file (e.g., BLB, DSK)")
-	overlayFormat      = flag.String("overlay-format", "PremierDraft", "Draft format for auto-loading set file")
-	overlayResume      = flag.Bool("overlay-resume", true, "Scan log history to resume active draft (default: true)")
-	overlayLookbackHrs = flag.Int("overlay-lookback-hours", 24, "How many hours back to scan for active draft (default: 24)")
 
 	// DEPRECATED FLAGS (v0.1.0) - Will be removed in v2.0.0
 	// These are kept for backward compatibility
-	pollInterval    = flag.Duration("poll-interval", 2*time.Second, "DEPRECATED: Use -log-poll-interval instead")
-	useFileEvents   = flag.Bool("use-file-events", true, "DEPRECATED: Use -log-use-fsnotify instead")
-	useGUI          = flag.Bool("gui", false, "DEPRECATED: Use -gui-mode or -g instead")
-	draftOverlay    = flag.Bool("draft-overlay", false, "DEPRECATED: Use -draft-overlay-mode instead")
-	setFilePath     = flag.String("set-file", "", "DEPRECATED: Use -overlay-set-file instead")
-	logPath         = flag.String("log-path", "", "DEPRECATED: Use -log-file-path instead")
-	overlaySetOld   = flag.String("overlay-set", "", "DEPRECATED: Use -overlay-set-code instead")
-	overlayLookback = flag.Int("overlay-lookback", 24, "DEPRECATED: Use -overlay-lookback-hours instead")
-	debug           = flag.Bool("debug", false, "DEPRECATED: Use -debug-mode or -d instead")
-	cacheOld        = flag.Bool("cache", true, "DEPRECATED: Use -cache-enabled instead")
+	pollInterval  = flag.Duration("poll-interval", 2*time.Second, "DEPRECATED: Use -log-poll-interval instead")
+	useFileEvents = flag.Bool("use-file-events", true, "DEPRECATED: Use -log-use-fsnotify instead")
+	logPath       = flag.String("log-path", "", "DEPRECATED: Use -log-file-path instead")
+	debug         = flag.Bool("debug", false, "DEPRECATED: Use -debug-mode or -d instead")
+	cacheOld      = flag.Bool("cache", true, "DEPRECATED: Use -cache-enabled instead")
 )
 
 // deprecatedFlags tracks which deprecated flags were explicitly set by the user
@@ -84,16 +67,11 @@ var deprecatedFlags = make(map[string]string)
 
 // flagDeprecationMap maps old flag names to their new equivalents
 var flagDeprecationMap = map[string]string{
-	"gui":              "gui-mode (or -g)",
-	"debug":            "debug-mode (or -d)",
-	"cache":            "cache-enabled",
-	"poll-interval":    "log-poll-interval",
-	"use-file-events":  "log-use-fsnotify",
-	"draft-overlay":    "draft-overlay-mode",
-	"set-file":         "overlay-set-file",
-	"log-path":         "log-file-path",
-	"overlay-set":      "overlay-set-code",
-	"overlay-lookback": "overlay-lookback-hours",
+	"debug":           "debug-mode (or -d)",
+	"cache":           "cache-enabled",
+	"poll-interval":   "log-poll-interval",
+	"use-file-events": "log-use-fsnotify",
+	"log-path":        "log-file-path",
 }
 
 // checkDeprecatedFlags detects and warns about deprecated flag usage
@@ -118,9 +96,6 @@ func checkDeprecatedFlags() {
 	}
 
 	// Map old flag values to new flags for backward compatibility
-	if visited["gui"] && !visited["gui-mode"] {
-		*guiMode = *useGUI
-	}
 	if visited["debug"] && !visited["debug-mode"] {
 		*debugMode = *debug
 	}
@@ -133,26 +108,11 @@ func checkDeprecatedFlags() {
 	if visited["use-file-events"] && !visited["log-use-fsnotify"] {
 		*logUseFsnotify = *useFileEvents
 	}
-	if visited["draft-overlay"] && !visited["draft-overlay-mode"] {
-		*draftOverlayMode = *draftOverlay
-	}
-	if visited["set-file"] && !visited["overlay-set-file"] {
-		*overlaySetFile = *setFilePath
-	}
 	if visited["log-path"] && !visited["log-file-path"] {
 		*logFilePath = *logPath
 	}
-	if visited["overlay-set"] && !visited["overlay-set-code"] {
-		*overlaySetCode = *overlaySetOld
-	}
-	if visited["overlay-lookback"] && !visited["overlay-lookback-hours"] {
-		*overlayLookbackHrs = *overlayLookback
-	}
 
 	// Handle shorthand flags
-	if *guiModeShort {
-		*guiMode = true
-	}
 	if *debugModeShort {
 		*debugMode = true
 	}
