@@ -3,6 +3,8 @@ import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetActiveEvents, GetEventWinDistribution } from '../../wailsjs/go/main/App';
 import { models, storage } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import './Events.css';
 
 const Events = () => {
@@ -83,7 +85,11 @@ const Events = () => {
   if (error) {
     return (
       <div className="events-page">
-        <div className="error-message">{error}</div>
+        <ErrorState
+          message="Failed to load event data"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
       </div>
     );
   }
@@ -96,7 +102,12 @@ const Events = () => {
       <section className="events-section">
         <h2>Active Events</h2>
         {activeEvents.length === 0 ? (
-          <div className="no-data">No active events</div>
+          <EmptyState
+            icon="🎫"
+            title="No active events"
+            message="You don't have any ongoing limited events at the moment."
+            helpText="Join a draft or sealed event in MTG Arena to start tracking your event performance."
+          />
         ) : (
           <div className="active-events-grid">
             {activeEvents.map((event) => (
@@ -124,7 +135,12 @@ const Events = () => {
       <section className="events-section">
         <h2>Event Win Distribution</h2>
         {winDistribution.length === 0 ? (
-          <div className="no-data">No completed events yet</div>
+          <EmptyState
+            icon="📊"
+            title="No event history"
+            message="Complete some limited events to see your win distribution statistics."
+            helpText="Your event records (0-3, 7-0, etc.) will be displayed here once you finish some drafts or sealed events."
+          />
         ) : (
           <>
             <div className="distribution-summary">

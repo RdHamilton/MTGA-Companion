@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { GetStats } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './ResultBreakdown.css';
 
@@ -158,10 +160,21 @@ const ResultBreakdown = () => {
       {/* Content */}
       {loading && <LoadingSpinner message="Loading performance metrics..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load performance metrics"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && !metrics && (
-        <div className="no-data">No performance data found for the selected filters</div>
+        <EmptyState
+          icon="📊"
+          title="No performance data"
+          message="Play some matches to see your detailed performance breakdown."
+          helpText="Statistics include win rates, match outcomes, and performance trends."
+        />
       )}
 
       {!loading && !error && metrics && (

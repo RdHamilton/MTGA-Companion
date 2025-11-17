@@ -3,6 +3,8 @@ import { PieChart, Pie, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { GetStatsByFormat } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './FormatDistribution.css';
 
@@ -213,10 +215,21 @@ const FormatDistribution = () => {
       {/* Content */}
       {loading && <LoadingSpinner message="Loading format statistics..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load format statistics"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && formatStats.length === 0 && (
-        <div className="no-data">No format data found for the selected filters</div>
+        <EmptyState
+          icon="🎯"
+          title="No format data"
+          message="Play matches in different formats to see your format distribution."
+          helpText="Try adjusting the date range if you've played matches but don't see data here."
+        />
       )}
 
       {!loading && !error && sortedFormats.length > 0 && (
