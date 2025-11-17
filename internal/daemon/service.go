@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
+
+// Version is the daemon version
+const Version = "1.0.0"
 
 // Service represents the daemon service that runs continuously.
 type Service struct {
@@ -22,6 +26,13 @@ type Service struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	startTime    time.Time
+
+	// Health tracking
+	healthMu       sync.RWMutex
+	lastLogRead    time.Time
+	lastDBWrite    time.Time
+	totalProcessed int64
+	totalErrors    int64
 }
 
 // New creates a new daemon service.
@@ -67,6 +78,9 @@ func (s *Service) Start() error {
 	}
 
 	s.poller = poller
+
+	// Set service reference for health checks
+	s.wsServer.SetService(s)
 
 	// Start WebSocket server in background
 	go func() {
@@ -144,11 +158,22 @@ func (s *Service) processUpdates(updates <-chan *logreader.LogEntry, errChan <-c
 			}
 			// Buffer entries for batch processing
 			entryBuffer = append(entryBuffer, entry)
+
+			// Update last log read time
+			s.healthMu.Lock()
+			s.lastLogRead = time.Now()
+			s.healthMu.Unlock()
 		case err, ok := <-errChan:
 			if !ok {
 				return
 			}
 			log.Printf("Poller error: %v", err)
+
+			// Track error
+			s.healthMu.Lock()
+			s.totalErrors++
+			s.healthMu.Unlock()
+
 			// Broadcast error event
 			s.wsServer.Broadcast(Event{
 				Type: "daemon:error",
@@ -172,8 +197,21 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 	result, err := s.logProcessor.ProcessLogEntries(s.ctx, entries)
 	if err != nil {
 		log.Printf("Error processing log entries: %v", err)
+
+		// Track error
+		s.healthMu.Lock()
+		s.totalErrors++
+		s.healthMu.Unlock()
 		return
 	}
+
+	// Track successful processing
+	s.healthMu.Lock()
+	s.totalProcessed += int64(len(entries))
+	if result.MatchesStored > 0 || result.GamesStored > 0 || result.DecksStored > 0 || result.RanksStored > 0 || result.QuestsStored > 0 {
+		s.lastDBWrite = time.Now()
+	}
+	s.healthMu.Unlock()
 
 	// Broadcast events for updates
 	if result.MatchesStored > 0 || result.GamesStored > 0 {
@@ -270,4 +308,91 @@ func (s *Service) GetUptime() float64 {
 // GetClientCount returns the number of connected WebSocket clients.
 func (s *Service) GetClientCount() int {
 	return s.wsServer.ClientCount()
+}
+
+// HealthStatus represents the health status of the daemon.
+type HealthStatus struct {
+	Status     string           `json:"status"`
+	Version    string           `json:"version"`
+	Uptime     float64          `json:"uptime"`
+	Database   DatabaseHealth   `json:"database"`
+	LogMonitor LogMonitorHealth `json:"logMonitor"`
+	WebSocket  WebSocketHealth  `json:"websocket"`
+	Metrics    HealthMetrics    `json:"metrics"`
+}
+
+// DatabaseHealth represents database health status.
+type DatabaseHealth struct {
+	Status    string `json:"status"`
+	LastWrite string `json:"lastWrite,omitempty"`
+}
+
+// LogMonitorHealth represents log monitor health status.
+type LogMonitorHealth struct {
+	Status   string `json:"status"`
+	LastRead string `json:"lastRead,omitempty"`
+}
+
+// WebSocketHealth represents WebSocket server health status.
+type WebSocketHealth struct {
+	Status           string `json:"status"`
+	ConnectedClients int    `json:"connectedClients"`
+}
+
+// HealthMetrics represents daemon performance metrics.
+type HealthMetrics struct {
+	TotalProcessed int64 `json:"totalProcessed"`
+	TotalErrors    int64 `json:"totalErrors"`
+}
+
+// GetHealth returns the current health status of the daemon.
+func (s *Service) GetHealth() *HealthStatus {
+	s.healthMu.RLock()
+	defer s.healthMu.RUnlock()
+
+	status := &HealthStatus{
+		Status:  "healthy",
+		Version: Version,
+		Uptime:  s.GetUptime(),
+		Database: DatabaseHealth{
+			Status: "ok",
+		},
+		LogMonitor: LogMonitorHealth{
+			Status: "ok",
+		},
+		WebSocket: WebSocketHealth{
+			Status:           "ok",
+			ConnectedClients: s.GetClientCount(),
+		},
+		Metrics: HealthMetrics{
+			TotalProcessed: s.totalProcessed,
+			TotalErrors:    s.totalErrors,
+		},
+	}
+
+	// Add last write time if available
+	if !s.lastDBWrite.IsZero() {
+		status.Database.LastWrite = s.lastDBWrite.Format(time.RFC3339)
+	}
+
+	// Add last read time if available
+	if !s.lastLogRead.IsZero() {
+		status.LogMonitor.LastRead = s.lastLogRead.Format(time.RFC3339)
+	}
+
+	// Determine overall health status based on component states
+	now := time.Now()
+
+	// If we haven't read logs in 5 minutes, log monitor might be unhealthy
+	if !s.lastLogRead.IsZero() && now.Sub(s.lastLogRead) > 5*time.Minute {
+		status.LogMonitor.Status = "warning"
+		status.Status = "degraded"
+	}
+
+	// If error rate is high (>10% of processed entries), mark as degraded
+	if s.totalProcessed > 0 && float64(s.totalErrors)/float64(s.totalProcessed) > 0.1 {
+		status.Status = "degraded"
+	}
+
+	return status
 }

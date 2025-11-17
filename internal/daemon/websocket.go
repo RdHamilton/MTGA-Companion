@@ -26,6 +26,7 @@ type WebSocketServer struct {
 	broadcast chan Event
 	upgrader  websocket.Upgrader
 	server    *http.Server
+	service   *Service // Reference to parent service for health checks
 }
 
 // NewWebSocketServer creates a new WebSocket server.
@@ -44,6 +45,11 @@ func NewWebSocketServer(port int) *WebSocketServer {
 	}
 }
 
+// SetService sets the parent service reference for health checks.
+func (s *WebSocketServer) SetService(service *Service) {
+	s.service = service
+}
+
 // Start starts the WebSocket server.
 func (s *WebSocketServer) Start() error {
 	// Start broadcast handler
@@ -53,6 +59,7 @@ func (s *WebSocketServer) Start() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleWebSocket)
 	mux.HandleFunc("/status", s.handleStatus)
+	mux.HandleFunc("/health", s.handleHealth)
 
 	s.server = &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.port),
@@ -214,5 +221,36 @@ func (s *WebSocketServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(status); err != nil {
 		log.Printf("Error encoding status response: %v", err)
+	}
+}
+
+// handleHealth handles HTTP health check requests.
+func (s *WebSocketServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if s.service == nil {
+		// Service not initialized yet
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "unavailable",
+			"message": "Service not fully initialized",
+		})
+		return
+	}
+
+	health := s.service.GetHealth()
+
+	// Set appropriate HTTP status code based on health
+	w.Header().Set("Content-Type", "application/json")
+	switch health.Status {
+	case "healthy":
+		w.WriteHeader(http.StatusOK)
+	case "degraded":
+		w.WriteHeader(http.StatusOK) // Still return 200 for degraded
+	default:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+
+	if err := json.NewEncoder(w).Encode(health); err != nil {
+		log.Printf("Error encoding health response: %v", err)
 	}
 }

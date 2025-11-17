@@ -207,3 +207,199 @@ func TestWebSocketServer_Stop(t *testing.T) {
 		t.Errorf("Expected clients to be cleared, got %d", len(server.clients))
 	}
 }
+
+func TestWebSocketServer_HealthHandler_NoService(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+
+	server.handleHealth(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503, got %d", w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected Content-Type application/json, got %s", contentType)
+	}
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if response["status"] != "unavailable" {
+		t.Errorf("Expected status unavailable, got %v", response["status"])
+	}
+
+	if response["message"] != "Service not fully initialized" {
+		t.Errorf("Expected initialization message, got %v", response["message"])
+	}
+}
+
+func TestWebSocketServer_HealthHandler_Healthy(t *testing.T) {
+	// Create a minimal service for testing
+	// Note: This is a simplified test - in production, a full service would be initialized
+	server := NewWebSocketServer(9999)
+
+	// Create a mock service with healthy state
+	mockService := &Service{
+		startTime: time.Now().Add(-1 * time.Hour), // Running for 1 hour
+		wsServer:  server,                         // Wire up the server
+	}
+	mockService.healthMu.Lock()
+	mockService.lastLogRead = time.Now().Add(-1 * time.Minute)
+	mockService.lastDBWrite = time.Now().Add(-2 * time.Minute)
+	mockService.totalProcessed = 100
+	mockService.totalErrors = 0
+	mockService.healthMu.Unlock()
+
+	server.SetService(mockService)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+
+	server.handleHealth(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected Content-Type application/json, got %s", contentType)
+	}
+
+	var health HealthStatus
+	if err := json.NewDecoder(w.Body).Decode(&health); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if health.Status != "healthy" {
+		t.Errorf("Expected status healthy, got %s", health.Status)
+	}
+
+	if health.Version != Version {
+		t.Errorf("Expected version %s, got %s", Version, health.Version)
+	}
+
+	if health.Database.Status != "ok" {
+		t.Errorf("Expected database status ok, got %s", health.Database.Status)
+	}
+
+	if health.LogMonitor.Status != "ok" {
+		t.Errorf("Expected log monitor status ok, got %s", health.LogMonitor.Status)
+	}
+
+	if health.WebSocket.Status != "ok" {
+		t.Errorf("Expected websocket status ok, got %s", health.WebSocket.Status)
+	}
+
+	if health.Metrics.TotalProcessed != 100 {
+		t.Errorf("Expected 100 processed, got %d", health.Metrics.TotalProcessed)
+	}
+
+	if health.Metrics.TotalErrors != 0 {
+		t.Errorf("Expected 0 errors, got %d", health.Metrics.TotalErrors)
+	}
+}
+
+func TestWebSocketServer_HealthHandler_Degraded_StaleLog(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	// Create a mock service with stale log reads
+	mockService := &Service{
+		startTime: time.Now().Add(-1 * time.Hour),
+		wsServer:  server, // Wire up the server
+	}
+	mockService.healthMu.Lock()
+	mockService.lastLogRead = time.Now().Add(-10 * time.Minute) // 10 minutes ago (stale)
+	mockService.lastDBWrite = time.Now().Add(-2 * time.Minute)
+	mockService.totalProcessed = 100
+	mockService.totalErrors = 0
+	mockService.healthMu.Unlock()
+
+	server.SetService(mockService)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+
+	server.handleHealth(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 for degraded, got %d", w.Code)
+	}
+
+	var health HealthStatus
+	if err := json.NewDecoder(w.Body).Decode(&health); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if health.Status != "degraded" {
+		t.Errorf("Expected status degraded, got %s", health.Status)
+	}
+
+	if health.LogMonitor.Status != "warning" {
+		t.Errorf("Expected log monitor warning, got %s", health.LogMonitor.Status)
+	}
+}
+
+func TestWebSocketServer_HealthHandler_Degraded_HighErrorRate(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	// Create a mock service with high error rate
+	mockService := &Service{
+		startTime: time.Now().Add(-1 * time.Hour),
+		wsServer:  server, // Wire up the server
+	}
+	mockService.healthMu.Lock()
+	mockService.lastLogRead = time.Now().Add(-1 * time.Minute)
+	mockService.lastDBWrite = time.Now().Add(-2 * time.Minute)
+	mockService.totalProcessed = 100
+	mockService.totalErrors = 15 // 15% error rate
+	mockService.healthMu.Unlock()
+
+	server.SetService(mockService)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+
+	server.handleHealth(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 for degraded, got %d", w.Code)
+	}
+
+	var health HealthStatus
+	if err := json.NewDecoder(w.Body).Decode(&health); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if health.Status != "degraded" {
+		t.Errorf("Expected status degraded due to high error rate, got %s", health.Status)
+	}
+
+	if health.Metrics.TotalErrors != 15 {
+		t.Errorf("Expected 15 errors, got %d", health.Metrics.TotalErrors)
+	}
+}
+
+func TestWebSocketServer_SetService(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	if server.service != nil {
+		t.Error("Expected nil service initially")
+	}
+
+	mockService := &Service{
+		startTime: time.Now(),
+	}
+
+	server.SetService(mockService)
+
+	if server.service != mockService {
+		t.Error("Expected service to be set")
+	}
+}
