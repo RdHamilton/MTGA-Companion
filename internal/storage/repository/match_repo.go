@@ -80,23 +80,32 @@ func NewMatchRepository(db *sql.DB) MatchRepository {
 
 // buildFilterWhereClause constructs a WHERE clause and args from a StatsFilter.
 // This supports advanced filtering including multiple formats, rank ranges, opponent filters, etc.
-func buildFilterWhereClause(filter models.StatsFilter) (where string, args []interface{}) {
+// If tableAlias is provided (e.g., "m"), columns will be prefixed with it (e.g., "m.format").
+func buildFilterWhereClause(filter models.StatsFilter, tableAlias string) (where string, args []interface{}) {
 	where = "WHERE 1=1"
 	args = make([]interface{}, 0)
 
+	// Helper function to add table prefix if provided
+	prefix := func(col string) string {
+		if tableAlias != "" {
+			return tableAlias + "." + col
+		}
+		return col
+	}
+
 	// Account filter
 	if filter.AccountID != nil && *filter.AccountID > 0 {
-		where += " AND m.account_id = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("account_id"))
 		args = append(args, *filter.AccountID)
 	}
 
 	// Date range filters
 	if filter.StartDate != nil {
-		where += " AND m.timestamp >= ?"
+		where += fmt.Sprintf(" AND %s >= ?", prefix("timestamp"))
 		args = append(args, *filter.StartDate)
 	}
 	if filter.EndDate != nil {
-		where += " AND m.timestamp <= ?"
+		where += fmt.Sprintf(" AND %s <= ?", prefix("timestamp"))
 		args = append(args, *filter.EndDate)
 	}
 
@@ -111,16 +120,16 @@ func buildFilterWhereClause(filter models.StatsFilter) (where string, args []int
 			placeholders += "?"
 			args = append(args, format)
 		}
-		where += fmt.Sprintf(" AND m.format IN (%s)", placeholders)
+		where += fmt.Sprintf(" AND %s IN (%s)", prefix("format"), placeholders)
 	} else if filter.Format != nil {
 		// Single format (backward compatibility)
-		where += " AND m.format = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("format"))
 		args = append(args, *filter.Format)
 	}
 
 	// Deck filter
 	if filter.DeckID != nil {
-		where += " AND m.deck_id = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("deck_id"))
 		args = append(args, *filter.DeckID)
 	}
 
@@ -141,38 +150,38 @@ func buildFilterWhereClause(filter models.StatsFilter) (where string, args []int
 			placeholders += "?"
 			args = append(args, eventName)
 		}
-		where += fmt.Sprintf(" AND m.event_name IN (%s)", placeholders)
+		where += fmt.Sprintf(" AND %s IN (%s)", prefix("event_name"), placeholders)
 	} else if filter.EventName != nil {
 		// Single event name
-		where += " AND m.event_name = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("event_name"))
 		args = append(args, *filter.EventName)
 	}
 
 	// Opponent filters
 	if filter.OpponentName != nil {
-		where += " AND m.opponent_name = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("opponent_name"))
 		args = append(args, *filter.OpponentName)
 	}
 	if filter.OpponentID != nil {
-		where += " AND m.opponent_id = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("opponent_id"))
 		args = append(args, *filter.OpponentID)
 	}
 
 	// Result filter
 	if filter.Result != nil {
-		where += " AND m.result = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("result"))
 		args = append(args, *filter.Result)
 	}
 
 	// Result reason filter
 	if filter.ResultReason != nil {
-		where += " AND m.result_reason = ?"
+		where += fmt.Sprintf(" AND %s = ?", prefix("result_reason"))
 		args = append(args, *filter.ResultReason)
 	}
 
 	// Rank filters (uses LIKE for rank_before or rank_after)
 	if filter.RankClass != nil {
-		where += " AND (m.rank_before LIKE ? OR m.rank_after LIKE ?)"
+		where += fmt.Sprintf(" AND (%s LIKE ? OR %s LIKE ?)", prefix("rank_before"), prefix("rank_after"))
 		rankPattern := "%" + *filter.RankClass + "%"
 		args = append(args, rankPattern, rankPattern)
 	}
@@ -428,16 +437,19 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string, accoun
 
 // GetMatches retrieves matches based on the given filter with advanced filtering support.
 func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
-	// Build WHERE clause using the new filter builder
-	where, args := buildFilterWhereClause(filter)
-
-	// Determine if we need to JOIN with decks table
+	// Determine if we need to JOIN with decks table and use table aliases
 	var fromClause string
+	var tableAlias string
 	if filter.DeckFormat != nil {
 		fromClause = "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
+		tableAlias = "m" // Use table alias when joining
 	} else {
 		fromClause = "FROM matches m"
+		tableAlias = "m" // Still use alias since we always have "m" in this query
 	}
+
+	// Build WHERE clause using the filter builder with table alias
+	where, args := buildFilterWhereClause(filter, tableAlias)
 
 	query := fmt.Sprintf(`
 		SELECT
@@ -497,18 +509,43 @@ func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFil
 
 // GetStats calculates statistics based on the given filter.
 func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilter) (*models.Statistics, error) {
-	// Build WHERE clause using the new filter builder
-	where, args := buildFilterWhereClause(filter)
+	// Determine table alias and FROM clause based on whether we need to JOIN
+	var tableAlias string
+	var matchFrom string
+	var gameFrom string
+
+	if filter.DeckFormat != nil {
+		// Need to JOIN with decks table to filter by deck format
+		tableAlias = "m"
+		matchFrom = "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
+		gameFrom = "FROM games g INNER JOIN matches m ON g.match_id = m.id LEFT JOIN decks d ON m.deck_id = d.id"
+	} else {
+		// No JOIN needed
+		tableAlias = ""
+		matchFrom = "FROM matches"
+		gameFrom = "FROM games g INNER JOIN matches m ON g.match_id = m.id"
+	}
+
+	// Build WHERE clause
+	where, args := buildFilterWhereClause(filter, tableAlias)
+
+	// Helper to prefix column with table alias if needed
+	col := func(name string) string {
+		if tableAlias != "" {
+			return tableAlias + "." + name
+		}
+		return name
+	}
 
 	// Query for match statistics
 	matchQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) as total,
-			COALESCE(SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END), 0) as wins,
-			COALESCE(SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END), 0) as losses
-		FROM matches
+			COALESCE(SUM(CASE WHEN %s = 'win' THEN 1 ELSE 0 END), 0) as wins,
+			COALESCE(SUM(CASE WHEN %s = 'loss' THEN 1 ELSE 0 END), 0) as losses
 		%s
-	`, where)
+		%s
+	`, col("result"), col("result"), matchFrom, where)
 
 	stats := &models.Statistics{}
 	err := r.db.QueryRowContext(ctx, matchQuery, args...).Scan(
@@ -531,10 +568,9 @@ func (r *matchRepository) GetStats(ctx context.Context, filter models.StatsFilte
 			COUNT(*) as total,
 			COALESCE(SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END), 0) as wins,
 			COALESCE(SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END), 0) as losses
-		FROM games g
-		INNER JOIN matches m ON g.match_id = m.id
 		%s
-	`, where)
+		%s
+	`, gameFrom, where)
 
 	err = r.db.QueryRowContext(ctx, gameQuery, args...).Scan(
 		&stats.TotalGames,
