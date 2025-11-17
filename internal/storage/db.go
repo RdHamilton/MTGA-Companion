@@ -76,7 +76,7 @@ func Open(config *Config) (*DB, error) {
 	// Create parent directory if it doesn't exist (unless using in-memory database)
 	if config.Path != ":memory:" {
 		dir := filepath.Dir(config.Path)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to create database directory: %w", err)
 		}
 	}
