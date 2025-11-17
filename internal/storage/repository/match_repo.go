@@ -61,6 +61,11 @@ type MatchRepository interface {
 
 	// UpdateDeckID updates the deck_id for a specific match.
 	UpdateDeckID(ctx context.Context, matchID, deckID string) error
+
+	// DeleteAll deletes all matches and games from the database.
+	// If accountID is > 0, only deletes matches for that account.
+	// If accountID is 0, deletes all matches for all accounts.
+	DeleteAll(ctx context.Context, accountID int) error
 }
 
 // matchRepository is the concrete implementation of MatchRepository.
@@ -1109,6 +1114,66 @@ func (r *matchRepository) UpdateDeckID(ctx context.Context, matchID, deckID stri
 	if rowsAffected == 0 {
 		return fmt.Errorf("match not found: %s", matchID)
 	}
+
+	return nil
+}
+
+// DeleteAll deletes all matches and games from the database.
+// If accountID is > 0, only deletes matches for that account.
+// If accountID is 0, deletes all matches for all accounts.
+func (r *matchRepository) DeleteAll(ctx context.Context, accountID int) error {
+	// Start a transaction to ensure atomicity
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	// Delete games first (foreign key constraint)
+	var gamesQuery string
+	var gamesArgs []interface{}
+	if accountID > 0 {
+		gamesQuery = `DELETE FROM games WHERE match_id IN (SELECT id FROM matches WHERE account_id = ?)`
+		gamesArgs = []interface{}{accountID}
+	} else {
+		gamesQuery = `DELETE FROM games`
+		gamesArgs = []interface{}{}
+	}
+
+	if _, err := tx.ExecContext(ctx, gamesQuery, gamesArgs...); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to delete games: %w", err)
+	}
+
+	// Delete matches
+	var matchesQuery string
+	var matchesArgs []interface{}
+	if accountID > 0 {
+		matchesQuery = `DELETE FROM matches WHERE account_id = ?`
+		matchesArgs = []interface{}{accountID}
+	} else {
+		matchesQuery = `DELETE FROM matches`
+		matchesArgs = []interface{}{}
+	}
+
+	result, err := tx.ExecContext(ctx, matchesQuery, matchesArgs...)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to delete matches: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("Deleted %d matches and associated games", rowsAffected)
 
 	return nil
 }

@@ -1604,6 +1604,30 @@ func (s *Service) Quests() *QuestRepository {
 	return s.quests
 }
 
+// ClearAllMatches deletes all matches and games for the current account.
+func (s *Service) ClearAllMatches(ctx context.Context) error {
+	return s.matches.DeleteAll(ctx, s.currentAccountID)
+}
+
+// SaveMatch saves a single match with duplicate checking.
+// If a match with the same ID already exists, it will be skipped (not an error).
+// This is useful for importing matches from backups.
+func (s *Service) SaveMatch(ctx context.Context, match *models.Match) error {
+	// Check if match already exists
+	existing, err := s.matches.GetByID(ctx, match.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing match: %w", err)
+	}
+
+	// Skip if match already exists (not an error)
+	if existing != nil {
+		return nil
+	}
+
+	// Create the match (no games for imported matches - they're not stored separately in export)
+	return s.matches.Create(ctx, match)
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()

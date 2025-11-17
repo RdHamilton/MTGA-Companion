@@ -4,6 +4,12 @@ import {models} from '../models';
 import {storage} from '../models';
 import {time} from '../models';
 
+export function ClearAllData():Promise<void>;
+
+export function ExportToCSV():Promise<void>;
+
+export function ExportToJSON():Promise<void>;
+
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
 
 export function GetActiveQuests():Promise<Array<models.Quest>>;
@@ -33,6 +39,8 @@ export function GetStatsByDeck(arg1:models.StatsFilter):Promise<Record<string, m
 export function GetStatsByFormat(arg1:models.StatsFilter):Promise<Record<string, models.Statistics>>;
 
 export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:Array<string>):Promise<storage.TrendAnalysis>;
+
+export function ImportFromFile():Promise<void>;
 
 export function Initialize(arg1:string):Promise<void>;
 
