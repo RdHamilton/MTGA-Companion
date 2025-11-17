@@ -14,7 +14,7 @@ type SortDirection = 'asc' | 'desc';
 
 const MatchHistory = () => {
   const { filters, updateFilters } = useAppContext();
-  const { dateRange, customStartDate, customEndDate, format, result } = filters.matchHistory;
+  const { dateRange, customStartDate, customEndDate, cardFormat, queueType, result } = filters.matchHistory;
 
   const [matches, setMatches] = useState<models.Match[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ const MatchHistory = () => {
 
   useEffect(() => {
     loadMatches();
-  }, [dateRange, customStartDate, customEndDate, format, result]);
+  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
 
   // Listen for real-time updates
   useEffect(() => {
@@ -44,7 +44,7 @@ const MatchHistory = () => {
         unsubscribe();
       }
     };
-  }, [dateRange, customStartDate, customEndDate, format, result]);
+  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
 
   const loadMatches = async () => {
     try {
@@ -95,16 +95,14 @@ const MatchHistory = () => {
         filter.EndDate = end;
       }
 
-      // Format filter
-      if (format !== 'all') {
-        if (format === 'constructed') {
-          filter.Formats = ['Ladder', 'Play'];
-        } else if (format === 'limited') {
-          // Limited formats contain 'Draft' or 'Sealed'
-          filter.Format = ''; // Backend will need to handle this specially
-        } else {
-          filter.Format = format;
-        }
+      // Card format filter (deck format)
+      if (cardFormat !== 'all') {
+        filter.DeckFormat = cardFormat;
+      }
+
+      // Queue type filter (ladder/play)
+      if (queueType !== 'all') {
+        filter.Format = queueType;
       }
 
       // Result filter
@@ -234,12 +232,23 @@ const MatchHistory = () => {
           )}
 
           <div className="filter-group">
-            <label className="filter-label">Format</label>
-            <select value={format} onChange={(e) => updateFilters('matchHistory', { format: e.target.value })}>
-              <option value="all">All Formats</option>
-              <option value="constructed">Constructed</option>
-              <option value="limited">Limited</option>
-              <option value="Ladder">Ranked (Ladder)</option>
+            <label className="filter-label">Card Format</label>
+            <select value={cardFormat} onChange={(e) => updateFilters('matchHistory', { cardFormat: e.target.value })}>
+              <option value="all">All Card Formats</option>
+              <option value="Standard">Standard</option>
+              <option value="Historic">Historic</option>
+              <option value="Alchemy">Alchemy</option>
+              <option value="Explorer">Explorer</option>
+              <option value="HistoricBrawl">Historic Brawl</option>
+              <option value="Brawl">Brawl</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label className="filter-label">Queue Type</label>
+            <select value={queueType} onChange={(e) => updateFilters('matchHistory', { queueType: e.target.value })}>
+              <option value="all">All Queues</option>
+              <option value="Ladder">Ranked</option>
               <option value="Play">Play Queue</option>
             </select>
           </div>
@@ -274,7 +283,7 @@ const MatchHistory = () => {
       )}
 
       {!loading && !error && matches.length === 0 && (
-        dateRange === 'all' && format === 'all' && result === 'all' ? (
+        dateRange === 'all' && cardFormat === 'all' && queueType === 'all' && result === 'all' ? (
           <EmptyState
             icon="🎮"
             title="No matches yet"
@@ -286,7 +295,7 @@ const MatchHistory = () => {
             icon="🔍"
             title="No matches found"
             message="Try adjusting your filters to see more results."
-            helpText="You can change the date range, format, or result filter above."
+            helpText="You can change the date range, card format, queue type, or result filter above."
           />
         )
       )}
