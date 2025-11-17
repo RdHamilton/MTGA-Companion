@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData } from '../../wailsjs/go/main/App';
 import './Settings.css';
 
 const Settings = () => {
@@ -102,14 +102,28 @@ const Settings = () => {
     setShowNotifications(true);
   };
 
-  const handleExportData = () => {
-    // TODO: Implement data export
-    alert('Export functionality coming soon!');
+  const handleExportData = async (format: 'json' | 'csv') => {
+    try {
+      if (format === 'json') {
+        await ExportToJSON();
+      } else {
+        await ExportToCSV();
+      }
+      alert(`Successfully exported data to ${format.toUpperCase()}!`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert(`Failed to export data: ${error}`);
+    }
   };
 
-  const handleImportData = () => {
-    // TODO: Implement data import
-    alert('Import functionality coming soon!');
+  const handleImportData = async () => {
+    try {
+      await ImportFromFile();
+      alert('Successfully imported data! Refresh the page to see updated statistics.');
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert(`Failed to import data: ${error}`);
+    }
   };
 
   return (
@@ -275,10 +289,10 @@ const Settings = () => {
               <span className="setting-description">Export your match history and statistics to a file</span>
             </label>
             <div className="setting-control">
-              <button className="action-button" onClick={handleExportData}>
+              <button className="action-button" onClick={() => handleExportData('json')}>
                 Export to JSON
               </button>
-              <button className="action-button" onClick={handleExportData}>
+              <button className="action-button" onClick={() => handleExportData('csv')}>
                 Export to CSV
               </button>
             </div>
@@ -302,9 +316,14 @@ const Settings = () => {
               <span className="setting-description">Permanently delete all match history and statistics</span>
             </label>
             <div className="setting-control">
-              <button className="danger-button" onClick={() => {
-                if (window.confirm('Are you sure you want to delete all data? This cannot be undone.')) {
-                  alert('Clear data functionality coming soon!');
+              <button className="danger-button" onClick={async () => {
+                try {
+                  await ClearAllData();
+                  alert('All data has been cleared successfully!');
+                  window.location.reload(); // Refresh to show empty state
+                } catch (error) {
+                  console.error('Clear data failed:', error);
+                  alert(`Failed to clear data: ${error}`);
                 }
               }}>
                 Clear All Data

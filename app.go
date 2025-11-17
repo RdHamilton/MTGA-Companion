@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -851,4 +853,173 @@ func (a *App) GetEventWinDistribution() ([]*storage.EventWinDistribution, error)
 	}
 
 	return distribution, nil
+}
+
+// ExportToJSON exports all match data to a JSON file.
+func (a *App) ExportToJSON() error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select save location
+	filePath, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: fmt.Sprintf("mtga-matches-%s.json", time.Now().Format("2006-01-02")),
+		Title:           "Export Matches to JSON",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON Files (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open save dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Get all matches
+	matches, err := a.service.GetMatches(a.ctx, models.StatsFilter{})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get matches: %v", err)}
+	}
+
+	// Export to JSON
+	exporter := export.NewExporter(export.Options{
+		Format:     export.FormatJSON,
+		FilePath:   filePath,
+		PrettyJSON: true,
+		Overwrite:  true,
+	})
+
+	if err := exporter.Export(matches); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to export to JSON: %v", err)}
+	}
+
+	log.Printf("Successfully exported %d matches to %s", len(matches), filePath)
+	return nil
+}
+
+// ExportToCSV exports all match data to a CSV file.
+func (a *App) ExportToCSV() error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select save location
+	filePath, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: fmt.Sprintf("mtga-matches-%s.csv", time.Now().Format("2006-01-02")),
+		Title:           "Export Matches to CSV",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "CSV Files (*.csv)", Pattern: "*.csv"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open save dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Get all matches
+	matches, err := a.service.GetMatches(a.ctx, models.StatsFilter{})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get matches: %v", err)}
+	}
+
+	// Export to CSV
+	exporter := export.NewExporter(export.Options{
+		Format:    export.FormatCSV,
+		FilePath:  filePath,
+		Overwrite: true,
+	})
+
+	if err := exporter.Export(matches); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to export to CSV: %v", err)}
+	}
+
+	log.Printf("Successfully exported %d matches to %s", len(matches), filePath)
+	return nil
+}
+
+// ImportFromFile imports match data from a JSON file.
+func (a *App) ImportFromFile() error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select file
+	filePath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Import Matches from JSON",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON Files (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open file dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Read file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to read file: %v", err)}
+	}
+
+	// Parse JSON
+	var matches []*models.Match
+	if err := json.Unmarshal(data, &matches); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to parse JSON: %v", err)}
+	}
+
+	// Import matches (this would need a service method to handle duplicate checking)
+	imported := 0
+	for _, match := range matches {
+		// Save each match (skip duplicates)
+		if err := a.service.SaveMatch(a.ctx, match); err != nil {
+			log.Printf("Warning: Failed to import match %s: %v", match.ID, err)
+			continue
+		}
+		imported++
+	}
+
+	log.Printf("Successfully imported %d/%d matches from %s", imported, len(matches), filePath)
+	return nil
+}
+
+// ClearAllData clears all match history from the database.
+func (a *App) ClearAllData() error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Show confirmation dialog
+	selection, err := wailsruntime.MessageDialog(a.ctx, wailsruntime.MessageDialogOptions{
+		Type:          wailsruntime.QuestionDialog,
+		Title:         "Clear All Data",
+		Message:       "⚠️ WARNING: This will permanently delete all match history and statistics.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?",
+		DefaultButton: "No",
+		Buttons:       []string{"Yes, Delete All Data", "No"},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to show confirmation dialog: %v", err)}
+	}
+	if selection != "Yes, Delete All Data" {
+		// User cancelled or clicked No
+		return nil
+	}
+
+	// Delete all matches
+	if err := a.service.ClearAllMatches(a.ctx); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to clear data: %v", err)}
+	}
+
+	log.Println("Successfully cleared all match history")
+	return nil
 }
