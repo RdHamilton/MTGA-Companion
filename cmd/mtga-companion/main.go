@@ -167,7 +167,7 @@ func getDBPath() string {
 		if err != nil {
 			log.Fatalf("Error getting home directory: %v", err)
 		}
-		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+		dbPath = filepath.Join(home, ".mtga-companion", "mtga.db")
 	}
 	return dbPath
 }
@@ -254,12 +254,7 @@ func main() {
 	}
 
 	// Initialize database
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("Error getting home directory: %v", err)
-	}
-
-	dbPath := filepath.Join(homeDir, ".mtga-companion", "data.db")
+	dbPath := getDBPath()
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		log.Fatalf("Error creating database directory: %v", err)
@@ -523,6 +518,7 @@ func main() {
 	pollerConfig.Interval = *logPollInterval
 	pollerConfig.UseFileEvents = *logUseFsnotify
 	pollerConfig.EnableMetrics = *enableMetrics
+	pollerConfig.ReadFromStart = true // Read entire log file
 	poller, err := logreader.NewPoller(pollerConfig)
 	if err != nil {
 		log.Printf("Warning: Failed to create poller: %v", err)

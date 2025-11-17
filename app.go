@@ -73,9 +73,9 @@ func getDefaultDBPath() string {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			log.Printf("Error getting home directory: %v", err)
-			return "data.db" // Fallback to current directory
+			return "mtga.db" // Fallback to current directory
 		}
-		dbPath = filepath.Join(home, ".mtga-companion", "data.db")
+		dbPath = filepath.Join(home, ".mtga-companion", "mtga.db")
 	}
 	return dbPath
 }
@@ -551,6 +551,22 @@ func (a *App) setupEventHandlers() {
 		wailsruntime.EventsEmit(a.ctx, "deck:updated", data)
 	})
 
+	// Handle quest:updated events from daemon
+	a.ipcClient.On("quest:updated", func(data map[string]interface{}) {
+		log.Printf("Received quest:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "quest:updated", data)
+	})
+
+	// Handle achievement:updated events from daemon
+	a.ipcClient.On("achievement:updated", func(data map[string]interface{}) {
+		log.Printf("Received achievement:updated event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "achievement:updated", data)
+	})
+
 	// Handle daemon:status events
 	a.ipcClient.On("daemon:status", func(data map[string]interface{}) {
 		log.Printf("Daemon status: %v", data)
@@ -571,6 +587,19 @@ func (a *App) setupEventHandlers() {
 		// Forward error event to frontend
 		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
 	})
+
+	// Handle disconnect events
+	a.ipcClient.OnDisconnect(func() {
+		log.Println("Daemon connection lost - notifying frontend")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
+	})
 }
 
 // stopDaemonClient stops the daemon IPC client if running.
@@ -583,6 +612,14 @@ func (a *App) stopDaemonClient() {
 		a.ipcClient = nil
 		a.daemonMode = false
 		log.Println("Daemon client stopped")
+
+		// Emit status change event to frontend
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "daemon:status", map[string]interface{}{
+				"status":    "standalone",
+				"connected": false,
+			})
+		}
 	}
 }
 
@@ -681,4 +718,100 @@ func (a *App) SwitchToDaemonMode() error {
 
 	log.Println("Switched to daemon mode successfully")
 	return nil
+}
+
+// GetActiveQuests returns all active (incomplete) quests.
+func (a *App) GetActiveQuests() ([]*models.Quest, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	quests, err := a.service.Quests().GetActiveQuests()
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get active quests: %v", err)}
+	}
+
+	return quests, nil
+}
+
+// GetQuestHistory returns quest history with optional date range and limit.
+func (a *App) GetQuestHistory(startDate, endDate string, limit int) ([]*models.Quest, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	var start, end *time.Time
+
+	// Parse start date if provided
+	if startDate != "" {
+		parsedStart, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid start date format: %v", err)}
+		}
+		start = &parsedStart
+	}
+
+	// Parse end date if provided
+	if endDate != "" {
+		parsedEnd, err := time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid end date format: %v", err)}
+		}
+		end = &parsedEnd
+	}
+
+	quests, err := a.service.Quests().GetQuestHistory(start, end, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get quest history: %v", err)}
+	}
+
+	return quests, nil
+}
+
+// GetQuestStats returns quest statistics with optional date range.
+func (a *App) GetQuestStats(startDate, endDate string) (*models.QuestStats, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	var start, end *time.Time
+
+	// Parse start date if provided
+	if startDate != "" {
+		parsedStart, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid start date format: %v", err)}
+		}
+		start = &parsedStart
+	}
+
+	// Parse end date if provided
+	if endDate != "" {
+		parsedEnd, err := time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Invalid end date format: %v", err)}
+		}
+		end = &parsedEnd
+	}
+
+	stats, err := a.service.Quests().GetQuestStats(start, end)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get quest stats: %v", err)}
+	}
+
+	return stats, nil
+}
+
+// GetCurrentAccount returns the current account with all fields including daily/weekly wins.
+func (a *App) GetCurrentAccount() (*models.Account, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	account, err := a.service.GetCurrentAccount(a.ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get current account: %v", err)}
+	}
+
+	return account, nil
 }

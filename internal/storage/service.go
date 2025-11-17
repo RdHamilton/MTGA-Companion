@@ -22,6 +22,7 @@ type Service struct {
 	collection       repository.CollectionRepository
 	accounts         repository.AccountRepository
 	rankHistory      repository.RankHistoryRepository
+	quests           *QuestRepository
 	currentAccountID int // Current active account ID
 }
 
@@ -35,6 +36,7 @@ func NewService(db *DB) *Service {
 		collection:  repository.NewCollectionRepository(db.Conn()),
 		accounts:    repository.NewAccountRepository(db.Conn()),
 		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
+		quests:      NewQuestRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -75,6 +77,77 @@ func (s *Service) GetDB() *sql.DB {
 func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.ArenaStats, entries []*logreader.LogEntry) error {
 	if arenaStats == nil {
 		return nil
+	}
+
+	// Parse and update player profile (screen name) if found
+	profile, _ := logreader.ParseProfile(entries)
+	if profile != nil && (profile.ScreenName != "" || profile.ClientID != "") {
+		// Get current account
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update screen name and client ID if changed
+			updated := false
+			if profile.ScreenName != "" && (account.ScreenName == nil || *account.ScreenName != profile.ScreenName) {
+				account.ScreenName = &profile.ScreenName
+				updated = true
+			}
+			if profile.ClientID != "" && (account.ClientID == nil || *account.ClientID != profile.ClientID) {
+				account.ClientID = &profile.ClientID
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
+	}
+
+	// Parse and update daily/weekly wins from periodic rewards
+	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
+	if periodicRewards != nil {
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update daily and weekly wins if changed
+			updated := false
+			if periodicRewards.DailyWins != account.DailyWins {
+				account.DailyWins = periodicRewards.DailyWins
+				updated = true
+			}
+			if periodicRewards.WeeklyWins != account.WeeklyWins {
+				account.WeeklyWins = periodicRewards.WeeklyWins
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
+	}
+
+	// Parse and update mastery pass progression
+	masteryPass, _ := logreader.ParseMasteryPass(entries)
+	if masteryPass != nil {
+		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+		if err == nil && account != nil {
+			// Update mastery pass data if changed
+			updated := false
+			if masteryPass.CurrentLevel != account.MasteryLevel {
+				account.MasteryLevel = masteryPass.CurrentLevel
+				updated = true
+			}
+			if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
+				account.MasteryPass = masteryPass.PassType
+				updated = true
+			}
+			if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
+				account.MasteryMax = masteryPass.MaxLevel
+				updated = true
+			}
+			if updated {
+				account.UpdatedAt = time.Now()
+				_ = s.accounts.Update(ctx, account)
+			}
+		}
 	}
 
 	// Extract match details from log entries for persistent storage
@@ -211,28 +284,62 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				continue
 			}
 
-			firstPlayer, ok := reservedPlayers[0].(map[string]interface{})
-			if !ok {
+			// Get current account's screen name for player identification
+			var playerScreenName string
+			account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+			if err == nil && account != nil && account.ScreenName != nil {
+				playerScreenName = *account.ScreenName
+			}
+
+			// Find the actual player (not the opponent) by matching screen name
+			var actualPlayer map[string]interface{}
+			var opponentPlayer map[string]interface{}
+			eventID := "Unknown"
+
+			for _, playerData := range reservedPlayers {
+				player, ok := playerData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Use the first player as fallback
+				if actualPlayer == nil {
+					actualPlayer = player
+				}
+
+				// Extract event ID from any player
+				if evID, ok := player["eventId"].(string); ok && evID != "" {
+					eventID = evID
+				}
+
+				// Match player by screen name if available
+				if playerName, ok := player["playerName"].(string); ok && playerName != "" {
+					if playerScreenName != "" && playerName == playerScreenName {
+						// Found the actual player by screen name
+						actualPlayer = player
+					} else if playerScreenName != "" && playerName != playerScreenName {
+						// This is the opponent (different screen name)
+						opponentPlayer = player
+					}
+				}
+			}
+
+			if actualPlayer == nil {
 				continue
 			}
 
-			eventID, _ := firstPlayer["eventId"].(string)
-			if eventID == "" {
-				eventID = "Unknown"
-			}
-
-			eventName, _ := firstPlayer["eventId"].(string)
+			eventName, _ := actualPlayer["eventId"].(string)
 			if eventName == "" {
 				eventName = eventID
 			}
 
-			playerTeamID, _ := firstPlayer["teamId"].(float64)
+			playerTeamID, _ := actualPlayer["teamId"].(float64)
 
 			// Extract deck ID if available
 			var deckID *string
-			if deckIDStr, ok := firstPlayer["deckId"].(string); ok && deckIDStr != "" {
+			if deckIDStr, ok := actualPlayer["deckId"].(string); ok && deckIDStr != "" {
 				deckID = &deckIDStr
-			} else if deckIDStr, ok := firstPlayer["DeckId"].(string); ok && deckIDStr != "" {
+			} else if deckIDStr, ok := actualPlayer["DeckId"].(string); ok && deckIDStr != "" {
 				deckID = &deckIDStr
 			}
 
@@ -314,6 +421,18 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				}
 			}
 
+			// Extract opponent information if available
+			var opponentName *string
+			var opponentID *string
+			if opponentPlayer != nil {
+				if name, ok := opponentPlayer["playerName"].(string); ok && name != "" {
+					opponentName = &name
+				}
+				if id, ok := opponentPlayer["userId"].(string); ok && id != "" {
+					opponentID = &id
+				}
+			}
+
 			// Create match record
 			match := &Match{
 				ID:           matchID,
@@ -328,6 +447,8 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				Format:       eventID,
 				Result:       matchResult,
 				ResultReason: resultReason,
+				OpponentName: opponentName,
+				OpponentID:   opponentID,
 				CreatedAt:    matchTime,
 			}
 
@@ -1476,6 +1597,11 @@ func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time
 	}
 
 	return nil
+}
+
+// Quests returns the quest repository for accessing quest data.
+func (s *Service) Quests() *QuestRepository {
+	return s.quests
 }
 
 // Close closes the database connection.

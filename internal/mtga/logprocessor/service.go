@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // Service handles processing of MTGA log entries and storing results.
@@ -25,11 +26,14 @@ func NewService(storage *storage.Service) *Service {
 
 // ProcessResult contains the results of processing log entries.
 type ProcessResult struct {
-	MatchesStored int
-	GamesStored   int
-	DecksStored   int
-	RanksStored   int
-	Errors        []error
+	MatchesStored      int
+	GamesStored        int
+	DecksStored        int
+	RanksStored        int
+	QuestsStored       int
+	QuestsCompleted    int
+	AchievementsStored int
+	Errors             []error
 }
 
 // ProcessLogEntries processes a batch of log entries and stores all extracted data.
@@ -51,6 +55,22 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 
 	// Process rank updates
 	if err := s.processRankUpdates(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process quests
+	if err := s.processQuests(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process graph state for progress tracking (daily wins, weekly wins, etc.)
+	// Note: We don't use this for quest COMPLETION anymore - that's handled automatically
+	if err := s.processGraphState(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process achievements
+	if err := s.processAchievements(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -77,13 +97,8 @@ func (s *Service) processArenaStats(ctx context.Context, entries []*logreader.Lo
 
 		log.Printf("✓ Stored statistics: %d matches, %d games", arenaStats.TotalMatches, arenaStats.TotalGames)
 
-		// Try to infer deck IDs for the new matches
-		inferredCount, err := s.storage.InferDeckIDsForMatches(ctx)
-		if err != nil {
-			log.Printf("Warning: Failed to infer deck IDs: %v", err)
-		} else if inferredCount > 0 {
-			log.Printf("✓ Linked %d match(es) to decks", inferredCount)
-		}
+		// Note: We don't infer deck IDs here anymore - we wait until AFTER decks are processed
+		// to ensure we have the most up-to-date last_played timestamps
 	}
 
 	return nil
@@ -213,5 +228,95 @@ func (s *Service) processRankUpdates(ctx context.Context, entries []*logreader.L
 		log.Printf("✓ Stored %d/%d rank update(s)", storedCount, len(rankUpdates))
 	}
 
+	return nil
+}
+
+// processQuests parses and stores quests from log entries.
+func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	quests, err := logreader.ParseQuests(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse quests: %v", err)
+		return err
+	}
+
+	if len(quests) == 0 {
+		return nil
+	}
+
+	log.Printf("Found %d quest(s) in entries", len(quests))
+
+	storedCount := 0
+	for _, questData := range quests {
+		// Small delay between operations to avoid database lock contention
+		if storedCount > 0 {
+			time.Sleep(25 * time.Millisecond)
+		}
+
+		// Convert QuestData to storage model
+		quest := &models.Quest{
+			QuestID:          questData.QuestID,
+			QuestType:        questData.QuestType,
+			Goal:             questData.Goal,
+			StartingProgress: questData.StartingProgress,
+			EndingProgress:   questData.EndingProgress,
+			Completed:        questData.Completed,
+			CanSwap:          questData.CanSwap,
+			Rewards:          questData.Rewards,
+			AssignedAt:       questData.AssignedAt,
+			CompletedAt:      questData.CompletedAt,
+			Rerolled:         questData.Rerolled,
+		}
+
+		// Save quest to database
+		if err := s.storage.Quests().Save(quest); err != nil {
+			log.Printf("Warning: Failed to store quest %s: %v", questData.QuestID, err)
+		} else {
+			storedCount++
+		}
+	}
+
+	if storedCount > 0 {
+		result.QuestsStored = storedCount
+		log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
+	}
+
+	return nil
+}
+
+// processGraphState parses GraphGetGraphState events for progress tracking data.
+// Note: We don't use this for quest COMPLETION (handled automatically via ending_progress >= goal).
+// Instead, we use it to discover and track other progress data (daily wins, weekly wins, etc.).
+func (s *Service) processGraphState(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	graphStates, err := logreader.ParseGraphState(entries)
+	if err != nil {
+		log.Printf("Warning: Failed to parse graph state: %v", err)
+		return err
+	}
+
+	if len(graphStates) == 0 {
+		return nil
+	}
+
+	// Log all unique node types we encounter for analysis
+	nodeTypesSeen := make(map[string]bool)
+	for _, state := range graphStates {
+		for _, node := range state.AllNodes {
+			if !nodeTypesSeen[node.NodeName] {
+				log.Printf("GraphState node discovered: %s (Status: %s)", node.NodeName, node.Status)
+				nodeTypesSeen[node.NodeName] = true
+			}
+		}
+	}
+
+	// TODO: Parse daily wins, weekly wins, and other progress from discovered nodes
+	// For now, we just log what's available for discovery
+
+	return nil
+}
+
+// processAchievements parses and stores achievements from log entries.
+// NOTE: Achievement system temporarily disabled - removed from UI
+func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	// Achievement system removed - skip processing
 	return nil
 }

@@ -1,5 +1,10 @@
 package logreader
 
+import (
+	"strconv"
+	"strings"
+)
+
 // ParseProfile extracts player profile information from log entries.
 // It looks for authenticateResponse events that contain screenName and clientId.
 func ParseProfile(entries []*LogEntry) (*PlayerProfile, error) {
@@ -369,6 +374,13 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 	// Track seen matches to avoid double counting
 	seenMatches := make(map[string]bool)
 
+	// Get player's screen name from authenticateResponse
+	var playerScreenName string
+	profile, _ := ParseProfile(entries)
+	if profile != nil && profile.ScreenName != "" {
+		playerScreenName = profile.ScreenName
+	}
+
 	for _, entry := range entries {
 		if !entry.IsJSON {
 			continue
@@ -412,19 +424,42 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 				continue
 			}
 
-			// Get eventId from first player
-			firstPlayer, ok := reservedPlayers[0].(map[string]interface{})
-			if !ok {
+			// Find the actual player (not the opponent) by matching screen name
+			var actualPlayer map[string]interface{}
+			eventID := "Unknown"
+
+			for _, playerData := range reservedPlayers {
+				player, ok := playerData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// Use the first player as fallback
+				if actualPlayer == nil {
+					actualPlayer = player
+				}
+
+				// Extract event ID from any player
+				if evID, ok := player["eventId"].(string); ok && evID != "" {
+					eventID = evID
+				}
+
+				// Match player by screen name if available
+				if playerName, ok := player["playerName"].(string); ok && playerName != "" {
+					if playerScreenName != "" && playerName == playerScreenName {
+						// Found the actual player by screen name
+						actualPlayer = player
+						break
+					}
+				}
+			}
+
+			if actualPlayer == nil {
 				continue
 			}
 
-			eventID, _ := firstPlayer["eventId"].(string)
-			if eventID == "" {
-				eventID = "Unknown"
-			}
-
 			// Get player's team ID to determine wins/losses
-			playerTeamID, _ := firstPlayer["teamId"].(float64)
+			playerTeamID, _ := actualPlayer["teamId"].(float64)
 
 			// Parse result list
 			resultList, ok := finalMatchResult["resultList"].([]interface{})
@@ -496,6 +531,127 @@ func ParseArenaStats(entries []*LogEntry) (*ArenaStats, error) {
 	}
 
 	return stats, nil
+}
+
+// ParsePeriodicRewards extracts daily and weekly win progress from log entries.
+// It looks for ClientPeriodicRewards events that contain _dailyRewardSequenceId and _weeklyRewardSequenceId.
+func ParsePeriodicRewards(entries []*LogEntry) (*PeriodicRewards, error) {
+	// Look for the most recent ClientPeriodicRewards
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !entry.IsJSON {
+			continue
+		}
+
+		// Check if this entry has ClientPeriodicRewards
+		if rewardsData, ok := entry.JSON["ClientPeriodicRewards"]; ok {
+			rewardsMap, ok := rewardsData.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			rewards := &PeriodicRewards{}
+
+			// Extract daily wins (sequence ID 1-15 means that many wins completed)
+			if dailySeq, ok := rewardsMap["_dailyRewardSequenceId"].(float64); ok {
+				rewards.DailyWins = int(dailySeq)
+			}
+
+			// Extract weekly wins (sequence ID 1-15 means that many wins completed)
+			if weeklySeq, ok := rewardsMap["_weeklyRewardSequenceId"].(float64); ok {
+				rewards.WeeklyWins = int(weeklySeq)
+			}
+
+			if rewards.DailyWins > 0 || rewards.WeeklyWins > 0 {
+				return rewards, nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+// ParseMasteryPass extracts mastery pass progression from log entries.
+// It looks for events with NodeStates containing LevelTrack_Level_X_Reward nodes.
+func ParseMasteryPass(entries []*LogEntry) (*MasteryPass, error) {
+	// Look for the most recent event with NodeStates
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !entry.IsJSON {
+			continue
+		}
+
+		// Check if this entry has NodeStates at the top level
+		nodeStatesData, hasNodeStates := entry.JSON["NodeStates"]
+		if !hasNodeStates {
+			continue
+		}
+
+		nodeStates, ok := nodeStatesData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		masteryPass := &MasteryPass{}
+		highestCompleted := 0
+		maxLevel := 0
+
+		// Iterate through all node states
+		for nodeName, nodeData := range nodeStates {
+			nodeMap, ok := nodeData.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Check if this is a LevelTrack_Level_X_Reward node
+			if strings.HasPrefix(nodeName, "LevelTrack_Level_") && strings.HasSuffix(nodeName, "_Reward") {
+				// Extract level number from node name
+				// "LevelTrack_Level_55_Reward" -> "55"
+				levelStr := strings.TrimPrefix(nodeName, "LevelTrack_Level_")
+				levelStr = strings.TrimSuffix(levelStr, "_Reward")
+
+				level, err := strconv.Atoi(levelStr)
+				if err != nil {
+					continue
+				}
+
+				// Track max level seen
+				if level > maxLevel {
+					maxLevel = level
+				}
+
+				// Check if this level is completed
+				if status, ok := nodeMap["Status"].(string); ok && status == "Completed" {
+					if level > highestCompleted {
+						highestCompleted = level
+					}
+
+					// Extract pass type from CurrentTiers
+					if masteryPass.PassType == "" {
+						if tierRewardState, ok := nodeMap["TierRewardNodeState"].(map[string]interface{}); ok {
+							if currentTiers, ok := tierRewardState["CurrentTiers"].([]interface{}); ok && len(currentTiers) > 0 {
+								if tierStr, ok := currentTiers[0].(string); ok {
+									// Capitalize first letter: "basic" -> "Basic"
+									if len(tierStr) > 0 {
+										masteryPass.PassType = strings.ToUpper(tierStr[:1]) + tierStr[1:]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		masteryPass.CurrentLevel = highestCompleted
+		masteryPass.MaxLevel = maxLevel
+
+		if masteryPass.CurrentLevel > 0 || masteryPass.PassType != "" {
+			return masteryPass, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // ParseAll extracts all available information from log entries.

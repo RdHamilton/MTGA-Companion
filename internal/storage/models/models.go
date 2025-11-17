@@ -4,13 +4,18 @@ import "time"
 
 // Account represents a player account.
 type Account struct {
-	ID         int
-	Name       string
-	ScreenName *string // Nullable
-	ClientID   *string // Nullable
-	IsDefault  bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           int
+	Name         string
+	ScreenName   *string // Nullable
+	ClientID     *string // Nullable
+	DailyWins    int     // Current daily win count (0-15)
+	WeeklyWins   int     // Current weekly win count (0-15)
+	MasteryLevel int     // Current mastery pass level
+	MasteryPass  string  // "Basic" (free) or "Advanced" (paid)
+	MasteryMax   int     // Maximum mastery level for current season
+	IsDefault    bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Match represents a single match in MTGA.
@@ -284,4 +289,29 @@ type DoubleRankUp struct {
 	Timestamp     time.Time // When it occurred
 	Format        string    // "constructed" or "limited"
 	SeasonOrdinal int       // Season when it occurred
+}
+
+// Achievement represents a player achievement/milestone in MTGA.
+type Achievement struct {
+	ID              int
+	AccountID       int // Foreign key to accounts
+	GraphID         string
+	NodeID          string
+	Status          string // "Available", "Completed", "InProgress"
+	CurrentProgress int    // Current progress toward achievement
+	MaxProgress     *int   // Nullable: max progress required (if applicable)
+	CompletedAt     *time.Time
+	FirstSeen       time.Time // When first detected
+	LastUpdated     time.Time // Last progress update
+	CreatedAt       time.Time
+}
+
+// AchievementStats represents achievement statistics.
+type AchievementStats struct {
+	TotalAchievements     int
+	CompletedAchievements int
+	InProgressCount       int
+	CompletionRate        float64
+	RecentlyCompleted     int // Completed in last 7 days
+	CloseToComplete       int // Within 90% of completion
 }

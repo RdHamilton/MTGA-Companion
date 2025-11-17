@@ -96,3 +96,16 @@ type FormatStats struct {
 	GameWins      int
 	GameLosses    int
 }
+
+// PeriodicRewards contains daily and weekly reward progress.
+type PeriodicRewards struct {
+	DailyWins  int // Current daily win count (0-15)
+	WeeklyWins int // Current weekly win count (0-15)
+}
+
+// MasteryPass contains mastery pass progression information.
+type MasteryPass struct {
+	CurrentLevel int    // Highest completed level
+	PassType     string // "Basic" (free) or "Advanced" (paid)
+	MaxLevel     int    // Maximum level available in current season
+}

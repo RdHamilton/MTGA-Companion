@@ -1,0 +1,456 @@
+package storage
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+)
+
+// QuestRepository handles database operations for quests
+type QuestRepository struct {
+	db *sql.DB
+}
+
+// NewQuestRepository creates a new quest repository
+func NewQuestRepository(db *sql.DB) *QuestRepository {
+	return &QuestRepository{db: db}
+}
+
+// Save saves a quest to the database (insert or update)
+func (r *QuestRepository) Save(quest *models.Quest) error {
+	// First, check if a quest with this quest_id already exists
+	existingQuery := `
+		SELECT id, ending_progress, assigned_at FROM quests
+		WHERE quest_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var existingID int
+	var existingProgress int
+	var existingAssignedAt time.Time
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt)
+
+	if err == nil {
+		// Quest exists - update it
+		// Use the completion status from the parser (which detects completion via quest disappearance)
+		// IMPORTANT: Preserve the original assigned_at timestamp for accurate duration calculation
+
+		// Strip monotonic clock from timestamps for SQLite compatibility
+		var completedAt *time.Time
+		if quest.CompletedAt != nil {
+			rounded := quest.CompletedAt.Round(0)
+			completedAt = &rounded
+		}
+
+		updateQuery := `
+			UPDATE quests
+			SET ending_progress = ?,
+				completed = ?,
+				completed_at = ?,
+				can_swap = ?
+			WHERE id = ?
+		`
+
+		_, err = r.db.Exec(updateQuery,
+			quest.EndingProgress,
+			quest.Completed,
+			completedAt,
+			quest.CanSwap,
+			existingID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update quest: %w", err)
+		}
+
+		quest.ID = existingID
+		// Preserve the original assigned_at for accurate duration
+		quest.AssignedAt = existingAssignedAt
+		return nil
+	}
+
+	// Quest doesn't exist - insert it
+	// Use the completion status from the parser (which detects completion via quest disappearance)
+
+	query := `
+		INSERT INTO quests (
+			quest_id, quest_type, goal, starting_progress, ending_progress,
+			completed, can_swap, rewards, assigned_at, completed_at, rerolled
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	// Strip monotonic clock from timestamps for SQLite compatibility
+	assignedAt := quest.AssignedAt.Round(0)
+	var completedAt *time.Time
+	if quest.CompletedAt != nil {
+		rounded := quest.CompletedAt.Round(0)
+		completedAt = &rounded
+	}
+
+	result, err := r.db.Exec(query,
+		quest.QuestID, quest.QuestType, quest.Goal,
+		quest.StartingProgress, quest.EndingProgress,
+		quest.Completed, quest.CanSwap, quest.Rewards,
+		assignedAt, completedAt, quest.Rerolled,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save quest: %w", err)
+	}
+
+	// Get the inserted ID
+	id, err := result.LastInsertId()
+	if err == nil {
+		quest.ID = int(id)
+	}
+
+	return nil
+}
+
+// GetActiveQuests returns all incomplete quests (one per unique quest_id)
+func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE completed = 0
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		WHERE q.completed = 0
+		ORDER BY q.assigned_at DESC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active quests: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	return r.scanQuests(rows)
+}
+
+// GetQuestHistory returns quest history with optional filters (one per unique quest_id)
+func (r *QuestRepository) GetQuestHistory(startDate, endDate *time.Time, limit int) ([]*models.Quest, error) {
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE 1=1
+	`
+	args := []interface{}{}
+
+	if startDate != nil {
+		query += " AND DATE(created_at) >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
+	}
+
+	if endDate != nil {
+		query += " AND DATE(created_at) <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
+	}
+
+	query += `
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		ORDER BY q.assigned_at DESC
+	`
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quest history: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	return r.scanQuests(rows)
+}
+
+// GetQuestStats returns analytics about quest completion (deduplicates quests by quest_id)
+func (r *QuestRepository) GetQuestStats(startDate, endDate *time.Time) (*models.QuestStats, error) {
+	stats := &models.QuestStats{}
+
+	// Get deduplicated quests (latest entry per quest_id)
+	query := `
+		WITH latest_quests AS (
+			SELECT q.*
+			FROM quests q
+			INNER JOIN (
+				SELECT quest_id, MAX(created_at) as max_created
+				FROM quests
+				WHERE 1=1
+	`
+	args := []interface{}{}
+
+	if startDate != nil {
+		query += " AND DATE(created_at) >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
+	}
+
+	if endDate != nil {
+		query += " AND DATE(created_at) <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
+	}
+
+	query += `
+				GROUP BY quest_id
+			) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		)
+		SELECT
+			COUNT(*) as total,
+			COALESCE(SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END), 0) as completed,
+			COALESCE(SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN rerolled = 1 THEN 1 ELSE 0 END), 0) as rerolled
+		FROM latest_quests
+	`
+
+	err := r.db.QueryRow(query, args...).Scan(
+		&stats.TotalQuests, &stats.CompletedQuests, &stats.ActiveQuests, &stats.RerollCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quest stats: %w", err)
+	}
+
+	// Calculate completion rate
+	if stats.TotalQuests > 0 {
+		stats.CompletionRate = float64(stats.CompletedQuests) / float64(stats.TotalQuests) * 100.0
+	}
+
+	// Average completion time (from deduplicated quests)
+	query = `
+		WITH latest_quests AS (
+			SELECT q.*
+			FROM quests q
+			INNER JOIN (
+				SELECT quest_id, MAX(created_at) as max_created
+				FROM quests
+				WHERE completed = 1 AND completed_at IS NOT NULL
+	`
+	args = []interface{}{}
+
+	if startDate != nil {
+		query += " AND DATE(created_at) >= DATE(?)"
+		args = append(args, startDate)
+	}
+
+	if endDate != nil {
+		query += " AND DATE(created_at) <= DATE(?)"
+		args = append(args, endDate)
+	}
+
+	query += `
+				GROUP BY quest_id
+			) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		)
+		SELECT AVG(
+			CAST((julianday(completed_at) - julianday(assigned_at)) * 86400000 AS INTEGER)
+		)
+		FROM latest_quests
+	`
+
+	var avgMS sql.NullInt64
+	err = r.db.QueryRow(query, args...).Scan(&avgMS)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to calculate average completion time: %w", err)
+	}
+
+	if avgMS.Valid {
+		stats.AverageCompletionMS = avgMS.Int64
+	}
+
+	// TODO: Calculate total gold earned by parsing rewards JSON
+	// For now, estimate based on completed quests (most quests give 500 or 750 gold)
+	stats.TotalGoldEarned = stats.CompletedQuests * 500 // Conservative estimate
+
+	return stats, nil
+}
+
+// GetQuestByID retrieves a quest by its database ID
+func (r *QuestRepository) GetQuestByID(id int) (*models.Quest, error) {
+	query := `
+		SELECT id, quest_id, quest_type, goal, starting_progress, ending_progress,
+		       completed, can_swap, rewards, assigned_at, completed_at, rerolled, created_at
+		FROM quests
+		WHERE id = ?
+	`
+
+	quest := &models.Quest{}
+	var completedAt sql.NullTime
+
+	err := r.db.QueryRow(query, id).Scan(
+		&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
+		&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
+		&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
+		&completedAt, &quest.Rerolled, &quest.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("quest not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quest: %w", err)
+	}
+
+	if completedAt.Valid {
+		quest.CompletedAt = &completedAt.Time
+	}
+
+	return quest, nil
+}
+
+// MarkCompleted marks a quest as completed
+func (r *QuestRepository) MarkCompleted(questID string, assignedAt time.Time, completedAt time.Time) error {
+	query := `
+		UPDATE quests
+		SET completed = 1, completed_at = ?, ending_progress = goal
+		WHERE quest_id = ? AND assigned_at = ?
+	`
+
+	_, err := r.db.Exec(query, completedAt, questID, assignedAt)
+	if err != nil {
+		return fmt.Errorf("failed to mark quest as completed: %w", err)
+	}
+
+	return nil
+}
+
+// MarkRerolled marks a quest as rerolled
+func (r *QuestRepository) MarkRerolled(questID string, assignedAt time.Time) error {
+	query := `
+		UPDATE quests
+		SET rerolled = 1
+		WHERE quest_id = ? AND assigned_at = ?
+	`
+
+	_, err := r.db.Exec(query, questID, assignedAt)
+	if err != nil {
+		return fmt.Errorf("failed to mark quest as rerolled: %w", err)
+	}
+
+	return nil
+}
+
+// MarkQuestsCompletedByGraphState marks quests as completed based on GraphGetGraphState data.
+// It maps Quest1-7 from the graph state to actual quests by their assigned order.
+func (r *QuestRepository) MarkQuestsCompletedByGraphState(completedQuestNumbers map[int]bool, timestamp time.Time) error {
+	// Get active quests ordered by assigned_at (oldest first)
+	// This maps to Quest1-7 in the graph state
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE completed = 0
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		WHERE q.completed = 0
+		ORDER BY q.assigned_at ASC
+		LIMIT 7
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to get active quests for completion: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	quests, err := r.scanQuests(rows)
+	if err != nil {
+		return fmt.Errorf("failed to scan quests for completion: %w", err)
+	}
+
+	// Mark quests as completed based on their position (Quest1 = oldest, Quest2 = 2nd oldest, etc.)
+	for i, quest := range quests {
+		questNumber := i + 1 // Quest1 = 1, Quest2 = 2, etc.
+
+		// Check if this quest number is marked as completed in graph state
+		if completedQuestNumbers[questNumber] {
+			// Only mark as completed if it's not already completed
+			if !quest.Completed {
+				if err := r.MarkCompleted(quest.QuestID, quest.AssignedAt, timestamp); err != nil {
+					return fmt.Errorf("failed to mark quest %d (%s) as completed: %w", questNumber, quest.QuestID, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// MarkActiveQuestsCompleted marks all active quests that have reached their goal as completed.
+// This is useful when we know quests should be completed but don't have specific quest IDs.
+func (r *QuestRepository) MarkActiveQuestsCompleted(timestamp time.Time) error {
+	query := `
+		UPDATE quests
+		SET completed = 1, completed_at = ?
+		WHERE completed = 0
+		  AND ending_progress >= goal
+		  AND id IN (
+			SELECT q.id
+			FROM quests q
+			INNER JOIN (
+				SELECT quest_id, MAX(created_at) as max_created
+				FROM quests
+				WHERE completed = 0
+				GROUP BY quest_id
+			) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		  )
+	`
+
+	result, err := r.db.Exec(query, timestamp)
+	if err != nil {
+		return fmt.Errorf("failed to mark active quests as completed: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		// Log how many quests were marked completed
+		_ = rowsAffected // Prevent unused variable warning
+	}
+
+	return nil
+}
+
+// scanQuests is a helper to scan multiple quest rows
+func (r *QuestRepository) scanQuests(rows *sql.Rows) ([]*models.Quest, error) {
+	quests := []*models.Quest{}
+
+	for rows.Next() {
+		quest := &models.Quest{}
+		var completedAt sql.NullTime
+
+		err := rows.Scan(
+			&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
+			&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
+			&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
+			&completedAt, &quest.Rerolled, &quest.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan quest: %w", err)
+		}
+
+		if completedAt.Valid {
+			quest.CompletedAt = &completedAt.Time
+		}
+
+		quests = append(quests, quest)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating quest rows: %w", err)
+	}
+
+	return quests, nil
+}

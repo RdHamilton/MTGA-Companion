@@ -65,7 +65,7 @@ func (r *accountRepository) Create(ctx context.Context, account *models.Account)
 // GetByID retrieves an account by ID.
 func (r *accountRepository) GetByID(ctx context.Context, id int) (*models.Account, error) {
 	query := `
-		SELECT id, name, screen_name, client_id, is_default, created_at, updated_at
+		SELECT id, name, screen_name, client_id, daily_wins, weekly_wins, mastery_level, mastery_pass, mastery_max, is_default, created_at, updated_at
 		FROM accounts
 		WHERE id = ?
 	`
@@ -80,6 +80,11 @@ func (r *accountRepository) GetByID(ctx context.Context, id int) (*models.Accoun
 		&account.Name,
 		&screenName,
 		&clientID,
+		&account.DailyWins,
+		&account.WeeklyWins,
+		&account.MasteryLevel,
+		&account.MasteryPass,
+		&account.MasteryMax,
 		&account.IsDefault,
 		&createdAt,
 		&updatedAt,
@@ -106,7 +111,7 @@ func (r *accountRepository) GetByID(ctx context.Context, id int) (*models.Accoun
 // GetDefault retrieves the default account.
 func (r *accountRepository) GetDefault(ctx context.Context) (*models.Account, error) {
 	query := `
-		SELECT id, name, screen_name, client_id, is_default, created_at, updated_at
+		SELECT id, name, screen_name, client_id, daily_wins, weekly_wins, mastery_level, mastery_pass, mastery_max, is_default, created_at, updated_at
 		FROM accounts
 		WHERE is_default = 1
 		LIMIT 1
@@ -122,6 +127,11 @@ func (r *accountRepository) GetDefault(ctx context.Context) (*models.Account, er
 		&account.Name,
 		&screenName,
 		&clientID,
+		&account.DailyWins,
+		&account.WeeklyWins,
+		&account.MasteryLevel,
+		&account.MasteryPass,
+		&account.MasteryMax,
 		&account.IsDefault,
 		&createdAt,
 		&updatedAt,
@@ -148,7 +158,7 @@ func (r *accountRepository) GetDefault(ctx context.Context) (*models.Account, er
 // GetAll retrieves all accounts.
 func (r *accountRepository) GetAll(ctx context.Context) ([]*models.Account, error) {
 	query := `
-		SELECT id, name, screen_name, client_id, is_default, created_at, updated_at
+		SELECT id, name, screen_name, client_id, daily_wins, weekly_wins, mastery_level, mastery_pass, mastery_max, is_default, created_at, updated_at
 		FROM accounts
 		ORDER BY is_default DESC, name ASC
 	`
@@ -173,6 +183,11 @@ func (r *accountRepository) GetAll(ctx context.Context) ([]*models.Account, erro
 			&account.Name,
 			&screenName,
 			&clientID,
+			&account.DailyWins,
+			&account.WeeklyWins,
+			&account.MasteryLevel,
+			&account.MasteryPass,
+			&account.MasteryMax,
 			&account.IsDefault,
 			&createdAt,
 			&updatedAt,
@@ -204,13 +219,18 @@ func (r *accountRepository) GetAll(ctx context.Context) ([]*models.Account, erro
 func (r *accountRepository) Update(ctx context.Context, account *models.Account) error {
 	query := `
 		UPDATE accounts
-		SET name = ?, screen_name = ?, client_id = ?, is_default = ?, updated_at = ?
+		SET name = ?, screen_name = ?, client_id = ?, daily_wins = ?, weekly_wins = ?, mastery_level = ?, mastery_pass = ?, mastery_max = ?, is_default = ?, updated_at = ?
 		WHERE id = ?
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		account.Name,
 		account.ScreenName,
 		account.ClientID,
+		account.DailyWins,
+		account.WeeklyWins,
+		account.MasteryLevel,
+		account.MasteryPass,
+		account.MasteryMax,
 		account.IsDefault,
 		time.Now(),
 		account.ID,
