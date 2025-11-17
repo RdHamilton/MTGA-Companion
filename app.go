@@ -46,8 +46,17 @@ func (a *App) startup(ctx context.Context) {
 	// Auto-initialize database with default path
 	dbPath := getDefaultDBPath()
 	if err := a.Initialize(dbPath); err != nil {
-		log.Printf("Warning: Failed to initialize database at %s: %v", dbPath, err)
-		log.Printf("You may need to configure the database path in Settings")
+		log.Printf("ERROR: Failed to initialize database at %s: %v", dbPath, err)
+
+		// Show error dialog to user
+		_, diagErr := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
+			Type:    wailsruntime.ErrorDialog,
+			Title:   "Database Initialization Failed",
+			Message: fmt.Sprintf("Failed to initialize database at:\n%s\n\nError: %v\n\nPlease check:\n• Directory permissions\n• Disk space\n• You can configure a different path in Settings", dbPath, err),
+		})
+		if diagErr != nil {
+			log.Printf("Failed to show error dialog: %v", diagErr)
+		}
 		return
 	}
 
