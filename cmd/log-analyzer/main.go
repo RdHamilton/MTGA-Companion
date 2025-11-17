@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }() //nolint:errcheck // Ignore error on cleanup
 
 	entries, err := reader.ReadAll()
 	if err != nil {
