@@ -410,6 +410,21 @@ Each data section has its own parser module:
 - All parsers must have comprehensive test coverage
 - Use composition to build complex data from log entries
 
+**MTGA Log Event Research**
+
+For detailed analysis of MTGA log events, structures, and correlations discovered through manual log parsing, see:
+
+📖 **[docs/MTGA_LOG_RESEARCH.md](docs/MTGA_LOG_RESEARCH.md)**
+
+This document contains:
+- Event structure documentation
+- Timing and correlation analysis
+- Edge cases and findings from manual testing
+- Implementation status tracking
+- Research notes organized by date
+
+**When implementing log parsing features:** Always check the research document first to understand event timing, structure, and any edge cases that have been discovered.
+
 ### Frontend Architecture
 
 The frontend is built with React and TypeScript, following modern best practices:
