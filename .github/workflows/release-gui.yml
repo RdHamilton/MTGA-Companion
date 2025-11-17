@@ -47,7 +47,7 @@ jobs:
         Compress-Archive -Path mtga-companion.exe, README.md, LICENSE -DestinationPath dist/mtga-companion-windows-amd64.zip
 
     - name: Upload Windows artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: windows-build
         path: dist/*.zip
@@ -90,7 +90,7 @@ jobs:
         tar -czf dist/mtga-companion-macos-universal.tar.gz -C dist "MTGA Companion.app" README.md
 
     - name: Upload macOS artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: macos-build
         path: dist/*.tar.gz
@@ -133,7 +133,7 @@ jobs:
         tar -czf dist/mtga-companion-linux-amd64.tar.gz mtga-companion README.md LICENSE
 
     - name: Upload Linux artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: linux-build
         path: dist/*.tar.gz
