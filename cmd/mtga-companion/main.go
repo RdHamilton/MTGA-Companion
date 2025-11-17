@@ -20,7 +20,6 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/daemon"
 	"github.com/ramonehamilton/MTGA-Companion/internal/display"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
-	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cardlookup"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/draftdata"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/imagecache"
@@ -187,12 +186,6 @@ func main() {
 		log.Fatalf("Poll interval must be at most 1 minute, got %v", *logPollInterval)
 	}
 
-	// Check if draft overlay mode is requested
-	if *draftOverlayMode {
-		runDraftOverlay()
-		return
-	}
-
 	// Check if this is a migration command
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
 		runMigrationCommand()
@@ -282,13 +275,6 @@ func main() {
 	}()
 
 	ctx := context.Background()
-
-	// Check if GUI mode is requested
-	if *guiMode {
-		guiApp := gui.NewApp(service)
-		guiApp.Run()
-		return
-	}
 
 	// Get the default log path for the current platform
 	defaultLogPath, err := logreader.DefaultLogPath()
