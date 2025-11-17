@@ -815,3 +815,31 @@ func (a *App) GetCurrentAccount() (*models.Account, error) {
 
 	return account, nil
 }
+
+// GetActiveEvents returns all currently active draft events.
+func (a *App) GetActiveEvents() ([]*models.DraftEvent, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	events, err := a.service.GetActiveEvents(a.ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get active events: %v", err)}
+	}
+
+	return events, nil
+}
+
+// GetEventWinDistribution returns the distribution of event win-loss records.
+func (a *App) GetEventWinDistribution() ([]*storage.EventWinDistribution, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	distribution, err := a.service.GetEventWinDistribution(a.ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get event win distribution: %v", err)}
+	}
+
+	return distribution, nil
+}

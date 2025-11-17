@@ -52,35 +52,39 @@ export namespace models {
 		    return a;
 		}
 	}
-	export class Achievement {
-	    ID: number;
+	export class DraftEvent {
+	    ID: string;
 	    AccountID: number;
-	    GraphID: string;
-	    NodeID: string;
+	    EventName: string;
+	    SetCode: string;
+	    StartTime: time.Time;
+	    EndTime?: time.Time;
+	    Wins: number;
+	    Losses: number;
 	    Status: string;
-	    CurrentProgress: number;
-	    MaxProgress?: number;
-	    CompletedAt?: time.Time;
-	    FirstSeen: time.Time;
-	    LastUpdated: time.Time;
+	    DeckID?: string;
+	    EntryFee?: string;
+	    Rewards?: string;
 	    CreatedAt: time.Time;
 	
 	    static createFrom(source: any = {}) {
-	        return new Achievement(source);
+	        return new DraftEvent(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
 	        this.AccountID = source["AccountID"];
-	        this.GraphID = source["GraphID"];
-	        this.NodeID = source["NodeID"];
+	        this.EventName = source["EventName"];
+	        this.SetCode = source["SetCode"];
+	        this.StartTime = this.convertValues(source["StartTime"], time.Time);
+	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
+	        this.Wins = source["Wins"];
+	        this.Losses = source["Losses"];
 	        this.Status = source["Status"];
-	        this.CurrentProgress = source["CurrentProgress"];
-	        this.MaxProgress = source["MaxProgress"];
-	        this.CompletedAt = this.convertValues(source["CompletedAt"], time.Time);
-	        this.FirstSeen = this.convertValues(source["FirstSeen"], time.Time);
-	        this.LastUpdated = this.convertValues(source["LastUpdated"], time.Time);
+	        this.DeckID = source["DeckID"];
+	        this.EntryFee = source["EntryFee"];
+	        this.Rewards = source["Rewards"];
 	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
 	    }
 	
@@ -101,28 +105,6 @@ export namespace models {
 		    }
 		    return a;
 		}
-	}
-	export class AchievementStats {
-	    TotalAchievements: number;
-	    CompletedAchievements: number;
-	    InProgressCount: number;
-	    CompletionRate: number;
-	    RecentlyCompleted: number;
-	    CloseToComplete: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new AchievementStats(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.TotalAchievements = source["TotalAchievements"];
-	        this.CompletedAchievements = source["CompletedAchievements"];
-	        this.InProgressCount = source["InProgressCount"];
-	        this.CompletionRate = source["CompletionRate"];
-	        this.RecentlyCompleted = source["RecentlyCompleted"];
-	        this.CloseToComplete = source["CloseToComplete"];
-	    }
 	}
 	export class Match {
 	    ID: string;
@@ -423,6 +405,20 @@ export namespace models {
 
 export namespace storage {
 	
+	export class EventWinDistribution {
+	    record: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EventWinDistribution(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.record = source["record"];
+	        this.count = source["count"];
+	    }
+	}
 	export class RankTimelineEntry {
 	    timestamp: time.Time;
 	    date: string;
