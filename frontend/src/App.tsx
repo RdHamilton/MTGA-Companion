@@ -8,7 +8,6 @@ import RankProgression from './pages/RankProgression';
 import FormatDistribution from './pages/FormatDistribution';
 import ResultBreakdown from './pages/ResultBreakdown';
 import Quests from './pages/Quests';
-import Achievements from './pages/Achievements';
 import Settings from './pages/Settings';
 import './App.css';
 
@@ -20,7 +19,6 @@ function App() {
           <Route path="/" element={<Navigate to="/match-history" replace />} />
           <Route path="/match-history" element={<MatchHistory />} />
           <Route path="/quests" element={<Quests />} />
-          <Route path="/achievements" element={<Achievements />} />
           <Route path="/charts/win-rate-trend" element={<WinRateTrend />} />
           <Route path="/charts/deck-performance" element={<DeckPerformance />} />
           <Route path="/charts/rank-progression" element={<RankProgression />} />
