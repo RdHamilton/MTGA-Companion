@@ -3,6 +3,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { GetRankProgressionTimeline } from '../../wailsjs/go/main/App';
 import { storage } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './RankProgression.css';
 
@@ -163,10 +165,21 @@ const RankProgression = () => {
       {/* Content */}
       {loading && <LoadingSpinner message="Loading rank progression..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load rank progression"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && timeline.length === 0 && (
-        <div className="no-data">No rank progression data available for the selected period</div>
+        <EmptyState
+          icon="🏆"
+          title="No rank progression data"
+          message="Play ranked matches to track your rank progression over time."
+          helpText="Your rank changes will be displayed here as you climb the ladder in ranked play."
+        />
       )}
 
       {!loading && !error && timeline.length > 0 && stats && (

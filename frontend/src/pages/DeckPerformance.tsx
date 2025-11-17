@@ -3,6 +3,8 @@ import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetStatsByDeck } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './DeckPerformance.css';
 
@@ -228,10 +230,21 @@ const DeckPerformance = () => {
       {/* Content */}
       {loading && <LoadingSpinner message="Loading deck statistics..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load deck statistics"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && deckStats.length === 0 && (
-        <div className="no-data">No deck data found for the selected filters</div>
+        <EmptyState
+          icon="🃏"
+          title="No deck data"
+          message="Play matches with different decks to see your deck performance statistics."
+          helpText="Try adjusting the filters if you've played matches but don't see data here."
+        />
       )}
 
       {!loading && !error && sortedDecks.length > 0 && (

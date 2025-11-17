@@ -4,6 +4,8 @@ import { GetActiveQuests, GetQuestHistory, GetCurrentAccount } from '../../wails
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import './Quests.css';
 
 const Quests = () => {
@@ -203,7 +205,13 @@ const Quests = () => {
 
       {/* Loading/Error States */}
       {loading && <LoadingSpinner message="Loading quest data..." />}
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load quest data"
+          error={error}
+          helpText="Make sure detailed logging is enabled in MTGA: Options → View Account → Detailed Logs (Plugin Support)"
+        />
+      )}
 
       {!loading && !error && (
         <>
@@ -257,7 +265,12 @@ const Quests = () => {
           <div className="quests-section">
             <h2 className="section-title">Active Quests</h2>
             {activeQuests.length === 0 ? (
-              <div className="no-data">No active quests</div>
+              <EmptyState
+                icon="📋"
+                title="No active quests"
+                message="You don't have any active daily quests at the moment."
+                helpText="Daily quests reset daily. Make sure detailed logging is enabled in MTGA to track new quests."
+              />
             ) : (
               <div className="active-quests-grid">
                 {activeQuests.map((quest) => {
@@ -341,7 +354,12 @@ const Quests = () => {
             </div>
 
             {questHistory.length === 0 ? (
-              <div className="no-data">No quest history found for the selected period</div>
+              <EmptyState
+                icon="📜"
+                title="No quest history"
+                message="No completed quests found for the selected time period."
+                helpText="Try adjusting the date range or complete some quests to see your history here."
+              />
             ) : (
               <>
                 <div className="quest-history-table-container">

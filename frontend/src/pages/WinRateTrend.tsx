@@ -3,6 +3,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { GetTrendAnalysis } from '../../wailsjs/go/main/App';
 import { storage } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './WinRateTrend.css';
 
@@ -108,10 +110,21 @@ const WinRateTrend = () => {
       {/* Content */}
       {loading && <LoadingSpinner message="Loading trend data..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load trend data"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && (!analysis || chartData.length === 0) && (
-        <div className="no-data">No trend data available for the selected period</div>
+        <EmptyState
+          icon="📈"
+          title="Not enough data"
+          message="Play at least 5 matches to see your win rate trends over time."
+          helpText="Your win rate will be tracked daily, weekly, or monthly depending on your selected date range."
+        />
       )}
 
       {!loading && !error && analysis && chartData.length > 0 && (

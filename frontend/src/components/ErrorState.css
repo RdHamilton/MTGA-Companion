@@ -1,0 +1,44 @@
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  min-height: 300px;
+  background-color: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 8px;
+  margin: 16px;
+}
+
+.error-state-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.error-state-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ef4444;
+  margin: 0 0 12px 0;
+}
+
+.error-state-details {
+  font-size: 14px;
+  color: #fca5a5;
+  margin: 0 0 8px 0;
+  max-width: 600px;
+  font-family: monospace;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.error-state-help {
+  font-size: 14px;
+  color: #aaaaaa;
+  margin: 16px 0 0 0;
+  max-width: 600px;
+  line-height: 1.5;
+}

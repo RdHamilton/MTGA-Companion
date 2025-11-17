@@ -4,6 +4,8 @@ import { GetMatches } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { useAppContext } from '../context/AppContext';
 import './MatchHistory.css';
 
@@ -263,10 +265,30 @@ const MatchHistory = () => {
       {/* Content - Loading/Error/Empty States */}
       {loading && <LoadingSpinner message="Loading matches..." />}
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <ErrorState
+          message="Failed to load matches"
+          error={error}
+          helpText="Check that the database is accessible and try refreshing the page."
+        />
+      )}
 
       {!loading && !error && matches.length === 0 && (
-        <div className="no-data">No matches found for the selected filters</div>
+        dateRange === 'all' && format === 'all' && result === 'all' ? (
+          <EmptyState
+            icon="🎮"
+            title="No matches yet"
+            message="Start playing MTG Arena to begin tracking your match history!"
+            helpText="Make sure detailed logging is enabled in MTGA: Options → View Account → Detailed Logs (Plugin Support)"
+          />
+        ) : (
+          <EmptyState
+            icon="🔍"
+            title="No matches found"
+            message="Try adjusting your filters to see more results."
+            helpText="You can change the date range, format, or result filter above."
+          />
+        )
       )}
 
       {/* Table Container - Scrollable */}
