@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.10
 
 require (
-	fyne.io/fyne/v2 v2.7.0
+	fyne.io/fyne/v2 v2.7.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-echarts/go-echarts/v2 v2.6.7
 	github.com/golang-migrate/migrate/v4 v4.19.0
