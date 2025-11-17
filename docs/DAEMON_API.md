@@ -350,16 +350,16 @@ Keepalive event sent periodically.
 
 ## HTTP Endpoints
 
-### Health Check
+### Status Check
 
 **Endpoint**: `GET http://localhost:9999/status`
 
 **Response**:
 ```json
 {
-  "status": "ok",
-  "version": "1.0.0",
-  "uptime": 3600
+  "status": "running",
+  "clients": 2,
+  "time": "2025-11-17T09:30:00-05:00"
 }
 ```
 
@@ -368,7 +368,160 @@ Keepalive event sent periodically.
 curl http://localhost:9999/status
 ```
 
-**Purpose**: Verify daemon is running and responsive
+**Purpose**: Quick check to verify daemon is running and responsive
+
+---
+
+### Health Check
+
+**Endpoint**: `GET http://localhost:9999/health`
+
+**Description**: Comprehensive health status endpoint for monitoring daemon health, including database connectivity, log monitoring, WebSocket status, and performance metrics.
+
+**HTTP Status Codes**:
+- `200 OK` - Service is healthy or degraded (but operational)
+- `503 Service Unavailable` - Service not fully initialized or unhealthy
+
+**Response (Healthy)**:
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "uptime": 3600.5,
+  "database": {
+    "status": "ok",
+    "lastWrite": "2025-11-17T09:29:45Z"
+  },
+  "logMonitor": {
+    "status": "ok",
+    "lastRead": "2025-11-17T09:29:50Z"
+  },
+  "websocket": {
+    "status": "ok",
+    "connectedClients": 2
+  },
+  "metrics": {
+    "totalProcessed": 12543,
+    "totalErrors": 0
+  }
+}
+```
+
+**Response (Degraded)**:
+```json
+{
+  "status": "degraded",
+  "version": "1.0.0",
+  "uptime": 7200.3,
+  "database": {
+    "status": "ok",
+    "lastWrite": "2025-11-17T09:15:30Z"
+  },
+  "logMonitor": {
+    "status": "warning",
+    "lastRead": "2025-11-17T09:20:15Z"
+  },
+  "websocket": {
+    "status": "ok",
+    "connectedClients": 1
+  },
+  "metrics": {
+    "totalProcessed": 8500,
+    "totalErrors": 950
+  }
+}
+```
+
+**Response (Unavailable)**:
+```json
+{
+  "status": "unavailable",
+  "message": "Service not fully initialized"
+}
+```
+
+**Response Fields**:
+- `status` (string) - Overall health status: `"healthy"`, `"degraded"`, or `"unavailable"`
+- `version` (string) - Daemon version
+- `uptime` (float) - Daemon uptime in seconds
+- `database` (object) - Database health status
+  - `status` (string) - `"ok"` or error state
+  - `lastWrite` (string, optional) - ISO 8601 timestamp of last successful database write
+- `logMonitor` (object) - Log monitoring health status
+  - `status` (string) - `"ok"` or `"warning"`
+  - `lastRead` (string, optional) - ISO 8601 timestamp of last successful log read
+- `websocket` (object) - WebSocket server health status
+  - `status` (string) - `"ok"` or error state
+  - `connectedClients` (integer) - Number of active WebSocket connections
+- `metrics` (object) - Performance metrics
+  - `totalProcessed` (integer) - Total log entries processed
+  - `totalErrors` (integer) - Total errors encountered
+
+**Health Status Determination**:
+- `healthy` - All components operational, error rate <10%, log reads within last 5 minutes
+- `degraded` - Service operational but with issues:
+  - No log reads for >5 minutes (log monitor status: `"warning"`)
+  - Error rate >10% of processed entries
+  - Still returns HTTP 200 to indicate service is available
+- `unavailable` - Service not initialized (returns HTTP 503)
+
+**Usage Examples**:
+
+Basic health check:
+```bash
+curl http://localhost:9999/health
+```
+
+Check HTTP status code:
+```bash
+curl -w "%{http_code}" -o /dev/null -s http://localhost:9999/health
+```
+
+Parse with jq:
+```bash
+curl -s http://localhost:9999/health | jq '.status'
+```
+
+Monitor in shell script:
+```bash
+#!/bin/bash
+response=$(curl -s http://localhost:9999/health)
+status=$(echo $response | jq -r '.status')
+
+if [ "$status" = "healthy" ]; then
+    echo "✅ Daemon is healthy"
+    exit 0
+elif [ "$status" = "degraded" ]; then
+    echo "⚠️  Daemon is degraded"
+    exit 1
+else
+    echo "❌ Daemon is unavailable"
+    exit 2
+fi
+```
+
+Kubernetes liveness probe:
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 9999
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+```
+
+Docker health check:
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:9999/health || exit 1
+```
+
+**Purpose**:
+- Monitor daemon health in production
+- Integrate with monitoring systems (Prometheus, Datadog, etc.)
+- Container orchestration health checks (Docker, Kubernetes)
+- Automated alerting on degraded performance
 
 ---
 
