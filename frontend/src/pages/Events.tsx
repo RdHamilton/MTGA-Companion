@@ -57,7 +57,7 @@ const Events = () => {
   };
 
   const getRecordColor = (record: string): string => {
-    const [wins, losses] = record.split('-').map(Number);
+    const [wins] = record.split('-').map(Number);
     if (wins >= 7) return 'record-excellent'; // 7+ wins
     if (wins >= 5) return 'record-good'; // 5-6 wins
     if (wins >= 3) return 'record-average'; // 3-4 wins
@@ -65,11 +65,11 @@ const Events = () => {
   };
 
   const getTotalEvents = (): number => {
-    return winDistribution.reduce((sum, item) => sum + item.Count, 0);
+    return winDistribution.reduce((sum, item) => sum + item.count, 0);
   };
 
   const getMaxCount = (): number => {
-    return Math.max(...winDistribution.map(item => item.Count), 1);
+    return Math.max(...winDistribution.map(item => item.count), 1);
   };
 
   if (loading) {
@@ -112,7 +112,7 @@ const Events = () => {
                   </span>
                 </div>
                 <div className="event-meta">
-                  <span>Started: {formatEventDate(event.StartTime)}</span>
+                  <span>Started: {formatEventDate(event.StartTime as string)}</span>
                 </div>
               </div>
             ))}
@@ -132,20 +132,20 @@ const Events = () => {
             </div>
             <div className="distribution-chart">
               {winDistribution.map((item) => {
-                const percentage = (item.Count / getTotalEvents()) * 100;
-                const barWidth = (item.Count / getMaxCount()) * 100;
+                const percentage = (item.count / getTotalEvents()) * 100;
+                const barWidth = (item.count / getMaxCount()) * 100;
 
                 return (
-                  <div key={item.Record} className="distribution-row">
-                    <span className={`record-label ${getRecordColor(item.Record)}`}>
-                      {item.Record}
+                  <div key={item.record} className="distribution-row">
+                    <span className={`record-label ${getRecordColor(item.record)}`}>
+                      {item.record}
                     </span>
                     <div className="bar-container">
                       <div
-                        className={`bar ${getRecordColor(item.Record)}`}
+                        className={`bar ${getRecordColor(item.record)}`}
                         style={{ width: `${barWidth}%` }}
                       >
-                        <span className="bar-count">{item.Count}</span>
+                        <span className="bar-count">{item.count}</span>
                       </div>
                     </div>
                     <span className="percentage">{percentage.toFixed(1)}%</span>

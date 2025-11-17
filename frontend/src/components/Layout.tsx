@@ -11,7 +11,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'charts'>('match-history');
+  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'charts'>('match-history');
   const [connectionStatus, setConnectionStatus] = useState<any>({
     status: 'standalone',
     connected: false
