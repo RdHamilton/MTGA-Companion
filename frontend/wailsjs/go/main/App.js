@@ -26,6 +26,10 @@ export function GetConnectionStatus() {
   return window['go']['main']['App']['GetConnectionStatus']();
 }
 
+export function GetCurrentAccount() {
+  return window['go']['main']['App']['GetCurrentAccount']();
+}
+
 export function GetMatches(arg1) {
   return window['go']['main']['App']['GetMatches'](arg1);
 }

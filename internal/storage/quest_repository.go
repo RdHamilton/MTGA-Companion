@@ -20,26 +20,29 @@ func NewQuestRepository(db *sql.DB) *QuestRepository {
 
 // Save saves a quest to the database (insert or update)
 func (r *QuestRepository) Save(quest *models.Quest) error {
-	// First, check if a quest with this quest_id already exists and is not completed
+	// First, check if a quest with this quest_id already exists
 	existingQuery := `
-		SELECT id, ending_progress FROM quests
-		WHERE quest_id = ? AND completed = 0
+		SELECT id, ending_progress, assigned_at FROM quests
+		WHERE quest_id = ?
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
 
 	var existingID int
 	var existingProgress int
-	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress)
+	var existingAssignedAt time.Time
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt)
 
 	if err == nil {
 		// Quest exists - update it
-		// Mark as completed if progress >= goal
-		completed := quest.EndingProgress >= quest.Goal
+		// Use the completion status from the parser (which detects completion via quest disappearance)
+		// IMPORTANT: Preserve the original assigned_at timestamp for accurate duration calculation
+
+		// Strip monotonic clock from timestamps for SQLite compatibility
 		var completedAt *time.Time
-		if completed {
-			now := time.Now()
-			completedAt = &now
+		if quest.CompletedAt != nil {
+			rounded := quest.CompletedAt.Round(0)
+			completedAt = &rounded
 		}
 
 		updateQuery := `
@@ -53,7 +56,7 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 
 		_, err = r.db.Exec(updateQuery,
 			quest.EndingProgress,
-			completed,
+			quest.Completed,
 			completedAt,
 			quest.CanSwap,
 			existingID,
@@ -63,21 +66,13 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		}
 
 		quest.ID = existingID
-		quest.Completed = completed
-		quest.CompletedAt = completedAt
+		// Preserve the original assigned_at for accurate duration
+		quest.AssignedAt = existingAssignedAt
 		return nil
 	}
 
 	// Quest doesn't exist - insert it
-	// Check if it should be marked completed on insert
-	completed := quest.EndingProgress >= quest.Goal
-	var completedAt *time.Time
-	if completed {
-		now := time.Now()
-		completedAt = &now
-		quest.Completed = true
-		quest.CompletedAt = &now
-	}
+	// Use the completion status from the parser (which detects completion via quest disappearance)
 
 	query := `
 		INSERT INTO quests (
@@ -86,11 +81,19 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
+	// Strip monotonic clock from timestamps for SQLite compatibility
+	assignedAt := quest.AssignedAt.Round(0)
+	var completedAt *time.Time
+	if quest.CompletedAt != nil {
+		rounded := quest.CompletedAt.Round(0)
+		completedAt = &rounded
+	}
+
 	result, err := r.db.Exec(query,
 		quest.QuestID, quest.QuestType, quest.Goal,
 		quest.StartingProgress, quest.EndingProgress,
-		completed, quest.CanSwap, quest.Rewards,
-		quest.AssignedAt, completedAt, quest.Rerolled,
+		quest.Completed, quest.CanSwap, quest.Rewards,
+		assignedAt, completedAt, quest.Rerolled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save quest: %w", err)
@@ -144,13 +147,13 @@ func (r *QuestRepository) GetQuestHistory(startDate, endDate *time.Time, limit i
 	args := []interface{}{}
 
 	if startDate != nil {
-		query += " AND DATE(created_at) >= DATE(?)"
-		args = append(args, startDate)
+		query += " AND DATE(created_at) >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
 	}
 
 	if endDate != nil {
-		query += " AND DATE(created_at) <= DATE(?)"
-		args = append(args, endDate)
+		query += " AND DATE(created_at) <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
 	}
 
 	query += `
@@ -190,13 +193,13 @@ func (r *QuestRepository) GetQuestStats(startDate, endDate *time.Time) (*models.
 	args := []interface{}{}
 
 	if startDate != nil {
-		query += " AND DATE(created_at) >= DATE(?)"
-		args = append(args, startDate)
+		query += " AND DATE(created_at) >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
 	}
 
 	if endDate != nil {
-		query += " AND DATE(created_at) <= DATE(?)"
-		args = append(args, endDate)
+		query += " AND DATE(created_at) <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
 	}
 
 	query += `

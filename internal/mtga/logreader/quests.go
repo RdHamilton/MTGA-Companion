@@ -22,13 +22,14 @@ type QuestData struct {
 }
 
 // ParseQuests extracts quest data from log entries.
-// It looks for "quests" and "newQuests" events in the MTGA logs.
+// It looks for QuestGetQuests responses to track quest state and detect completion via disappearance.
 func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 	var quests []*QuestData
-	questMap := make(map[string]*QuestData) // Track by questId to detect updates
+	questMap := make(map[string]*QuestData)        // Track by questId to detect updates
+	lastSeenQuestIDs := make(map[string]time.Time) // Track when each quest was last seen
 
 	questsFound := 0
-	newQuestsFound := 0
+	responsesFound := 0
 
 	for _, entry := range entries {
 		if !entry.IsJSON {
@@ -43,16 +44,48 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 			}
 		}
 
-		// Check for "quests" event (quest state/progress updates)
+		// Check for QuestGetQuests response (contains current active quests)
 		if questsData, ok := entry.JSON["quests"]; ok {
-			questsFound++
-			if questArray, ok := questsData.([]interface{}); ok {
-				for _, q := range questArray {
-					if questJSON, ok := q.(map[string]interface{}); ok {
-						quest := parseQuestFromMap(questJSON, timestamp)
-						if quest != nil {
-							questMap[quest.QuestID] = quest
+			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+				// This is a QuestGetQuests response
+				responsesFound++
+
+				// Track which quest IDs are present in this response
+				currentQuestIDs := make(map[string]bool)
+
+				if questArray, ok := questsData.([]interface{}); ok {
+					for _, q := range questArray {
+						if questJSON, ok := q.(map[string]interface{}); ok {
+							quest := parseQuestFromMap(questJSON, timestamp)
+							if quest != nil {
+								currentQuestIDs[quest.QuestID] = true
+								lastSeenQuestIDs[quest.QuestID] = timestamp
+
+								// Update or add quest
+								if existing, exists := questMap[quest.QuestID]; exists {
+									// Update existing quest progress
+									existing.EndingProgress = quest.EndingProgress
+									existing.CanSwap = quest.CanSwap
+								} else {
+									// New quest
+									questMap[quest.QuestID] = quest
+									questsFound++
+								}
+							}
 						}
+					}
+				}
+
+				// Check for quest disappearance (completion detection)
+				// If we previously saw a quest but it's not in this response, it was completed
+				for questID, quest := range questMap {
+					if !quest.Completed && !currentQuestIDs[questID] {
+						// Quest disappeared - mark as completed
+						quest.Completed = true
+						quest.CompletedAt = &timestamp
+						// Set progress to goal when completed
+						quest.EndingProgress = quest.Goal
+						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
 					}
 				}
 			}
@@ -60,14 +93,19 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 		// Check for "newQuests" event (newly assigned quests)
 		if newQuestsData, ok := entry.JSON["newQuests"]; ok {
-			newQuestsFound++
 			if questArray, ok := newQuestsData.([]interface{}); ok {
 				for _, q := range questArray {
 					if questJSON, ok := q.(map[string]interface{}); ok {
 						quest := parseQuestFromMap(questJSON, timestamp)
 						if quest != nil {
 							quest.AssignedAt = timestamp
-							questMap[quest.QuestID] = quest
+							lastSeenQuestIDs[quest.QuestID] = timestamp
+
+							// Add or update quest
+							if _, exists := questMap[quest.QuestID]; !exists {
+								questMap[quest.QuestID] = quest
+								questsFound++
+							}
 						}
 					}
 				}
@@ -80,8 +118,8 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 		quests = append(quests, quest)
 	}
 
-	if questsFound > 0 || newQuestsFound > 0 {
-		log.Printf("Quest parser: Found %d 'quests' events and %d 'newQuests' events, parsed %d unique quests", questsFound, newQuestsFound, len(quests))
+	if responsesFound > 0 || questsFound > 0 {
+		log.Printf("Quest parser: Found %d QuestGetQuests responses, parsed %d unique quests", responsesFound, questsFound)
 	}
 
 	return quests, nil
@@ -142,12 +180,8 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 		quest.Rewards = chestDescStr
 	}
 
-	// Check if completed (when ending progress >= goal)
-	if quest.Goal > 0 && quest.EndingProgress >= quest.Goal {
-		quest.Completed = true
-		completedAt := timestamp
-		quest.CompletedAt = &completedAt
-	}
+	// Note: Completion is detected by quest disappearance from QuestGetQuests responses,
+	// not by checking progress >= goal. MTGA removes quests from the response when completed.
 
 	return quest
 }

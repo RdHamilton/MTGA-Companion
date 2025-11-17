@@ -4,13 +4,18 @@ import "time"
 
 // Account represents a player account.
 type Account struct {
-	ID         int
-	Name       string
-	ScreenName *string // Nullable
-	ClientID   *string // Nullable
-	IsDefault  bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           int
+	Name         string
+	ScreenName   *string // Nullable
+	ClientID     *string // Nullable
+	DailyWins    int     // Current daily win count (0-15)
+	WeeklyWins   int     // Current weekly win count (0-15)
+	MasteryLevel int     // Current mastery pass level
+	MasteryPass  string  // "Basic" (free) or "Advanced" (paid)
+	MasteryMax   int     // Maximum mastery level for current season
+	IsDefault    bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Match represents a single match in MTGA.

@@ -16,6 +16,8 @@ export function GetCloseToCompleteAchievements():Promise<Array<models.Achievemen
 
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
+export function GetCurrentAccount():Promise<models.Account>;
+
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;

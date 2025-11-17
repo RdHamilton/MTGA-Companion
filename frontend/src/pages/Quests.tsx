@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetActiveQuests, GetQuestHistory, GetQuestStats } from '../../wailsjs/go/main/App';
+import { GetActiveQuests, GetQuestHistory, GetCurrentAccount } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
@@ -8,9 +8,8 @@ import './Quests.css';
 
 const Quests = () => {
   const [activeQuests, setActiveQuests] = useState<models.Quest[]>([]);
-  const [dailyWins, setDailyWins] = useState<models.Quest | null>(null);
   const [questHistory, setQuestHistory] = useState<models.Quest[]>([]);
-  const [questStats, setQuestStats] = useState<models.QuestStats | null>(null);
+  const [currentAccount, setCurrentAccount] = useState<models.Account | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,11 +80,7 @@ const Quests = () => {
       // Load quest data sequentially with better error reporting
       try {
         const active = await GetActiveQuests();
-        // Separate Daily wins from regular quests
-        const daily = active?.find(q => q.quest_type === 'Daily') || null;
-        const regular = active?.filter(q => q.quest_type !== 'Daily') || [];
-        setDailyWins(daily);
-        setActiveQuests(regular);
+        setActiveQuests(active || []);
       } catch (activeErr) {
         console.error('Error loading active quests:', activeErr);
         throw new Error(`Failed to load active quests: ${activeErr instanceof Error ? activeErr.message : String(activeErr)}`);
@@ -102,11 +97,11 @@ const Quests = () => {
       }
 
       try {
-        const stats = await GetQuestStats(startDate, endDate);
-        setQuestStats(stats);
-      } catch (statsErr) {
-        console.error('Error loading quest stats:', statsErr);
-        throw new Error(`Failed to load quest stats: ${statsErr instanceof Error ? statsErr.message : String(statsErr)}`);
+        const account = await GetCurrentAccount();
+        setCurrentAccount(account);
+      } catch (accountErr) {
+        console.error('Error loading current account:', accountErr);
+        // Don't throw - account data is optional
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load quest data');
@@ -167,34 +162,40 @@ const Quests = () => {
     return customStartDate || undefined;
   };
 
+  const getDailyWinsColorClass = (wins: number): string => {
+    if (wins < 5) return 'low';     // Red
+    if (wins < 15) return 'medium'; // Yellow
+    return 'high';                   // Green
+  };
+
   return (
     <div className="page-container">
       {/* Header */}
       <div className="quests-header">
         <h1 className="page-title">Daily Quests</h1>
 
-        {/* Quest Statistics Summary */}
-        {!loading && !error && questStats && (
+        {/* Mastery Pass Summary */}
+        {!loading && !error && currentAccount && (
           <div className="quest-stats-summary">
             <div className="stat-card">
-              <div className="stat-label">Active Quests</div>
-              <div className="stat-value">{questStats.active_quests}</div>
+              <div className="stat-label">Mastery Level</div>
+              <div className="stat-value">{currentAccount.MasteryLevel}</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Completion Rate</div>
-              <div className="stat-value">{questStats.completion_rate.toFixed(1)}%</div>
+              <div className="stat-label">Pass Type</div>
+              <div className="stat-value">{currentAccount.MasteryPass}</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Total Gold Earned</div>
-              <div className="stat-value">{questStats.total_gold_earned.toLocaleString()}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Avg Completion Time</div>
+              <div className="stat-label">Progress</div>
               <div className="stat-value">
-                {questStats.average_completion_ms > 0
-                  ? `${(questStats.average_completion_ms / (1000 * 60 * 60)).toFixed(1)}h`
+                {currentAccount.MasteryMax > 0
+                  ? `${((currentAccount.MasteryLevel / currentAccount.MasteryMax) * 100).toFixed(1)}%`
                   : 'N/A'}
               </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Daily Goal</div>
+              <div className="stat-value">{currentAccount.DailyWins >= 5 ? '✓' : `${currentAccount.DailyWins}/5`}</div>
             </div>
           </div>
         )}
@@ -206,24 +207,47 @@ const Quests = () => {
 
       {!loading && !error && (
         <>
-          {/* Daily Wins Section */}
-          {dailyWins && (
+          {/* Daily/Weekly Wins Section */}
+          {currentAccount && (
             <div className="quests-section">
-              <h2 className="section-title">Daily Wins</h2>
-              <div className="daily-wins-card">
-                <div className="daily-wins-header">
-                  <span className="daily-wins-title">Win 15 Games</span>
-                  <span className="daily-wins-progress">{dailyWins.ending_progress} / {dailyWins.goal}</span>
+              <h2 className="section-title">Win Progress</h2>
+              <div className="wins-grid">
+                {/* Daily Wins */}
+                <div className="daily-wins-card">
+                  <div className="daily-wins-header">
+                    <span className="daily-wins-title">Daily Wins</span>
+                    <span className="daily-wins-progress">{currentAccount.DailyWins} / 15</span>
+                  </div>
+                  <div className="daily-wins-bar">
+                    <div
+                      className={`daily-wins-fill ${getDailyWinsColorClass(currentAccount.DailyWins)}`}
+                      style={{ width: `${(currentAccount.DailyWins / 15) * 100}%` }}
+                    />
+                  </div>
+                  <div className="daily-wins-footer">
+                    <span className="daily-wins-percent">{((currentAccount.DailyWins / 15) * 100).toFixed(0)}% Complete</span>
+                    <span className="daily-wins-reward">
+                      {currentAccount.DailyWins < 5 ? 'Goal: 5 wins for mastery' : 'Earn up to 1,250 gold'}
+                    </span>
+                  </div>
                 </div>
-                <div className="daily-wins-bar">
-                  <div
-                    className="daily-wins-fill"
-                    style={{ width: `${calculateProgress(dailyWins)}%` }}
-                  />
-                </div>
-                <div className="daily-wins-footer">
-                  <span className="daily-wins-percent">{calculateProgress(dailyWins).toFixed(0)}% Complete</span>
-                  <span className="daily-wins-reward">Earn gold and XP rewards</span>
+
+                {/* Weekly Wins */}
+                <div className="daily-wins-card">
+                  <div className="daily-wins-header">
+                    <span className="daily-wins-title">Weekly Wins</span>
+                    <span className="daily-wins-progress">{currentAccount.WeeklyWins} / 15</span>
+                  </div>
+                  <div className="daily-wins-bar">
+                    <div
+                      className="daily-wins-fill weekly"
+                      style={{ width: `${(currentAccount.WeeklyWins / 15) * 100}%` }}
+                    />
+                  </div>
+                  <div className="daily-wins-footer">
+                    <span className="daily-wins-percent">{((currentAccount.WeeklyWins / 15) * 100).toFixed(0)}% Complete</span>
+                    <span className="daily-wins-reward">Earn up to 2,250 gold</span>
+                  </div>
                 </div>
               </div>
             </div>
