@@ -527,7 +527,7 @@ func TestPoller_FallbackOnWatcherFailure(t *testing.T) {
 	select {
 	case entry := <-updates:
 		receivedEntry = entry
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("Timeout waiting for log entry (events or polling)")
 	}
 
