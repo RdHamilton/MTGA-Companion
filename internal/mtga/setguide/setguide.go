@@ -107,8 +107,7 @@ func (sg *SetGuide) LoadSet(ctx context.Context, setCode, format string) error {
 
 	colorRatings, err := sg.client.GetColorRatings(ctx, params)
 	if err != nil {
-		// Color ratings are optional - log warning but don't fail
-		fmt.Printf("Warning: failed to fetch color ratings: %v\n", err)
+		// Color ratings are optional - silently continue without them
 		colorRatings = []seventeenlands.ColorRating{}
 	}
 
@@ -153,11 +152,8 @@ func (sg *SetGuide) LoadSet(ctx context.Context, setCode, format string) error {
 
 	sg.setFiles[setCode] = setFile
 
-	// Save to cache
-	if err := sg.saveToCache(cacheKey, setFile); err != nil {
-		// Log error but don't fail - caching is optional
-		fmt.Printf("Warning: failed to save set file to cache: %v\n", err)
-	}
+	// Save to cache (silently ignore errors - caching is optional)
+	_ = sg.saveToCache(cacheKey, setFile)
 
 	return nil
 }
