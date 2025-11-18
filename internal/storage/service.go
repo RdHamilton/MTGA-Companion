@@ -785,15 +785,25 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 	updatedCount := 0
 	const maxTimeDiff = 24 * time.Hour // Only link if within 24 hours (same play session day)
 
-	for _, match := range matchesNeedingDecks {
+	log.Printf("[InferDeckIDs] Starting to match %d matches with %d decks (max time diff: %v)", len(matchesNeedingDecks), len(decksWithTimestamp), maxTimeDiff)
+
+	for i, match := range matchesNeedingDecks {
 		var bestDeck *models.Deck
 		var minDiff time.Duration
 
-		for _, deck := range decksWithTimestamp {
+		if i < 3 { // Log first 3 matches for debugging
+			log.Printf("[InferDeckIDs] Match %d: timestamp=%v", i+1, match.Timestamp)
+		}
+
+		for j, deck := range decksWithTimestamp {
 			// Calculate time difference
 			diff := match.Timestamp.Sub(*deck.LastPlayed)
 			if diff < 0 {
 				diff = -diff
+			}
+
+			if i < 3 && j < 3 { // Log first few comparisons
+				log.Printf("[InferDeckIDs]   Deck '%s': LastPlayed=%v, diff=%v", deck.Name, *deck.LastPlayed, diff)
 			}
 
 			// Check if this is the closest deck so far
@@ -809,8 +819,21 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 				return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
 			}
 			updatedCount++
+			if updatedCount <= 3 { // Log first few successful links
+				log.Printf("[InferDeckIDs] ✓ Linked match %s to deck '%s' (diff: %v)", match.ID, bestDeck.Name, minDiff)
+			}
+		} else {
+			if i < 3 { // Log first few failures
+				if bestDeck != nil {
+					log.Printf("[InferDeckIDs] ✗ Match %s too far from best deck '%s' (diff: %v > max: %v)", match.ID, bestDeck.Name, minDiff, maxTimeDiff)
+				} else {
+					log.Printf("[InferDeckIDs] ✗ Match %s has no best deck", match.ID)
+				}
+			}
 		}
 	}
+
+	log.Printf("[InferDeckIDs] Completed: linked %d/%d matches to decks", updatedCount, len(matchesNeedingDecks))
 
 	return updatedCount, nil
 }
