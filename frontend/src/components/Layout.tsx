@@ -19,6 +19,19 @@ const Layout = ({ children }: LayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Sync activeTab with current route (for keyboard shortcuts and direct navigation)
+  useEffect(() => {
+    if (location.pathname === '/match-history' || location.pathname === '/') {
+      setActiveTab('match-history');
+    } else if (location.pathname === '/quests') {
+      setActiveTab('quests');
+    } else if (location.pathname === '/events') {
+      setActiveTab('events');
+    } else if (location.pathname.startsWith('/charts/')) {
+      setActiveTab('charts');
+    }
+  }, [location.pathname]);
+
   // Load connection status on mount
   useEffect(() => {
     loadConnectionStatus();
