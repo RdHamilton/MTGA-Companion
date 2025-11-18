@@ -24,6 +24,16 @@ The MTGA Companion daemon is a background service that:
 - Runs continuously in the background (even when GUI is closed)
 - Starts automatically on system boot
 
+## Platform Verification Status
+
+> **⚠️ IMPORTANT**: Service installation has only been fully tested and verified on **macOS**.
+
+- ✅ **macOS**: Fully tested and verified (v1.0)
+- ⚠️ **Windows**: Implementation complete but not yet verified
+- ⚠️ **Linux**: Implementation complete but not yet verified
+
+The service installation uses the cross-platform [kardianos/service](https://github.com/kardianos/service) library which has proven support for all three platforms. The implementation should work on Windows and Linux, but has not been tested on those platforms yet. If you encounter issues on Windows or Linux, please [report them](https://github.com/RdHamilton/MTGA-Companion/issues).
+
 ## Prerequisites
 
 - MTGA Companion binary (`mtga-companion` or `mtga-companion.exe`)

@@ -118,6 +118,14 @@ MTGA Companion can run as a background service (daemon) that continuously monito
 ✅ **Reliable** - Automatic restart if it crashes
 ✅ **Cleaner** - Separation of data collection (daemon) and display (GUI)
 
+**Platform Support Status:**
+
+- ✅ **macOS**: Service installation fully tested and verified
+- ⚠️ **Windows**: Service code implemented but not yet verified on Windows
+- ⚠️ **Linux**: Service code implemented but not yet verified on Linux
+
+> **Note**: The service installation code uses the cross-platform [kardianos/service](https://github.com/kardianos/service) library which supports Windows, macOS, and Linux. While the implementation is complete for all platforms, testing has only been performed on macOS. Windows and Linux service installation should work but has not been verified yet.
+
 **Installation**:
 
 1. Download and extract MTGA Companion for your platform (see Quick Start above)
