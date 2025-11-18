@@ -277,7 +277,11 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 				// Try to parse timestamp (format: [UnityCrossThreadLogger]2024-01-15 10:30:45)
 				if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 					matchTime = parsedTime
+				} else {
+					log.Printf("[ExtractMatches] WARNING: Failed to parse timestamp '%s' for match %s, using current time instead. Error: %v", entry.Timestamp, matchID, err)
 				}
+			} else {
+				log.Printf("[ExtractMatches] WARNING: No timestamp in log entry for match %s, using current time", matchID)
 			}
 
 			// Get event information
