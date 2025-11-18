@@ -41,6 +41,14 @@ func getServiceConfig() *service.Config {
 		Name:        "MTGACompanionDaemon",
 		DisplayName: "MTGA Companion Daemon",
 		Description: "Background service that monitors MTGA log files and provides data to the MTGA Companion GUI",
+		Arguments:   []string{"daemon"}, // Run in daemon mode
+		Option: service.KeyValue{
+			"UserService":  true,                               // Install as user-level service (LaunchAgent)
+			"RunAtLoad":    true,                               // Auto-start on login
+			"KeepAlive":    true,                               // Restart if crashed
+			"LogDirectory": os.ExpandEnv("$HOME/Library/Logs"), // macOS log directory
+			"LogFilename":  "MTGACompanionDaemon.log",          // Log file name
+		},
 	}
 }
 
