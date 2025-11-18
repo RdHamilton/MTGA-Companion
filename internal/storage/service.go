@@ -278,14 +278,22 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 
 			// 1. Try JSON payload timestamp (Unix milliseconds)
 			if tsVal, ok := entry.JSON["timestamp"]; ok {
+				log.Printf("[ExtractMatches] Found timestamp field in JSON for match %s: %v (type: %T)", matchID, tsVal, tsVal)
 				if tsStr, ok := tsVal.(string); ok {
 					// Parse Unix milliseconds timestamp
 					var tsMs int64
 					if _, err := fmt.Sscanf(tsStr, "%d", &tsMs); err == nil {
 						matchTime = time.Unix(tsMs/1000, (tsMs%1000)*1000000)
 						timestampFound = true
+						log.Printf("[ExtractMatches] ✓ Parsed JSON timestamp for match %s: %v (from %s ms)", matchID, matchTime, tsStr)
+					} else {
+						log.Printf("[ExtractMatches] Failed to parse JSON timestamp string '%s': %v", tsStr, err)
 					}
+				} else {
+					log.Printf("[ExtractMatches] JSON timestamp field is not a string: %T", tsVal)
 				}
+			} else {
+				log.Printf("[ExtractMatches] No 'timestamp' field found in JSON for match %s", matchID)
 			}
 
 			// 2. Try log entry prefix timestamp
