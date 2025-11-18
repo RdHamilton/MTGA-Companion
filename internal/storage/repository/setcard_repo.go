@@ -245,7 +245,9 @@ func (r *setCardRepository) GetCardsBySet(ctx context.Context, setCode string) (
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	cards := []*models.SetCard{}
 	for rows.Next() {
@@ -307,7 +309,9 @@ func (r *setCardRepository) GetCachedSets(ctx context.Context) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	sets := []string{}
 	for rows.Next() {
