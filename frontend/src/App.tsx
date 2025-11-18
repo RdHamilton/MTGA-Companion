@@ -10,11 +10,13 @@ import ResultBreakdown from './pages/ResultBreakdown';
 import Quests from './pages/Quests';
 import Events from './pages/Events';
 import Settings from './pages/Settings';
+import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import './App.css';
 
 function App() {
   return (
     <Router>
+      <KeyboardShortcutsHandler />
       <Layout>
         <Routes>
           <Route path="/" element={<Navigate to="/match-history" replace />} />
