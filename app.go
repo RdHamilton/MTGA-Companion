@@ -1106,6 +1106,24 @@ func (a *App) GetActiveDraftSessions() ([]*models.DraftSession, error) {
 	return sessions, nil
 }
 
+// GetCompletedDraftSessions returns recently completed draft sessions.
+func (a *App) GetCompletedDraftSessions(limit int) ([]*models.DraftSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if limit <= 0 {
+		limit = 20 // Default limit
+	}
+
+	sessions, err := a.service.DraftRepo().GetCompletedSessions(a.ctx, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get completed draft sessions: %v", err)}
+	}
+
+	return sessions, nil
+}
+
 // GetDraftSession returns a draft session by ID.
 func (a *App) GetDraftSession(sessionID string) (*models.DraftSession, error) {
 	if a.service == nil {

@@ -341,3 +341,109 @@
 .card-details::-webkit-scrollbar-thumb:hover {
     background: #5ab0ff;
 }
+
+/* Historical Drafts Grid */
+.historical-drafts {
+    padding: 20px 0;
+}
+
+.drafts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    max-width: 1400px;
+}
+
+.draft-card {
+    background-color: #2d2d2d;
+    border-radius: 12px;
+    padding: 20px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.draft-card:hover {
+    border-color: #4a9eff;
+    box-shadow: 0 4px 16px rgba(74, 158, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.draft-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #444444;
+}
+
+.draft-card-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.draft-set-badge {
+    background-color: #4a9eff;
+    color: #ffffff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.draft-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.draft-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.draft-stat .stat-label {
+    color: #aaaaaa;
+    font-size: 14px;
+}
+
+.draft-stat .stat-value {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.draft-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-view-replay {
+    flex: 1;
+    background-color: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-view-replay:hover {
+    background-color: #5ab0ff;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-view-replay:active {
+    transform: translateY(0);
+}

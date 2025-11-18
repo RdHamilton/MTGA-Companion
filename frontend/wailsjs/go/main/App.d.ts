@@ -18,6 +18,8 @@ export function GetActiveQuests():Promise<Array<models.Quest>>;
 
 export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;
 
+export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.DraftSession>>;
+
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
 export function GetCurrentAccount():Promise<models.Account>;

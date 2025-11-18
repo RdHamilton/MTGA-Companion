@@ -15,6 +15,7 @@ type DraftRepository interface {
 	CreateSession(ctx context.Context, session *models.DraftSession) error
 	GetSession(ctx context.Context, id string) (*models.DraftSession, error)
 	GetActiveSessions(ctx context.Context) ([]*models.DraftSession, error)
+	GetCompletedSessions(ctx context.Context, limit int) ([]*models.DraftSession, error)
 	UpdateSessionStatus(ctx context.Context, id string, status string, endTime *time.Time) error
 	IncrementSessionPicks(ctx context.Context, id string) error
 
@@ -105,6 +106,54 @@ func (r *draftRepository) GetActiveSessions(ctx context.Context) ([]*models.Draf
 		ORDER BY start_time DESC
 	`
 	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	sessions := []*models.DraftSession{}
+	for rows.Next() {
+		session := &models.DraftSession{}
+		var endTime sql.NullTime
+
+		err := rows.Scan(
+			&session.ID,
+			&session.EventName,
+			&session.SetCode,
+			&session.DraftType,
+			&session.StartTime,
+			&endTime,
+			&session.Status,
+			&session.TotalPicks,
+			&session.CreatedAt,
+			&session.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if endTime.Valid {
+			session.EndTime = &endTime.Time
+		}
+
+		sessions = append(sessions, session)
+	}
+
+	return sessions, rows.Err()
+}
+
+// GetCompletedSessions retrieves completed draft sessions ordered by completion date.
+func (r *draftRepository) GetCompletedSessions(ctx context.Context, limit int) ([]*models.DraftSession, error) {
+	query := `
+		SELECT id, event_name, set_code, draft_type, start_time, end_time, status, total_picks, created_at, updated_at
+		FROM draft_sessions
+		WHERE status = 'completed'
+		ORDER BY start_time DESC
+		LIMIT ?
+	`
+	rows, err := r.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}

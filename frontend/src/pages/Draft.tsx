@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards } from '../../wailsjs/go/main/App';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import './Draft.css';
 
@@ -8,6 +8,12 @@ interface DraftState {
     picks: models.DraftPickSession[];
     packs: models.DraftPackSession[];
     setCards: models.SetCard[];
+    loading: boolean;
+    error: string | null;
+}
+
+interface HistoricalDraftsState {
+    sessions: models.DraftSession[];
     loading: boolean;
     error: string | null;
 }
@@ -22,11 +28,36 @@ const Draft: React.FC = () => {
         error: null,
     });
 
+    const [historicalState, setHistoricalState] = useState<HistoricalDraftsState>({
+        sessions: [],
+        loading: false,
+        error: null,
+    });
+
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
 
     useEffect(() => {
         loadActiveDraft();
     }, []);
+
+    const loadHistoricalDrafts = async () => {
+        try {
+            setHistoricalState(prev => ({ ...prev, loading: true, error: null }));
+            const sessions = await GetCompletedDraftSessions(20); // Get last 20 completed drafts
+            setHistoricalState({
+                sessions: sessions || [],
+                loading: false,
+                error: null,
+            });
+        } catch (error) {
+            console.error('Failed to load historical drafts:', error);
+            setHistoricalState(prev => ({
+                ...prev,
+                loading: false,
+                error: error instanceof Error ? error.message : 'Failed to load historical drafts',
+            }));
+        }
+    };
 
     const loadActiveDraft = async () => {
         try {
@@ -41,6 +72,8 @@ const Draft: React.FC = () => {
                     loading: false,
                     error: null,
                 }));
+                // Load historical drafts when no active draft
+                loadHistoricalDrafts();
                 return;
             }
 
@@ -93,19 +126,80 @@ const Draft: React.FC = () => {
     if (!state.session) {
         return (
             <div className="draft-container">
-                <div className="draft-empty">
-                    <h2>No Active Draft</h2>
-                    <p>Start a Quick Draft in MTG Arena to begin tracking.</p>
-                    <div className="empty-help">
-                        <h3>How it works:</h3>
-                        <ul>
-                            <li>Start a Quick Draft in MTG Arena</li>
-                            <li>The draft assistant will automatically detect and display</li>
-                            <li>See all cards from the set with pick highlighting</li>
-                            <li>View your pick history and synergies</li>
-                        </ul>
-                    </div>
+                <div className="draft-header">
+                    <h1>Draft History</h1>
+                    <p>Start a Quick Draft in MTG Arena to begin a new draft session</p>
                 </div>
+
+                {historicalState.loading ? (
+                    <div className="draft-loading">
+                        <div className="loading-spinner"></div>
+                        <p>Loading draft history...</p>
+                    </div>
+                ) : historicalState.sessions.length === 0 ? (
+                    <div className="draft-empty">
+                        <h2>No Draft History</h2>
+                        <p>Complete a Quick Draft in MTG Arena to see your draft history here.</p>
+                        <div className="empty-help">
+                            <h3>How it works:</h3>
+                            <ul>
+                                <li>Start a Quick Draft in MTG Arena</li>
+                                <li>The draft assistant will automatically detect and display</li>
+                                <li>See all cards from the set with pick highlighting</li>
+                                <li>View your pick history and synergies</li>
+                                <li>Completed drafts will appear here with stats</li>
+                            </ul>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="historical-drafts">
+                        <div className="drafts-grid">
+                            {historicalState.sessions.map((session) => {
+                                const startDate = new Date(session.StartTime);
+                                const formattedDate = startDate.toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                });
+                                const formattedTime = startDate.toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit'
+                                });
+
+                                return (
+                                    <div key={session.ID} className="draft-card">
+                                        <div className="draft-card-header">
+                                            <h3>{session.EventName}</h3>
+                                            <span className="draft-set-badge">{session.SetCode}</span>
+                                        </div>
+                                        <div className="draft-card-info">
+                                            <div className="draft-stat">
+                                                <span className="stat-label">Date:</span>
+                                                <span className="stat-value">{formattedDate}</span>
+                                            </div>
+                                            <div className="draft-stat">
+                                                <span className="stat-label">Time:</span>
+                                                <span className="stat-value">{formattedTime}</span>
+                                            </div>
+                                            <div className="draft-stat">
+                                                <span className="stat-label">Picks:</span>
+                                                <span className="stat-value">{session.TotalPicks || 0}</span>
+                                            </div>
+                                        </div>
+                                        <div className="draft-card-actions">
+                                            <button
+                                                className="btn-view-replay"
+                                                onClick={() => window.location.href = `/draft/${session.ID}`}
+                                            >
+                                                View Replay
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }

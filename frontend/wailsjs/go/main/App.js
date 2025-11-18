@@ -30,6 +30,10 @@ export function GetCardByArenaID(arg1) {
   return window['go']['main']['App']['GetCardByArenaID'](arg1);
 }
 
+export function GetCompletedDraftSessions(arg1) {
+  return window['go']['main']['App']['GetCompletedDraftSessions'](arg1);
+}
+
 export function GetConnectionStatus() {
   return window['go']['main']['App']['GetConnectionStatus']();
 }
