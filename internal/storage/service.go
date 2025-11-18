@@ -530,28 +530,52 @@ func normalizeResultReason(reason string) string {
 
 // parseLogTimestamp attempts to parse a timestamp from the log entry format.
 func parseLogTimestamp(timestampStr string) (time.Time, error) {
-	// Format: [UnityCrossThreadLogger]2024-01-15 10:30:45
-	// Try to extract the date/time portion
+	// Format examples:
+	// - [UnityCrossThreadLogger]11/16/2025 10:16:08 AM
+	// - [UnityCrossThreadLogger]2024-01-15 10:30:45
+
+	// Try to extract the date/time portion after the logger prefix
 	parts := strings.Fields(timestampStr)
 	if len(parts) < 2 {
-		return time.Time{}, fmt.Errorf("invalid timestamp format")
+		return time.Time{}, fmt.Errorf("invalid timestamp format: not enough parts")
 	}
 
-	// Try common formats
-	formats := []string{
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04:05.000",
+	// Try common formats with different combinations of parts
+	// For "11/16/2025 10:16:08 AM" we need 3 parts (date, time, AM/PM)
+	// For "2024-01-15 10:30:45" we need 2 parts (date, time)
+
+	formats := []struct {
+		format    string
+		numParts  int
+	}{
+		// 12-hour format with AM/PM (MM/DD/YYYY)
+		{"01/02/2006 03:04:05 PM", 3},
+		{"1/2/2006 3:04:05 PM", 3},
+		// 24-hour format (YYYY-MM-DD)
+		{"2006-01-02 15:04:05", 2},
+		{"2006-01-02T15:04:05", 2},
+		{"2006-01-02 15:04:05.000", 2},
 	}
 
-	dateTimeStr := parts[len(parts)-2] + " " + parts[len(parts)-1]
-	for _, format := range formats {
-		if t, err := time.Parse(format, dateTimeStr); err == nil {
+	for _, fmt := range formats {
+		if len(parts) < fmt.numParts {
+			continue
+		}
+
+		// Build datetime string from last N parts
+		var dateTimeStr string
+		if fmt.numParts == 3 {
+			dateTimeStr = parts[len(parts)-3] + " " + parts[len(parts)-2] + " " + parts[len(parts)-1]
+		} else {
+			dateTimeStr = parts[len(parts)-2] + " " + parts[len(parts)-1]
+		}
+
+		if t, err := time.Parse(fmt.format, dateTimeStr); err == nil {
 			return t, nil
 		}
 	}
 
-	return time.Time{}, fmt.Errorf("unable to parse timestamp: %s", timestampStr)
+	return time.Time{}, fmt.Errorf("unable to parse timestamp from: %s", timestampStr)
 }
 
 // StoreMatch stores a single match and its games.
