@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData, DiscoverHistoricalLogs, StartHistoricalImport, GetHistoricalImportProgress, CancelHistoricalImport } from '../../wailsjs/go/main/App';
+import { logimporter } from '../../wailsjs/go/models';
 import './Settings.css';
 
 const Settings = () => {
@@ -22,6 +23,12 @@ const Settings = () => {
   const [daemonMode, setDaemonMode] = useState('auto');
   const [daemonPort, setDaemonPortState] = useState(9999);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Historical import settings
+  const [logFiles, setLogFiles] = useState<logimporter.LogFileInfo[]>([]);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importProgress, setImportProgress] = useState<logimporter.ImportProgress | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Load connection status on mount
   useEffect(() => {
@@ -124,6 +131,69 @@ const Settings = () => {
       console.error('Import failed:', error);
       alert(`Failed to import data: ${error}`);
     }
+  };
+
+  const handleDiscoverLogs = async () => {
+    try {
+      const files = await DiscoverHistoricalLogs();
+      setLogFiles(files || []);
+      setShowImportDialog(true);
+    } catch (error) {
+      console.error('Failed to discover logs:', error);
+      alert(`Failed to discover log files: ${error}`);
+    }
+  };
+
+  const handleStartImport = async () => {
+    try {
+      const selectedFiles = logFiles.filter(f => f.Selected);
+      if (selectedFiles.length === 0) {
+        alert('Please select at least one log file to import');
+        return;
+      }
+
+      await StartHistoricalImport(selectedFiles);
+      setIsImporting(true);
+
+      // Poll for progress updates
+      const progressInterval = setInterval(async () => {
+        try {
+          const progress = await GetHistoricalImportProgress();
+          setImportProgress(progress);
+
+          if (progress && (progress.Status === 'completed' || progress.Status === 'failed' || progress.Status === 'cancelled')) {
+            clearInterval(progressInterval);
+            setIsImporting(false);
+            if (progress.Status === 'completed') {
+              alert(`Import completed! Imported ${progress.MatchesImported} matches, ${progress.DecksImported} decks, ${progress.QuestsImported} quests`);
+              setShowImportDialog(false);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to get import progress:', error);
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to start import:', error);
+      alert(`Failed to start import: ${error}`);
+      setIsImporting(false);
+    }
+  };
+
+  const handleCancelImport = async () => {
+    try {
+      await CancelHistoricalImport();
+      setIsImporting(false);
+    } catch (error) {
+      console.error('Failed to cancel import:', error);
+      alert(`Failed to cancel import: ${error}`);
+    }
+  };
+
+  const toggleFileSelection = (index: number) => {
+    const updated = [...logFiles];
+    updated[index].Selected = !updated[index].Selected;
+    setLogFiles(updated);
   };
 
   return (
@@ -310,6 +380,18 @@ const Settings = () => {
             </div>
           </div>
 
+          <div className="setting-item">
+            <label className="setting-label">
+              Import Historical Logs
+              <span className="setting-description">Import your complete MTGA match history from existing log files</span>
+            </label>
+            <div className="setting-control">
+              <button className="action-button primary" onClick={handleDiscoverLogs}>
+                Import Historical Data
+              </button>
+            </div>
+          </div>
+
           <div className="setting-item danger">
             <label className="setting-label">
               Clear All Data
@@ -386,6 +468,99 @@ const Settings = () => {
           </button>
         </div>
       </div>
+
+      {/* Historical Import Dialog */}
+      {showImportDialog && (
+        <div className="modal-overlay" onClick={() => !isImporting && setShowImportDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Import Historical Logs</h2>
+              <button className="modal-close" onClick={() => !isImporting && setShowImportDialog(false)} disabled={isImporting}>×</button>
+            </div>
+            <div className="modal-body">
+              {!isImporting ? (
+                <>
+                  <p className="modal-description">
+                    Select log files to import. Files are sorted chronologically (oldest first).
+                  </p>
+                  <div className="log-files-list">
+                    {logFiles.length === 0 ? (
+                      <div className="no-files">No log files found</div>
+                    ) : (
+                      logFiles.map((file, index) => (
+                        <div key={index} className="log-file-item">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={file.Selected}
+                              onChange={() => toggleFileSelection(index)}
+                            />
+                            <span className="file-name">{file.Name}</span>
+                            <span className="file-info">
+                              {(file.Size / 1024 / 1024).toFixed(2)} MB • {file.ModTime ? new Date(file.ModTime as any).toLocaleDateString() : 'Unknown date'}
+                            </span>
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="import-progress">
+                  <h3>Importing...</h3>
+                  {importProgress && (
+                    <>
+                      <div className="progress-stats">
+                        <div className="stat">Files: {importProgress.ProcessedFiles} / {importProgress.TotalFiles}</div>
+                        <div className="stat">Current: {importProgress.CurrentFile}</div>
+                        <div className="stat">Entries: {importProgress.ProcessedEntries}</div>
+                        <div className="stat">Matches: {importProgress.MatchesImported}</div>
+                        <div className="stat">Decks: {importProgress.DecksImported}</div>
+                        <div className="stat">Quests: {importProgress.QuestsImported}</div>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${(importProgress.ProcessedFiles / importProgress.TotalFiles) * 100}%` }}
+                        ></div>
+                      </div>
+                      {importProgress.EstimatedTimeLeft > 0 && (
+                        <div className="progress-time">
+                          Estimated time remaining: {Math.ceil(importProgress.EstimatedTimeLeft / 1000000000 / 60)} minutes
+                        </div>
+                      )}
+                      {importProgress.Errors && importProgress.Errors.length > 0 && (
+                        <div className="progress-errors">
+                          <h4>Errors:</h4>
+                          {importProgress.Errors.map((error, i) => (
+                            <div key={i} className="error-item">{error}</div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              {!isImporting ? (
+                <>
+                  <button className="secondary-button" onClick={() => setShowImportDialog(false)}>
+                    Cancel
+                  </button>
+                  <button className="primary-button" onClick={handleStartImport}>
+                    Start Import
+                  </button>
+                </>
+              ) : (
+                <button className="danger-button" onClick={handleCancelImport}>
+                  Cancel Import
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* About Dialog */}
       <AboutDialog isOpen={showAbout} onClose={() => setShowAbout(false)} />

@@ -15,6 +15,8 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logimporter"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -22,15 +24,17 @@ import (
 
 // App struct
 type App struct {
-	ctx         context.Context
-	service     *storage.Service
-	poller      *logreader.Poller
-	pollerStop  context.CancelFunc
-	pollerMu    sync.Mutex
-	ipcClient   *ipc.Client
-	ipcClientMu sync.Mutex
-	daemonMode  bool
-	daemonPort  int // Configurable daemon port
+	ctx          context.Context
+	service      *storage.Service
+	logProcessor *logprocessor.Service
+	logImporter  *logimporter.Service
+	poller       *logreader.Poller
+	pollerStop   context.CancelFunc
+	pollerMu     sync.Mutex
+	ipcClient    *ipc.Client
+	ipcClientMu  sync.Mutex
+	daemonMode   bool
+	daemonPort   int // Configurable daemon port
 }
 
 // NewApp creates a new App application struct
@@ -117,6 +121,11 @@ func (a *App) Initialize(dbPath string) error {
 		return err
 	}
 	a.service = storage.NewService(db)
+
+	// Initialize log processor and importer
+	a.logProcessor = logprocessor.NewService(a.service)
+	a.logImporter = logimporter.NewService(a.logProcessor)
+
 	return nil
 }
 
@@ -1108,4 +1117,53 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 	}
 
 	return card, nil
+}
+
+// DiscoverHistoricalLogs discovers all available MTGA log files for import.
+func (a *App) DiscoverHistoricalLogs() ([]*logimporter.LogFileInfo, error) {
+	if a.logImporter == nil {
+		return nil, &AppError{Message: "Log importer not initialized"}
+	}
+
+	files, err := a.logImporter.DiscoverLogFiles()
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to discover log files: %v", err)}
+	}
+
+	return files, nil
+}
+
+// StartHistoricalImport begins importing the selected log files.
+func (a *App) StartHistoricalImport(files []*logimporter.LogFileInfo) error {
+	if a.logImporter == nil {
+		return &AppError{Message: "Log importer not initialized"}
+	}
+
+	if err := a.logImporter.StartImport(a.ctx, files); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to start import: %v", err)}
+	}
+
+	return nil
+}
+
+// GetHistoricalImportProgress returns the current import progress.
+func (a *App) GetHistoricalImportProgress() (*logimporter.ImportProgress, error) {
+	if a.logImporter == nil {
+		return nil, &AppError{Message: "Log importer not initialized"}
+	}
+
+	return a.logImporter.GetProgress(), nil
+}
+
+// CancelHistoricalImport cancels the current import operation.
+func (a *App) CancelHistoricalImport() error {
+	if a.logImporter == nil {
+		return &AppError{Message: "Log importer not initialized"}
+	}
+
+	if err := a.logImporter.CancelImport(); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to cancel import: %v", err)}
+	}
+
+	return nil
 }
