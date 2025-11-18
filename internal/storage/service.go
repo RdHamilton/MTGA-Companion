@@ -272,17 +272,36 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 			}
 			seenMatches[matchID] = true
 
-			// Parse timestamp from entry
+			// Parse timestamp - try multiple sources in order of preference
 			matchTime := time.Now()
-			if entry.Timestamp != "" {
-				// Try to parse timestamp (format: [UnityCrossThreadLogger]2024-01-15 10:30:45)
+			timestampFound := false
+
+			// 1. Try JSON payload timestamp (Unix milliseconds)
+			if tsVal, ok := entry.JSON["timestamp"]; ok {
+				if tsStr, ok := tsVal.(string); ok {
+					// Parse Unix milliseconds timestamp
+					var tsMs int64
+					if _, err := fmt.Sscanf(tsStr, "%d", &tsMs); err == nil {
+						matchTime = time.Unix(tsMs/1000, (tsMs%1000)*1000000)
+						timestampFound = true
+					}
+				}
+			}
+
+			// 2. Try log entry prefix timestamp
+			if !timestampFound && entry.Timestamp != "" {
+				// Try to parse timestamp (format: [UnityCrossThreadLogger]11/16/2025 10:16:08 AM)
 				if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 					matchTime = parsedTime
+					timestampFound = true
 				} else {
-					log.Printf("[ExtractMatches] WARNING: Failed to parse timestamp '%s' for match %s, using current time instead. Error: %v", entry.Timestamp, matchID, err)
+					log.Printf("[ExtractMatches] WARNING: Failed to parse prefix timestamp '%s' for match %s. Error: %v", entry.Timestamp, matchID, err)
 				}
-			} else {
-				log.Printf("[ExtractMatches] WARNING: No timestamp in log entry for match %s, using current time", matchID)
+			}
+
+			// 3. Fallback to current time
+			if !timestampFound {
+				log.Printf("[ExtractMatches] WARNING: No valid timestamp found for match %s, using current time", matchID)
 			}
 
 			// Get event information
