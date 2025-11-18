@@ -68,7 +68,9 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 	if err != nil {
 		return err
 	}
-	defer cardStmt.Close()
+	defer func() {
+		_ = cardStmt.Close()
+	}()
 
 	cachedAt := time.Now()
 	for _, card := range cardRatings {
@@ -104,7 +106,9 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 	if err != nil {
 		return err
 	}
-	defer colorStmt.Close()
+	defer func() {
+		_ = colorStmt.Close()
+	}()
 
 	for _, color := range colorRatings {
 		_, err = colorStmt.ExecContext(ctx,
@@ -175,7 +179,9 @@ func (r *draftRatingsRepository) GetColorRatings(ctx context.Context, setCode, d
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	ratings := []seventeenlands.ColorRating{}
 	var cachedAt time.Time

@@ -140,7 +140,9 @@ func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCa
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		_ = stmt.Close()
+	}()
 
 	for _, card := range cards {
 		typesJSON, err := json.Marshal(card.Types)

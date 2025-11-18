@@ -108,7 +108,9 @@ func (r *draftRepository) GetActiveSessions(ctx context.Context) ([]*models.Draf
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	sessions := []*models.DraftSession{}
 	for rows.Next() {
