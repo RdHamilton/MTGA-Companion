@@ -852,6 +852,10 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 	suspiciousBatch := false
 	if len(matchesNeedingDecks) > 1 {
 		timeDiffBetweenMatches := matchesNeedingDecks[len(matchesNeedingDecks)-1].Timestamp.Sub(matchesNeedingDecks[0].Timestamp)
+		// Take absolute value to handle both chronological and reverse-chronological ordering
+		if timeDiffBetweenMatches < 0 {
+			timeDiffBetweenMatches = -timeDiffBetweenMatches
+		}
 		if timeDiffBetweenMatches < 1*time.Minute {
 			suspiciousBatch = true
 			log.Printf("[InferDeckIDs] WARNING: All %d matches have timestamps within %v - likely using time.Now() fallback", len(matchesNeedingDecks), timeDiffBetweenMatches)
