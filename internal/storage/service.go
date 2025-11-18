@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -789,7 +790,26 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 	updatedCount := 0
 	const maxTimeDiff = 24 * time.Hour // Only link if within 24 hours (same play session day)
 
+	// Sort decks by LastPlayed descending (most recent first)
+	// This helps when match timestamps are missing and we fall back to time.Now()
+	sort.Slice(decksWithTimestamp, func(i, j int) bool {
+		return decksWithTimestamp[i].LastPlayed.After(*decksWithTimestamp[j].LastPlayed)
+	})
+
+	// Check if all match timestamps are suspiciously close together (within 1 minute)
+	// This indicates they're using time.Now() fallback during batch replay
+	suspiciousBatch := false
+	if len(matchesNeedingDecks) > 1 {
+		timeDiffBetweenMatches := matchesNeedingDecks[len(matchesNeedingDecks)-1].Timestamp.Sub(matchesNeedingDecks[0].Timestamp)
+		if timeDiffBetweenMatches < 1*time.Minute {
+			suspiciousBatch = true
+			log.Printf("[InferDeckIDs] WARNING: All %d matches have timestamps within %v - likely using time.Now() fallback", len(matchesNeedingDecks), timeDiffBetweenMatches)
+			log.Printf("[InferDeckIDs] Will link all matches to most recently played deck: '%s'", decksWithTimestamp[0].Name)
+		}
+	}
+
 	log.Printf("[InferDeckIDs] Starting to match %d matches with %d decks (max time diff: %v)", len(matchesNeedingDecks), len(decksWithTimestamp), maxTimeDiff)
+	log.Printf("[InferDeckIDs] Most recent deck: '%s' (LastPlayed: %v)", decksWithTimestamp[0].Name, *decksWithTimestamp[0].LastPlayed)
 
 	for i, match := range matchesNeedingDecks {
 		var bestDeck *models.Deck
@@ -817,14 +837,26 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 			}
 		}
 
-		// Only update if within reasonable time window
+		// Determine if we should link this match to the best deck
+		shouldLink := false
+		var linkReason string
+
 		if bestDeck != nil && minDiff <= maxTimeDiff {
+			shouldLink = true
+			linkReason = fmt.Sprintf("within time window (diff: %v)", minDiff)
+		} else if suspiciousBatch && bestDeck != nil {
+			// Fallback for batch replay: link to most recent deck
+			shouldLink = true
+			linkReason = "suspicious batch - using most recent deck"
+		}
+
+		if shouldLink && bestDeck != nil {
 			if err := s.matches.UpdateDeckID(ctx, match.ID, bestDeck.ID); err != nil {
 				return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
 			}
 			updatedCount++
 			if updatedCount <= 3 { // Log first few successful links
-				log.Printf("[InferDeckIDs] ✓ Linked match %s to deck '%s' (diff: %v)", match.ID, bestDeck.Name, minDiff)
+				log.Printf("[InferDeckIDs] ✓ Linked match %s to deck '%s' (%s)", match.ID, bestDeck.Name, linkReason)
 			}
 		} else {
 			if i < 3 { // Log first few failures
