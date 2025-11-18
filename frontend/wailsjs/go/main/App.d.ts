@@ -10,13 +10,23 @@ export function ExportToCSV():Promise<void>;
 
 export function ExportToJSON():Promise<void>;
 
+export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
+
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
 
 export function GetActiveQuests():Promise<Array<models.Quest>>;
 
+export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;
+
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
 export function GetCurrentAccount():Promise<models.Account>;
+
+export function GetDraftPacks(arg1:string):Promise<Array<models.DraftPackSession>>;
+
+export function GetDraftPicks(arg1:string):Promise<Array<models.DraftPickSession>>;
+
+export function GetDraftSession(arg1:string):Promise<models.DraftSession>;
 
 export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribution>>;
 
@@ -31,6 +41,8 @@ export function GetQuestStats(arg1:string,arg2:string):Promise<models.QuestStats
 export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
 export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.Time,arg4:storage.TimelinePeriod):Promise<storage.RankTimeline>;
+
+export function GetSetCards(arg1:string):Promise<Array<models.SetCard>>;
 
 export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
 
