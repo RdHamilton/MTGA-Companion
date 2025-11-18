@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import './Draft.css';
 
 interface DraftState {
@@ -38,6 +39,16 @@ const Draft: React.FC = () => {
 
     useEffect(() => {
         loadActiveDraft();
+
+        // Listen for draft updates from backend
+        const unsubscribe = EventsOn('draft:updated', () => {
+            // Refresh both active draft and historical drafts when draft data changes
+            loadActiveDraft();
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, []);
 
     const loadHistoricalDrafts = async () => {

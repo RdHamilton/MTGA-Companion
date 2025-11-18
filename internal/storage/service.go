@@ -553,8 +553,8 @@ func parseLogTimestamp(timestampStr string) (time.Time, error) {
 	// For "2024-01-15 10:30:45" we need 2 parts (date, time)
 
 	formats := []struct {
-		format    string
-		numParts  int
+		format   string
+		numParts int
 	}{
 		// 12-hour format with AM/PM (MM/DD/YYYY)
 		{"01/02/2006 03:04:05 PM", 3},

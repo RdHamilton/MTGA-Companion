@@ -212,7 +212,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 	// Track successful processing
 	s.healthMu.Lock()
 	s.totalProcessed += int64(len(entries))
-	if result.MatchesStored > 0 || result.GamesStored > 0 || result.DecksStored > 0 || result.RanksStored > 0 || result.QuestsStored > 0 {
+	if result.MatchesStored > 0 || result.GamesStored > 0 || result.DecksStored > 0 || result.RanksStored > 0 || result.QuestsStored > 0 || result.DraftsStored > 0 {
 		s.lastDBWrite = time.Now()
 	}
 	s.healthMu.Unlock()
@@ -276,6 +276,17 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 			Type: "achievement:updated",
 			Data: map[string]interface{}{
 				"count": result.AchievementsStored,
+			},
+		})
+	}
+
+	if result.DraftsStored > 0 {
+		log.Printf("Stored %d draft session(s) with %d picks", result.DraftsStored, result.DraftPicksStored)
+		s.wsServer.Broadcast(Event{
+			Type: "draft:updated",
+			Data: map[string]interface{}{
+				"count": result.DraftsStored,
+				"picks": result.DraftPicksStored,
 			},
 		})
 	}
@@ -521,8 +532,8 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	}
 
 	elapsed := time.Since(startTime)
-	log.Printf("Replay completed in %v: %d entries, %d matches, %d decks, %d quests",
-		elapsed, len(allEntries), result.MatchesStored, result.DecksStored, result.QuestsStored)
+	log.Printf("Replay completed in %v: %d entries, %d matches, %d decks, %d quests, %d drafts",
+		elapsed, len(allEntries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
 
 	// Broadcast completion
 	s.wsServer.Broadcast(Event{
@@ -533,6 +544,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 			"matchesImported": result.MatchesStored,
 			"decksImported":   result.DecksStored,
 			"questsImported":  result.QuestsStored,
+			"draftsImported":  result.DraftsStored,
 			"duration":        elapsed.Seconds(),
 		},
 	})

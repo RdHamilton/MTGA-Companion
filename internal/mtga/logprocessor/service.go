@@ -519,12 +519,6 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			status = "completed"
 		}
 
-		// Count total picks expected (typically 45 for a full draft: 3 packs * 15 picks)
-		totalPicks := len(picks)
-		if totalPicks == 0 {
-			totalPicks = 45 // Default expectation
-		}
-
 		session := &draftSessionData{
 			SessionID: sessionID,
 			EventName: eventName,

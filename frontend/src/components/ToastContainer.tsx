@@ -68,23 +68,36 @@ const ToastContainer = () => {
       }
     });
 
+    // Listen for draft update events
+    const unsubscribeDraft = EventsOn('draft:updated', (data: any) => {
+      const count = data?.count || 0;
+      const picks = data?.picks || 0;
+
+      if (count > 0) {
+        addToast(
+          `Draft session${count > 1 ? 's' : ''} stored! (${count} session${count > 1 ? 's' : ''}, ${picks} pick${picks !== 1 ? 's' : ''})`,
+          'success'
+        );
+      }
+    });
+
     return () => {
       if (unsubscribeStats) unsubscribeStats();
       if (unsubscribeRank) unsubscribeRank();
       if (unsubscribeQuest) unsubscribeQuest();
+      if (unsubscribeDraft) unsubscribeDraft();
     };
   }, [addToast]);
 
   return (
-    <div style={{ position: 'fixed', bottom: 0, right: 0, zIndex: 10000 }}>
-      {toasts.map((toast, index) => (
-        <div key={toast.id} style={{ marginBottom: index > 0 ? '10px' : '0' }}>
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => removeToast(toast.id)}
-          />
-        </div>
+    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 10000, display: 'flex', flexDirection: 'column-reverse' }}>
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => removeToast(toast.id)}
+        />
       ))}
     </div>
   );
