@@ -87,6 +87,13 @@ const Layout = ({ children }: LayoutProps) => {
             Events
           </Link>
           <Link
+            to="/draft"
+            className={`tab ${activeTab === 'draft' ? 'active' : ''}`}
+            onClick={() => setActiveTab('draft')}
+          >
+            Draft
+          </Link>
+          <Link
             to="/charts/win-rate-trend"
             className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
             onClick={() => setActiveTab('charts')}
