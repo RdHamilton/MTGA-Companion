@@ -203,7 +203,9 @@ func (r *draftRepository) GetPicksBySession(ctx context.Context, sessionID strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	picks := []*models.DraftPickSession{}
 	for rows.Next() {
@@ -299,7 +301,9 @@ func (r *draftRepository) GetPacksBySession(ctx context.Context, sessionID strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	packs := []*models.DraftPackSession{}
 	for rows.Next() {

@@ -139,7 +139,9 @@ func (r *draftRatingsRepository) GetCardRatings(ctx context.Context, setCode, dr
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	ratings := []seventeenlands.CardRating{}
 	var cachedAt time.Time
