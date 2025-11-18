@@ -15,8 +15,6 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
-	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logimporter"
-	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -24,17 +22,15 @@ import (
 
 // App struct
 type App struct {
-	ctx          context.Context
-	service      *storage.Service
-	logProcessor *logprocessor.Service
-	logImporter  *logimporter.Service
-	poller       *logreader.Poller
-	pollerStop   context.CancelFunc
-	pollerMu     sync.Mutex
-	ipcClient    *ipc.Client
-	ipcClientMu  sync.Mutex
-	daemonMode   bool
-	daemonPort   int // Configurable daemon port
+	ctx         context.Context
+	service     *storage.Service
+	poller      *logreader.Poller
+	pollerStop  context.CancelFunc
+	pollerMu    sync.Mutex
+	ipcClient   *ipc.Client
+	ipcClientMu sync.Mutex
+	daemonMode  bool
+	daemonPort  int // Configurable daemon port
 }
 
 // NewApp creates a new App application struct
@@ -121,11 +117,6 @@ func (a *App) Initialize(dbPath string) error {
 		return err
 	}
 	a.service = storage.NewService(db)
-
-	// Initialize log processor and importer
-	a.logProcessor = logprocessor.NewService(a.service)
-	a.logImporter = logimporter.NewService(a.logProcessor)
-
 	return nil
 }
 
@@ -608,6 +599,38 @@ func (a *App) setupEventHandlers() {
 		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
 	})
 
+	// Handle replay:started events from daemon
+	a.ipcClient.On("replay:started", func(data map[string]interface{}) {
+		log.Printf("Received replay:started event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:started", data)
+	})
+
+	// Handle replay:progress events from daemon
+	a.ipcClient.On("replay:progress", func(data map[string]interface{}) {
+		log.Printf("Received replay:progress event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:progress", data)
+	})
+
+	// Handle replay:completed events from daemon
+	a.ipcClient.On("replay:completed", func(data map[string]interface{}) {
+		log.Printf("Received replay:completed event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:completed", data)
+	})
+
+	// Handle replay:error events from daemon
+	a.ipcClient.On("replay:error", func(data map[string]interface{}) {
+		log.Printf("Received replay:error event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:error", data)
+	})
+
 	// Handle disconnect events
 	a.ipcClient.OnDisconnect(func() {
 		log.Println("Daemon connection lost - notifying frontend")
@@ -1033,6 +1056,40 @@ func (a *App) ClearAllData() error {
 	return nil
 }
 
+// TriggerReplayLogs sends a command to the daemon to replay historical logs.
+// This is only available when connected to the daemon (not standalone mode).
+func (a *App) TriggerReplayLogs(clearData bool) error {
+	log.Printf("[TriggerReplayLogs] Called with clearData=%v", clearData)
+
+	a.ipcClientMu.Lock()
+	defer a.ipcClientMu.Unlock()
+
+	log.Printf("[TriggerReplayLogs] IPC client nil? %v", a.ipcClient == nil)
+	if a.ipcClient != nil {
+		log.Printf("[TriggerReplayLogs] IPC client connected? %v", a.ipcClient.IsConnected())
+	}
+
+	if a.ipcClient == nil || !a.ipcClient.IsConnected() {
+		log.Printf("[TriggerReplayLogs] ERROR: Not connected to daemon")
+		return &AppError{Message: "Not connected to daemon. Replay logs requires daemon mode."}
+	}
+
+	// Send replay_logs command via IPC
+	message := map[string]interface{}{
+		"type":       "replay_logs",
+		"clear_data": clearData,
+	}
+
+	log.Printf("[TriggerReplayLogs] Sending IPC message: %+v", message)
+	if err := a.ipcClient.Send(message); err != nil {
+		log.Printf("[TriggerReplayLogs] ERROR: Failed to send: %v", err)
+		return &AppError{Message: fmt.Sprintf("Failed to send replay command to daemon: %v", err)}
+	}
+
+	log.Printf("[TriggerReplayLogs] Successfully sent replay_logs command to daemon (clear_data: %v)", clearData)
+	return nil
+}
+
 // ==================== Draft Methods ====================
 
 // GetActiveDraftSessions returns all active draft sessions.
@@ -1117,53 +1174,4 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 	}
 
 	return card, nil
-}
-
-// DiscoverHistoricalLogs discovers all available MTGA log files for import.
-func (a *App) DiscoverHistoricalLogs() ([]*logimporter.LogFileInfo, error) {
-	if a.logImporter == nil {
-		return nil, &AppError{Message: "Log importer not initialized"}
-	}
-
-	files, err := a.logImporter.DiscoverLogFiles()
-	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to discover log files: %v", err)}
-	}
-
-	return files, nil
-}
-
-// StartHistoricalImport begins importing the selected log files.
-func (a *App) StartHistoricalImport(files []*logimporter.LogFileInfo) error {
-	if a.logImporter == nil {
-		return &AppError{Message: "Log importer not initialized"}
-	}
-
-	if err := a.logImporter.StartImport(a.ctx, files); err != nil {
-		return &AppError{Message: fmt.Sprintf("Failed to start import: %v", err)}
-	}
-
-	return nil
-}
-
-// GetHistoricalImportProgress returns the current import progress.
-func (a *App) GetHistoricalImportProgress() (*logimporter.ImportProgress, error) {
-	if a.logImporter == nil {
-		return nil, &AppError{Message: "Log importer not initialized"}
-	}
-
-	return a.logImporter.GetProgress(), nil
-}
-
-// CancelHistoricalImport cancels the current import operation.
-func (a *App) CancelHistoricalImport() error {
-	if a.logImporter == nil {
-		return &AppError{Message: "Log importer not initialized"}
-	}
-
-	if err := a.logImporter.CancelImport(); err != nil {
-		return &AppError{Message: fmt.Sprintf("Failed to cancel import: %v", err)}
-	}
-
-	return nil
 }

@@ -297,8 +297,55 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 		return nil
 	}
 
-	// TODO: Parse daily wins, weekly wins, and other progress from GraphState nodes
-	// For now, we skip processing until parsing logic is implemented
+	// Parse and update mastery pass progression
+	masteryPass, _ := logreader.ParseMasteryPass(entries)
+	if masteryPass != nil {
+		account, err := s.storage.GetCurrentAccount(ctx)
+		if err == nil && account != nil {
+			// Update mastery pass data if changed
+			updated := false
+			if masteryPass.CurrentLevel != account.MasteryLevel {
+				account.MasteryLevel = masteryPass.CurrentLevel
+				updated = true
+			}
+			if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
+				account.MasteryPass = masteryPass.PassType
+				updated = true
+			}
+			if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
+				account.MasteryMax = masteryPass.MaxLevel
+				updated = true
+			}
+			if updated {
+				if err := s.storage.UpdateAccount(ctx, account); err != nil {
+					log.Printf("Warning: Failed to update mastery pass data: %v", err)
+				}
+			}
+		}
+	}
+
+	// Parse and update daily/weekly wins
+	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
+	if periodicRewards != nil {
+		account, err := s.storage.GetCurrentAccount(ctx)
+		if err == nil && account != nil {
+			// Update daily/weekly wins if changed
+			updated := false
+			if periodicRewards.DailyWins != account.DailyWins {
+				account.DailyWins = periodicRewards.DailyWins
+				updated = true
+			}
+			if periodicRewards.WeeklyWins != account.WeeklyWins {
+				account.WeeklyWins = periodicRewards.WeeklyWins
+				updated = true
+			}
+			if updated {
+				if err := s.storage.UpdateAccount(ctx, account); err != nil {
+					log.Printf("Warning: Failed to update daily/weekly wins: %v", err)
+				}
+			}
+		}
+	}
 
 	return nil
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData, DiscoverHistoricalLogs, StartHistoricalImport, GetHistoricalImportProgress, CancelHistoricalImport } from '../../wailsjs/go/main/App';
-import { logimporter } from '../../wailsjs/go/models';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData, TriggerReplayLogs } from '../../wailsjs/go/main/App';
+import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import './Settings.css';
 
 const Settings = () => {
@@ -24,15 +24,51 @@ const Settings = () => {
   const [daemonPort, setDaemonPortState] = useState(9999);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Historical import settings
-  const [logFiles, setLogFiles] = useState<logimporter.LogFileInfo[]>([]);
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importProgress, setImportProgress] = useState<logimporter.ImportProgress | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
+  // Replay logs settings
+  const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayProgress, setReplayProgress] = useState<any>(null);
 
   // Load connection status on mount
   useEffect(() => {
     loadConnectionStatus();
+  }, []);
+
+  // Listen for replay events
+  useEffect(() => {
+    const unsubscribeStarted = EventsOn('replay:started', (data: any) => {
+      console.log('Replay started:', data);
+      setIsReplaying(true);
+      setReplayProgress(null);
+    });
+
+    const unsubscribeProgress = EventsOn('replay:progress', (data: any) => {
+      console.log('Replay progress:', data);
+      setReplayProgress(data);
+    });
+
+    const unsubscribeCompleted = EventsOn('replay:completed', (data: any) => {
+      console.log('Replay completed:', data);
+      setIsReplaying(false);
+      setReplayProgress(data);
+      // Keep progress visible for a moment, then reload using Wails native method
+      setTimeout(() => {
+        WindowReloadApp(); // Refresh to show updated data
+      }, 2000);
+    });
+
+    const unsubscribeError = EventsOn('replay:error', (data: any) => {
+      console.error('Replay error:', data);
+      setIsReplaying(false);
+      // Error will be logged to console
+    });
+
+    return () => {
+      unsubscribeStarted();
+      unsubscribeProgress();
+      unsubscribeCompleted();
+      unsubscribeError();
+    };
   }, []);
 
   const loadConnectionStatus = async () => {
@@ -133,67 +169,26 @@ const Settings = () => {
     }
   };
 
-  const handleDiscoverLogs = async () => {
-    try {
-      const files = await DiscoverHistoricalLogs();
-      setLogFiles(files || []);
-      setShowImportDialog(true);
-    } catch (error) {
-      console.error('Failed to discover logs:', error);
-      alert(`Failed to discover log files: ${error}`);
+  const handleReplayLogs = async () => {
+    console.log('=== REPLAY LOGS CLICKED ===');
+    console.log('handleReplayLogs called');
+    console.log('Connection status:', connectionStatus);
+    console.log('Clear data before replay:', clearDataBeforeReplay);
+
+    // Check if connected to daemon
+    if (connectionStatus.status !== 'connected') {
+      console.error('Daemon not connected, status:', connectionStatus.status);
+      return;
     }
-  };
 
-  const handleStartImport = async () => {
+    console.log('Calling TriggerReplayLogs...');
     try {
-      const selectedFiles = logFiles.filter(f => f.Selected);
-      if (selectedFiles.length === 0) {
-        alert('Please select at least one log file to import');
-        return;
-      }
-
-      await StartHistoricalImport(selectedFiles);
-      setIsImporting(true);
-
-      // Poll for progress updates
-      const progressInterval = setInterval(async () => {
-        try {
-          const progress = await GetHistoricalImportProgress();
-          setImportProgress(progress);
-
-          if (progress && (progress.Status === 'completed' || progress.Status === 'failed' || progress.Status === 'cancelled')) {
-            clearInterval(progressInterval);
-            setIsImporting(false);
-            if (progress.Status === 'completed') {
-              alert(`Import completed! Imported ${progress.MatchesImported} matches, ${progress.DecksImported} decks, ${progress.QuestsImported} quests`);
-              setShowImportDialog(false);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to get import progress:', error);
-        }
-      }, 1000);
+      await TriggerReplayLogs(clearDataBeforeReplay);
+      console.log('TriggerReplayLogs succeeded - replay started on daemon');
+      // Progress UI will update automatically from events
     } catch (error) {
-      console.error('Failed to start import:', error);
-      alert(`Failed to start import: ${error}`);
-      setIsImporting(false);
+      console.error('Failed to trigger replay:', error);
     }
-  };
-
-  const handleCancelImport = async () => {
-    try {
-      await CancelHistoricalImport();
-      setIsImporting(false);
-    } catch (error) {
-      console.error('Failed to cancel import:', error);
-      alert(`Failed to cancel import: ${error}`);
-    }
-  };
-
-  const toggleFileSelection = (index: number) => {
-    const updated = [...logFiles];
-    updated[index].Selected = !updated[index].Selected;
-    setLogFiles(updated);
   };
 
   return (
@@ -382,15 +377,95 @@ const Settings = () => {
 
           <div className="setting-item">
             <label className="setting-label">
-              Import Historical Logs
-              <span className="setting-description">Import your complete MTGA match history from existing log files</span>
+              Replay Historical Logs
+              <span className="setting-description">
+                Process all historical MTGA log files through the daemon. This replays logs chronologically
+                to ensure all game data, statistics, and quest progression are tracked correctly.
+              </span>
             </label>
             <div className="setting-control">
-              <button className="action-button primary" onClick={handleDiscoverLogs}>
-                Import Historical Data
+              <div style={{ marginBottom: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={clearDataBeforeReplay}
+                    onChange={(e) => setClearDataBeforeReplay(e.target.checked)}
+                    className="checkbox-input"
+                    disabled={isReplaying}
+                  />
+                  <span>Clear all data before replay (recommended for first-time setup)</span>
+                </label>
+              </div>
+              <button
+                className="action-button primary"
+                onClick={handleReplayLogs}
+                disabled={isReplaying || connectionStatus.status !== 'connected'}
+              >
+                {isReplaying ? 'Replaying Logs...' : 'Replay Historical Logs'}
               </button>
+              {connectionStatus.status !== 'connected' && (
+                <div className="setting-hint" style={{ color: '#ff6b6b', marginTop: '8px' }}>
+                  Daemon must be running to replay logs
+                </div>
+              )}
             </div>
           </div>
+
+          {(isReplaying || replayProgress) && (
+            <div className="setting-item">
+              <div className="replay-progress" style={{
+                background: '#2d2d2d',
+                padding: '16px',
+                borderRadius: '8px',
+                marginTop: '8px'
+              }}>
+                <h3 style={{ marginTop: 0, color: isReplaying ? '#4a9eff' : '#00ff00' }}>
+                  {isReplaying ? 'Replaying Historical Logs...' : '✓ Replay Complete'}
+                </h3>
+                {replayProgress && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                      <div>Files: {replayProgress.processedFiles || 0} / {replayProgress.totalFiles || 0}</div>
+                      <div>Entries: {replayProgress.totalEntries || 0}</div>
+                      <div>Matches: {replayProgress.matchesImported || 0}</div>
+                      <div>Decks: {replayProgress.decksImported || 0}</div>
+                      <div>Quests: {replayProgress.questsImported || 0}</div>
+                      {replayProgress.duration && (
+                        <div>Duration: {replayProgress.duration.toFixed(1)}s</div>
+                      )}
+                    </div>
+                    {replayProgress.currentFile && isReplaying && (
+                      <div style={{ fontSize: '0.9em', color: '#aaa' }}>
+                        Current: {replayProgress.currentFile}
+                      </div>
+                    )}
+                    {isReplaying && (
+                      <div style={{
+                        width: '100%',
+                        height: '8px',
+                        background: '#1e1e1e',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        marginTop: '12px'
+                      }}>
+                        <div style={{
+                          width: `${((replayProgress.processedFiles || 0) / (replayProgress.totalFiles || 1)) * 100}%`,
+                          height: '100%',
+                          background: '#4a9eff',
+                          transition: 'width 0.3s ease'
+                        }}></div>
+                      </div>
+                    )}
+                    {!isReplaying && (
+                      <div style={{ color: '#aaa', marginTop: '8px' }}>
+                        Page will refresh in 2 seconds to show imported data...
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="setting-item danger">
             <label className="setting-label">
@@ -468,99 +543,6 @@ const Settings = () => {
           </button>
         </div>
       </div>
-
-      {/* Historical Import Dialog */}
-      {showImportDialog && (
-        <div className="modal-overlay" onClick={() => !isImporting && setShowImportDialog(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Import Historical Logs</h2>
-              <button className="modal-close" onClick={() => !isImporting && setShowImportDialog(false)} disabled={isImporting}>×</button>
-            </div>
-            <div className="modal-body">
-              {!isImporting ? (
-                <>
-                  <p className="modal-description">
-                    Select log files to import. Files are sorted chronologically (oldest first).
-                  </p>
-                  <div className="log-files-list">
-                    {logFiles.length === 0 ? (
-                      <div className="no-files">No log files found</div>
-                    ) : (
-                      logFiles.map((file, index) => (
-                        <div key={index} className="log-file-item">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={file.Selected}
-                              onChange={() => toggleFileSelection(index)}
-                            />
-                            <span className="file-name">{file.Name}</span>
-                            <span className="file-info">
-                              {(file.Size / 1024 / 1024).toFixed(2)} MB • {file.ModTime ? new Date(file.ModTime as any).toLocaleDateString() : 'Unknown date'}
-                            </span>
-                          </label>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="import-progress">
-                  <h3>Importing...</h3>
-                  {importProgress && (
-                    <>
-                      <div className="progress-stats">
-                        <div className="stat">Files: {importProgress.ProcessedFiles} / {importProgress.TotalFiles}</div>
-                        <div className="stat">Current: {importProgress.CurrentFile}</div>
-                        <div className="stat">Entries: {importProgress.ProcessedEntries}</div>
-                        <div className="stat">Matches: {importProgress.MatchesImported}</div>
-                        <div className="stat">Decks: {importProgress.DecksImported}</div>
-                        <div className="stat">Quests: {importProgress.QuestsImported}</div>
-                      </div>
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${(importProgress.ProcessedFiles / importProgress.TotalFiles) * 100}%` }}
-                        ></div>
-                      </div>
-                      {importProgress.EstimatedTimeLeft > 0 && (
-                        <div className="progress-time">
-                          Estimated time remaining: {Math.ceil(importProgress.EstimatedTimeLeft / 1000000000 / 60)} minutes
-                        </div>
-                      )}
-                      {importProgress.Errors && importProgress.Errors.length > 0 && (
-                        <div className="progress-errors">
-                          <h4>Errors:</h4>
-                          {importProgress.Errors.map((error, i) => (
-                            <div key={i} className="error-item">{error}</div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              {!isImporting ? (
-                <>
-                  <button className="secondary-button" onClick={() => setShowImportDialog(false)}>
-                    Cancel
-                  </button>
-                  <button className="primary-button" onClick={handleStartImport}>
-                    Start Import
-                  </button>
-                </>
-              ) : (
-                <button className="danger-button" onClick={handleCancelImport}>
-                  Cancel Import
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* About Dialog */}
       <AboutDialog isOpen={showAbout} onClose={() => setShowAbout(false)} />
