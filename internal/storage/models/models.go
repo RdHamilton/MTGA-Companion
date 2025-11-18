@@ -316,3 +316,58 @@ type AchievementStats struct {
 	RecentlyCompleted     int // Completed in last 7 days
 	CloseToComplete       int // Within 90% of completion
 }
+
+// DraftSession represents a Quick Draft session parsed from MTGA logs.
+type DraftSession struct {
+	ID         string
+	EventName  string
+	SetCode    string
+	DraftType  string
+	StartTime  time.Time
+	EndTime    *time.Time
+	Status     string // "in_progress", "completed", "abandoned"
+	TotalPicks int
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// DraftPickSession represents a single pick made during a draft session.
+type DraftPickSession struct {
+	ID         int
+	SessionID  string
+	PackNumber int
+	PickNumber int
+	CardID     string
+	Timestamp  time.Time
+}
+
+// DraftPackSession represents the cards available in a pack during a draft.
+type DraftPackSession struct {
+	ID         int
+	SessionID  string
+	PackNumber int
+	PickNumber int
+	CardIDs    []string
+	Timestamp  time.Time
+}
+
+// SetCard represents a card from a specific MTG set, cached from Scryfall.
+type SetCard struct {
+	ID            int
+	SetCode       string
+	ArenaID       string
+	ScryfallID    string
+	Name          string
+	ManaCost      string
+	CMC           int
+	Types         []string
+	Colors        []string
+	Rarity        string
+	Text          string
+	Power         string
+	Toughness     string
+	ImageURL      string
+	ImageURLSmall string
+	ImageURLArt   string
+	FetchedAt     time.Time
+}

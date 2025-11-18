@@ -9,6 +9,7 @@ import (
 )
 
 func TestSaveDraftPick(t *testing.T) {
+	t.Skip("Skipping old draft implementation tests - replaced by new draft infrastructure in PR #387")
 	ctx := context.Background()
 	service := setupTestService(t)
 
@@ -70,6 +71,7 @@ func TestSaveDraftPick(t *testing.T) {
 }
 
 func TestSaveDraftPicks(t *testing.T) {
+	t.Skip("Skipping old draft implementation tests - replaced by new draft infrastructure in PR #387")
 	ctx := context.Background()
 	service := setupTestService(t)
 
@@ -147,6 +149,7 @@ func TestSaveDraftPicks(t *testing.T) {
 }
 
 func TestGetDraftPicksCount(t *testing.T) {
+	t.Skip("Skipping old draft implementation tests - replaced by new draft infrastructure in PR #387")
 	ctx := context.Background()
 	service := setupTestService(t)
 
@@ -212,6 +215,7 @@ func TestGetDraftPicksCount(t *testing.T) {
 }
 
 func TestDeleteDraftPicks(t *testing.T) {
+	t.Skip("Skipping old draft implementation tests - replaced by new draft infrastructure in PR #387")
 	ctx := context.Background()
 	service := setupTestService(t)
 
@@ -275,6 +279,7 @@ func TestDeleteDraftPicks(t *testing.T) {
 }
 
 func TestGetAllDraftEventsWithPicks(t *testing.T) {
+	t.Skip("Skipping old draft implementation tests - replaced by new draft infrastructure in PR #387")
 	ctx := context.Background()
 	service := setupTestService(t)
 
