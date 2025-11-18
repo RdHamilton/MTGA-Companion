@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
