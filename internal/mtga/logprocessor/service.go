@@ -297,19 +297,8 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 		return nil
 	}
 
-	// Log all unique node types we encounter for analysis
-	nodeTypesSeen := make(map[string]bool)
-	for _, state := range graphStates {
-		for _, node := range state.AllNodes {
-			if !nodeTypesSeen[node.NodeName] {
-				log.Printf("GraphState node discovered: %s (Status: %s)", node.NodeName, node.Status)
-				nodeTypesSeen[node.NodeName] = true
-			}
-		}
-	}
-
-	// TODO: Parse daily wins, weekly wins, and other progress from discovered nodes
-	// For now, we just log what's available for discovery
+	// TODO: Parse daily wins, weekly wins, and other progress from GraphState nodes
+	// For now, we skip processing until parsing logic is implemented
 
 	return nil
 }
