@@ -48,9 +48,9 @@ const Draft: React.FC = () => {
 
             // Load draft data
             const [picks, packs, setCards] = await Promise.all([
-                GetDraftPicks(session.id),
-                GetDraftPacks(session.id),
-                GetSetCards(session.set_code),
+                GetDraftPicks(session.ID),
+                GetDraftPacks(session.ID),
+                GetSetCards(session.SetCode),
             ]);
 
             setState({
@@ -76,7 +76,7 @@ const Draft: React.FC = () => {
     };
 
     const getPickedCardIds = (): Set<string> => {
-        return new Set(state.picks.map(pick => pick.card_id));
+        return new Set(state.picks.map(pick => pick.CardID));
     };
 
     if (state.loading) {
@@ -117,9 +117,9 @@ const Draft: React.FC = () => {
             <div className="draft-header">
                 <h1>Draft Assistant</h1>
                 <div className="draft-info">
-                    <span className="draft-event">{state.session.event_name}</span>
-                    <span className="draft-set">Set: {state.session.set_code}</span>
-                    <span className="draft-picks">Picks: {state.picks.length}/{state.session.total_picks || 45}</span>
+                    <span className="draft-event">{state.session.EventName}</span>
+                    <span className="draft-set">Set: {state.session.SetCode}</span>
+                    <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
                 </div>
             </div>
 
@@ -129,18 +129,18 @@ const Draft: React.FC = () => {
                     <h2>Set Cards ({state.setCards.length})</h2>
                     <div className="card-grid">
                         {state.setCards.map(card => {
-                            const isPicked = pickedCardIds.has(card.arena_id);
+                            const isPicked = pickedCardIds.has(card.ArenaID);
                             return (
                                 <div
-                                    key={card.id}
+                                    key={card.ID}
                                     className={`card-item ${isPicked ? 'picked' : ''}`}
                                     onMouseEnter={() => handleCardHover(card)}
                                     onMouseLeave={() => handleCardHover(null)}
                                 >
-                                    {card.image_url_small ? (
-                                        <img src={card.image_url_small} alt={card.name} />
+                                    {card.ImageURLSmall ? (
+                                        <img src={card.ImageURLSmall} alt={card.Name} />
                                     ) : (
-                                        <div className="card-placeholder">{card.name}</div>
+                                        <div className="card-placeholder">{card.Name}</div>
                                     )}
                                     {isPicked && <div className="picked-indicator">✓</div>}
                                 </div>
@@ -155,16 +155,16 @@ const Draft: React.FC = () => {
                     <div className="pick-history">
                         <h2>Pick History</h2>
                         <div className="pick-history-grid">
-                            {state.picks.map((pick, index) => {
-                                const card = state.setCards.find(c => c.arena_id === pick.card_id);
+                            {state.picks.map((pick) => {
+                                const card = state.setCards.find(c => c.ArenaID === pick.CardID);
                                 return (
-                                    <div key={pick.id} className="pick-history-item">
-                                        <div className="pick-number">P{pick.pack_number + 1}P{pick.pick_number + 1}</div>
-                                        {card && card.image_url_small && (
-                                            <img src={card.image_url_small} alt={card.name} title={card.name} />
+                                    <div key={pick.ID} className="pick-history-item">
+                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                        {card && card.ImageURLSmall && (
+                                            <img src={card.ImageURLSmall} alt={card.Name} title={card.Name} />
                                         )}
-                                        {card && !card.image_url_small && (
-                                            <div className="card-name-small">{card.name}</div>
+                                        {card && !card.ImageURLSmall && (
+                                            <div className="card-name-small">{card.Name}</div>
                                         )}
                                     </div>
                                 );
@@ -175,26 +175,26 @@ const Draft: React.FC = () => {
                     {/* Card Tooltip/Details */}
                     {selectedCard && (
                         <div className="card-details">
-                            <h3>{selectedCard.name}</h3>
-                            {selectedCard.image_url && (
-                                <img src={selectedCard.image_url} alt={selectedCard.name} className="card-detail-image" />
+                            <h3>{selectedCard.Name}</h3>
+                            {selectedCard.ImageURL && (
+                                <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
                             )}
                             <div className="card-stats">
                                 <div className="stat">
                                     <span className="stat-label">Mana Cost:</span>
-                                    <span className="stat-value">{selectedCard.mana_cost || 'N/A'}</span>
+                                    <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
                                 </div>
                                 <div className="stat">
                                     <span className="stat-label">Type:</span>
-                                    <span className="stat-value">{selectedCard.types || 'N/A'}</span>
+                                    <span className="stat-value">{selectedCard.Types || 'N/A'}</span>
                                 </div>
                                 <div className="stat">
                                     <span className="stat-label">Rarity:</span>
-                                    <span className="stat-value">{selectedCard.rarity}</span>
+                                    <span className="stat-value">{selectedCard.Rarity}</span>
                                 </div>
                             </div>
                             <div className="card-text">
-                                <p>{selectedCard.text}</p>
+                                <p>{selectedCard.Text}</p>
                             </div>
                         </div>
                     )}
