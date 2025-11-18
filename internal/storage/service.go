@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -671,6 +672,12 @@ func (s *Service) StoreDeckFromParser(ctx context.Context, deckID, name, format,
 		LastPlayed: lastPlayed,
 	}
 
+	if lastPlayed != nil {
+		log.Printf("[StoreDeck] Deck '%s' has LastPlayed: %v", name, *lastPlayed)
+	} else {
+		log.Printf("[StoreDeck] Deck '%s' has NO LastPlayed timestamp", name)
+	}
+
 	if description != "" {
 		deck.Description = &description
 	}
@@ -746,6 +753,8 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to get matches without deck IDs: %w", err)
 	}
 
+	log.Printf("[InferDeckIDs] Found %d matches without deck IDs", len(matchesNeedingDecks))
+
 	if len(matchesNeedingDecks) == 0 {
 		return 0, nil
 	}
@@ -756,6 +765,8 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to list decks: %w", err)
 	}
 
+	log.Printf("[InferDeckIDs] Found %d total decks in database", len(allDecks))
+
 	// Filter to decks that have LastPlayed timestamp
 	var decksWithTimestamp []*models.Deck
 	for _, deck := range allDecks {
@@ -764,7 +775,10 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		}
 	}
 
+	log.Printf("[InferDeckIDs] Found %d decks with LastPlayed timestamps", len(decksWithTimestamp))
+
 	if len(decksWithTimestamp) == 0 {
+		log.Printf("[InferDeckIDs] No decks have LastPlayed timestamps - cannot infer deck IDs")
 		return 0, nil
 	}
 
