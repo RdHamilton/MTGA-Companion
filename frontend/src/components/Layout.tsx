@@ -11,7 +11,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'charts'>('match-history');
+  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'draft' | 'charts'>('match-history');
   const [connectionStatus, setConnectionStatus] = useState<any>({
     status: 'standalone',
     connected: false
@@ -27,6 +27,8 @@ const Layout = ({ children }: LayoutProps) => {
       setActiveTab('quests');
     } else if (location.pathname === '/events') {
       setActiveTab('events');
+    } else if (location.pathname === '/draft') {
+      setActiveTab('draft');
     } else if (location.pathname.startsWith('/charts/')) {
       setActiveTab('charts');
     }
@@ -85,6 +87,13 @@ const Layout = ({ children }: LayoutProps) => {
             onClick={() => setActiveTab('events')}
           >
             Events
+          </Link>
+          <Link
+            to="/draft"
+            className={`tab ${activeTab === 'draft' ? 'active' : ''}`}
+            onClick={() => setActiveTab('draft')}
+          >
+            Draft
           </Link>
           <Link
             to="/charts/win-rate-trend"

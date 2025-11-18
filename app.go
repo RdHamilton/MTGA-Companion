@@ -1023,3 +1023,89 @@ func (a *App) ClearAllData() error {
 	log.Println("Successfully cleared all match history")
 	return nil
 }
+
+// ==================== Draft Methods ====================
+
+// GetActiveDraftSessions returns all active draft sessions.
+func (a *App) GetActiveDraftSessions() ([]*models.DraftSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	sessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get active draft sessions: %v", err)}
+	}
+
+	return sessions, nil
+}
+
+// GetDraftSession returns a draft session by ID.
+func (a *App) GetDraftSession(sessionID string) (*models.DraftSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft session: %v", err)}
+	}
+
+	return session, nil
+}
+
+// GetDraftPicks returns all picks for a draft session.
+func (a *App) GetDraftPicks(sessionID string) ([]*models.DraftPickSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft picks: %v", err)}
+	}
+
+	return picks, nil
+}
+
+// GetDraftPacks returns all packs for a draft session.
+func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	packs, err := a.service.DraftRepo().GetPacksBySession(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft packs: %v", err)}
+	}
+
+	return packs, nil
+}
+
+// GetSetCards returns all cards for a given set code.
+func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	cards, err := a.service.SetCardRepo().GetCardsBySet(a.ctx, setCode)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get set cards: %v", err)}
+	}
+
+	return cards, nil
+}
+
+// GetCardByArenaID returns a card by its Arena ID.
+func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	card, err := a.service.SetCardRepo().GetCardByArenaID(a.ctx, arenaID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card: %v", err)}
+	}
+
+	return card, nil
+}

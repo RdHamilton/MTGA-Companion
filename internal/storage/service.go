@@ -23,20 +23,26 @@ type Service struct {
 	accounts         repository.AccountRepository
 	rankHistory      repository.RankHistoryRepository
 	quests           *QuestRepository
+	draft            repository.DraftRepository
+	setCard          repository.SetCardRepository
+	draftRatings     repository.DraftRatingsRepository
 	currentAccountID int // Current active account ID
 }
 
 // NewService creates a new storage service.
 func NewService(db *DB) *Service {
 	svc := &Service{
-		db:          db,
-		matches:     repository.NewMatchRepository(db.Conn()),
-		stats:       repository.NewStatsRepository(db.Conn()),
-		decks:       repository.NewDeckRepository(db.Conn()),
-		collection:  repository.NewCollectionRepository(db.Conn()),
-		accounts:    repository.NewAccountRepository(db.Conn()),
-		rankHistory: repository.NewRankHistoryRepository(db.Conn()),
-		quests:      NewQuestRepository(db.Conn()),
+		db:           db,
+		matches:      repository.NewMatchRepository(db.Conn()),
+		stats:        repository.NewStatsRepository(db.Conn()),
+		decks:        repository.NewDeckRepository(db.Conn()),
+		collection:   repository.NewCollectionRepository(db.Conn()),
+		accounts:     repository.NewAccountRepository(db.Conn()),
+		rankHistory:  repository.NewRankHistoryRepository(db.Conn()),
+		quests:       NewQuestRepository(db.Conn()),
+		draft:        repository.NewDraftRepository(db.Conn()),
+		setCard:      repository.NewSetCardRepository(db.Conn()),
+		draftRatings: repository.NewDraftRatingsRepository(db.Conn()),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -1602,6 +1608,21 @@ func (s *Service) SetLastBulkDataUpdate(ctx context.Context, timestamp time.Time
 // Quests returns the quest repository for accessing quest data.
 func (s *Service) Quests() *QuestRepository {
 	return s.quests
+}
+
+// DraftRepo returns the draft repository.
+func (s *Service) DraftRepo() repository.DraftRepository {
+	return s.draft
+}
+
+// SetCardRepo returns the set card repository.
+func (s *Service) SetCardRepo() repository.SetCardRepository {
+	return s.setCard
+}
+
+// DraftRatingsRepo returns the draft ratings repository.
+func (s *Service) DraftRatingsRepo() repository.DraftRatingsRepository {
+	return s.draftRatings
 }
 
 // ClearAllMatches deletes all matches and games for the current account.

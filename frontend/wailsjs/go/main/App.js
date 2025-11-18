@@ -14,6 +14,10 @@ export function ExportToJSON() {
   return window['go']['main']['App']['ExportToJSON']();
 }
 
+export function GetActiveDraftSessions() {
+  return window['go']['main']['App']['GetActiveDraftSessions']();
+}
+
 export function GetActiveEvents() {
   return window['go']['main']['App']['GetActiveEvents']();
 }
@@ -22,12 +26,28 @@ export function GetActiveQuests() {
   return window['go']['main']['App']['GetActiveQuests']();
 }
 
+export function GetCardByArenaID(arg1) {
+  return window['go']['main']['App']['GetCardByArenaID'](arg1);
+}
+
 export function GetConnectionStatus() {
   return window['go']['main']['App']['GetConnectionStatus']();
 }
 
 export function GetCurrentAccount() {
   return window['go']['main']['App']['GetCurrentAccount']();
+}
+
+export function GetDraftPacks(arg1) {
+  return window['go']['main']['App']['GetDraftPacks'](arg1);
+}
+
+export function GetDraftPicks(arg1) {
+  return window['go']['main']['App']['GetDraftPicks'](arg1);
+}
+
+export function GetDraftSession(arg1) {
+  return window['go']['main']['App']['GetDraftSession'](arg1);
 }
 
 export function GetEventWinDistribution() {
@@ -56,6 +76,10 @@ export function GetRankProgression(arg1) {
 
 export function GetRankProgressionTimeline(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetRankProgressionTimeline'](arg1, arg2, arg3, arg4);
+}
+
+export function GetSetCards(arg1) {
+  return window['go']['main']['App']['GetSetCards'](arg1);
 }
 
 export function GetStats(arg1) {

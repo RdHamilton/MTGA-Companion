@@ -106,6 +106,134 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class DraftPackSession {
+	    ID: number;
+	    SessionID: string;
+	    PackNumber: number;
+	    PickNumber: number;
+	    CardIDs: string[];
+	    Timestamp: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftPackSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.SessionID = source["SessionID"];
+	        this.PackNumber = source["PackNumber"];
+	        this.PickNumber = source["PickNumber"];
+	        this.CardIDs = source["CardIDs"];
+	        this.Timestamp = this.convertValues(source["Timestamp"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DraftPickSession {
+	    ID: number;
+	    SessionID: string;
+	    PackNumber: number;
+	    PickNumber: number;
+	    CardID: string;
+	    Timestamp: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftPickSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.SessionID = source["SessionID"];
+	        this.PackNumber = source["PackNumber"];
+	        this.PickNumber = source["PickNumber"];
+	        this.CardID = source["CardID"];
+	        this.Timestamp = this.convertValues(source["Timestamp"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DraftSession {
+	    ID: string;
+	    EventName: string;
+	    SetCode: string;
+	    DraftType: string;
+	    StartTime: time.Time;
+	    EndTime?: time.Time;
+	    Status: string;
+	    TotalPicks: number;
+	    CreatedAt: time.Time;
+	    UpdatedAt: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.EventName = source["EventName"];
+	        this.SetCode = source["SetCode"];
+	        this.DraftType = source["DraftType"];
+	        this.StartTime = this.convertValues(source["StartTime"], time.Time);
+	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
+	        this.Status = source["Status"];
+	        this.TotalPicks = source["TotalPicks"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Match {
 	    ID: string;
 	    AccountID: number;
@@ -296,6 +424,68 @@ export namespace models {
 	        this.WinRateUsed = source["WinRateUsed"];
 	        this.Format = source["Format"];
 	        this.LastUpdated = this.convertValues(source["LastUpdated"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SetCard {
+	    ID: number;
+	    SetCode: string;
+	    ArenaID: string;
+	    ScryfallID: string;
+	    Name: string;
+	    ManaCost: string;
+	    CMC: number;
+	    Types: string[];
+	    Colors: string[];
+	    Rarity: string;
+	    Text: string;
+	    Power: string;
+	    Toughness: string;
+	    ImageURL: string;
+	    ImageURLSmall: string;
+	    ImageURLArt: string;
+	    FetchedAt: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.SetCode = source["SetCode"];
+	        this.ArenaID = source["ArenaID"];
+	        this.ScryfallID = source["ScryfallID"];
+	        this.Name = source["Name"];
+	        this.ManaCost = source["ManaCost"];
+	        this.CMC = source["CMC"];
+	        this.Types = source["Types"];
+	        this.Colors = source["Colors"];
+	        this.Rarity = source["Rarity"];
+	        this.Text = source["Text"];
+	        this.Power = source["Power"];
+	        this.Toughness = source["Toughness"];
+	        this.ImageURL = source["ImageURL"];
+	        this.ImageURLSmall = source["ImageURLSmall"];
+	        this.ImageURLArt = source["ImageURLArt"];
+	        this.FetchedAt = this.convertValues(source["FetchedAt"], time.Time);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

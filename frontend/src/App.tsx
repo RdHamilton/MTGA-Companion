@@ -9,6 +9,7 @@ import FormatDistribution from './pages/FormatDistribution';
 import ResultBreakdown from './pages/ResultBreakdown';
 import Quests from './pages/Quests';
 import Events from './pages/Events';
+import Draft from './pages/Draft';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import './App.css';
@@ -23,6 +24,7 @@ function App() {
           <Route path="/match-history" element={<MatchHistory />} />
           <Route path="/quests" element={<Quests />} />
           <Route path="/events" element={<Events />} />
+          <Route path="/draft" element={<Draft />} />
           <Route path="/charts/win-rate-trend" element={<WinRateTrend />} />
           <Route path="/charts/deck-performance" element={<DeckPerformance />} />
           <Route path="/charts/rank-progression" element={<RankProgression />} />
