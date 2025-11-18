@@ -1,0 +1,327 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+)
+
+// SetCardRepository provides methods for managing set cards cached from Scryfall.
+type SetCardRepository interface {
+	// SaveCard saves a set card to the database.
+	SaveCard(ctx context.Context, card *models.SetCard) error
+
+	// SaveCards saves multiple set cards in a batch.
+	SaveCards(ctx context.Context, cards []*models.SetCard) error
+
+	// GetCardByArenaID retrieves a card by its Arena ID.
+	GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error)
+
+	// GetCardsBySet retrieves all cards for a given set code.
+	GetCardsBySet(ctx context.Context, setCode string) ([]*models.SetCard, error)
+
+	// IsSetCached checks if a set has been cached.
+	IsSetCached(ctx context.Context, setCode string) (bool, error)
+
+	// GetCachedSets returns a list of all cached set codes.
+	GetCachedSets(ctx context.Context) ([]string, error)
+
+	// DeleteSet removes all cards for a given set (for cache invalidation).
+	DeleteSet(ctx context.Context, setCode string) error
+}
+
+type setCardRepository struct {
+	db *sql.DB
+}
+
+// NewSetCardRepository creates a new set card repository.
+func NewSetCardRepository(db *sql.DB) SetCardRepository {
+	return &setCardRepository{db: db}
+}
+
+// SaveCard saves a set card to the database.
+func (r *setCardRepository) SaveCard(ctx context.Context, card *models.SetCard) error {
+	// Marshal arrays to JSON
+	typesJSON, err := json.Marshal(card.Types)
+	if err != nil {
+		return err
+	}
+
+	colorsJSON, err := json.Marshal(card.Colors)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		INSERT INTO set_cards (
+			set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(set_code, arena_id) DO UPDATE SET
+			scryfall_id = excluded.scryfall_id,
+			name = excluded.name,
+			mana_cost = excluded.mana_cost,
+			cmc = excluded.cmc,
+			types = excluded.types,
+			colors = excluded.colors,
+			rarity = excluded.rarity,
+			text = excluded.text,
+			power = excluded.power,
+			toughness = excluded.toughness,
+			image_url = excluded.image_url,
+			image_url_small = excluded.image_url_small,
+			image_url_art = excluded.image_url_art,
+			fetched_at = excluded.fetched_at
+	`
+	result, err := r.db.ExecContext(ctx, query,
+		card.SetCode,
+		card.ArenaID,
+		card.ScryfallID,
+		card.Name,
+		card.ManaCost,
+		card.CMC,
+		string(typesJSON),
+		string(colorsJSON),
+		card.Rarity,
+		card.Text,
+		card.Power,
+		card.Toughness,
+		card.ImageURL,
+		card.ImageURLSmall,
+		card.ImageURLArt,
+		card.FetchedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err == nil {
+		card.ID = int(id)
+	}
+
+	return nil
+}
+
+// SaveCards saves multiple set cards in a batch.
+func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCard) error {
+	// Start a transaction for batch insert
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO set_cards (
+			set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(set_code, arena_id) DO UPDATE SET
+			scryfall_id = excluded.scryfall_id,
+			name = excluded.name,
+			mana_cost = excluded.mana_cost,
+			cmc = excluded.cmc,
+			types = excluded.types,
+			colors = excluded.colors,
+			rarity = excluded.rarity,
+			text = excluded.text,
+			power = excluded.power,
+			toughness = excluded.toughness,
+			image_url = excluded.image_url,
+			image_url_small = excluded.image_url_small,
+			image_url_art = excluded.image_url_art,
+			fetched_at = excluded.fetched_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, card := range cards {
+		typesJSON, err := json.Marshal(card.Types)
+		if err != nil {
+			return err
+		}
+
+		colorsJSON, err := json.Marshal(card.Colors)
+		if err != nil {
+			return err
+		}
+
+		_, err = stmt.ExecContext(ctx,
+			card.SetCode,
+			card.ArenaID,
+			card.ScryfallID,
+			card.Name,
+			card.ManaCost,
+			card.CMC,
+			string(typesJSON),
+			string(colorsJSON),
+			card.Rarity,
+			card.Text,
+			card.Power,
+			card.Toughness,
+			card.ImageURL,
+			card.ImageURLSmall,
+			card.ImageURLArt,
+			card.FetchedAt,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetCardByArenaID retrieves a card by its Arena ID.
+func (r *setCardRepository) GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error) {
+	query := `
+		SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+		FROM set_cards
+		WHERE arena_id = ?
+		LIMIT 1
+	`
+	row := r.db.QueryRowContext(ctx, query, arenaID)
+
+	card := &models.SetCard{}
+	var typesJSON, colorsJSON string
+
+	err := row.Scan(
+		&card.ID,
+		&card.SetCode,
+		&card.ArenaID,
+		&card.ScryfallID,
+		&card.Name,
+		&card.ManaCost,
+		&card.CMC,
+		&typesJSON,
+		&colorsJSON,
+		&card.Rarity,
+		&card.Text,
+		&card.Power,
+		&card.Toughness,
+		&card.ImageURL,
+		&card.ImageURLSmall,
+		&card.ImageURLArt,
+		&card.FetchedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// Parse JSON arrays
+	if err := json.Unmarshal([]byte(typesJSON), &card.Types); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(colorsJSON), &card.Colors); err != nil {
+		return nil, err
+	}
+
+	return card, nil
+}
+
+// GetCardsBySet retrieves all cards for a given set code.
+func (r *setCardRepository) GetCardsBySet(ctx context.Context, setCode string) ([]*models.SetCard, error) {
+	query := `
+		SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+		FROM set_cards
+		WHERE set_code = ?
+		ORDER BY name
+	`
+	rows, err := r.db.QueryContext(ctx, query, setCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cards := []*models.SetCard{}
+	for rows.Next() {
+		card := &models.SetCard{}
+		var typesJSON, colorsJSON string
+
+		err := rows.Scan(
+			&card.ID,
+			&card.SetCode,
+			&card.ArenaID,
+			&card.ScryfallID,
+			&card.Name,
+			&card.ManaCost,
+			&card.CMC,
+			&typesJSON,
+			&colorsJSON,
+			&card.Rarity,
+			&card.Text,
+			&card.Power,
+			&card.Toughness,
+			&card.ImageURL,
+			&card.ImageURLSmall,
+			&card.ImageURLArt,
+			&card.FetchedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse JSON arrays
+		if err := json.Unmarshal([]byte(typesJSON), &card.Types); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(colorsJSON), &card.Colors); err != nil {
+			return nil, err
+		}
+
+		cards = append(cards, card)
+	}
+
+	return cards, rows.Err()
+}
+
+// IsSetCached checks if a set has been cached.
+func (r *setCardRepository) IsSetCached(ctx context.Context, setCode string) (bool, error) {
+	query := `SELECT COUNT(*) FROM set_cards WHERE set_code = ?`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, setCode).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// GetCachedSets returns a list of all cached set codes.
+func (r *setCardRepository) GetCachedSets(ctx context.Context) ([]string, error) {
+	query := `SELECT DISTINCT set_code FROM set_cards ORDER BY set_code`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sets := []string{}
+	for rows.Next() {
+		var setCode string
+		if err := rows.Scan(&setCode); err != nil {
+			return nil, err
+		}
+		sets = append(sets, setCode)
+	}
+
+	return sets, rows.Err()
+}
+
+// DeleteSet removes all cards for a given set (for cache invalidation).
+func (r *setCardRepository) DeleteSet(ctx context.Context, setCode string) error {
+	query := `DELETE FROM set_cards WHERE set_code = ?`
+	_, err := r.db.ExecContext(ctx, query, setCode)
+	return err
+}
