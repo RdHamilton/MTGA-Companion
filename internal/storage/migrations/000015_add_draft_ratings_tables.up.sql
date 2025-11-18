@@ -1,3 +1,7 @@
+-- Drop old draft ratings tables if they exist (from migration 000007)
+DROP TABLE IF EXISTS draft_card_ratings;
+DROP TABLE IF EXISTS draft_color_ratings;
+
 -- Create draft_card_ratings table for caching 17Lands card performance data
 CREATE TABLE IF NOT EXISTS draft_card_ratings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

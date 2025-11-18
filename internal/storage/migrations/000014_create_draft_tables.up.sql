@@ -1,3 +1,6 @@
+-- Drop old draft tables if they exist (from migrations 000005 and earlier)
+DROP TABLE IF EXISTS draft_picks;
+
 -- Create draft_sessions table
 CREATE TABLE IF NOT EXISTS draft_sessions (
     id TEXT PRIMARY KEY,
