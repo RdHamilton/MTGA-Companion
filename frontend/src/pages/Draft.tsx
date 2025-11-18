@@ -155,7 +155,7 @@ const Draft: React.FC = () => {
                     <div className="historical-drafts">
                         <div className="drafts-grid">
                             {historicalState.sessions.map((session) => {
-                                const startDate = new Date(session.StartTime);
+                                const startDate = new Date(session.StartTime as any);
                                 const formattedDate = startDate.toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
