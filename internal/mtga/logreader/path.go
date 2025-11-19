@@ -10,25 +10,27 @@ import (
 )
 
 // DefaultLogPath returns the most recent MTGA log file path for the current platform.
-// It checks multiple locations and prioritizes UTC_Log files over Player.log.
+// It checks multiple locations and prioritizes Player.log over UTC_Log files.
+// Player.log contains gameplay events (matches, drafts, picks) while UTC_Log files
+// contain session/connection events.
 // It returns an error if the platform is unsupported or no log files are found.
 func DefaultLogPath() (string, error) {
 	logDirs := getLogDirectories()
 
-	// Try to find the most recent UTC_Log file in all directories
-	for _, logDir := range logDirs {
-		utcLogPath, err := findMostRecentUTCLog(logDir)
-		if err == nil {
-			return utcLogPath, nil
-		}
-	}
-
-	// Fall back to Player.log in any of the directories
+	// Try to find Player.log first (contains gameplay events including draft picks)
 	for _, logDir := range logDirs {
 		playerLogPath := filepath.Join(logDir, "Player.log")
 		exists, err := LogExists(playerLogPath)
 		if err == nil && exists {
 			return playerLogPath, nil
+		}
+	}
+
+	// Fall back to the most recent UTC_Log file in any of the directories
+	for _, logDir := range logDirs {
+		utcLogPath, err := findMostRecentUTCLog(logDir)
+		if err == nil {
+			return utcLogPath, nil
 		}
 	}
 
