@@ -76,6 +76,10 @@ func (s *Service) Start() error {
 		log.Printf("Warning: Startup recovery failed: %v", err)
 	}
 
+	// Start UTC_Log monitoring in background
+	// This detects and processes new UTC_Log files created during daemon runtime (Phase 2)
+	go s.monitorUTCLogs()
+
 	// Create and start log poller
 	pollerConfig := logreader.DefaultPollerConfig(logPath)
 	pollerConfig.Interval = s.config.PollInterval
@@ -710,6 +714,107 @@ func (s *Service) StartupRecovery() error {
 			processedCount, totalEntries, totalMatches, skippedCount)
 	} else {
 		log.Printf("Startup recovery complete: all %d file(s) already processed, no new data to recover", skippedCount)
+	}
+
+	return nil
+}
+
+// monitorUTCLogs runs in the background and periodically checks for new UTC_Log files.
+// When MTGA rotates logs (creates new session files), this detector captures and processes them.
+// This prevents data loss during long daemon uptime when MTGA creates new UTC_Log files.
+func (s *Service) monitorUTCLogs() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	log.Println("UTC_Log monitoring started (checking every 5 minutes)")
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := s.checkForNewLogFiles(); err != nil {
+				log.Printf("Warning: UTC_Log check failed: %v", err)
+			}
+		case <-s.ctx.Done():
+			log.Println("UTC_Log monitoring stopped")
+			return
+		}
+	}
+}
+
+// checkForNewLogFiles discovers and processes any unprocessed log files.
+// This is similar to StartupRecovery but runs periodically during daemon uptime.
+// It only processes UTC_Log files (not Player.log or Player-prev.log).
+func (s *Service) checkForNewLogFiles() error {
+	logFiles, err := s.discoverLogFiles()
+	if err != nil {
+		return fmt.Errorf("failed to discover log files: %w", err)
+	}
+
+	processedCount := 0
+
+	for _, logFile := range logFiles {
+		// Skip Player.log (monitored by poller) and Player-prev.log (handled by startup recovery)
+		if logFile.Name == "Player.log" || logFile.Name == "Player-prev.log" {
+			continue
+		}
+
+		// Only process UTC_Log files
+		if !strings.HasPrefix(logFile.Name, "UTC_Log") {
+			continue
+		}
+
+		// Check if already processed
+		alreadyProcessed, err := s.storage.HasProcessedLogFile(s.ctx, logFile.Name)
+		if err != nil {
+			log.Printf("Warning: Failed to check if %s was processed: %v", logFile.Name, err)
+			continue
+		}
+
+		if alreadyProcessed {
+			continue
+		}
+
+		// New UTC_Log file detected!
+		log.Printf("New UTC_Log file detected: %s", logFile.Name)
+
+		// Process it (same logic as StartupRecovery)
+		entries, err := s.readLogFile(logFile.Path)
+		if err != nil {
+			log.Printf("Warning: Failed to read %s: %v", logFile.Name, err)
+			continue
+		}
+
+		if len(entries) == 0 {
+			log.Printf("Skipping %s (no entries found)", logFile.Name)
+			continue
+		}
+
+		result, err := s.logProcessor.ProcessLogEntries(s.ctx, entries)
+		if err != nil {
+			log.Printf("Warning: Failed to process %s: %v", logFile.Name, err)
+			continue
+		}
+
+		fileInfo, err := os.Stat(logFile.Path)
+		var fileSizeBytes int64
+		if err == nil {
+			fileSizeBytes = fileInfo.Size()
+		}
+
+		err = s.storage.MarkLogFileProcessed(s.ctx, logFile.Name, len(entries), result.MatchesStored, fileSizeBytes)
+		if err != nil {
+			log.Printf("Warning: Failed to mark %s as processed: %v", logFile.Name, err)
+			// Continue anyway - we've already processed the data
+		}
+
+		log.Printf("✓ Processed new UTC_Log: %s (%d entries, %d matches, %d decks, %d quests)",
+			logFile.Name, len(entries), result.MatchesStored, result.DecksStored, result.QuestsStored)
+
+		processedCount++
+	}
+
+	if processedCount > 0 {
+		log.Printf("UTC_Log check: processed %d new file(s)", processedCount)
 	}
 
 	return nil

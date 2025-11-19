@@ -460,6 +460,7 @@ export namespace models {
 	    rewards: string;
 	    assigned_at: time.Time;
 	    completed_at?: time.Time;
+	    last_seen_at?: time.Time;
 	    rerolled: boolean;
 	    created_at: time.Time;
 	
@@ -480,6 +481,7 @@ export namespace models {
 	        this.rewards = source["rewards"];
 	        this.assigned_at = this.convertValues(source["assigned_at"], time.Time);
 	        this.completed_at = this.convertValues(source["completed_at"], time.Time);
+	        this.last_seen_at = this.convertValues(source["last_seen_at"], time.Time);
 	        this.rerolled = source["rerolled"];
 	        this.created_at = this.convertValues(source["created_at"], time.Time);
 	    }
