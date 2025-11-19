@@ -86,6 +86,10 @@ export function GetDraftSession(arg1) {
   return window['go']['main']['App']['GetDraftSession'](arg1);
 }
 
+export function GetDraftWinRatePrediction(arg1) {
+  return window['go']['main']['App']['GetDraftWinRatePrediction'](arg1);
+}
+
 export function GetEventWinDistribution() {
   return window['go']['main']['App']['GetEventWinDistribution']();
 }
@@ -144,6 +148,10 @@ export function ImportFromFile() {
 
 export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
+}
+
+export function PredictDraftWinRate(arg1) {
+  return window['go']['main']['App']['PredictDraftWinRate'](arg1);
 }
 
 export function ReconnectToDaemon() {

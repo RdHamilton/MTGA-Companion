@@ -1,0 +1,372 @@
+.win-rate-prediction {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+
+.win-rate-prediction.compact {
+  padding: 0;
+  display: inline-flex;
+}
+
+/* Badge style for compact mode */
+.win-rate-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid;
+  background: #2d2d2d;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.win-rate-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.win-rate-value {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.win-rate-label {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* Card style for full mode */
+.prediction-card {
+  background: #2d2d2d;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.prediction-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+.prediction-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+.win-rate-display {
+  margin-bottom: 16px;
+}
+
+.win-rate-main {
+  font-size: 64px;
+  font-weight: bold;
+  line-height: 1;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.win-rate-range {
+  font-size: 16px;
+  color: #aaa;
+  margin-bottom: 16px;
+}
+
+.win-rate-explanation {
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.prediction-hint {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.predict-button {
+  background: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.predict-button:hover {
+  background: #3a8eef;
+  transform: translateY(-2px);
+}
+
+.predict-button:active {
+  transform: translateY(0);
+}
+
+.loading,
+.error {
+  color: #aaaaaa;
+  font-size: 14px;
+  text-align: center;
+}
+
+.error {
+  color: #ff4444;
+}
+
+/* Modal styles */
+.prediction-modal {
+  max-width: 800px;
+}
+
+.prediction-summary {
+  text-align: center;
+  padding: 24px;
+  margin-bottom: 24px;
+  background: #1e1e1e;
+  border-radius: 8px;
+}
+
+.predicted-win-rate-large {
+  font-size: 72px;
+  font-weight: bold;
+  line-height: 1;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #4a9eff 0%, #44ff88 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.confidence-interval {
+  font-size: 18px;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+.confidence-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(74, 158, 255, 0.2);
+  color: #4a9eff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.explanation-section {
+  padding: 16px;
+  margin-bottom: 24px;
+  background: rgba(74, 158, 255, 0.1);
+  border-left: 3px solid #4a9eff;
+  border-radius: 4px;
+}
+
+.explanation-text {
+  margin: 0;
+  color: #ddd;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.factors-section {
+  margin-bottom: 24px;
+}
+
+.factors-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: white;
+}
+
+.factor-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #1e1e1e;
+  border-radius: 6px;
+}
+
+.factor-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.factor-value {
+  font-weight: bold;
+  color: #4a9eff;
+  font-size: 16px;
+}
+
+.performers-section {
+  margin-bottom: 24px;
+}
+
+.performers-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: white;
+}
+
+.performers-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.performer-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.performer-item.premium {
+  background: rgba(68, 255, 136, 0.1);
+  border-left: 3px solid #44ff88;
+  color: #eee;
+}
+
+.performer-item.weak {
+  background: rgba(255, 68, 68, 0.1);
+  border-left: 3px solid #ff4444;
+  color: #eee;
+}
+
+.distribution-section {
+  margin-bottom: 24px;
+}
+
+.distribution-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: white;
+}
+
+.color-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.color-label {
+  flex: 0 0 30px;
+  font-weight: bold;
+  color: #fff;
+  font-size: 14px;
+}
+
+.bar-container {
+  flex: 1;
+  height: 24px;
+  background: #1e1e1e;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.color-count {
+  flex: 0 0 40px;
+  text-align: right;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.curve-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 200px;
+  padding: 16px;
+  background: #1e1e1e;
+  border-radius: 8px;
+  gap: 8px;
+}
+
+.curve-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.curve-bar-fill {
+  width: 100%;
+  background: linear-gradient(to top, #4a9eff, #44ff88);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s ease;
+}
+
+.curve-label {
+  font-size: 12px;
+  color: #aaa;
+  font-weight: bold;
+}
+
+.curve-count {
+  font-size: 11px;
+  color: #888;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .prediction-modal {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .predicted-win-rate-large {
+    font-size: 56px;
+  }
+
+  .performers-list {
+    grid-template-columns: 1fr;
+  }
+
+  .curve-chart {
+    height: 150px;
+  }
+
+  .win-rate-main {
+    font-size: 48px;
+  }
+}

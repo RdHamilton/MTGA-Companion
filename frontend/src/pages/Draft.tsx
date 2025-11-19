@@ -4,6 +4,7 @@ import { models, pickquality, grading } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';
+import { WinRatePrediction } from '../components/WinRatePrediction';
 import './Draft.css';
 
 interface DraftState {
@@ -296,14 +297,23 @@ const Draft: React.FC = () => {
                         <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
                     </div>
                     {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
-                        <DraftGrade
-                            sessionID={historicalDetailState.session.ID}
-                            showCalculateButton={true}
-                            onGradeCalculated={async (grade) => {
-                                // Reload the grade to refresh best/worst pick highlighting
-                                setHistoricalDetailState(prev => ({ ...prev, grade }));
-                            }}
-                        />
+                        <>
+                            <DraftGrade
+                                sessionID={historicalDetailState.session.ID}
+                                showCalculateButton={true}
+                                onGradeCalculated={async (grade) => {
+                                    // Reload the grade to refresh best/worst pick highlighting
+                                    setHistoricalDetailState(prev => ({ ...prev, grade }));
+                                }}
+                            />
+                            <WinRatePrediction
+                                sessionID={historicalDetailState.session.ID}
+                                showPredictButton={true}
+                                onPredictionCalculated={(pred) => {
+                                    console.log('Prediction calculated:', pred);
+                                }}
+                            />
+                        </>
                     )}
                 </div>
 
@@ -521,6 +531,7 @@ const Draft: React.FC = () => {
                                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                 <span className="draft-set-badge">{session.SetCode}</span>
                                                 <DraftGrade sessionID={session.ID} compact={true} />
+                                                <WinRatePrediction sessionID={session.ID} compact={true} />
                                             </div>
                                         </div>
                                         <div className="draft-card-info">
