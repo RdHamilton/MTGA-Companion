@@ -9,20 +9,20 @@ import (
 
 // PredictionFactors contains the breakdown of how the win rate was predicted
 type PredictionFactors struct {
-	DeckAverageGIHWR    float64            `json:"deck_average_gihwr"`    // Average GIHWR of all cards
-	ColorAdjustment     float64            `json:"color_adjustment"`      // Multiplier based on color combination
-	CurveScore          float64            `json:"curve_score"`           // Quality of mana curve (0-1)
-	BombBonus           float64            `json:"bomb_bonus"`            // Bonus from premium cards
-	SynergyScore        float64            `json:"synergy_score"`         // Card synergy rating (0-1)
-	BaselineWinRate     float64            `json:"baseline_win_rate"`     // Format average (0.50)
-	Explanation         string             `json:"explanation"`           // Human-readable summary
-	CardBreakdown       map[string]float64 `json:"card_breakdown"`        // Card name -> GIHWR
-	ColorDistribution   map[string]int     `json:"color_distribution"`    // Color -> count
-	CurveDistribution   map[int]int        `json:"curve_distribution"`    // CMC -> count
-	TotalCards          int                `json:"total_cards"`           // Number of cards analyzed
-	HighPerformers      []string           `json:"high_performers"`       // Top 5 cards by GIHWR
-	LowPerformers       []string           `json:"low_performers"`        // Bottom 5 cards by GIHWR
-	ConfidenceLevel     string             `json:"confidence_level"`      // "high", "medium", "low"
+	DeckAverageGIHWR  float64            `json:"deck_average_gihwr"` // Average GIHWR of all cards
+	ColorAdjustment   float64            `json:"color_adjustment"`   // Multiplier based on color combination
+	CurveScore        float64            `json:"curve_score"`        // Quality of mana curve (0-1)
+	BombBonus         float64            `json:"bomb_bonus"`         // Bonus from premium cards
+	SynergyScore      float64            `json:"synergy_score"`      // Card synergy rating (0-1)
+	BaselineWinRate   float64            `json:"baseline_win_rate"`  // Format average (0.50)
+	Explanation       string             `json:"explanation"`        // Human-readable summary
+	CardBreakdown     map[string]float64 `json:"card_breakdown"`     // Card name -> GIHWR
+	ColorDistribution map[string]int     `json:"color_distribution"` // Color -> count
+	CurveDistribution map[int]int        `json:"curve_distribution"` // CMC -> count
+	TotalCards        int                `json:"total_cards"`        // Number of cards analyzed
+	HighPerformers    []string           `json:"high_performers"`    // Top 5 cards by GIHWR
+	LowPerformers     []string           `json:"low_performers"`     // Bottom 5 cards by GIHWR
+	ConfidenceLevel   string             `json:"confidence_level"`   // "high", "medium", "low"
 }
 
 // DeckPrediction contains the complete win rate prediction
@@ -36,10 +36,10 @@ type DeckPrediction struct {
 
 // Card represents a card in the draft deck with its ratings
 type Card struct {
-	Name  string
-	CMC   int
-	Color string
-	GIHWR float64
+	Name   string
+	CMC    int
+	Color  string
+	GIHWR  float64
 	Rarity string
 }
 
@@ -51,7 +51,7 @@ const (
 	bombThreshold = 0.60 // 60% GIHWR is considered a bomb
 
 	// Color combination adjustments (simplified for now)
-	twoColorBonus = 0.02  // Focused 2-color deck
+	twoColorBonus     = 0.02  // Focused 2-color deck
 	threeColorPenalty = -0.01 // 3+ color deck penalty
 
 	// Confidence intervals
