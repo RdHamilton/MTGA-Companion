@@ -239,7 +239,6 @@ const Draft: React.FC = () => {
                                         key={card.ID}
                                         className="card-item picked"
                                         onMouseEnter={() => handleCardHover(card)}
-                                        onMouseLeave={() => handleCardHover(null)}
                                     >
                                         {card.ImageURLSmall ? (
                                             <img src={card.ImageURLSmall} alt={card.Name} />
@@ -270,7 +269,6 @@ const Draft: React.FC = () => {
                                                     alt={card.Name}
                                                     title={card.Name}
                                                     onMouseEnter={() => handleCardHover(card)}
-                                                    onMouseLeave={() => handleCardHover(null)}
                                                 />
                                             )}
                                             {card && !card.ImageURLSmall && (
@@ -444,7 +442,6 @@ const Draft: React.FC = () => {
                                     key={card.ID}
                                     className={`card-item ${isPicked ? 'picked' : ''}`}
                                     onMouseEnter={() => handleCardHover(card)}
-                                    onMouseLeave={() => handleCardHover(null)}
                                 >
                                     {card.ImageURLSmall ? (
                                         <img src={card.ImageURLSmall} alt={card.Name} />
@@ -475,7 +472,6 @@ const Draft: React.FC = () => {
                                                 alt={card.Name}
                                                 title={card.Name}
                                                 onMouseEnter={() => handleCardHover(card)}
-                                                onMouseLeave={() => handleCardHover(null)}
                                             />
                                         )}
                                         {card && !card.ImageURLSmall && (
