@@ -135,12 +135,13 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 /* Pick History */
 .pick-history {
     flex: 0 0 auto;
+    min-height: 0;
 }
 
 .pick-history h2 {

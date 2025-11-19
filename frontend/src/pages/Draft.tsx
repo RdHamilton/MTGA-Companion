@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
+import TierList from '../components/TierList';
 import './Draft.css';
 
 interface DraftState {
@@ -456,7 +457,7 @@ const Draft: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Right: Pick History */}
+                {/* Right: Pick History and Tier List */}
                 <div className="draft-details-section">
                     {/* Pick History */}
                     <div className="pick-history">
@@ -484,6 +485,19 @@ const Draft: React.FC = () => {
                             })}
                         </div>
                     </div>
+
+                    {/* Tier List */}
+                    <TierList
+                        setCode={state.session.SetCode}
+                        draftFormat={state.session.EventName}
+                        pickedCardIds={pickedCardIds}
+                        onCardClick={(arenaId) => {
+                            const card = state.setCards.find(c => c.ArenaID === String(arenaId));
+                            if (card) {
+                                handleCardHover(card);
+                            }
+                        }}
+                    />
                 </div>
 
                 {/* Card Details Overlay */}
