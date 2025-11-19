@@ -188,34 +188,52 @@
     justify-content: center;
 }
 
-/* Card Details - Compact Stats Panel */
-.card-details {
-    flex: 1;
+/* Card Details - Popup Overlay */
+.card-details-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background-color: #2d2d2d;
     border-radius: 12px;
-    padding: 20px;
+    padding: 24px;
+    max-width: 500px;
+    max-height: 90vh;
     overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    border: 2px solid #4a9eff;
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.card-details h3 {
+.card-details-overlay-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+}
+
+.card-details-overlay h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 600;
     color: #ffffff;
     padding-bottom: 12px;
     border-bottom: 2px solid #4a9eff;
 }
 
-.card-detail-type {
+.card-details-overlay .card-detail-type {
     font-size: 14px;
     color: #aaaaaa;
     margin: 0;
 }
 
-.card-detail-set {
+.card-details-overlay .card-detail-set {
     font-size: 13px;
     color: #888888;
     display: flex;
@@ -223,13 +241,13 @@
     gap: 6px;
 }
 
-.card-stats-section {
+.card-details-overlay .card-stats-section {
     background-color: #1e1e1e;
     border-radius: 8px;
     padding: 16px;
 }
 
-.card-stats-section h4 {
+.card-details-overlay .card-stats-section h4 {
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
@@ -238,19 +256,19 @@
     letter-spacing: 0.5px;
 }
 
-.card-stats {
+.card-details-overlay .card-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
 
-.stat {
+.card-details-overlay .stat {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.stat-label {
+.card-details-overlay .stat-label {
     color: #888888;
     font-size: 11px;
     font-weight: 500;
@@ -258,13 +276,13 @@
     letter-spacing: 0.5px;
 }
 
-.stat-value {
+.card-details-overlay .stat-value {
     color: #ffffff;
     font-size: 16px;
     font-weight: 600;
 }
 
-.card-text {
+.card-details-overlay .card-text {
     background-color: #1e1e1e;
     border-radius: 8px;
     padding: 12px;
@@ -273,13 +291,13 @@
     color: #cccccc;
 }
 
-.card-text p {
+.card-details-overlay .card-text p {
     margin: 0;
 }
 
-.card-detail-image {
+.card-details-overlay .card-detail-image {
     width: 100%;
-    max-width: 240px;
+    max-width: 320px;
     border-radius: 8px;
     margin: 0 auto;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -353,28 +371,28 @@
 /* Scrollbar Styling */
 .card-grid::-webkit-scrollbar,
 .pick-history-grid::-webkit-scrollbar,
-.card-details::-webkit-scrollbar {
+.card-details-overlay::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 .card-grid::-webkit-scrollbar-track,
 .pick-history-grid::-webkit-scrollbar-track,
-.card-details::-webkit-scrollbar-track {
+.card-details-overlay::-webkit-scrollbar-track {
     background: #1e1e1e;
     border-radius: 4px;
 }
 
 .card-grid::-webkit-scrollbar-thumb,
 .pick-history-grid::-webkit-scrollbar-thumb,
-.card-details::-webkit-scrollbar-thumb {
+.card-details-overlay::-webkit-scrollbar-thumb {
     background: #4a9eff;
     border-radius: 4px;
 }
 
 .card-grid::-webkit-scrollbar-thumb:hover,
 .pick-history-grid::-webkit-scrollbar-thumb:hover,
-.card-details::-webkit-scrollbar-thumb:hover {
+.card-details-overlay::-webkit-scrollbar-thumb:hover {
     background: #5ab0ff;
 }
 
