@@ -506,31 +506,86 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 
 	log.Printf("Collected %d total entries from %d files", len(allEntries), len(logFiles))
 
-	// Step 5: Process all entries in one batch to maintain parser state
+	// Step 5: Enable bulk import mode for faster processing
+	log.Println("Enabling bulk import mode for faster processing...")
+	bulkSettings, err := s.storage.EnableBulkImportMode(s.ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to enable bulk import mode: %v", err)
+		// Continue anyway with normal mode
+	}
+
+	// Ensure we restore safe mode even if processing fails
+	defer func() {
+		if bulkSettings != nil {
+			if err := s.storage.RestoreSafeMode(s.ctx, bulkSettings); err != nil {
+				log.Printf("Error restoring safe mode: %v", err)
+			}
+		}
+	}()
+
+	// Step 6: Process entries in chunks to show incremental progress
 	// This is critical for quest completion detection, which relies on seeing
 	// quests disappear from subsequent QuestGetQuests responses
 	log.Println("Processing all entries through business logic...")
-	s.wsServer.Broadcast(Event{
-		Type: "replay:progress",
-		Data: map[string]interface{}{
-			"totalFiles":     len(logFiles),
-			"processedFiles": len(logFiles),
-			"currentFile":    "Processing all entries...",
-			"totalEntries":   len(allEntries),
-		},
-	})
 
-	result, err := s.logProcessor.ProcessLogEntries(s.ctx, allEntries)
-	if err != nil {
+	chunkSize := 5000 // Process 5000 entries at a time
+	totalChunks := (len(allEntries) + chunkSize - 1) / chunkSize
+	var totalResult *logprocessor.ProcessResult
+
+	for chunkIdx := 0; chunkIdx < totalChunks; chunkIdx++ {
+		start := chunkIdx * chunkSize
+		end := start + chunkSize
+		if end > len(allEntries) {
+			end = len(allEntries)
+		}
+
+		chunk := allEntries[start:end]
+
+		// Broadcast progress
+		percentComplete := float64(end) / float64(len(allEntries)) * 100
 		s.wsServer.Broadcast(Event{
-			Type: "replay:error",
+			Type: "replay:progress",
 			Data: map[string]interface{}{
-				"error": fmt.Sprintf("Failed to process entries: %v", err),
+				"totalFiles":       len(logFiles),
+				"processedFiles":   len(logFiles),
+				"currentFile":      fmt.Sprintf("Processing entries %d-%d of %d", start, end, len(allEntries)),
+				"totalEntries":     len(allEntries),
+				"processedEntries": end,
+				"percentComplete":  percentComplete,
 			},
 		})
-		return fmt.Errorf("failed to process entries: %w", err)
+
+		log.Printf("Processing chunk %d/%d (%d entries)...", chunkIdx+1, totalChunks, len(chunk))
+
+		result, err := s.logProcessor.ProcessLogEntries(s.ctx, chunk)
+		if err != nil {
+			s.wsServer.Broadcast(Event{
+				Type: "replay:error",
+				Data: map[string]interface{}{
+					"error": fmt.Sprintf("Failed to process entries: %v", err),
+				},
+			})
+			return fmt.Errorf("failed to process entries: %w", err)
+		}
+
+		// Accumulate results
+		if totalResult == nil {
+			totalResult = result
+		} else {
+			totalResult.MatchesStored += result.MatchesStored
+			totalResult.GamesStored += result.GamesStored
+			totalResult.DecksStored += result.DecksStored
+			totalResult.RanksStored += result.RanksStored
+			totalResult.QuestsStored += result.QuestsStored
+			totalResult.QuestsCompleted += result.QuestsCompleted
+			totalResult.AchievementsStored += result.AchievementsStored
+			totalResult.DraftsStored += result.DraftsStored
+			totalResult.DraftPicksStored += result.DraftPicksStored
+			totalResult.Errors = append(totalResult.Errors, result.Errors...)
+		}
 	}
 
+	result := totalResult
 	elapsed := time.Since(startTime)
 	log.Printf("Replay completed in %v: %d entries, %d matches, %d decks, %d quests, %d drafts",
 		elapsed, len(allEntries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
@@ -659,44 +714,22 @@ func fileExists(path string) bool {
 // readLogFile reads all log entries from a file without processing them.
 // This is used during replay to collect entries from all files before processing.
 func (s *Service) readLogFile(path string) ([]*logreader.LogEntry, error) {
-	// Create a poller that reads from start
-	config := &logreader.PollerConfig{
-		Path:          path,
-		Interval:      100 * time.Millisecond,
-		BufferSize:    10000, // Larger buffer for reading
-		UseFileEvents: false,
-		ReadFromStart: true, // Read entire file
-	}
-
-	poller, err := logreader.NewPoller(config)
+	// Use Reader to read entire file synchronously (much faster than Poller)
+	reader, err := logreader.NewReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("create poller: %w", err)
+		return nil, fmt.Errorf("create reader: %w", err)
+	}
+	defer func() {
+		_ = reader.Close() // Explicitly ignore error - file is read-only
+	}()
+
+	// Read all entries from the file in one pass
+	entries, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("read entries: %w", err)
 	}
 
-	// Start polling - returns the update channel
-	updates := poller.Start()
-	defer poller.Stop()
-
-	// Collect all entries
-	var allEntries []*logreader.LogEntry
-	timeout := time.After(30 * time.Second) // Timeout if no updates for 30s
-
-	for {
-		select {
-		case entry, ok := <-updates:
-			if !ok {
-				// Channel closed, return all collected entries
-				return allEntries, nil
-			}
-
-			allEntries = append(allEntries, entry)
-			timeout = time.After(30 * time.Second) // Reset timeout on each entry
-
-		case <-timeout:
-			// No updates for 30s, assume file is done
-			return allEntries, nil
-		}
-	}
+	return entries, nil
 }
 
 // restartPoller restarts the log poller after replay.

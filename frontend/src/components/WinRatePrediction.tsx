@@ -263,16 +263,22 @@ const PredictionBreakdownModal: React.FC<PredictionBreakdownModalProps> = ({ pre
           <div className="distribution-section">
             <h3>Mana Curve</h3>
             <div className="curve-chart">
-              {Object.entries(prediction.Factors.curve_distribution || {}).map(([cmc, count]) => (
-                <div key={cmc} className="curve-bar">
-                  <div
-                    className="curve-bar-fill"
-                    style={{ height: `${(Number(count) / prediction.Factors.total_cards) * 200}px` }}
-                  />
-                  <div className="curve-label">{cmc}</div>
-                  <div className="curve-count">{count as number}</div>
-                </div>
-              ))}
+              {(() => {
+                const curveEntries = Object.entries(prediction.Factors.curve_distribution || {});
+                const maxCount = Math.max(...curveEntries.map(([_, count]) => Number(count)), 1);
+                const maxHeight = 160; // Max bar height in pixels
+
+                return curveEntries.map(([cmc, count]) => (
+                  <div key={cmc} className="curve-bar">
+                    <div
+                      className="curve-bar-fill"
+                      style={{ height: `${(Number(count) / maxCount) * maxHeight}px` }}
+                    />
+                    <div className="curve-label">{cmc}</div>
+                    <div className="curve-count">{count as number}</div>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </div>

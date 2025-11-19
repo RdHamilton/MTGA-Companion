@@ -28,16 +28,17 @@ import (
 
 // App struct
 type App struct {
-	ctx         context.Context
-	service     *storage.Service
-	setFetcher  *setcache.Fetcher
-	poller      *logreader.Poller
-	pollerStop  context.CancelFunc
-	pollerMu    sync.Mutex
-	ipcClient   *ipc.Client
-	ipcClientMu sync.Mutex
-	daemonMode  bool
-	daemonPort  int // Configurable daemon port
+	ctx            context.Context
+	service        *storage.Service
+	setFetcher     *setcache.Fetcher
+	ratingsFetcher *setcache.RatingsFetcher
+	poller         *logreader.Poller
+	pollerStop     context.CancelFunc
+	pollerMu       sync.Mutex
+	ipcClient      *ipc.Client
+	ipcClientMu    sync.Mutex
+	daemonMode     bool
+	daemonPort     int // Configurable daemon port
 }
 
 // NewApp creates a new App application struct
@@ -128,6 +129,10 @@ func (a *App) Initialize(dbPath string) error {
 	// Initialize set card fetcher
 	scryfallClient := scryfall.NewClient()
 	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
+
+	// Initialize 17Lands ratings fetcher
+	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+	a.ratingsFetcher = setcache.NewRatingsFetcher(seventeenlandsClient, a.service.DraftRatingsRepo())
 
 	return nil
 }
@@ -1240,6 +1245,47 @@ func (a *App) RefreshSetCards(setCode string) (int, error) {
 
 	log.Printf("Successfully refreshed %d cards for set %s", count, setCode)
 	return count, nil
+}
+
+// FetchSetRatings fetches and caches 17Lands card ratings for a set and draft format.
+// Returns an error if the fetch fails.
+func (a *App) FetchSetRatings(setCode string, draftFormat string) error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	if a.ratingsFetcher == nil {
+		return &AppError{Message: "Ratings fetcher not initialized"}
+	}
+
+	log.Printf("Fetching 17Lands ratings for set %s, format %s...", setCode, draftFormat)
+	err := a.ratingsFetcher.FetchAndCacheRatings(a.ctx, setCode, draftFormat)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to fetch ratings: %v", err)}
+	}
+
+	log.Printf("Successfully fetched and cached ratings for set %s, format %s", setCode, draftFormat)
+	return nil
+}
+
+// RefreshSetRatings deletes and re-fetches 17Lands ratings for a set and draft format.
+func (a *App) RefreshSetRatings(setCode string, draftFormat string) error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	if a.ratingsFetcher == nil {
+		return &AppError{Message: "Ratings fetcher not initialized"}
+	}
+
+	log.Printf("Refreshing 17Lands ratings for set %s, format %s...", setCode, draftFormat)
+	err := a.ratingsFetcher.RefreshRatings(a.ctx, setCode, draftFormat)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to refresh ratings: %v", err)}
+	}
+
+	log.Printf("Successfully refreshed ratings for set %s, format %s", setCode, draftFormat)
+	return nil
 }
 
 // GetCardByArenaID returns a card by its Arena ID.

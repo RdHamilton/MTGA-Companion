@@ -14,6 +14,7 @@ import (
 type Service struct {
 	draftRepo   repository.DraftRepository
 	ratingsRepo repository.DraftRatingsRepository
+	setCardRepo repository.SetCardRepository
 	db          *sql.DB
 }
 
@@ -22,6 +23,7 @@ func NewService(db *sql.DB) *Service {
 	return &Service{
 		draftRepo:   repository.NewDraftRepository(db),
 		ratingsRepo: repository.NewDraftRatingsRepository(db),
+		setCardRepo: repository.NewSetCardRepository(db),
 		db:          db,
 	}
 }
@@ -56,35 +58,53 @@ func (s *Service) PredictSessionWinRate(ctx context.Context, sessionID string) (
 		}
 		cardsSeen[cardKey] = true
 
-		// Get card rating from 17Lands data
+		// Try to get card rating from 17Lands data
 		rating, err := s.ratingsRepo.GetCardRatingByArenaID(ctx, session.SetCode, "QuickDraft", pick.CardID)
+
+		// If 17Lands data not available, try Scryfall data as fallback
 		if err != nil || rating == nil {
-			// If we can't find the rating, use a neutral baseline
-			log.Printf("Warning: No rating found for card %s in set %s, using baseline", pick.CardID, session.SetCode)
+			scryfallCard, scryfallErr := s.setCardRepo.GetCardByArenaID(ctx, pick.CardID)
+
+			if scryfallErr != nil || scryfallCard == nil {
+				// No data available from either source - use complete baseline
+				log.Printf("Warning: No card data found for Arena ID %s, using complete baseline", pick.CardID)
+				cards = append(cards, Card{
+					Name:   pick.CardID,
+					CMC:    0,
+					Color:  "C",
+					GIHWR:  0.50,
+					Rarity: "common",
+				})
+				continue
+			}
+
+			// Use Scryfall data with baseline GIHWR
+			color := parseCardColor(scryfallCard.Colors)
+			log.Printf("Using Scryfall data for %s (no 17Lands rating)", scryfallCard.Name)
+
 			cards = append(cards, Card{
-				Name:   pick.CardID, // Using CardID as name for now
-				CMC:    0,           // Unknown CMC
-				Color:  "C",         // Unknown color
-				GIHWR:  0.50,        // Baseline 50%
-				Rarity: "common",
+				Name:   scryfallCard.Name,
+				CMC:    scryfallCard.CMC,
+				Color:  color,
+				GIHWR:  0.50, // Baseline 50% when no 17Lands data
+				Rarity: scryfallCard.Rarity,
 			})
 			continue
 		}
 
-		// Determine card color (simplified - use first color or colorless)
+		// We have 17Lands data - use it
 		color := "C"
 		if len(rating.Color) > 0 {
 			color = string(rating.Color[0])
 		}
 
-		// Estimate CMC from card name (this is a simplification - ideally we'd have CMC in the database)
 		cmc := estimateCMC(rating)
 
 		cards = append(cards, Card{
 			Name:   rating.Name,
 			CMC:    cmc,
 			Color:  color,
-			GIHWR:  rating.GIHWR / 100.0, // Convert percentage to decimal
+			GIHWR:  rating.GIHWR / 100.0,
 			Rarity: rating.Rarity,
 		})
 	}
@@ -166,6 +186,16 @@ func (s *Service) storePrediction(sessionID string, prediction *DeckPrediction) 
 	}
 
 	return nil
+}
+
+// parseCardColor converts a color slice from Scryfall into a single-character color code
+func parseCardColor(colors []string) string {
+	if len(colors) == 0 {
+		return "C" // Colorless
+	}
+
+	// Return first color (simplified - multicolor cards get first color)
+	return colors[0]
 }
 
 // estimateCMC estimates the converted mana cost from card data

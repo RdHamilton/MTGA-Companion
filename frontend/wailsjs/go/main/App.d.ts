@@ -21,6 +21,8 @@ export function ExportToJSON():Promise<void>;
 
 export function FetchSetCards(arg1:string):Promise<number>;
 
+export function FetchSetRatings(arg1:string,arg2:string):Promise<void>;
+
 export function FixDraftSessionStatuses():Promise<number>;
 
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
@@ -88,6 +90,8 @@ export function PredictDraftWinRate(arg1:string):Promise<prediction.DeckPredicti
 export function ReconnectToDaemon():Promise<void>;
 
 export function RefreshSetCards(arg1:string):Promise<number>;
+
+export function RefreshSetRatings(arg1:string,arg2:string):Promise<void>;
 
 export function SetDaemonPort(arg1:number):Promise<void>;
 
