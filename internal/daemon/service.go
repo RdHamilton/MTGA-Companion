@@ -719,7 +719,9 @@ func (s *Service) readLogFile(path string) ([]*logreader.LogEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		_ = reader.Close() // Explicitly ignore error - file is read-only
+	}()
 
 	// Read all entries from the file in one pass
 	entries, err := reader.ReadAll()

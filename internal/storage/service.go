@@ -715,7 +715,9 @@ func (s *Service) BatchStoreMatches(ctx context.Context, matchesData []matchData
 	if err != nil {
 		return 0, fmt.Errorf("failed to prepare match statement: %w", err)
 	}
-	defer matchStmt.Close()
+	defer func() {
+		_ = matchStmt.Close() // Explicitly ignore error - statement cleanup
+	}()
 
 	// Prepare game insert statement
 	gameStmt, err := tx.PrepareContext(ctx, `
@@ -726,7 +728,9 @@ func (s *Service) BatchStoreMatches(ctx context.Context, matchesData []matchData
 	if err != nil {
 		return 0, fmt.Errorf("failed to prepare game statement: %w", err)
 	}
-	defer gameStmt.Close()
+	defer func() {
+		_ = gameStmt.Close() // Explicitly ignore error - statement cleanup
+	}()
 
 	// Insert all matches and games
 	for _, matchData := range matchesData {
