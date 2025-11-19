@@ -700,7 +700,9 @@ func (s *Service) BatchStoreMatches(ctx context.Context, matchesData []matchData
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback() // Ignore error - will be nil if Commit() succeeds
+	}()
 
 	// Prepare match insert statement
 	matchStmt, err := tx.PrepareContext(ctx, `

@@ -714,44 +714,20 @@ func fileExists(path string) bool {
 // readLogFile reads all log entries from a file without processing them.
 // This is used during replay to collect entries from all files before processing.
 func (s *Service) readLogFile(path string) ([]*logreader.LogEntry, error) {
-	// Create a poller that reads from start
-	config := &logreader.PollerConfig{
-		Path:          path,
-		Interval:      100 * time.Millisecond,
-		BufferSize:    10000, // Larger buffer for reading
-		UseFileEvents: false,
-		ReadFromStart: true, // Read entire file
-	}
-
-	poller, err := logreader.NewPoller(config)
+	// Use Reader to read entire file synchronously (much faster than Poller)
+	reader, err := logreader.NewReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("create poller: %w", err)
+		return nil, fmt.Errorf("create reader: %w", err)
+	}
+	defer reader.Close()
+
+	// Read all entries from the file in one pass
+	entries, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("read entries: %w", err)
 	}
 
-	// Start polling - returns the update channel
-	updates := poller.Start()
-	defer poller.Stop()
-
-	// Collect all entries
-	var allEntries []*logreader.LogEntry
-	timeout := time.After(30 * time.Second) // Timeout if no updates for 30s
-
-	for {
-		select {
-		case entry, ok := <-updates:
-			if !ok {
-				// Channel closed, return all collected entries
-				return allEntries, nil
-			}
-
-			allEntries = append(allEntries, entry)
-			timeout = time.After(30 * time.Second) // Reset timeout on each entry
-
-		case <-timeout:
-			// No updates for 30s, assume file is done
-			return allEntries, nil
-		}
-	}
+	return entries, nil
 }
 
 // restartPoller restarts the log poller after replay.
