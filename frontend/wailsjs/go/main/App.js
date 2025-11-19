@@ -26,6 +26,10 @@ export function FetchSetCards(arg1) {
   return window['go']['main']['App']['FetchSetCards'](arg1);
 }
 
+export function FetchSetRatings(arg1, arg2) {
+  return window['go']['main']['App']['FetchSetRatings'](arg1, arg2);
+}
+
 export function FixDraftSessionStatuses() {
   return window['go']['main']['App']['FixDraftSessionStatuses']();
 }
@@ -160,6 +164,10 @@ export function ReconnectToDaemon() {
 
 export function RefreshSetCards(arg1) {
   return window['go']['main']['App']['RefreshSetCards'](arg1);
+}
+
+export function RefreshSetRatings(arg1, arg2) {
+  return window['go']['main']['App']['RefreshSetRatings'](arg1, arg2);
 }
 
 export function SetDaemonPort(arg1) {
