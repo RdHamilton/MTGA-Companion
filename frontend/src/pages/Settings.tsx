@@ -312,7 +312,7 @@ const Settings = () => {
   // 17Lands handlers
   const handleFetchSetRatings = async () => {
     if (!setCode || setCode.trim() === '') {
-      alert('Please enter a set code (e.g., BLB, DSK, FDN, ATB)');
+      alert('Please enter a set code (e.g., TLA, BLB, DSK, FDN)');
       return;
     }
 
@@ -322,7 +322,7 @@ const Settings = () => {
       alert(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!\n\nThe data is now cached and ready for use in drafts.`);
     } catch (error) {
       console.error('Failed to fetch ratings:', error);
-      alert(`Failed to fetch 17Lands ratings: ${error}\n\nMake sure:\n- Set code is correct (e.g., BLB, DSK, FDN)\n- You have internet connection\n- 17Lands has data for this set`);
+      alert(`Failed to fetch 17Lands ratings: ${error}\n\nMake sure:\n- Set code is correct (e.g., TLA, BLB, DSK, FDN)\n- You have internet connection\n- 17Lands has data for this set`);
     } finally {
       setIsFetchingRatings(false);
     }
@@ -330,7 +330,7 @@ const Settings = () => {
 
   const handleRefreshSetRatings = async () => {
     if (!setCode || setCode.trim() === '') {
-      alert('Please enter a set code (e.g., BLB, DSK, FDN, ATB)');
+      alert('Please enter a set code (e.g., TLA, BLB, DSK, FDN)');
       return;
     }
 
@@ -851,7 +851,7 @@ const Settings = () => {
             <label className="setting-label">
               Set Code
               <span className="setting-description">
-                The MTG set code (e.g., BLB = Bloomburrow, DSK = Duskmourn, FDN = Foundations, ATB = Avatar: The Last Airbender)
+                The MTG set code (e.g., TLA = Avatar: The Last Airbender, BLB = Bloomburrow, DSK = Duskmourn)
               </span>
             </label>
             <div className="setting-control">
@@ -859,7 +859,7 @@ const Settings = () => {
                 type="text"
                 value={setCode}
                 onChange={(e) => setSetCode(e.target.value.toUpperCase())}
-                placeholder="e.g., BLB, DSK, FDN, ATB"
+                placeholder="e.g., TLA, BLB, DSK, FDN"
                 className="text-input"
                 style={{ width: '200px', textTransform: 'uppercase' }}
                 maxLength={5}
@@ -913,15 +913,12 @@ const Settings = () => {
           <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
             <strong>💡 Common Set Codes:</strong>
             <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', fontSize: '0.9em' }}>
+              <div>• TLA - Avatar: The Last Airbender</div>
               <div>• FDN - Foundations</div>
               <div>• DSK - Duskmourn</div>
               <div>• BLB - Bloomburrow</div>
               <div>• OTJ - Outlaws of Thunder Junction</div>
               <div>• MKM - Murders at Karlov Manor</div>
-              <div>• LCI - Lost Caverns of Ixalan</div>
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '0.9em', color: '#aaa' }}>
-              For Avatar: The Last Airbender, try "ATB" or check 17Lands.com for the official code.
             </div>
           </div>
         </div>
