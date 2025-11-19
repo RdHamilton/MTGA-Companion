@@ -5996,8 +5996,8 @@ func runReplayCommand() {
 	fmt.Println("Press Ctrl+C to stop")
 	fmt.Println()
 
-	// Start replay
-	if err := daemonService.StartReplay(*file, *speed, *filter); err != nil {
+	// Start replay (CLI doesn't support auto-pause on draft events yet)
+	if err := daemonService.StartReplay([]string{*file}, *speed, *filter, false); err != nil {
 		log.Fatalf("Failed to start replay: %v", err)
 	}
 

@@ -198,8 +198,8 @@ export function StartPoller() {
   return window['go']['main']['App']['StartPoller']();
 }
 
-export function StartReplayWithFileDialog(arg1, arg2) {
-  return window['go']['main']['App']['StartReplayWithFileDialog'](arg1, arg2);
+export function StartReplayWithFileDialog(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartReplayWithFileDialog'](arg1, arg2, arg3);
 }
 
 export function StopPoller() {

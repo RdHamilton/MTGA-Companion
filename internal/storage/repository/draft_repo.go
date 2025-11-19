@@ -44,9 +44,10 @@ func NewDraftRepository(db *sql.DB) DraftRepository {
 }
 
 // CreateSession creates a new draft session.
+// Uses INSERT OR REPLACE to handle replays where the same draft session may be processed multiple times.
 func (r *draftRepository) CreateSession(ctx context.Context, session *models.DraftSession) error {
 	query := `
-		INSERT INTO draft_sessions (id, event_name, set_code, draft_type, start_time, status, total_picks, created_at, updated_at)
+		INSERT OR REPLACE INTO draft_sessions (id, event_name, set_code, draft_type, start_time, status, total_picks, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -252,9 +253,10 @@ func (r *draftRepository) IncrementSessionPicks(ctx context.Context, id string) 
 }
 
 // SavePick saves a draft pick.
+// Uses INSERT OR REPLACE to handle replays where the same pick may be processed multiple times.
 func (r *draftRepository) SavePick(ctx context.Context, pick *models.DraftPickSession) error {
 	query := `
-		INSERT INTO draft_picks (session_id, pack_number, pick_number, card_id, timestamp)
+		INSERT OR REPLACE INTO draft_picks (session_id, pack_number, pick_number, card_id, timestamp)
 		VALUES (?, ?, ?, ?, ?)
 	`
 	result, err := r.db.ExecContext(ctx, query,
@@ -372,6 +374,7 @@ func (r *draftRepository) GetPickByNumber(ctx context.Context, sessionID string,
 }
 
 // SavePack saves a draft pack.
+// Uses INSERT OR REPLACE to handle replays where the same pack may be processed multiple times.
 func (r *draftRepository) SavePack(ctx context.Context, pack *models.DraftPackSession) error {
 	// Convert []string to JSON for storage
 	cardIDsJSON, err := json.Marshal(pack.CardIDs)
@@ -380,7 +383,7 @@ func (r *draftRepository) SavePack(ctx context.Context, pack *models.DraftPackSe
 	}
 
 	query := `
-		INSERT INTO draft_packs (session_id, pack_number, pick_number, card_ids, timestamp)
+		INSERT OR REPLACE INTO draft_packs (session_id, pack_number, pick_number, card_ids, timestamp)
 		VALUES (?, ?, ?, ?, ?)
 	`
 	result, err := r.db.ExecContext(ctx, query,

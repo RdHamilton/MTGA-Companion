@@ -16,11 +16,21 @@ const ToastContainer = () => {
   const addToast = useCallback((message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = toastIdCounter++;
     setToasts(prev => [...prev, { id, message, type }]);
+
+    // Auto-remove toast after 5 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 5000);
   }, []);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
+
+  useEffect(() => {
+    // Register global toast function
+    showToast.setAddFn(addToast);
+  }, [addToast]);
 
   useEffect(() => {
     // Listen for stats:updated events from backend

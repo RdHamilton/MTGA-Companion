@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Footer from './Footer';
-import { GetConnectionStatus } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
+import { getReplayState, subscribeToReplayState } from '../App';
 import './Layout.css';
 
 interface LayoutProps {
@@ -11,11 +12,14 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'draft' | 'charts'>('match-history');
   const [connectionStatus, setConnectionStatus] = useState<any>({
     status: 'standalone',
     connected: false
   });
+  const [replayActive, setReplayActive] = useState(getReplayState().isActive);
+  const [replayPaused, setReplayPaused] = useState(getReplayState().isPaused);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -33,6 +37,18 @@ const Layout = ({ children }: LayoutProps) => {
       setActiveTab('charts');
     }
   }, [location.pathname]);
+
+  // Subscribe to replay state changes
+  useEffect(() => {
+    console.log('[Layout] Subscribing to replay state changes');
+    const unsubscribe = subscribeToReplayState((state) => {
+      console.log('[Layout] Replay state updated:', state);
+      setReplayActive(state.isActive);
+      setReplayPaused(state.isPaused);
+    });
+
+    return unsubscribe;
+  }, []);
 
   // Load connection status on mount
   useEffect(() => {
@@ -59,6 +75,24 @@ const Layout = ({ children }: LayoutProps) => {
       setConnectionStatus(status);
     } catch (error) {
       console.error('Failed to load connection status:', error);
+    }
+  };
+
+  const handleResumeReplay = async () => {
+    try {
+      await ResumeReplay();
+    } catch (error) {
+      console.error('Failed to resume replay:', error);
+    }
+  };
+
+  const handleStopReplay = async () => {
+    try {
+      await StopReplay();
+      // Navigate to settings after stopping
+      navigate('/settings');
+    } catch (error) {
+      console.error('Failed to stop replay:', error);
     }
   };
 
@@ -150,6 +184,68 @@ const Layout = ({ children }: LayoutProps) => {
           >
             Result Breakdown
           </Link>
+        </div>
+      )}
+
+      {/* Floating Replay Control Banner - Only shown when replay is paused and not on settings page */}
+      {replayActive && replayPaused && location.pathname !== '/settings' && (
+        <div style={{
+          position: 'fixed',
+          bottom: '60px',
+          right: '20px',
+          background: '#ff9800',
+          color: 'white',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          fontWeight: 'bold',
+        }}>
+          <span>⏸️ Replay Paused</span>
+          <button
+            onClick={handleResumeReplay}
+            style={{
+              background: '#00c853',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            ▶️ Resume
+          </button>
+          <button
+            onClick={handleStopReplay}
+            style={{
+              background: '#f44336',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            ⏹️ Stop
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            style={{
+              background: 'transparent',
+              color: 'white',
+              border: '1px solid white',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Settings
+          </button>
         </div>
       )}
 

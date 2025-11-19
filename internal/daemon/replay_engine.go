@@ -19,15 +19,16 @@ type ReplayEngine struct {
 	speed   float64 // 1.0 = real-time, 2.0 = 2x speed, etc.
 
 	// Replay state
-	mu          sync.RWMutex
-	isActive    bool
-	isPaused    bool
-	entries     []*logreader.LogEntry
-	currentIdx  int
-	startTime   time.Time
-	pauseTime   time.Time
-	totalPaused time.Duration
-	filterType  string // "all", "draft", "match", "event"
+	mu           sync.RWMutex
+	isActive     bool
+	isPaused     bool
+	entries      []*logreader.LogEntry
+	currentIdx   int
+	startTime    time.Time
+	pauseTime    time.Time
+	totalPaused  time.Duration
+	filterType   string // "all", "draft", "match", "event"
+	pauseOnDraft bool   // Auto-pause when draft events are detected
 
 	// Control channels
 	ctx        context.Context
@@ -53,9 +54,9 @@ func NewReplayEngine(service *Service) *ReplayEngine {
 	}
 }
 
-// Start begins replay of a log file with the specified speed and filter.
-// Returns error if replay is already active or if log file cannot be read.
-func (r *ReplayEngine) Start(logPath string, speed float64, filterType string) error {
+// Start begins replay of one or more log files with the specified speed and filter.
+// Returns error if replay is already active or if log files cannot be read.
+func (r *ReplayEngine) Start(logPaths []string, speed float64, filterType string, pauseOnDraft bool) error {
 	r.mu.Lock()
 	if r.isActive {
 		r.mu.Unlock()
@@ -64,42 +65,49 @@ func (r *ReplayEngine) Start(logPath string, speed float64, filterType string) e
 	r.isActive = true
 	r.speed = speed
 	r.filterType = filterType
+	r.pauseOnDraft = pauseOnDraft
 	r.currentIdx = 0
 	r.startTime = time.Now()
 	r.totalPaused = 0
 	r.mu.Unlock()
 
-	// Read log file
-	reader, err := logreader.NewReader(logPath)
-	if err != nil {
-		r.mu.Lock()
-		r.isActive = false
-		r.mu.Unlock()
-		return fmt.Errorf("failed to open log file: %w", err)
-	}
-	defer func() {
+	// Read all log files and merge entries
+	var allEntries []*logreader.LogEntry
+
+	for _, logPath := range logPaths {
+		reader, err := logreader.NewReader(logPath)
+		if err != nil {
+			r.mu.Lock()
+			r.isActive = false
+			r.mu.Unlock()
+			return fmt.Errorf("failed to open log file %s: %w", logPath, err)
+		}
+
+		entries, err := reader.ReadAll()
 		_ = reader.Close()
-	}()
 
-	entries, err := reader.ReadAll()
-	if err != nil {
-		r.mu.Lock()
-		r.isActive = false
-		r.mu.Unlock()
-		return fmt.Errorf("failed to read log file: %w", err)
+		if err != nil {
+			r.mu.Lock()
+			r.isActive = false
+			r.mu.Unlock()
+			return fmt.Errorf("failed to read log file %s: %w", logPath, err)
+		}
+
+		log.Printf("Read %d entries from %s", len(entries), logPath)
+		allEntries = append(allEntries, entries...)
 	}
 
-	if len(entries) == 0 {
+	if len(allEntries) == 0 {
 		r.mu.Lock()
 		r.isActive = false
 		r.mu.Unlock()
-		return fmt.Errorf("log file contains no entries")
+		return fmt.Errorf("log files contain no entries")
 	}
 
 	// Filter entries if needed
 	if filterType != "all" {
-		entries = r.filterEntries(entries, filterType)
-		if len(entries) == 0 {
+		allEntries = r.filterEntries(allEntries, filterType)
+		if len(allEntries) == 0 {
 			r.mu.Lock()
 			r.isActive = false
 			r.mu.Unlock()
@@ -108,22 +116,25 @@ func (r *ReplayEngine) Start(logPath string, speed float64, filterType string) e
 	}
 
 	r.mu.Lock()
-	r.entries = entries
+	r.entries = allEntries
 	r.mu.Unlock()
 
-	log.Printf("Starting replay: %d entries, %.1fx speed, filter: %s", len(entries), speed, filterType)
+	log.Printf("Starting replay: %d entries from %d file(s), %.1fx speed, filter: %s, pauseOnDraft: %v",
+		len(allEntries), len(logPaths), speed, filterType, pauseOnDraft)
 
-	// Enable dry run mode to prevent database pollution
-	r.service.logProcessor.SetDryRun(true)
-	log.Println("⚠️  REPLAY MODE: Data will be parsed and broadcast but NOT stored to database")
+	// Enable replay mode to keep draft sessions as "in_progress" for Active Draft UI testing
+	r.service.logProcessor.SetReplayMode(true)
+	log.Println("📝  REPLAY MODE: Data will be processed and stored normally for UI testing")
 
 	// Broadcast replay started event
 	r.service.wsServer.Broadcast(Event{
 		Type: "replay:started",
 		Data: map[string]interface{}{
-			"totalEntries": len(entries),
+			"totalEntries": len(allEntries),
 			"speed":        speed,
 			"filter":       filterType,
+			"pauseOnDraft": pauseOnDraft,
+			"fileCount":    len(logPaths),
 		},
 	})
 
@@ -141,8 +152,8 @@ func (r *ReplayEngine) streamEntries() {
 		r.isPaused = false
 		r.mu.Unlock()
 
-		// Disable dry run mode - return to normal operation
-		r.service.logProcessor.SetDryRun(false)
+		// Disable replay mode - return to normal operation
+		r.service.logProcessor.SetReplayMode(false)
 
 		// Broadcast replay completed event
 		r.service.wsServer.Broadcast(Event{
@@ -191,21 +202,28 @@ func (r *ReplayEngine) streamEntries() {
 				},
 			})
 
-			// Wait for resume signal
-			<-r.resumeChan
+			// Wait for resume or stop signal
+			select {
+			case <-r.resumeChan:
+				r.mu.Lock()
+				r.totalPaused += time.Since(r.pauseTime)
+				r.mu.Unlock()
 
-			r.mu.Lock()
-			r.totalPaused += time.Since(r.pauseTime)
-			r.mu.Unlock()
-
-			log.Println("Replay resumed")
-			r.service.wsServer.Broadcast(Event{
-				Type: "replay:resumed",
-				Data: map[string]interface{}{
-					"currentEntry": i,
-					"totalEntries": len(r.entries),
-				},
-			})
+				log.Println("Replay resumed")
+				r.service.wsServer.Broadcast(Event{
+					Type: "replay:resumed",
+					Data: map[string]interface{}{
+						"currentEntry": i,
+						"totalEntries": len(r.entries),
+					},
+				})
+			case <-r.stopChan:
+				log.Println("Replay stopped while paused")
+				return
+			case <-r.ctx.Done():
+				log.Println("Replay cancelled while paused")
+				return
+			}
 		}
 
 		entry := r.entries[i]
@@ -229,10 +247,74 @@ func (r *ReplayEngine) streamEntries() {
 		// Add to batch
 		batch = append(batch, entry)
 
-		// Process batch when full or at end
-		if len(batch) >= batchSize || i == len(r.entries)-1 {
+		// Check if this is a draft entry that should trigger auto-pause
+		r.mu.RLock()
+		shouldPauseOnDraft := r.pauseOnDraft && !r.isPaused
+		r.mu.RUnlock()
+
+		isDraft := shouldPauseOnDraft && r.isDraftEntry(entry)
+
+		// Process batch BEFORE pausing so draft sessions are created
+		if isDraft || len(batch) >= batchSize || i == len(r.entries)-1 {
+			log.Printf("Processing batch of %d entries (isDraft=%v, batchFull=%v, isLast=%v)", len(batch), isDraft, len(batch) >= batchSize, i == len(r.entries)-1)
 			r.service.processEntries(batch)
 			batch = batch[:0] // Clear batch
+		}
+
+		// NOW pause if this was a draft entry (after processing it)
+		if isDraft {
+			log.Printf("Draft event detected at entry %d - auto-pausing AFTER processing", i)
+
+			r.mu.Lock()
+			r.isPaused = true
+			r.pauseTime = time.Now()
+			r.mu.Unlock()
+
+			// Broadcast draft detection event
+			log.Printf("Broadcasting replay:draft_detected event to %d client(s)", r.service.wsServer.ClientCount())
+			r.service.wsServer.Broadcast(Event{
+				Type: "replay:draft_detected",
+				Data: map[string]interface{}{
+					"currentEntry": i,
+					"totalEntries": len(r.entries),
+					"message":      "Draft event detected - replay paused. Check the Draft tab!",
+				},
+			})
+
+			// Also broadcast standard pause event
+			log.Printf("Broadcasting replay:paused event to %d client(s)", r.service.wsServer.ClientCount())
+			r.service.wsServer.Broadcast(Event{
+				Type: "replay:paused",
+				Data: map[string]interface{}{
+					"currentEntry": i,
+					"totalEntries": len(r.entries),
+					"reason":       "draft_detected",
+				},
+			})
+
+			// Wait for resume or stop signal
+			select {
+			case <-r.resumeChan:
+				r.mu.Lock()
+				r.totalPaused += time.Since(r.pauseTime)
+				r.isPaused = false
+				r.mu.Unlock()
+
+				log.Println("Replay resumed after draft pause")
+				r.service.wsServer.Broadcast(Event{
+					Type: "replay:resumed",
+					Data: map[string]interface{}{
+						"currentEntry": i,
+						"totalEntries": len(r.entries),
+					},
+				})
+			case <-r.stopChan:
+				log.Println("Replay stopped while paused")
+				return
+			case <-r.ctx.Done():
+				log.Println("Replay cancelled while paused")
+				return
+			}
 		}
 
 		prevEntry = entry

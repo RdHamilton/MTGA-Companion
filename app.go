@@ -651,6 +651,30 @@ func (a *App) setupEventHandlers() {
 		wailsruntime.EventsEmit(a.ctx, "replay:error", data)
 	})
 
+	// Handle replay:paused events from daemon
+	a.ipcClient.On("replay:paused", func(data map[string]interface{}) {
+		log.Printf("✅ [IPC→Backend] Received replay:paused event from daemon: %v", data)
+		log.Printf("✅ [Backend→Frontend] Emitting replay:paused to frontend via wailsruntime.EventsEmit")
+		wailsruntime.EventsEmit(a.ctx, "replay:paused", data)
+		log.Printf("✅ [Backend→Frontend] EventsEmit call completed for replay:paused")
+	})
+
+	// Handle replay:resumed events from daemon
+	a.ipcClient.On("replay:resumed", func(data map[string]interface{}) {
+		log.Printf("✅ [IPC→Backend] Received replay:resumed event from daemon: %v", data)
+		log.Printf("✅ [Backend→Frontend] Emitting replay:resumed to frontend via wailsruntime.EventsEmit")
+		wailsruntime.EventsEmit(a.ctx, "replay:resumed", data)
+		log.Printf("✅ [Backend→Frontend] EventsEmit call completed for replay:resumed")
+	})
+
+	// Handle replay:draft_detected events from daemon
+	a.ipcClient.On("replay:draft_detected", func(data map[string]interface{}) {
+		log.Printf("✅ [IPC→Backend] Received replay:draft_detected event from daemon: %v", data)
+		log.Printf("✅ [Backend→Frontend] Emitting replay:draft_detected to frontend via wailsruntime.EventsEmit")
+		wailsruntime.EventsEmit(a.ctx, "replay:draft_detected", data)
+		log.Printf("✅ [Backend→Frontend] EventsEmit call completed for replay:draft_detected")
+	})
+
 	// Handle disconnect events
 	a.ipcClient.OnDisconnect(func() {
 		log.Println("Daemon connection lost - notifying frontend")
@@ -1244,8 +1268,8 @@ type ReplayStatus struct {
 
 // StartReplayWithFileDialog opens a file dialog and starts replay with the selected file.
 // Only works in daemon mode.
-func (a *App) StartReplayWithFileDialog(speed float64, filterType string) error {
-	log.Printf("[StartReplayWithFileDialog] Called with speed=%.1fx, filter=%s", speed, filterType)
+func (a *App) StartReplayWithFileDialog(speed float64, filterType string, pauseOnDraft bool) error {
+	log.Printf("[StartReplayWithFileDialog] Called with speed=%.1fx, filter=%s, pauseOnDraft=%v", speed, filterType, pauseOnDraft)
 
 	// Check if connected to daemon
 	a.ipcClientMu.Lock()
@@ -1256,9 +1280,9 @@ func (a *App) StartReplayWithFileDialog(speed float64, filterType string) error 
 		return &AppError{Message: "Replay feature requires daemon mode. Please start the daemon service."}
 	}
 
-	// Open file dialog to select log file
-	filePath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
-		Title: "Select MTGA Log File for Replay",
+	// Open file dialog to select multiple log files
+	filePaths, err := wailsruntime.OpenMultipleFilesDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select MTGA Log File(s) for Replay",
 		Filters: []wailsruntime.FileFilter{
 			{DisplayName: "MTGA Log Files (*.log)", Pattern: "*.log"},
 			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
@@ -1268,17 +1292,20 @@ func (a *App) StartReplayWithFileDialog(speed float64, filterType string) error 
 		return &AppError{Message: fmt.Sprintf("Failed to open file dialog: %v", err)}
 	}
 
-	// User cancelled
-	if filePath == "" {
+	// User cancelled or selected no files
+	if len(filePaths) == 0 {
 		return nil
 	}
 
+	log.Printf("[StartReplayWithFileDialog] Selected %d file(s)", len(filePaths))
+
 	// Send start_replay command via IPC
 	message := map[string]interface{}{
-		"type":      "start_replay",
-		"file_path": filePath,
-		"speed":     speed,
-		"filter":    filterType,
+		"type":           "start_replay",
+		"file_paths":     filePaths,
+		"speed":          speed,
+		"filter":         filterType,
+		"pause_on_draft": pauseOnDraft,
 	}
 
 	log.Printf("[StartReplayWithFileDialog] Sending IPC message: %+v", message)
@@ -1385,19 +1412,9 @@ func (a *App) StopReplay() error {
 // GetReplayStatus returns the current replay status.
 // Only works in daemon mode. UI should use WebSocket events for real-time updates.
 func (a *App) GetReplayStatus() (*ReplayStatus, error) {
-	// Check if connected to daemon
-	a.ipcClientMu.Lock()
-	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
-	a.ipcClientMu.Unlock()
-
-	if !connectedToDaemon {
-		return &ReplayStatus{IsActive: false}, nil
-	}
-
-	// Note: For daemon mode, the UI should use WebSocket events for real-time updates
-	// This method returns a basic inactive status. Subscribe to 'replay:progress' events.
-	log.Println("[GetReplayStatus] Replay status available via WebSocket events")
-
+	// Note: This method is deprecated and only returns inactive status.
+	// The UI should subscribe to 'replay:*' WebSocket events for real-time updates.
+	// Session status management is handled by the daemon's log processor, not the frontend.
 	return &ReplayStatus{IsActive: false}, nil
 }
 
@@ -1412,6 +1429,11 @@ func (a *App) GetActiveDraftSessions() ([]*models.DraftSession, error) {
 	sessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get active draft sessions: %v", err)}
+	}
+
+	log.Printf("🎯 [GetActiveDraftSessions] Returning %d active session(s)", len(sessions))
+	for i, s := range sessions {
+		log.Printf("🎯 [GetActiveDraftSessions] Session %d: ID=%s, Status=%s, SetCode=%s, TotalPicks=%d", i, s.ID, s.Status, s.SetCode, s.TotalPicks)
 	}
 
 	return sessions, nil
@@ -1601,6 +1623,13 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 func (a *App) FixDraftSessionStatuses() (int, error) {
 	if a.service == nil {
 		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	// Don't fix statuses while replay is active - replay mode keeps sessions as "in_progress" for testing
+	replayStatus, err := a.GetReplayStatus()
+	if err == nil && replayStatus != nil && replayStatus.IsActive {
+		log.Println("[FixDraftSessionStatuses] Skipping - replay is active")
+		return 0, nil
 	}
 
 	// Get all active sessions

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, RecalculateAllDraftGrades } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
+import { subscribeToReplayState, getReplayState } from '../App';
+import { showToast } from '../components/ToastContainer';
 import './Settings.css';
 
 const Settings = () => {
@@ -29,12 +31,13 @@ const Settings = () => {
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayProgress, setReplayProgress] = useState<any>(null);
 
-  // Replay tool settings
-  const [replayToolActive, setReplayToolActive] = useState(false);
-  const [replayToolPaused, setReplayToolPaused] = useState(false);
-  const [replayToolProgress, setReplayToolProgress] = useState<any>(null);
+  // Replay tool settings - use global state for active/paused to persist across navigation
+  const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
+  const [replayToolPaused, setReplayToolPaused] = useState(getReplayState().isPaused);
+  const [replayToolProgress, setReplayToolProgress] = useState<any>(getReplayState().progress);
   const [replaySpeed, setReplaySpeed] = useState(1.0);
   const [replayFilter, setReplayFilter] = useState('all');
+  const [pauseOnDraft, setPauseOnDraft] = useState(false);
 
   // 17Lands data settings
   const [setCode, setSetCode] = useState('');
@@ -46,6 +49,32 @@ const Settings = () => {
   // Load connection status on mount
   useEffect(() => {
     loadConnectionStatus();
+  }, []);
+
+  // Subscribe to global replay state changes
+  useEffect(() => {
+    // Get initial state immediately
+    const initialState = getReplayState();
+    console.log('[Settings] Initial replay state on mount:', initialState);
+    console.log('[Settings] Setting local state: active=%s, paused=%s', initialState.isActive, initialState.isPaused);
+    setReplayToolActive(initialState.isActive);
+    setReplayToolPaused(initialState.isPaused);
+    setReplayToolProgress(initialState.progress);
+
+    // Subscribe to future changes
+    console.log('[Settings] Subscribing to replay state changes');
+    const unsubscribe = subscribeToReplayState((state) => {
+      console.log('[Settings] Received state update from subscription:', state);
+      console.log('[Settings] Updating local state: active=%s, paused=%s', state.isActive, state.isPaused);
+      setReplayToolActive(state.isActive);
+      setReplayToolPaused(state.isPaused);
+      setReplayToolProgress(state.progress);
+    });
+
+    return () => {
+      console.log('[Settings] Unsubscribing from replay state changes');
+      unsubscribe();
+    };
   }, []);
 
   // Listen for replay events
@@ -77,46 +106,14 @@ const Settings = () => {
       // Error will be logged to console
     });
 
-    // Replay tool events
-    const unsubscribeToolStarted = EventsOn('replay:started', (data: any) => {
-      console.log('Replay tool started:', data);
-      setReplayToolActive(true);
-      setReplayToolPaused(false);
-      setReplayToolProgress(null);
-    });
-
-    const unsubscribeToolProgress = EventsOn('replay:progress', (data: any) => {
-      console.log('Replay tool progress:', data);
-      setReplayToolProgress(data);
-    });
-
-    const unsubscribeToolPaused = EventsOn('replay:paused', (data: any) => {
-      console.log('Replay tool paused:', data);
-      setReplayToolPaused(true);
-    });
-
-    const unsubscribeToolResumed = EventsOn('replay:resumed', (data: any) => {
-      console.log('Replay tool resumed:', data);
-      setReplayToolPaused(false);
-    });
-
-    const unsubscribeToolCompleted = EventsOn('replay:completed', (data: any) => {
-      console.log('Replay tool completed:', data);
-      setReplayToolActive(false);
-      setReplayToolPaused(false);
-      setReplayToolProgress(data);
-    });
+    // Note: Replay tool events are now handled globally in App.tsx
+    // This ensures state persists across navigation and enables automatic tab switching
 
     return () => {
       unsubscribeStarted();
       unsubscribeProgress();
       unsubscribeCompleted();
       unsubscribeError();
-      unsubscribeToolStarted();
-      unsubscribeToolProgress();
-      unsubscribeToolPaused();
-      unsubscribeToolResumed();
-      unsubscribeToolCompleted();
     };
   }, []);
 
@@ -142,7 +139,7 @@ const Settings = () => {
       console.log('Daemon port updated to', port);
     } catch (error) {
       console.error('Failed to set daemon port:', error);
-      alert(`Failed to set daemon port: ${error}`);
+      showToast.show(`Failed to set daemon port: ${error}`, 'error');
     }
   };
 
@@ -151,10 +148,10 @@ const Settings = () => {
     try {
       await ReconnectToDaemon();
       await loadConnectionStatus();
-      alert('Successfully reconnected to daemon');
+      showToast.show('Successfully reconnected to daemon', 'success');
     } catch (error) {
       console.error('Failed to reconnect:', error);
-      alert(`Failed to reconnect to daemon: ${error}`);
+      showToast.show(`Failed to reconnect to daemon: ${error}`, 'error');
     } finally {
       setIsReconnecting(false);
     }
@@ -167,16 +164,16 @@ const Settings = () => {
       if (mode === 'standalone') {
         await SwitchToStandaloneMode();
         await loadConnectionStatus();
-        alert('Switched to standalone mode');
+        showToast.show('Switched to standalone mode', 'success');
       } else if (mode === 'daemon') {
         await SwitchToDaemonMode();
         await loadConnectionStatus();
-        alert('Switched to daemon mode');
+        showToast.show('Switched to daemon mode', 'success');
       }
       // 'auto' mode is handled automatically by the app
     } catch (error) {
       console.error('Failed to switch mode:', error);
-      alert(`Failed to switch mode: ${error}`);
+      showToast.show(`Failed to switch mode: ${error}`, 'error');
     }
   };
 
@@ -201,20 +198,20 @@ const Settings = () => {
       } else {
         await ExportToCSV();
       }
-      alert(`Successfully exported data to ${format.toUpperCase()}!`);
+      showToast.show(`Successfully exported data to ${format.toUpperCase()}!`, 'success');
     } catch (error) {
       console.error('Export failed:', error);
-      alert(`Failed to export data: ${error}`);
+      showToast.show(`Failed to export data: ${error}`, 'error');
     }
   };
 
   const handleImportData = async () => {
     try {
       await ImportFromFile();
-      alert('Successfully imported data! Refresh the page to see updated statistics.');
+      showToast.show('Successfully imported data! Refresh the page to see updated statistics.', 'success');
     } catch (error) {
       console.error('Import failed:', error);
-      alert(`Failed to import data: ${error}`);
+      showToast.show(`Failed to import data: ${error}`, 'error');
     }
   };
 
@@ -228,20 +225,21 @@ const Settings = () => {
       }
 
       // Show success message with detailed results
-      alert(
-        `Successfully imported ${result.fileName}!\n\n` +
-        `Entries Read: ${result.entriesRead}\n` +
-        `Matches: ${result.matchesStored}\n` +
-        `Games: ${result.gamesStored}\n` +
-        `Decks: ${result.decksStored}\n` +
-        `Ranks: ${result.ranksStored}\n` +
-        `Quests: ${result.questsStored}\n` +
-        `Drafts: ${result.draftsStored}\n\n` +
-        `Refresh the page to see updated statistics.`
+      showToast.show(
+        `Successfully imported ${result.fileName}! ` +
+        `Entries: ${result.entriesRead}, ` +
+        `Matches: ${result.matchesStored}, ` +
+        `Games: ${result.gamesStored}, ` +
+        `Decks: ${result.decksStored}, ` +
+        `Ranks: ${result.ranksStored}, ` +
+        `Quests: ${result.questsStored}, ` +
+        `Drafts: ${result.draftsStored}. ` +
+        `Refresh to see updated statistics.`,
+        'success'
       );
     } catch (error) {
       console.error('Log import failed:', error);
-      alert(`Failed to import log file: ${error}`);
+      showToast.show(`Failed to import log file: ${error}`, 'error');
     }
   };
 
@@ -271,16 +269,16 @@ const Settings = () => {
   const handleStartReplayTool = async () => {
     // Check if connected to daemon
     if (connectionStatus.status !== 'connected') {
-      alert('Replay tool requires daemon mode. Please start the daemon service.');
+      showToast.show('Replay tool requires daemon mode. Please start the daemon service.', 'warning');
       return;
     }
 
     try {
-      console.log('Starting replay with speed:', replaySpeed, 'filter:', replayFilter);
-      await StartReplayWithFileDialog(replaySpeed, replayFilter);
+      console.log('Starting replay with speed:', replaySpeed, 'filter:', replayFilter, 'pauseOnDraft:', pauseOnDraft);
+      await StartReplayWithFileDialog(replaySpeed, replayFilter, pauseOnDraft);
     } catch (error) {
       console.error('Failed to start replay:', error);
-      alert(`Failed to start replay: ${error}`);
+      showToast.show(`Failed to start replay: ${error}`, 'error');
     }
   };
 
@@ -289,7 +287,7 @@ const Settings = () => {
       await PauseReplay();
     } catch (error) {
       console.error('Failed to pause replay:', error);
-      alert(`Failed to pause replay: ${error}`);
+      showToast.show(`Failed to pause replay: ${error}`, 'error');
     }
   };
 
@@ -298,7 +296,7 @@ const Settings = () => {
       await ResumeReplay();
     } catch (error) {
       console.error('Failed to resume replay:', error);
-      alert(`Failed to resume replay: ${error}`);
+      showToast.show(`Failed to resume replay: ${error}`, 'error');
     }
   };
 
@@ -307,24 +305,24 @@ const Settings = () => {
       await StopReplay();
     } catch (error) {
       console.error('Failed to stop replay:', error);
-      alert(`Failed to stop replay: ${error}`);
+      showToast.show(`Failed to stop replay: ${error}`, 'error');
     }
   };
 
   // 17Lands handlers
   const handleFetchSetRatings = async () => {
     if (!setCode || setCode.trim() === '') {
-      alert('Please enter a set code (e.g., TLA, BLB, DSK, FDN)');
+      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
       return;
     }
 
     setIsFetchingRatings(true);
     try {
       await FetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
-      alert(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!\n\nThe data is now cached and ready for use in drafts.`);
+      showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})! The data is now cached and ready for use in drafts.`, 'success');
     } catch (error) {
       console.error('Failed to fetch ratings:', error);
-      alert(`Failed to fetch 17Lands ratings: ${error}\n\nMake sure:\n- Set code is correct (e.g., TLA, BLB, DSK, FDN)\n- You have internet connection\n- 17Lands has data for this set`);
+      showToast.show(`Failed to fetch 17Lands ratings: ${error}. Make sure: Set code is correct (e.g., TLA, BLB, DSK, FDN), you have internet connection, and 17Lands has data for this set.`, 'error');
     } finally {
       setIsFetchingRatings(false);
     }
@@ -332,7 +330,7 @@ const Settings = () => {
 
   const handleRefreshSetRatings = async () => {
     if (!setCode || setCode.trim() === '') {
-      alert('Please enter a set code (e.g., TLA, BLB, DSK, FDN)');
+      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
       return;
     }
 
@@ -343,10 +341,10 @@ const Settings = () => {
     setIsFetchingRatings(true);
     try {
       await RefreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
-      alert(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`);
+      showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`, 'success');
     } catch (error) {
       console.error('Failed to refresh ratings:', error);
-      alert(`Failed to refresh 17Lands ratings: ${error}`);
+      showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
     } finally {
       setIsFetchingRatings(false);
     }
@@ -679,11 +677,11 @@ const Settings = () => {
               <button className="danger-button" onClick={async () => {
                 try {
                   await ClearAllData();
-                  alert('All data has been cleared successfully!');
+                  showToast.show('All data has been cleared successfully!', 'success');
                   window.location.reload(); // Refresh to show empty state
                 } catch (error) {
                   console.error('Clear data failed:', error);
-                  alert(`Failed to clear data: ${error}`);
+                  showToast.show(`Failed to clear data: ${error}`, 'error');
                 }
               }}>
                 Clear All Data
@@ -698,6 +696,10 @@ const Settings = () => {
           <div className="setting-description" style={{ marginBottom: '16px', color: '#aaa' }}>
             Test draft and event features by replaying historical log files at variable speeds.
             While replay is active, navigate to Draft or Events pages to watch them populate in real-time.
+            <div style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '4px', border: '1px solid #ff6b6b' }}>
+              ⚠️ <strong>Important:</strong> Clear draft/event data before starting replay to avoid database conflicts.
+              Existing draft sessions with the same ID will cause storage failures.
+            </div>
           </div>
 
           {connectionStatus.status !== 'connected' && (
@@ -752,8 +754,23 @@ const Settings = () => {
 
               <div className="setting-item">
                 <label className="setting-label">
+                  <input
+                    type="checkbox"
+                    checked={pauseOnDraft}
+                    onChange={(e) => setPauseOnDraft(e.target.checked)}
+                    className="checkbox-input"
+                  />
+                  Auto-pause on draft events
+                  <span className="setting-description">
+                    Automatically pause when draft events are detected so you can navigate to the Draft tab to watch the active draft populate in real-time
+                  </span>
+                </label>
+              </div>
+
+              <div className="setting-item">
+                <label className="setting-label">
                   Start Replay
-                  <span className="setting-description">Select a log file and start replay with the settings above</span>
+                  <span className="setting-description">Select one or more log files and start replay with the settings above</span>
                 </label>
                 <div className="setting-control">
                   <button
@@ -761,7 +778,7 @@ const Settings = () => {
                     onClick={handleStartReplayTool}
                     disabled={connectionStatus.status !== 'connected'}
                   >
-                    Select Log File & Start
+                    Select Log File(s) & Start
                   </button>
                 </div>
               </div>
@@ -789,6 +806,23 @@ const Settings = () => {
                   </span>
                 )}
               </h3>
+
+              {/* Debug State Panel */}
+              <div style={{
+                background: '#1e1e1e',
+                padding: '12px',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                fontSize: '0.85em',
+                fontFamily: 'monospace',
+                color: '#4a9eff'
+              }}>
+                <div><strong>STATE DEBUG:</strong></div>
+                <div>replayToolActive: {String(replayToolActive)}</div>
+                <div>replayToolPaused: {String(replayToolPaused)}</div>
+                <div>Global State isPaused: {String(getReplayState().isPaused)}</div>
+                <div>Global State isActive: {String(getReplayState().isActive)}</div>
+              </div>
 
               {replayToolProgress && (
                 <>
@@ -829,6 +863,10 @@ const Settings = () => {
               )}
 
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {(() => {
+                  console.log('[Settings Render] Button logic - replayToolPaused:', replayToolPaused);
+                  return null;
+                })()}
                 {!replayToolPaused && (
                   <button
                     className="action-button"

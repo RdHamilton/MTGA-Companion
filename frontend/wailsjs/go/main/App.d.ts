@@ -107,7 +107,7 @@ export function SetDaemonPort(arg1:number):Promise<void>;
 
 export function StartPoller():Promise<void>;
 
-export function StartReplayWithFileDialog(arg1:number,arg2:string):Promise<void>;
+export function StartReplayWithFileDialog(arg1:number,arg2:string,arg3:boolean):Promise<void>;
 
 export function StopPoller():Promise<void>;
 
