@@ -2,6 +2,7 @@ package logprocessor
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -33,6 +34,8 @@ type ProcessResult struct {
 	QuestsStored       int
 	QuestsCompleted    int
 	AchievementsStored int
+	DraftsStored       int
+	DraftPicksStored   int
 	Errors             []error
 }
 
@@ -71,6 +74,11 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 
 	// Process achievements
 	if err := s.processAchievements(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process draft sessions
+	if err := s.processDrafts(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -297,8 +305,55 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 		return nil
 	}
 
-	// TODO: Parse daily wins, weekly wins, and other progress from GraphState nodes
-	// For now, we skip processing until parsing logic is implemented
+	// Parse and update mastery pass progression
+	masteryPass, _ := logreader.ParseMasteryPass(entries)
+	if masteryPass != nil {
+		account, err := s.storage.GetCurrentAccount(ctx)
+		if err == nil && account != nil {
+			// Update mastery pass data if changed
+			updated := false
+			if masteryPass.CurrentLevel != account.MasteryLevel {
+				account.MasteryLevel = masteryPass.CurrentLevel
+				updated = true
+			}
+			if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
+				account.MasteryPass = masteryPass.PassType
+				updated = true
+			}
+			if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
+				account.MasteryMax = masteryPass.MaxLevel
+				updated = true
+			}
+			if updated {
+				if err := s.storage.UpdateAccount(ctx, account); err != nil {
+					log.Printf("Warning: Failed to update mastery pass data: %v", err)
+				}
+			}
+		}
+	}
+
+	// Parse and update daily/weekly wins
+	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
+	if periodicRewards != nil {
+		account, err := s.storage.GetCurrentAccount(ctx)
+		if err == nil && account != nil {
+			// Update daily/weekly wins if changed
+			updated := false
+			if periodicRewards.DailyWins != account.DailyWins {
+				account.DailyWins = periodicRewards.DailyWins
+				updated = true
+			}
+			if periodicRewards.WeeklyWins != account.WeeklyWins {
+				account.WeeklyWins = periodicRewards.WeeklyWins
+				updated = true
+			}
+			if updated {
+				if err := s.storage.UpdateAccount(ctx, account); err != nil {
+					log.Printf("Warning: Failed to update daily/weekly wins: %v", err)
+				}
+			}
+		}
+	}
 
 	return nil
 }
@@ -307,5 +362,225 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 // NOTE: Achievement system temporarily disabled - removed from UI
 func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
 	// Achievement system removed - skip processing
+	return nil
+}
+
+// processDrafts parses and stores draft sessions from log entries.
+func (s *Service) processDrafts(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	// Parse all draft events from entries
+	var draftEvents []*logreader.DraftSessionEvent
+	for _, entry := range entries {
+		event, err := logreader.ParseDraftSessionEvent(entry)
+		if err != nil {
+			log.Printf("Warning: Failed to parse draft event: %v", err)
+			continue
+		}
+		if event != nil {
+			draftEvents = append(draftEvents, event)
+		}
+	}
+
+	if len(draftEvents) == 0 {
+		return nil
+	}
+
+	log.Printf("Found %d draft event(s) in entries", len(draftEvents))
+
+	// Group events into sessions
+	sessions := s.groupDraftEvents(draftEvents)
+
+	if len(sessions) == 0 {
+		return nil
+	}
+
+	log.Printf("Grouped into %d draft session(s)", len(sessions))
+
+	// Store each session with its picks and packs
+	storedCount := 0
+	pickCount := 0
+	for _, session := range sessions {
+		if err := s.storeDraftSession(ctx, session); err != nil {
+			log.Printf("Warning: Failed to store draft session: %v", err)
+			continue
+		}
+		storedCount++
+		pickCount += len(session.Picks)
+	}
+
+	if storedCount > 0 {
+		result.DraftsStored = storedCount
+		result.DraftPicksStored = pickCount
+		log.Printf("✓ Stored %d draft session(s) with %d pick(s)", storedCount, pickCount)
+	}
+
+	return nil
+}
+
+// draftSessionData holds all data for a complete draft session.
+type draftSessionData struct {
+	SessionID string
+	EventName string
+	SetCode   string
+	DraftType string
+	StartTime time.Time
+	EndTime   *time.Time
+	Status    string
+	Picks     []*models.DraftPickSession
+	Packs     []*models.DraftPackSession
+}
+
+// groupDraftEvents groups draft events into complete sessions.
+func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*draftSessionData {
+	// Group events by event name (each draft run has same event name)
+	eventGroups := make(map[string][]*logreader.DraftSessionEvent)
+	for _, event := range events {
+		if event.EventName == "" {
+			continue
+		}
+		eventGroups[event.EventName] = append(eventGroups[event.EventName], event)
+	}
+
+	var sessions []*draftSessionData
+
+	for eventName, eventList := range eventGroups {
+		// Find start and end times
+		var startTime time.Time
+		var endTime *time.Time
+		hasStart := false
+		hasEnd := false
+
+		for _, event := range eventList {
+			if event.Type == "started" && !hasStart {
+				startTime = event.Timestamp
+				hasStart = true
+			}
+			if event.Type == "ended" && !hasEnd {
+				t := event.Timestamp
+				endTime = &t
+				hasEnd = true
+			}
+		}
+
+		// Use first event time if no start event found
+		if !hasStart && len(eventList) > 0 {
+			startTime = eventList[0].Timestamp
+		}
+
+		// Extract set code and draft type from event name
+		setCode := ""
+		draftType := "QuickDraft"
+		for _, event := range eventList {
+			if event.SetCode != "" {
+				setCode = event.SetCode
+			}
+			if event.Context == "PremierDraft" {
+				draftType = "PremierDraft"
+			}
+		}
+
+		// Create session ID from event name
+		sessionID := eventName
+
+		// Build picks and packs from events
+		picks := []*models.DraftPickSession{}
+		packs := []*models.DraftPackSession{}
+
+		for _, event := range eventList {
+			// Save pack contents
+			if event.Type == "status_updated" && len(event.DraftPack) > 0 {
+				pack := &models.DraftPackSession{
+					SessionID:  sessionID,
+					PackNumber: event.PackNumber,
+					PickNumber: event.PickNumber,
+					CardIDs:    event.DraftPack,
+					Timestamp:  event.Timestamp,
+				}
+				packs = append(packs, pack)
+			}
+
+			// Save picks
+			if event.Type == "pick_made" && len(event.SelectedCard) > 0 {
+				for _, cardID := range event.SelectedCard {
+					pick := &models.DraftPickSession{
+						SessionID:  sessionID,
+						PackNumber: event.PackNumber,
+						PickNumber: event.PickNumber,
+						CardID:     cardID,
+						Timestamp:  event.Timestamp,
+					}
+					picks = append(picks, pick)
+				}
+			}
+		}
+
+		// Determine status
+		status := "in_progress"
+		if hasEnd {
+			status = "completed"
+		} else {
+			// Also mark as completed if all picks are done
+			// Quick Draft = 42 picks (3 packs * 14 cards)
+			// Premier Draft = 45 picks (3 packs * 15 cards)
+			expectedPicks := 42 // Default for QuickDraft
+			if draftType == "PremierDraft" {
+				expectedPicks = 45
+			}
+			if len(picks) >= expectedPicks {
+				status = "completed"
+			}
+		}
+
+		session := &draftSessionData{
+			SessionID: sessionID,
+			EventName: eventName,
+			SetCode:   setCode,
+			DraftType: draftType,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Status:    status,
+			Picks:     picks,
+			Packs:     packs,
+		}
+
+		sessions = append(sessions, session)
+	}
+
+	return sessions
+}
+
+// storeDraftSession stores a complete draft session with picks and packs.
+func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData) error {
+	// Create draft session
+	session := &models.DraftSession{
+		ID:         data.SessionID,
+		EventName:  data.EventName,
+		SetCode:    data.SetCode,
+		DraftType:  data.DraftType,
+		StartTime:  data.StartTime,
+		EndTime:    data.EndTime,
+		Status:     data.Status,
+		TotalPicks: len(data.Picks),
+		CreatedAt:  data.StartTime,
+		UpdatedAt:  time.Now(),
+	}
+
+	if err := s.storage.DraftRepo().CreateSession(ctx, session); err != nil {
+		return fmt.Errorf("create session: %w", err)
+	}
+
+	// Store all picks
+	for _, pick := range data.Picks {
+		if err := s.storage.DraftRepo().SavePick(ctx, pick); err != nil {
+			log.Printf("Warning: Failed to save pick: %v", err)
+		}
+	}
+
+	// Store all packs
+	for _, pack := range data.Packs {
+		if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
+			log.Printf("Warning: Failed to save pack: %v", err)
+		}
+	}
+
 	return nil
 }

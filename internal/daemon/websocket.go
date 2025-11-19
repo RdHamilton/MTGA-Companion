@@ -187,6 +187,42 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 		case "subscribe":
 			// TODO: Implement selective event subscription
 			log.Printf("Client subscribed to events: %v", msg["events"])
+		case "replay_logs":
+			// Extract clear_data parameter (default to false)
+			clearData := false
+			if data, ok := msg["clear_data"].(bool); ok {
+				clearData = data
+			}
+
+			log.Printf("Received replay_logs command (clear_data: %v)", clearData)
+
+			// Send acknowledgment
+			ack := Event{
+				Type: "replay:acknowledged",
+				Data: map[string]interface{}{
+					"clear_data": clearData,
+				},
+				Timestamp: time.Now(),
+			}
+			if err := conn.WriteJSON(ack); err != nil {
+				log.Printf("Error sending replay acknowledgment: %v", err)
+				return
+			}
+
+			// Run replay in background goroutine
+			// This allows the WebSocket to continue handling other messages
+			go func() {
+				if err := s.service.ReplayHistoricalLogs(clearData); err != nil {
+					log.Printf("Replay error: %v", err)
+					// Broadcast error event
+					s.Broadcast(Event{
+						Type: "replay:error",
+						Data: map[string]interface{}{
+							"error": err.Error(),
+						},
+					})
+				}
+			}()
 		}
 	}
 }

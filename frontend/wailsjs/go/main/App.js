@@ -14,6 +14,14 @@ export function ExportToJSON() {
   return window['go']['main']['App']['ExportToJSON']();
 }
 
+export function FetchSetCards(arg1) {
+  return window['go']['main']['App']['FetchSetCards'](arg1);
+}
+
+export function FixDraftSessionStatuses() {
+  return window['go']['main']['App']['FixDraftSessionStatuses']();
+}
+
 export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }
@@ -28,6 +36,10 @@ export function GetActiveQuests() {
 
 export function GetCardByArenaID(arg1) {
   return window['go']['main']['App']['GetCardByArenaID'](arg1);
+}
+
+export function GetCompletedDraftSessions(arg1) {
+  return window['go']['main']['App']['GetCompletedDraftSessions'](arg1);
 }
 
 export function GetConnectionStatus() {
@@ -110,6 +122,10 @@ export function ReconnectToDaemon() {
   return window['go']['main']['App']['ReconnectToDaemon']();
 }
 
+export function RefreshSetCards(arg1) {
+  return window['go']['main']['App']['RefreshSetCards'](arg1);
+}
+
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
 }
@@ -128,4 +144,8 @@ export function SwitchToDaemonMode() {
 
 export function SwitchToStandaloneMode() {
   return window['go']['main']['App']['SwitchToStandaloneMode']();
+}
+
+export function TriggerReplayLogs(arg1) {
+  return window['go']['main']['App']['TriggerReplayLogs'](arg1);
 }

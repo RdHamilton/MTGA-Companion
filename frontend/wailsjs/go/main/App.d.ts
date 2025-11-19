@@ -10,6 +10,10 @@ export function ExportToCSV():Promise<void>;
 
 export function ExportToJSON():Promise<void>;
 
+export function FetchSetCards(arg1:string):Promise<number>;
+
+export function FixDraftSessionStatuses():Promise<number>;
+
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
@@ -17,6 +21,8 @@ export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
 export function GetActiveQuests():Promise<Array<models.Quest>>;
 
 export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;
+
+export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.DraftSession>>;
 
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
@@ -58,6 +64,8 @@ export function Initialize(arg1:string):Promise<void>;
 
 export function ReconnectToDaemon():Promise<void>;
 
+export function RefreshSetCards(arg1:string):Promise<number>;
+
 export function SetDaemonPort(arg1:number):Promise<void>;
 
 export function StartPoller():Promise<void>;
@@ -67,3 +75,5 @@ export function StopPoller():Promise<void>;
 export function SwitchToDaemonMode():Promise<void>;
 
 export function SwitchToStandaloneMode():Promise<void>;
+
+export function TriggerReplayLogs(arg1:boolean):Promise<void>;

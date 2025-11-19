@@ -215,6 +215,15 @@ func (c *Client) SendPing() error {
 	return c.conn.WriteJSON(ping)
 }
 
+// Send sends a generic message to the daemon.
+func (c *Client) Send(message map[string]interface{}) error {
+	if c.conn == nil {
+		return websocket.ErrCloseSent
+	}
+
+	return c.conn.WriteJSON(message)
+}
+
 // GetURL returns the WebSocket URL.
 func (c *Client) GetURL() string {
 	return c.url

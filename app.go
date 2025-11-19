@@ -15,6 +15,8 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -24,6 +26,7 @@ import (
 type App struct {
 	ctx         context.Context
 	service     *storage.Service
+	setFetcher  *setcache.Fetcher
 	poller      *logreader.Poller
 	pollerStop  context.CancelFunc
 	pollerMu    sync.Mutex
@@ -117,6 +120,11 @@ func (a *App) Initialize(dbPath string) error {
 		return err
 	}
 	a.service = storage.NewService(db)
+
+	// Initialize set card fetcher
+	scryfallClient := scryfall.NewClient()
+	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
+
 	return nil
 }
 
@@ -599,6 +607,38 @@ func (a *App) setupEventHandlers() {
 		wailsruntime.EventsEmit(a.ctx, "daemon:error", data)
 	})
 
+	// Handle replay:started events from daemon
+	a.ipcClient.On("replay:started", func(data map[string]interface{}) {
+		log.Printf("Received replay:started event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:started", data)
+	})
+
+	// Handle replay:progress events from daemon
+	a.ipcClient.On("replay:progress", func(data map[string]interface{}) {
+		log.Printf("Received replay:progress event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:progress", data)
+	})
+
+	// Handle replay:completed events from daemon
+	a.ipcClient.On("replay:completed", func(data map[string]interface{}) {
+		log.Printf("Received replay:completed event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:completed", data)
+	})
+
+	// Handle replay:error events from daemon
+	a.ipcClient.On("replay:error", func(data map[string]interface{}) {
+		log.Printf("Received replay:error event from daemon: %v", data)
+
+		// Forward event to frontend
+		wailsruntime.EventsEmit(a.ctx, "replay:error", data)
+	})
+
 	// Handle disconnect events
 	a.ipcClient.OnDisconnect(func() {
 		log.Println("Daemon connection lost - notifying frontend")
@@ -1024,6 +1064,40 @@ func (a *App) ClearAllData() error {
 	return nil
 }
 
+// TriggerReplayLogs sends a command to the daemon to replay historical logs.
+// This is only available when connected to the daemon (not standalone mode).
+func (a *App) TriggerReplayLogs(clearData bool) error {
+	log.Printf("[TriggerReplayLogs] Called with clearData=%v", clearData)
+
+	a.ipcClientMu.Lock()
+	defer a.ipcClientMu.Unlock()
+
+	log.Printf("[TriggerReplayLogs] IPC client nil? %v", a.ipcClient == nil)
+	if a.ipcClient != nil {
+		log.Printf("[TriggerReplayLogs] IPC client connected? %v", a.ipcClient.IsConnected())
+	}
+
+	if a.ipcClient == nil || !a.ipcClient.IsConnected() {
+		log.Printf("[TriggerReplayLogs] ERROR: Not connected to daemon")
+		return &AppError{Message: "Not connected to daemon. Replay logs requires daemon mode."}
+	}
+
+	// Send replay_logs command via IPC
+	message := map[string]interface{}{
+		"type":       "replay_logs",
+		"clear_data": clearData,
+	}
+
+	log.Printf("[TriggerReplayLogs] Sending IPC message: %+v", message)
+	if err := a.ipcClient.Send(message); err != nil {
+		log.Printf("[TriggerReplayLogs] ERROR: Failed to send: %v", err)
+		return &AppError{Message: fmt.Sprintf("Failed to send replay command to daemon: %v", err)}
+	}
+
+	log.Printf("[TriggerReplayLogs] Successfully sent replay_logs command to daemon (clear_data: %v)", clearData)
+	return nil
+}
+
 // ==================== Draft Methods ====================
 
 // GetActiveDraftSessions returns all active draft sessions.
@@ -1035,6 +1109,24 @@ func (a *App) GetActiveDraftSessions() ([]*models.DraftSession, error) {
 	sessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get active draft sessions: %v", err)}
+	}
+
+	return sessions, nil
+}
+
+// GetCompletedDraftSessions returns recently completed draft sessions.
+func (a *App) GetCompletedDraftSessions(limit int) ([]*models.DraftSession, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if limit <= 0 {
+		limit = 20 // Default limit
+	}
+
+	sessions, err := a.service.DraftRepo().GetCompletedSessions(a.ctx, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get completed draft sessions: %v", err)}
 	}
 
 	return sessions, nil
@@ -1083,9 +1175,26 @@ func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error
 }
 
 // GetSetCards returns all cards for a given set code.
+// Automatically fetches and caches from Scryfall if not already cached.
 func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 	if a.service == nil {
 		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Check if set is already cached
+	isCached, err := a.service.SetCardRepo().IsSetCached(a.ctx, setCode)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to check set cache: %v", err)}
+	}
+
+	// If not cached, fetch from Scryfall
+	if !isCached {
+		log.Printf("Set %s not cached, fetching from Scryfall...", setCode)
+		count, err := a.setFetcher.FetchAndCacheSet(a.ctx, setCode)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Failed to fetch set cards from Scryfall: %v", err)}
+		}
+		log.Printf("Fetched and cached %d cards for set %s", count, setCode)
 	}
 
 	cards, err := a.service.SetCardRepo().GetCardsBySet(a.ctx, setCode)
@@ -1094,6 +1203,39 @@ func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 	}
 
 	return cards, nil
+}
+
+// FetchSetCards manually fetches and caches set cards from Scryfall.
+// Returns the number of cards fetched and cached.
+func (a *App) FetchSetCards(setCode string) (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Manually fetching set %s from Scryfall...", setCode)
+	count, err := a.setFetcher.FetchAndCacheSet(a.ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to fetch set cards: %v", err)}
+	}
+
+	log.Printf("Successfully fetched and cached %d cards for set %s", count, setCode)
+	return count, nil
+}
+
+// RefreshSetCards deletes and re-fetches all cards for a set.
+func (a *App) RefreshSetCards(setCode string) (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Refreshing set %s from Scryfall...", setCode)
+	count, err := a.setFetcher.RefreshSet(a.ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to refresh set cards: %v", err)}
+	}
+
+	log.Printf("Successfully refreshed %d cards for set %s", count, setCode)
+	return count, nil
 }
 
 // GetCardByArenaID returns a card by its Arena ID.
@@ -1108,4 +1250,55 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 	}
 
 	return card, nil
+}
+
+// FixDraftSessionStatuses updates draft sessions that should be marked as completed
+// based on their pick counts (42 for Quick Draft, 45 for Premier Draft).
+func (a *App) FixDraftSessionStatuses() (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get all active sessions
+	activeSessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get active sessions: %v", err)}
+	}
+
+	updated := 0
+	for _, session := range activeSessions {
+		// Get picks for this session
+		picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, session.ID)
+		if err != nil {
+			log.Printf("Failed to get picks for session %s: %v", session.ID, err)
+			continue
+		}
+
+		// Determine expected picks based on draft type
+		expectedPicks := 42 // Quick Draft
+		if session.DraftType == "PremierDraft" {
+			expectedPicks = 45
+		}
+
+		// If session has all expected picks, mark as completed
+		if len(picks) >= expectedPicks {
+			// Use the timestamp of the last pick as end time
+			var endTime *time.Time
+			if len(picks) > 0 {
+				lastPickTime := picks[len(picks)-1].Timestamp
+				endTime = &lastPickTime
+			}
+
+			err := a.service.DraftRepo().UpdateSessionStatus(a.ctx, session.ID, "completed", endTime)
+			if err != nil {
+				log.Printf("Failed to update session %s status: %v", session.ID, err)
+				continue
+			}
+
+			log.Printf("Updated session %s to completed (%d/%d picks)", session.ID, len(picks), expectedPicks)
+			updated++
+		}
+	}
+
+	return updated, nil
 }

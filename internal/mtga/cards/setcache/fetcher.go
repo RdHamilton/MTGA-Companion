@@ -13,8 +13,9 @@ import (
 
 // MTGASetToScryfall maps MTGA set codes to Scryfall set codes.
 var MTGASetToScryfall = map[string]string{
-	"TDM": "dsk", // Duskmourn: House of Horror
-	"DSK": "dsk", // Duskmourn: House of Horror (alternate)
+	"TLA": "tla", // Avatar: The Last Airbender
+	"TDM": "tdm", // Tarkir Dragonstorm
+	"DSK": "dsk", // Duskmourn: House of Horror
 	"BLB": "blb", // Bloomburrow
 	"OTJ": "otj", // Outlaws of Thunder Junction
 	"MKM": "mkm", // Murders at Karlov Manor

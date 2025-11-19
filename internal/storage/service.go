@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -270,13 +272,44 @@ func (s *Service) extractMatchesFromEntries(ctx context.Context, entries []*logr
 			}
 			seenMatches[matchID] = true
 
-			// Parse timestamp from entry
+			// Parse timestamp - try multiple sources in order of preference
 			matchTime := time.Now()
-			if entry.Timestamp != "" {
-				// Try to parse timestamp (format: [UnityCrossThreadLogger]2024-01-15 10:30:45)
+			timestampFound := false
+
+			// 1. Try JSON payload timestamp (Unix milliseconds)
+			if tsVal, ok := entry.JSON["timestamp"]; ok {
+				log.Printf("[ExtractMatches] Found timestamp field in JSON for match %s: %v (type: %T)", matchID, tsVal, tsVal)
+				if tsStr, ok := tsVal.(string); ok {
+					// Parse Unix milliseconds timestamp
+					var tsMs int64
+					if _, err := fmt.Sscanf(tsStr, "%d", &tsMs); err == nil {
+						matchTime = time.Unix(tsMs/1000, (tsMs%1000)*1000000)
+						timestampFound = true
+						log.Printf("[ExtractMatches] ✓ Parsed JSON timestamp for match %s: %v (from %s ms)", matchID, matchTime, tsStr)
+					} else {
+						log.Printf("[ExtractMatches] Failed to parse JSON timestamp string '%s': %v", tsStr, err)
+					}
+				} else {
+					log.Printf("[ExtractMatches] JSON timestamp field is not a string: %T", tsVal)
+				}
+			} else {
+				log.Printf("[ExtractMatches] No 'timestamp' field found in JSON for match %s", matchID)
+			}
+
+			// 2. Try log entry prefix timestamp
+			if !timestampFound && entry.Timestamp != "" {
+				// Try to parse timestamp (format: [UnityCrossThreadLogger]11/16/2025 10:16:08 AM)
 				if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 					matchTime = parsedTime
+					timestampFound = true
+				} else {
+					log.Printf("[ExtractMatches] WARNING: Failed to parse prefix timestamp '%s' for match %s. Error: %v", entry.Timestamp, matchID, err)
 				}
+			}
+
+			// 3. Fallback to current time
+			if !timestampFound {
+				log.Printf("[ExtractMatches] WARNING: No valid timestamp found for match %s, using current time", matchID)
 			}
 
 			// Get event information
@@ -505,28 +538,52 @@ func normalizeResultReason(reason string) string {
 
 // parseLogTimestamp attempts to parse a timestamp from the log entry format.
 func parseLogTimestamp(timestampStr string) (time.Time, error) {
-	// Format: [UnityCrossThreadLogger]2024-01-15 10:30:45
-	// Try to extract the date/time portion
+	// Format examples:
+	// - [UnityCrossThreadLogger]11/16/2025 10:16:08 AM
+	// - [UnityCrossThreadLogger]2024-01-15 10:30:45
+
+	// Try to extract the date/time portion after the logger prefix
 	parts := strings.Fields(timestampStr)
 	if len(parts) < 2 {
-		return time.Time{}, fmt.Errorf("invalid timestamp format")
+		return time.Time{}, fmt.Errorf("invalid timestamp format: not enough parts")
 	}
 
-	// Try common formats
-	formats := []string{
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04:05.000",
+	// Try common formats with different combinations of parts
+	// For "11/16/2025 10:16:08 AM" we need 3 parts (date, time, AM/PM)
+	// For "2024-01-15 10:30:45" we need 2 parts (date, time)
+
+	formats := []struct {
+		format   string
+		numParts int
+	}{
+		// 12-hour format with AM/PM (MM/DD/YYYY)
+		{"01/02/2006 03:04:05 PM", 3},
+		{"1/2/2006 3:04:05 PM", 3},
+		// 24-hour format (YYYY-MM-DD)
+		{"2006-01-02 15:04:05", 2},
+		{"2006-01-02T15:04:05", 2},
+		{"2006-01-02 15:04:05.000", 2},
 	}
 
-	dateTimeStr := parts[len(parts)-2] + " " + parts[len(parts)-1]
-	for _, format := range formats {
-		if t, err := time.Parse(format, dateTimeStr); err == nil {
+	for _, fmt := range formats {
+		if len(parts) < fmt.numParts {
+			continue
+		}
+
+		// Build datetime string from last N parts
+		var dateTimeStr string
+		if fmt.numParts == 3 {
+			dateTimeStr = parts[len(parts)-3] + " " + parts[len(parts)-2] + " " + parts[len(parts)-1]
+		} else {
+			dateTimeStr = parts[len(parts)-2] + " " + parts[len(parts)-1]
+		}
+
+		if t, err := time.Parse(fmt.format, dateTimeStr); err == nil {
 			return t, nil
 		}
 	}
 
-	return time.Time{}, fmt.Errorf("unable to parse timestamp: %s", timestampStr)
+	return time.Time{}, fmt.Errorf("unable to parse timestamp from: %s", timestampStr)
 }
 
 // StoreMatch stores a single match and its games.
@@ -671,6 +728,12 @@ func (s *Service) StoreDeckFromParser(ctx context.Context, deckID, name, format,
 		LastPlayed: lastPlayed,
 	}
 
+	if lastPlayed != nil {
+		log.Printf("[StoreDeck] Deck '%s' has LastPlayed: %v", name, *lastPlayed)
+	} else {
+		log.Printf("[StoreDeck] Deck '%s' has NO LastPlayed timestamp", name)
+	}
+
 	if description != "" {
 		deck.Description = &description
 	}
@@ -746,6 +809,8 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to get matches without deck IDs: %w", err)
 	}
 
+	log.Printf("[InferDeckIDs] Found %d matches without deck IDs", len(matchesNeedingDecks))
+
 	if len(matchesNeedingDecks) == 0 {
 		return 0, nil
 	}
@@ -756,6 +821,8 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to list decks: %w", err)
 	}
 
+	log.Printf("[InferDeckIDs] Found %d total decks in database", len(allDecks))
+
 	// Filter to decks that have LastPlayed timestamp
 	var decksWithTimestamp []*models.Deck
 	for _, deck := range allDecks {
@@ -764,22 +831,58 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		}
 	}
 
+	log.Printf("[InferDeckIDs] Found %d decks with LastPlayed timestamps", len(decksWithTimestamp))
+
 	if len(decksWithTimestamp) == 0 {
+		log.Printf("[InferDeckIDs] No decks have LastPlayed timestamps - cannot infer deck IDs")
 		return 0, nil
 	}
 
 	updatedCount := 0
 	const maxTimeDiff = 24 * time.Hour // Only link if within 24 hours (same play session day)
 
-	for _, match := range matchesNeedingDecks {
+	// Sort decks by LastPlayed descending (most recent first)
+	// This helps when match timestamps are missing and we fall back to time.Now()
+	sort.Slice(decksWithTimestamp, func(i, j int) bool {
+		return decksWithTimestamp[i].LastPlayed.After(*decksWithTimestamp[j].LastPlayed)
+	})
+
+	// Check if all match timestamps are suspiciously close together (within 1 minute)
+	// This indicates they're using time.Now() fallback during batch replay
+	suspiciousBatch := false
+	if len(matchesNeedingDecks) > 1 {
+		timeDiffBetweenMatches := matchesNeedingDecks[len(matchesNeedingDecks)-1].Timestamp.Sub(matchesNeedingDecks[0].Timestamp)
+		// Take absolute value to handle both chronological and reverse-chronological ordering
+		if timeDiffBetweenMatches < 0 {
+			timeDiffBetweenMatches = -timeDiffBetweenMatches
+		}
+		if timeDiffBetweenMatches < 1*time.Minute {
+			suspiciousBatch = true
+			log.Printf("[InferDeckIDs] WARNING: All %d matches have timestamps within %v - likely using time.Now() fallback", len(matchesNeedingDecks), timeDiffBetweenMatches)
+			log.Printf("[InferDeckIDs] Will link all matches to most recently played deck: '%s'", decksWithTimestamp[0].Name)
+		}
+	}
+
+	log.Printf("[InferDeckIDs] Starting to match %d matches with %d decks (max time diff: %v)", len(matchesNeedingDecks), len(decksWithTimestamp), maxTimeDiff)
+	log.Printf("[InferDeckIDs] Most recent deck: '%s' (LastPlayed: %v)", decksWithTimestamp[0].Name, *decksWithTimestamp[0].LastPlayed)
+
+	for i, match := range matchesNeedingDecks {
 		var bestDeck *models.Deck
 		var minDiff time.Duration
 
-		for _, deck := range decksWithTimestamp {
+		if i < 3 { // Log first 3 matches for debugging
+			log.Printf("[InferDeckIDs] Match %d: timestamp=%v", i+1, match.Timestamp)
+		}
+
+		for j, deck := range decksWithTimestamp {
 			// Calculate time difference
 			diff := match.Timestamp.Sub(*deck.LastPlayed)
 			if diff < 0 {
 				diff = -diff
+			}
+
+			if i < 3 && j < 3 { // Log first few comparisons
+				log.Printf("[InferDeckIDs]   Deck '%s': LastPlayed=%v, diff=%v", deck.Name, *deck.LastPlayed, diff)
 			}
 
 			// Check if this is the closest deck so far
@@ -789,14 +892,39 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 			}
 		}
 
-		// Only update if within reasonable time window
+		// Determine if we should link this match to the best deck
+		shouldLink := false
+		var linkReason string
+
 		if bestDeck != nil && minDiff <= maxTimeDiff {
+			shouldLink = true
+			linkReason = fmt.Sprintf("within time window (diff: %v)", minDiff)
+		} else if suspiciousBatch && bestDeck != nil {
+			// Fallback for batch replay: link to most recent deck
+			shouldLink = true
+			linkReason = "suspicious batch - using most recent deck"
+		}
+
+		if shouldLink && bestDeck != nil {
 			if err := s.matches.UpdateDeckID(ctx, match.ID, bestDeck.ID); err != nil {
 				return updatedCount, fmt.Errorf("failed to update match %s with deck ID: %w", match.ID, err)
 			}
 			updatedCount++
+			if updatedCount <= 3 { // Log first few successful links
+				log.Printf("[InferDeckIDs] ✓ Linked match %s to deck '%s' (%s)", match.ID, bestDeck.Name, linkReason)
+			}
+		} else {
+			if i < 3 { // Log first few failures
+				if bestDeck != nil {
+					log.Printf("[InferDeckIDs] ✗ Match %s too far from best deck '%s' (diff: %v > max: %v)", match.ID, bestDeck.Name, minDiff, maxTimeDiff)
+				} else {
+					log.Printf("[InferDeckIDs] ✗ Match %s has no best deck", match.ID)
+				}
+			}
 		}
 	}
+
+	log.Printf("[InferDeckIDs] Completed: linked %d/%d matches to decks", updatedCount, len(matchesNeedingDecks))
 
 	return updatedCount, nil
 }
