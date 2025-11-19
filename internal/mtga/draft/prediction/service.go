@@ -161,7 +161,6 @@ func (s *Service) storePrediction(sessionID string, prediction *DeckPrediction) 
 		prediction.PredictedAt,
 		sessionID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to update session with prediction: %w", err)
 	}
