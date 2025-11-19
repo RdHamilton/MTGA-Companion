@@ -161,6 +161,51 @@
     flex: 0 0 auto;
     width: 100px;
     text-align: center;
+    position: relative;
+}
+
+/* Best pick highlighting */
+.pick-history-item.best-pick-highlight {
+    background: linear-gradient(135deg, rgba(68, 255, 136, 0.15) 0%, rgba(68, 255, 136, 0.05) 100%);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 0 12px rgba(68, 255, 136, 0.3);
+}
+
+.pick-history-item.best-pick-highlight::before {
+    content: '⭐';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.pick-history-item.best-pick-highlight .pick-number {
+    color: #44ff88;
+    font-weight: 700;
+}
+
+/* Worst pick highlighting */
+.pick-history-item.worst-pick-highlight {
+    background: linear-gradient(135deg, rgba(255, 68, 68, 0.15) 0%, rgba(255, 68, 68, 0.05) 100%);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 0 12px rgba(255, 68, 68, 0.3);
+}
+
+.pick-history-item.worst-pick-highlight::before {
+    content: '⚠️';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.pick-history-item.worst-pick-highlight .pick-number {
+    color: #ff4444;
+    font-weight: 700;
 }
 
 .pick-number {

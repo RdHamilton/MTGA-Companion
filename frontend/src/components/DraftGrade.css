@@ -202,9 +202,33 @@
 }
 
 .component-label {
-  flex: 0 0 140px;
+  flex: 0 0 160px;
   color: #ccc;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  color: #4a9eff;
+  cursor: help;
+  border: 1px solid #4a9eff;
+  border-radius: 50%;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.info-icon:hover {
+  background: #4a9eff;
+  color: #1e1e1e;
+  transform: scale(1.1);
 }
 
 .component-progress {

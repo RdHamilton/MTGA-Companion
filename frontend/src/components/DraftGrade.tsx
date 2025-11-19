@@ -154,10 +154,26 @@ const GradeBreakdownModal: React.FC<GradeBreakdownModalProps> = ({ grade, onClos
   };
 
   const components = [
-    { label: 'Pick Quality', score: grade.pick_quality_score },
-    { label: 'Color Discipline', score: grade.color_discipline_score },
-    { label: 'Deck Composition', score: grade.deck_composition_score },
-    { label: 'Strategic Picks', score: grade.strategic_score },
+    {
+      label: 'Pick Quality',
+      score: grade.pick_quality_score,
+      tooltip: 'How well your picks align with 17Lands data. Measures if you picked the highest win-rate cards available in each pack.'
+    },
+    {
+      label: 'Color Discipline',
+      score: grade.color_discipline_score,
+      tooltip: 'How focused your color commitment is. Staying in 2-3 colors early and committing to a pair improves this score.'
+    },
+    {
+      label: 'Deck Composition',
+      score: grade.deck_composition_score,
+      tooltip: 'How well-balanced your deck is. Good mana curve, creature/spell ratio, and removal spells improve this score.'
+    },
+    {
+      label: 'Strategic Picks',
+      score: grade.strategic_score,
+      tooltip: 'Advanced drafting decisions like reading signals, hate-drafting bombs, and taking fixing when needed.'
+    },
   ];
 
   return (
@@ -185,7 +201,10 @@ const GradeBreakdownModal: React.FC<GradeBreakdownModalProps> = ({ grade, onClos
             <h3>Component Scores</h3>
             {components.map((component) => (
               <div key={component.label} className="component-score-row">
-                <div className="component-label">{component.label}</div>
+                <div className="component-label">
+                  {component.label}
+                  <span className="info-icon" title={component.tooltip}>ⓘ</span>
+                </div>
                 <div className="component-progress">
                   <div
                     className="component-progress-bar"

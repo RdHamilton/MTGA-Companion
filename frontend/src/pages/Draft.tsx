@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses, AnalyzeSessionPickQuality, GetPickAlternatives } from '../../wailsjs/go/main/App';
-import { models, pickquality } from '../../wailsjs/go/models';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade } from '../../wailsjs/go/main/App';
+import { models, pickquality, grading } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';
@@ -26,6 +26,7 @@ interface HistoricalDraftDetailState {
     picks: models.DraftPickSession[];
     packs: models.DraftPackSession[];
     pickedCards: models.SetCard[];
+    grade: grading.DraftGrade | null;
     loading: boolean;
     error: string | null;
 }
@@ -51,6 +52,7 @@ const Draft: React.FC = () => {
         picks: [],
         packs: [],
         pickedCards: [],
+        grade: null,
         loading: false,
         error: null,
     });
@@ -123,11 +125,20 @@ const Draft: React.FC = () => {
             const pickedCardsResults = await Promise.all(pickedCardsPromises);
             const pickedCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
 
+            // Try to load grade if it exists
+            let grade: grading.DraftGrade | null = null;
+            try {
+                grade = await GetDraftGrade(session.ID);
+            } catch {
+                // Grade doesn't exist yet, that's okay
+            }
+
             setHistoricalDetailState({
                 session,
                 picks: picks || [],
                 packs: packs || [],
                 pickedCards,
+                grade,
                 loading: false,
                 error: null,
             });
@@ -147,6 +158,7 @@ const Draft: React.FC = () => {
             picks: [],
             packs: [],
             pickedCards: [],
+            grade: null,
             loading: false,
             error: null,
         });
@@ -287,8 +299,9 @@ const Draft: React.FC = () => {
                         <DraftGrade
                             sessionID={historicalDetailState.session.ID}
                             showCalculateButton={true}
-                            onGradeCalculated={() => {
-                                console.log('Grade calculated for draft:', historicalDetailState.session?.ID);
+                            onGradeCalculated={async (grade) => {
+                                // Reload the grade to refresh best/worst pick highlighting
+                                setHistoricalDetailState(prev => ({ ...prev, grade }));
                             }}
                         />
                     )}
@@ -330,8 +343,20 @@ const Draft: React.FC = () => {
                                     const altKey = `${pick.SessionID}-${pick.PackNumber}-${pick.PickNumber}`;
                                     const alternatives = pickAlternatives.get(altKey);
 
+                                    // Check if this pick is in best/worst picks
+                                    const isBestPick = historicalDetailState.grade?.best_picks?.some(bp =>
+                                        card && bp.includes(card.Name)
+                                    );
+                                    const isWorstPick = historicalDetailState.grade?.worst_picks?.some(wp =>
+                                        card && wp.includes(card.Name)
+                                    );
+
+                                    let highlightClass = '';
+                                    if (isBestPick) highlightClass = 'best-pick-highlight';
+                                    if (isWorstPick) highlightClass = 'worst-pick-highlight';
+
                                     return (
-                                        <div key={pick.ID} className="pick-history-item">
+                                        <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
                                             <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                             {card && card.ImageURLSmall && (
                                                 <img
