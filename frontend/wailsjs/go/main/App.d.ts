@@ -71,6 +71,8 @@ export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
 export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.Time,arg4:storage.TimelinePeriod):Promise<storage.RankTimeline>;
 
+export function GetReplayStatus():Promise<main.ReplayStatus>;
+
 export function GetSetCards(arg1:string):Promise<Array<models.SetCard>>;
 
 export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
@@ -87,6 +89,8 @@ export function ImportLogFile():Promise<main.ImportLogFileResult>;
 
 export function Initialize(arg1:string):Promise<void>;
 
+export function PauseReplay():Promise<void>;
+
 export function PredictDraftWinRate(arg1:string):Promise<prediction.DeckPrediction>;
 
 export function ReconnectToDaemon():Promise<void>;
@@ -95,11 +99,17 @@ export function RefreshSetCards(arg1:string):Promise<number>;
 
 export function RefreshSetRatings(arg1:string,arg2:string):Promise<void>;
 
+export function ResumeReplay():Promise<void>;
+
 export function SetDaemonPort(arg1:number):Promise<void>;
 
 export function StartPoller():Promise<void>;
 
+export function StartReplayWithFileDialog(arg1:number,arg2:string):Promise<void>;
+
 export function StopPoller():Promise<void>;
+
+export function StopReplay():Promise<void>;
 
 export function SwitchToDaemonMode():Promise<void>;
 

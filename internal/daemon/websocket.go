@@ -223,6 +223,90 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 					})
 				}
 			}()
+		case "start_replay":
+			// Extract parameters
+			filePath, _ := msg["file_path"].(string)
+			speed := 1.0
+			if s, ok := msg["speed"].(float64); ok {
+				speed = s
+			}
+			filterType := "all"
+			if f, ok := msg["filter"].(string); ok {
+				filterType = f
+			}
+
+			log.Printf("Received start_replay command (file: %s, speed: %.1fx, filter: %s)", filePath, speed, filterType)
+
+			// Start replay
+			if err := s.service.StartReplay(filePath, speed, filterType); err != nil {
+				log.Printf("Failed to start replay: %v", err)
+				errEvent := Event{
+					Type: "replay:error",
+					Data: map[string]interface{}{
+						"error": err.Error(),
+					},
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(errEvent); err != nil {
+					log.Printf("Error sending replay error: %v", err)
+				}
+			}
+		case "pause_replay":
+			log.Println("Received pause_replay command")
+			if err := s.service.PauseReplay(); err != nil {
+				log.Printf("Failed to pause replay: %v", err)
+				errEvent := Event{
+					Type: "replay:error",
+					Data: map[string]interface{}{
+						"error": err.Error(),
+					},
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(errEvent); err != nil {
+					log.Printf("Error sending replay error: %v", err)
+				}
+			}
+		case "resume_replay":
+			log.Println("Received resume_replay command")
+			if err := s.service.ResumeReplay(); err != nil {
+				log.Printf("Failed to resume replay: %v", err)
+				errEvent := Event{
+					Type: "replay:error",
+					Data: map[string]interface{}{
+						"error": err.Error(),
+					},
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(errEvent); err != nil {
+					log.Printf("Error sending replay error: %v", err)
+				}
+			}
+		case "stop_replay":
+			log.Println("Received stop_replay command")
+			if err := s.service.StopReplay(); err != nil {
+				log.Printf("Failed to stop replay: %v", err)
+				errEvent := Event{
+					Type: "replay:error",
+					Data: map[string]interface{}{
+						"error": err.Error(),
+					},
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(errEvent); err != nil {
+					log.Printf("Error sending replay error: %v", err)
+				}
+			}
+		case "get_replay_status":
+			log.Println("Received get_replay_status command")
+			status := s.service.GetReplayStatus()
+			statusEvent := Event{
+				Type:      "replay:status",
+				Data:      status,
+				Timestamp: time.Now(),
+			}
+			if err := conn.WriteJSON(statusEvent); err != nil {
+				log.Printf("Error sending replay status: %v", err)
+			}
 		}
 	}
 }

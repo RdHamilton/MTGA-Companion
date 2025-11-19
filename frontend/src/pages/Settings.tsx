@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import './Settings.css';
 
@@ -28,6 +28,13 @@ const Settings = () => {
   const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayProgress, setReplayProgress] = useState<any>(null);
+
+  // Replay tool settings
+  const [replayToolActive, setReplayToolActive] = useState(false);
+  const [replayToolPaused, setReplayToolPaused] = useState(false);
+  const [replayToolProgress, setReplayToolProgress] = useState<any>(null);
+  const [replaySpeed, setReplaySpeed] = useState(1.0);
+  const [replayFilter, setReplayFilter] = useState('all');
 
   // Load connection status on mount
   useEffect(() => {
@@ -63,11 +70,46 @@ const Settings = () => {
       // Error will be logged to console
     });
 
+    // Replay tool events
+    const unsubscribeToolStarted = EventsOn('replay:started', (data: any) => {
+      console.log('Replay tool started:', data);
+      setReplayToolActive(true);
+      setReplayToolPaused(false);
+      setReplayToolProgress(null);
+    });
+
+    const unsubscribeToolProgress = EventsOn('replay:progress', (data: any) => {
+      console.log('Replay tool progress:', data);
+      setReplayToolProgress(data);
+    });
+
+    const unsubscribeToolPaused = EventsOn('replay:paused', (data: any) => {
+      console.log('Replay tool paused:', data);
+      setReplayToolPaused(true);
+    });
+
+    const unsubscribeToolResumed = EventsOn('replay:resumed', (data: any) => {
+      console.log('Replay tool resumed:', data);
+      setReplayToolPaused(false);
+    });
+
+    const unsubscribeToolCompleted = EventsOn('replay:completed', (data: any) => {
+      console.log('Replay tool completed:', data);
+      setReplayToolActive(false);
+      setReplayToolPaused(false);
+      setReplayToolProgress(data);
+    });
+
     return () => {
       unsubscribeStarted();
       unsubscribeProgress();
       unsubscribeCompleted();
       unsubscribeError();
+      unsubscribeToolStarted();
+      unsubscribeToolProgress();
+      unsubscribeToolPaused();
+      unsubscribeToolResumed();
+      unsubscribeToolCompleted();
     };
   }, []);
 
@@ -215,6 +257,50 @@ const Settings = () => {
       // Progress UI will update automatically from events
     } catch (error) {
       console.error('Failed to trigger replay:', error);
+    }
+  };
+
+  // Replay tool handlers
+  const handleStartReplayTool = async () => {
+    // Check if connected to daemon
+    if (connectionStatus.status !== 'connected') {
+      alert('Replay tool requires daemon mode. Please start the daemon service.');
+      return;
+    }
+
+    try {
+      console.log('Starting replay with speed:', replaySpeed, 'filter:', replayFilter);
+      await StartReplayWithFileDialog(replaySpeed, replayFilter);
+    } catch (error) {
+      console.error('Failed to start replay:', error);
+      alert(`Failed to start replay: ${error}`);
+    }
+  };
+
+  const handlePauseReplayTool = async () => {
+    try {
+      await PauseReplay();
+    } catch (error) {
+      console.error('Failed to pause replay:', error);
+      alert(`Failed to pause replay: ${error}`);
+    }
+  };
+
+  const handleResumeReplayTool = async () => {
+    try {
+      await ResumeReplay();
+    } catch (error) {
+      console.error('Failed to resume replay:', error);
+      alert(`Failed to resume replay: ${error}`);
+    }
+  };
+
+  const handleStopReplayTool = async () => {
+    try {
+      await StopReplay();
+    } catch (error) {
+      console.error('Failed to stop replay:', error);
+      alert(`Failed to stop replay: ${error}`);
     }
   };
 
@@ -528,6 +614,183 @@ const Settings = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Replay Testing Tool */}
+        <div className="settings-section">
+          <h2 className="section-title">Replay Testing Tool (Daemon Only)</h2>
+          <div className="setting-description" style={{ marginBottom: '16px', color: '#aaa' }}>
+            Test draft and event features by replaying historical log files at variable speeds.
+            While replay is active, navigate to Draft or Events pages to watch them populate in real-time.
+          </div>
+
+          {connectionStatus.status !== 'connected' && (
+            <div className="setting-hint" style={{ color: '#ff6b6b', marginBottom: '16px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
+              ⚠️ Replay tool requires daemon mode. Please start the daemon service to use this feature.
+            </div>
+          )}
+
+          {!replayToolActive && (
+            <>
+              <div className="setting-item">
+                <label className="setting-label">
+                  Replay Speed
+                  <span className="setting-description">How fast to replay events (1x = real-time, 10x = 10x faster)</span>
+                </label>
+                <div className="setting-control">
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={replaySpeed}
+                    onChange={(e) => setReplaySpeed(parseFloat(e.target.value))}
+                    className="slider-input"
+                    style={{ width: '200px' }}
+                  />
+                  <span style={{ marginLeft: '12px', minWidth: '60px', display: 'inline-block' }}>
+                    {replaySpeed}x
+                  </span>
+                </div>
+              </div>
+
+              <div className="setting-item">
+                <label className="setting-label">
+                  Event Filter
+                  <span className="setting-description">Filter which types of events to replay</span>
+                </label>
+                <div className="setting-control">
+                  <select
+                    className="select-input"
+                    value={replayFilter}
+                    onChange={(e) => setReplayFilter(e.target.value)}
+                    style={{ width: '200px' }}
+                  >
+                    <option value="all">All Events</option>
+                    <option value="draft">Draft Only</option>
+                    <option value="match">Matches Only</option>
+                    <option value="event">Events Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="setting-item">
+                <label className="setting-label">
+                  Start Replay
+                  <span className="setting-description">Select a log file and start replay with the settings above</span>
+                </label>
+                <div className="setting-control">
+                  <button
+                    className="action-button primary"
+                    onClick={handleStartReplayTool}
+                    disabled={connectionStatus.status !== 'connected'}
+                  >
+                    Select Log File & Start
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {replayToolActive && (
+            <div className="replay-tool-controls" style={{
+              background: '#2d2d2d',
+              padding: '20px',
+              borderRadius: '8px',
+              marginTop: '16px'
+            }}>
+              <h3 style={{
+                marginTop: 0,
+                color: replayToolPaused ? '#ff9800' : '#4a9eff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                {replayToolPaused ? '⏸️ Replay Paused' : '▶️ Replay Active'}
+                {replayToolProgress && (
+                  <span style={{ fontSize: '0.9em', fontWeight: 'normal', color: '#aaa' }}>
+                    ({replayToolProgress.speed || replaySpeed}x speed, {replayToolProgress.filter || replayFilter})
+                  </span>
+                )}
+              </h3>
+
+              {replayToolProgress && (
+                <>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '12px',
+                    marginBottom: '16px',
+                    fontSize: '0.95em'
+                  }}>
+                    <div>
+                      <strong>Progress:</strong> {replayToolProgress.currentEntry || 0} / {replayToolProgress.totalEntries || 0} entries
+                    </div>
+                    <div>
+                      <strong>Complete:</strong> {(replayToolProgress.percentComplete || 0).toFixed(1)}%
+                    </div>
+                    <div>
+                      <strong>Elapsed:</strong> {(replayToolProgress.elapsed || 0).toFixed(1)}s
+                    </div>
+                  </div>
+
+                  <div style={{
+                    width: '100%',
+                    height: '8px',
+                    background: '#1e1e1e',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{
+                      width: `${replayToolProgress.percentComplete || 0}%`,
+                      height: '100%',
+                      background: replayToolPaused ? '#ff9800' : '#4a9eff',
+                      transition: 'width 0.3s ease'
+                    }}></div>
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {!replayToolPaused && (
+                  <button
+                    className="action-button"
+                    onClick={handlePauseReplayTool}
+                    style={{ background: '#ff9800' }}
+                  >
+                    ⏸️ Pause
+                  </button>
+                )}
+                {replayToolPaused && (
+                  <button
+                    className="action-button"
+                    onClick={handleResumeReplayTool}
+                    style={{ background: '#00c853' }}
+                  >
+                    ▶️ Resume
+                  </button>
+                )}
+                <button
+                  className="danger-button"
+                  onClick={handleStopReplayTool}
+                >
+                  ⏹️ Stop
+                </button>
+              </div>
+
+              <div style={{
+                marginTop: '16px',
+                padding: '12px',
+                background: '#1e1e1e',
+                borderRadius: '4px',
+                fontSize: '0.9em',
+                color: '#aaa'
+              }}>
+                💡 <strong>Tip:</strong> Navigate to the Draft or Events page to watch them populate in real-time as the replay progresses!
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Theme Preferences */}

@@ -1226,6 +1226,179 @@ func (a *App) TriggerReplayLogs(clearData bool) error {
 	return nil
 }
 
+// ==================== Replay Tool Methods ====================
+
+// ReplayStatus represents the current state of the replay engine.
+type ReplayStatus struct {
+	IsActive        bool    `json:"isActive"`
+	IsPaused        bool    `json:"isPaused"`
+	CurrentEntry    int     `json:"currentEntry"`
+	TotalEntries    int     `json:"totalEntries"`
+	PercentComplete float64 `json:"percentComplete"`
+	Elapsed         float64 `json:"elapsed"`
+	Speed           float64 `json:"speed"`
+	Filter          string  `json:"filter"`
+}
+
+// StartReplayWithFileDialog opens a file dialog and starts replay with the selected file.
+// Only works in daemon mode.
+func (a *App) StartReplayWithFileDialog(speed float64, filterType string) error {
+	log.Printf("[StartReplayWithFileDialog] Called with speed=%.1fx, filter=%s", speed, filterType)
+
+	// Check if connected to daemon
+	a.ipcClientMu.Lock()
+	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
+	a.ipcClientMu.Unlock()
+
+	if !connectedToDaemon {
+		return &AppError{Message: "Replay feature requires daemon mode. Please start the daemon service."}
+	}
+
+	// Open file dialog to select log file
+	filePath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select MTGA Log File for Replay",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "MTGA Log Files (*.log)", Pattern: "*.log"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open file dialog: %v", err)}
+	}
+
+	// User cancelled
+	if filePath == "" {
+		return nil
+	}
+
+	// Send start_replay command via IPC
+	message := map[string]interface{}{
+		"type":      "start_replay",
+		"file_path": filePath,
+		"speed":     speed,
+		"filter":    filterType,
+	}
+
+	log.Printf("[StartReplayWithFileDialog] Sending IPC message: %+v", message)
+	a.ipcClientMu.Lock()
+	err = a.ipcClient.Send(message)
+	a.ipcClientMu.Unlock()
+
+	if err != nil {
+		log.Printf("[StartReplayWithFileDialog] ERROR: Failed to send: %v", err)
+		return &AppError{Message: fmt.Sprintf("Failed to send start replay command to daemon: %v", err)}
+	}
+
+	log.Printf("[StartReplayWithFileDialog] Successfully sent start_replay command to daemon")
+	return nil
+}
+
+// PauseReplay pauses the active replay.
+// Only works in daemon mode.
+func (a *App) PauseReplay() error {
+	log.Println("[PauseReplay] Called")
+
+	// Check if connected to daemon
+	a.ipcClientMu.Lock()
+	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
+	a.ipcClientMu.Unlock()
+
+	if !connectedToDaemon {
+		return &AppError{Message: "Replay feature requires daemon mode."}
+	}
+
+	message := map[string]interface{}{
+		"type": "pause_replay",
+	}
+
+	a.ipcClientMu.Lock()
+	err := a.ipcClient.Send(message)
+	a.ipcClientMu.Unlock()
+
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to send pause replay command: %v", err)}
+	}
+
+	return nil
+}
+
+// ResumeReplay resumes a paused replay.
+// Only works in daemon mode.
+func (a *App) ResumeReplay() error {
+	log.Println("[ResumeReplay] Called")
+
+	// Check if connected to daemon
+	a.ipcClientMu.Lock()
+	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
+	a.ipcClientMu.Unlock()
+
+	if !connectedToDaemon {
+		return &AppError{Message: "Replay feature requires daemon mode."}
+	}
+
+	message := map[string]interface{}{
+		"type": "resume_replay",
+	}
+
+	a.ipcClientMu.Lock()
+	err := a.ipcClient.Send(message)
+	a.ipcClientMu.Unlock()
+
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to send resume replay command: %v", err)}
+	}
+
+	return nil
+}
+
+// StopReplay stops the active replay.
+// Only works in daemon mode.
+func (a *App) StopReplay() error {
+	log.Println("[StopReplay] Called")
+
+	// Check if connected to daemon
+	a.ipcClientMu.Lock()
+	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
+	a.ipcClientMu.Unlock()
+
+	if !connectedToDaemon {
+		return &AppError{Message: "Replay feature requires daemon mode."}
+	}
+
+	message := map[string]interface{}{
+		"type": "stop_replay",
+	}
+
+	a.ipcClientMu.Lock()
+	err := a.ipcClient.Send(message)
+	a.ipcClientMu.Unlock()
+
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to send stop replay command: %v", err)}
+	}
+
+	return nil
+}
+
+// GetReplayStatus returns the current replay status.
+// Only works in daemon mode. UI should use WebSocket events for real-time updates.
+func (a *App) GetReplayStatus() (*ReplayStatus, error) {
+	// Check if connected to daemon
+	a.ipcClientMu.Lock()
+	connectedToDaemon := a.ipcClient != nil && a.ipcClient.IsConnected()
+	a.ipcClientMu.Unlock()
+
+	if !connectedToDaemon {
+		return &ReplayStatus{IsActive: false}, nil
+	}
+
+	// Note: For daemon mode, the UI should use WebSocket events for real-time updates
+	// This method returns a basic inactive status. Subscribe to 'replay:progress' events.
+	log.Println("[GetReplayStatus] Replay status available via WebSocket events")
+
+	return &ReplayStatus{IsActive: false}, nil
+}
+
 // ==================== Draft Methods ====================
 
 // GetActiveDraftSessions returns all active draft sessions.
