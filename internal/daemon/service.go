@@ -80,6 +80,10 @@ func (s *Service) Start() error {
 	// This detects and processes new UTC_Log files created during daemon runtime (Phase 2)
 	go s.monitorUTCLogs()
 
+	// Start Player.log archival monitoring in background (Phase 4)
+	// This periodically archives the active Player.log file
+	go s.monitorPlayerLogArchival()
+
 	// Create and start log poller
 	pollerConfig := logreader.DefaultPollerConfig(logPath)
 	pollerConfig.Interval = s.config.PollInterval
@@ -137,6 +141,11 @@ func (s *Service) Start() error {
 // Stop gracefully stops the daemon service.
 func (s *Service) Stop() error {
 	log.Println("Stopping daemon...")
+
+	// Archive Player.log before shutdown (Phase 4)
+	if err := s.archiveOnShutdown(); err != nil {
+		log.Printf("Warning: Failed to archive on shutdown: %v", err)
+	}
 
 	// Cancel context
 	s.cancel()
@@ -810,6 +819,13 @@ func (s *Service) checkForNewLogFiles() error {
 		log.Printf("✓ Processed new UTC_Log: %s (%d entries, %d matches, %d decks, %d quests)",
 			logFile.Name, len(entries), result.MatchesStored, result.DecksStored, result.QuestsStored)
 
+		// Archive the UTC_Log file if archival is enabled
+		if s.config.EnableArchival {
+			if _, err := s.archiveLogFile(logFile.Path); err != nil {
+				log.Printf("Warning: Failed to archive %s: %v", logFile.Name, err)
+			}
+		}
+
 		processedCount++
 	}
 
@@ -973,5 +989,123 @@ func (s *Service) restartPoller() error {
 	go s.processUpdates(updates, errChan)
 
 	log.Println("Log poller restarted successfully")
+	return nil
+}
+
+// getArchiveDir returns the archive directory path, creating it if needed.
+func (s *Service) getArchiveDir() (string, error) {
+	archiveDir := s.config.ArchiveDir
+
+	// Use default directory if not specified
+	if archiveDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		archiveDir = filepath.Join(home, ".mtga-companion", "archived_logs")
+	}
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create archive directory: %w", err)
+	}
+
+	return archiveDir, nil
+}
+
+// archiveLogFile copies a log file to the archive directory.
+// Returns the destination path and any error encountered.
+func (s *Service) archiveLogFile(srcPath string) (string, error) {
+	// Get archive directory
+	archiveDir, err := s.getArchiveDir()
+	if err != nil {
+		return "", err
+	}
+
+	// Extract filename from source path
+	filename := filepath.Base(srcPath)
+	destPath := filepath.Join(archiveDir, filename)
+
+	// Check if destination already exists
+	if _, err := os.Stat(destPath); err == nil {
+		// File already archived, skip
+		return destPath, nil
+	}
+
+	// Read source file
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	// Write to destination
+	if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("failed to write destination file: %w", err)
+	}
+
+	log.Printf("✓ Archived log file: %s (%d bytes) → %s", filename, len(data), archiveDir)
+	return destPath, nil
+}
+
+// monitorPlayerLogArchival periodically archives the active Player.log file.
+// This runs in a background goroutine and archives every config.ArchiveInterval.
+func (s *Service) monitorPlayerLogArchival() {
+	if !s.config.EnableArchival {
+		return
+	}
+
+	ticker := time.NewTicker(s.config.ArchiveInterval)
+	defer ticker.Stop()
+
+	log.Printf("Player.log archival started (archiving every %v)", s.config.ArchiveInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			// Get current log path
+			logPath := s.config.LogPath
+			if logPath == "" {
+				detected, err := logreader.DefaultLogPath()
+				if err != nil {
+					log.Printf("Warning: Failed to detect log path for archival: %v", err)
+					continue
+				}
+				logPath = detected
+			}
+
+			// Archive the current Player.log
+			if _, err := s.archiveLogFile(logPath); err != nil {
+				log.Printf("Warning: Failed to archive Player.log: %v", err)
+			}
+		case <-s.ctx.Done():
+			log.Println("Player.log archival stopped")
+			return
+		}
+	}
+}
+
+// archiveOnShutdown archives the current Player.log before daemon shutdown.
+// This ensures we capture the final state of the log file.
+func (s *Service) archiveOnShutdown() error {
+	if !s.config.EnableArchival {
+		return nil
+	}
+
+	// Get current log path
+	logPath := s.config.LogPath
+	if logPath == "" {
+		detected, err := logreader.DefaultLogPath()
+		if err != nil {
+			return fmt.Errorf("failed to detect log path: %w", err)
+		}
+		logPath = detected
+	}
+
+	// Archive the current Player.log
+	if _, err := s.archiveLogFile(logPath); err != nil {
+		return fmt.Errorf("failed to archive Player.log on shutdown: %w", err)
+	}
+
+	log.Println("✓ Archived Player.log before shutdown")
 	return nil
 }
