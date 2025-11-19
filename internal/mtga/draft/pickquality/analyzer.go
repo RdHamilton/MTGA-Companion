@@ -105,8 +105,21 @@ func (a *Analyzer) AnalyzePick(ctx context.Context, setCode, draftFormat string,
 		return nil, fmt.Errorf("picked card not found in pack")
 	}
 
-	// Determine grade based on rank
-	grade := calculateGrade(pickedRank, len(sortedCards))
+	// Check if we have any real rating data (if all cards have 0.0 GIHWR, no ratings exist)
+	hasRatingData := false
+	for _, gihwr := range cardRatings {
+		if gihwr > 0.0 {
+			hasRatingData = true
+			break
+		}
+	}
+
+	// If no rating data exists, mark as N/A
+	grade := "N/A"
+	if hasRatingData {
+		// Determine grade based on rank
+		grade = calculateGrade(pickedRank, len(sortedCards))
+	}
 
 	// Get top alternatives (exclude picked card)
 	alternatives := make([]Alternative, 0, 5)

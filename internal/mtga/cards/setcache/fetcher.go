@@ -3,6 +3,7 @@ package setcache
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -65,69 +66,101 @@ func (f *Fetcher) FetchAndCacheSet(ctx context.Context, mtgaSetCode string) (int
 		return 0, nil // Already cached
 	}
 
-	// Search for all cards in the set
+	// Search for all cards in the set (with pagination)
 	query := fmt.Sprintf("set:%s", scryfallSetCode)
+	allCards := []*models.SetCard{}
+	fetchedAt := time.Now()
+	pageNum := 1
+
 	searchResult, err := f.scryfallClient.SearchCards(ctx, query)
 	if err != nil {
 		return 0, fmt.Errorf("search cards for set %s: %w", scryfallSetCode, err)
 	}
 
-	// Convert Scryfall cards to SetCard models
-	cards := make([]*models.SetCard, 0, len(searchResult.Data))
-	fetchedAt := time.Now()
-
+	// Process first page
 	for _, scryfallCard := range searchResult.Data {
 		// Skip cards without Arena IDs (not in MTGA)
 		if scryfallCard.ArenaID == nil {
 			continue
 		}
 
-		// Parse type line into types
-		types := parseTypeLine(scryfallCard.TypeLine)
-
-		// Get image URLs
-		imageURL := ""
-		imageURLSmall := ""
-		imageURLArt := ""
-		if scryfallCard.ImageURIs != nil {
-			imageURL = scryfallCard.ImageURIs.Normal
-			imageURLSmall = scryfallCard.ImageURIs.Small
-			imageURLArt = scryfallCard.ImageURIs.ArtCrop
-		}
-
-		card := &models.SetCard{
-			SetCode:       mtgaSetCode,
-			ArenaID:       fmt.Sprintf("%d", *scryfallCard.ArenaID),
-			ScryfallID:    scryfallCard.ID,
-			Name:          scryfallCard.Name,
-			ManaCost:      scryfallCard.ManaCost,
-			CMC:           int(scryfallCard.CMC),
-			Types:         types,
-			Colors:        scryfallCard.Colors,
-			Rarity:        scryfallCard.Rarity,
-			Text:          scryfallCard.OracleText,
-			Power:         scryfallCard.Power,
-			Toughness:     scryfallCard.Toughness,
-			ImageURL:      imageURL,
-			ImageURLSmall: imageURLSmall,
-			ImageURLArt:   imageURLArt,
-			FetchedAt:     fetchedAt,
-		}
-
-		cards = append(cards, card)
+		card := convertScryfallCard(&scryfallCard, mtgaSetCode, fetchedAt)
+		allCards = append(allCards, card)
 	}
 
-	// Save cards to database
-	if len(cards) > 0 {
-		if err := f.setCardRepo.SaveCards(ctx, cards); err != nil {
+	// Handle pagination if there are more results
+	for searchResult.HasMore && searchResult.NextPage != "" {
+		pageNum++
+
+		// Fetch next page using the NextPage URL
+		var nextResult scryfall.SearchResult
+		if err := f.scryfallClient.DoRequestRaw(ctx, searchResult.NextPage, &nextResult); err != nil {
+			return 0, fmt.Errorf("fetch page %d for set %s: %w", pageNum, scryfallSetCode, err)
+		}
+
+		// Process this page
+		for _, scryfallCard := range nextResult.Data {
+			// Skip cards without Arena IDs (not in MTGA)
+			if scryfallCard.ArenaID == nil {
+				continue
+			}
+
+			card := convertScryfallCard(&scryfallCard, mtgaSetCode, fetchedAt)
+			allCards = append(allCards, card)
+		}
+
+		searchResult = &nextResult
+	}
+
+	// Save all cards to database
+	if len(allCards) > 0 {
+		if err := f.setCardRepo.SaveCards(ctx, allCards); err != nil {
 			return 0, fmt.Errorf("save cards to database: %w", err)
 		}
 	}
 
-	// TODO: Handle pagination if there are more results
-	// For now, we just cache the first page
+	return len(allCards), nil
+}
 
-	return len(cards), nil
+// convertScryfallCard converts a Scryfall card to a SetCard model.
+func convertScryfallCard(scryfallCard *scryfall.Card, setCode string, fetchedAt time.Time) *models.SetCard {
+	// Parse type line into types
+	types := parseTypeLine(scryfallCard.TypeLine)
+
+	// Get image URLs
+	imageURL := ""
+	imageURLSmall := ""
+	imageURLArt := ""
+	if scryfallCard.ImageURIs != nil {
+		imageURL = scryfallCard.ImageURIs.Normal
+		imageURLSmall = scryfallCard.ImageURIs.Small
+		imageURLArt = scryfallCard.ImageURIs.ArtCrop
+	}
+
+	// Handle Arena ID (may be nil for cards not yet in MTGA)
+	arenaID := ""
+	if scryfallCard.ArenaID != nil {
+		arenaID = fmt.Sprintf("%d", *scryfallCard.ArenaID)
+	}
+
+	return &models.SetCard{
+		SetCode:       setCode,
+		ArenaID:       arenaID,
+		ScryfallID:    scryfallCard.ID,
+		Name:          scryfallCard.Name,
+		ManaCost:      scryfallCard.ManaCost,
+		CMC:           int(scryfallCard.CMC),
+		Types:         types,
+		Colors:        scryfallCard.Colors,
+		Rarity:        scryfallCard.Rarity,
+		Text:          scryfallCard.OracleText,
+		Power:         scryfallCard.Power,
+		Toughness:     scryfallCard.Toughness,
+		ImageURL:      imageURL,
+		ImageURLSmall: imageURLSmall,
+		ImageURLArt:   imageURLArt,
+		FetchedAt:     fetchedAt,
+	}
 }
 
 // GetCachedSet retrieves all cached cards for a set.
@@ -149,6 +182,54 @@ func (f *Fetcher) RefreshSet(ctx context.Context, setCode string) (int, error) {
 
 	// Fetch and cache again
 	return f.FetchAndCacheSet(ctx, setCode)
+}
+
+// FetchCardByName fetches a single card from Scryfall by exact name and set code.
+// Returns nil if the card is not found.
+// Checks cache first to avoid unnecessary API calls.
+func (f *Fetcher) FetchCardByName(ctx context.Context, setCode, cardName, arenaID string) (*models.SetCard, error) {
+	// Check if card is already cached by Arena ID
+	cachedCard, err := f.setCardRepo.GetCardByArenaID(ctx, arenaID)
+	if err != nil {
+		return nil, fmt.Errorf("check cache: %w", err)
+	}
+	if cachedCard != nil {
+		return cachedCard, nil // Already cached
+	}
+
+	// Map MTGA set code to Scryfall set code
+	scryfallSetCode, ok := MTGASetToScryfall[setCode]
+	if !ok {
+		scryfallSetCode = strings.ToLower(setCode)
+	}
+
+	// Search Scryfall for this specific card (!"name" means exact match)
+	query := fmt.Sprintf(`!"%s" set:%s`, cardName, scryfallSetCode)
+	log.Printf("[FetchCardByName] Searching Scryfall with query: %s", query)
+	searchResult, err := f.scryfallClient.SearchCards(ctx, query)
+	if err != nil {
+		log.Printf("[FetchCardByName] Scryfall API error for '%s': %v", cardName, err)
+		return nil, fmt.Errorf("scryfall search failed: %w", err)
+	}
+	if len(searchResult.Data) == 0 {
+		log.Printf("[FetchCardByName] No results from Scryfall for '%s' (query: %s)", cardName, query)
+		return nil, nil // Card not found
+	}
+	log.Printf("[FetchCardByName] Found %d result(s) for '%s'", len(searchResult.Data), cardName)
+
+	// Take the first result
+	scryfallCard := searchResult.Data[0]
+
+	// Convert and use our Arena ID
+	card := convertScryfallCard(&scryfallCard, setCode, time.Now())
+	card.ArenaID = arenaID
+
+	// Save to database
+	if err := f.setCardRepo.SaveCard(ctx, card); err != nil {
+		return nil, fmt.Errorf("save card: %w", err)
+	}
+
+	return card, nil
 }
 
 // parseTypeLine parses a type line into individual types.

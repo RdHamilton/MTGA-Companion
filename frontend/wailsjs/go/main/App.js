@@ -170,6 +170,10 @@ export function PredictDraftWinRate(arg1) {
   return window['go']['main']['App']['PredictDraftWinRate'](arg1);
 }
 
+export function RecalculateAllDraftGrades() {
+  return window['go']['main']['App']['RecalculateAllDraftGrades']();
+}
+
 export function ReconnectToDaemon() {
   return window['go']['main']['App']['ReconnectToDaemon']();
 }

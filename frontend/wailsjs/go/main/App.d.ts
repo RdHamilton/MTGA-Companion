@@ -93,6 +93,8 @@ export function PauseReplay():Promise<void>;
 
 export function PredictDraftWinRate(arg1:string):Promise<prediction.DeckPrediction>;
 
+export function RecalculateAllDraftGrades():Promise<number>;
+
 export function ReconnectToDaemon():Promise<void>;
 
 export function RefreshSetCards(arg1:string):Promise<number>;

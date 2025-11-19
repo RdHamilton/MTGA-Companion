@@ -248,6 +248,8 @@ const Draft: React.FC = () => {
                 return 'quality-d';
             case 'F':
                 return 'quality-f';
+            case 'N/A':
+                return 'quality-n-a';
             default:
                 return '';
         }
@@ -368,28 +370,30 @@ const Draft: React.FC = () => {
                                     return (
                                         <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
                                             <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
-                                            {card && card.ImageURLSmall && (
-                                                <img
-                                                    src={card.ImageURLSmall}
-                                                    alt={card.Name}
-                                                    title={card.Name}
-                                                    onClick={() => handleCardHover(card)}
-                                                    style={{ cursor: 'pointer' }}
-                                                    onMouseEnter={() => {
-                                                        if (hasQuality && !alternatives) {
-                                                            loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
-                                                        }
-                                                    }}
-                                                />
-                                            )}
-                                            {card && !card.ImageURLSmall && (
-                                                <div className="card-name-small">{card.Name}</div>
-                                            )}
-                                            {hasQuality && (
-                                                <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
-                                                    {pick.PickQualityGrade}
-                                                </div>
-                                            )}
+                                            <div className="card-image-container">
+                                                {card && card.ImageURLSmall && (
+                                                    <img
+                                                        src={card.ImageURLSmall}
+                                                        alt={card.Name}
+                                                        title={card.Name}
+                                                        onClick={() => handleCardHover(card)}
+                                                        style={{ cursor: 'pointer' }}
+                                                        onMouseEnter={() => {
+                                                            if (hasQuality && !alternatives) {
+                                                                loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                            }
+                                                        }}
+                                                    />
+                                                )}
+                                                {card && !card.ImageURLSmall && (
+                                                    <div className="card-name-small">{card.Name}</div>
+                                                )}
+                                                {hasQuality && (
+                                                    <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                        {pick.PickQualityGrade}
+                                                    </div>
+                                                )}
+                                            </div>
                                             {hasQuality && alternatives && (
                                                 <div className="pick-quality-tooltip">
                                                     <h4>Pick Quality Analysis</h4>
@@ -638,28 +642,30 @@ const Draft: React.FC = () => {
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
                                         <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
-                                        {card && card.ImageURLSmall && (
-                                            <img
-                                                src={card.ImageURLSmall}
-                                                alt={card.Name}
-                                                title={card.Name}
-                                                onClick={() => handleCardHover(card)}
-                                                style={{ cursor: 'pointer' }}
-                                                onMouseEnter={() => {
-                                                    if (hasQuality && !alternatives) {
-                                                        loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
-                                                    }
-                                                }}
-                                            />
-                                        )}
-                                        {card && !card.ImageURLSmall && (
-                                            <div className="card-name-small">{card.Name}</div>
-                                        )}
-                                        {hasQuality && (
-                                            <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
-                                                {pick.PickQualityGrade}
-                                            </div>
-                                        )}
+                                        <div className="card-image-container">
+                                            {card && card.ImageURLSmall && (
+                                                <img
+                                                    src={card.ImageURLSmall}
+                                                    alt={card.Name}
+                                                    title={card.Name}
+                                                    onClick={() => handleCardHover(card)}
+                                                    style={{ cursor: 'pointer' }}
+                                                    onMouseEnter={() => {
+                                                        if (hasQuality && !alternatives) {
+                                                            loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                            {card && !card.ImageURLSmall && (
+                                                <div className="card-name-small">{card.Name}</div>
+                                            )}
+                                            {hasQuality && (
+                                                <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                    {pick.PickQualityGrade}
+                                                </div>
+                                            )}
+                                        </div>
                                         {hasQuality && alternatives && (
                                             <div className="pick-quality-tooltip">
                                                 <h4>Pick Quality Analysis</h4>
