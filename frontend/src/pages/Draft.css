@@ -135,12 +135,13 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 /* Pick History */
 .pick-history {
     flex: 0 0 auto;
+    min-height: 0;
 }
 
 .pick-history h2 {
@@ -160,6 +161,51 @@
     flex: 0 0 auto;
     width: 100px;
     text-align: center;
+    position: relative;
+}
+
+/* Best pick highlighting */
+.pick-history-item.best-pick-highlight {
+    background: linear-gradient(135deg, rgba(68, 255, 136, 0.15) 0%, rgba(68, 255, 136, 0.05) 100%);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 0 12px rgba(68, 255, 136, 0.3);
+}
+
+.pick-history-item.best-pick-highlight::before {
+    content: '⭐';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.pick-history-item.best-pick-highlight .pick-number {
+    color: #44ff88;
+    font-weight: 700;
+}
+
+/* Worst pick highlighting */
+.pick-history-item.worst-pick-highlight {
+    background: linear-gradient(135deg, rgba(255, 68, 68, 0.15) 0%, rgba(255, 68, 68, 0.05) 100%);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 0 12px rgba(255, 68, 68, 0.3);
+}
+
+.pick-history-item.worst-pick-highlight::before {
+    content: '⚠️';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.pick-history-item.worst-pick-highlight .pick-number {
+    color: #ff4444;
+    font-weight: 700;
 }
 
 .pick-number {
@@ -520,4 +566,170 @@
     background-color: #4a9eff;
     color: #ffffff;
     transform: translateX(-2px);
+}
+
+/* Pick Quality Indicators */
+.pick-quality-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1e1e1e;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+}
+
+.quality-a-plus {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); /* Gold */
+}
+
+.quality-a {
+    background: linear-gradient(135deg, #44ff88 0%, #66ffaa 100%); /* Green */
+}
+
+.quality-b {
+    background: linear-gradient(135deg, #4a9eff 0%, #6ab0ff 100%); /* Blue */
+}
+
+.quality-c {
+    background: linear-gradient(135deg, #ffaa44 0%, #ffbb66 100%); /* Orange */
+}
+
+.quality-d {
+    background: linear-gradient(135deg, #ff8844 0%, #ff9966 100%); /* Dark Orange */
+}
+
+.quality-f {
+    background: linear-gradient(135deg, #ff4444 0%, #ff6666 100%); /* Red */
+}
+
+/* Pick Quality Tooltip */
+.pick-quality-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2d2d2d;
+    border: 2px solid #4a9eff;
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 250px;
+    max-width: 350px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.pick-history-item:hover .pick-quality-tooltip {
+    opacity: 1;
+}
+
+.pick-quality-tooltip h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a9eff;
+    border-bottom: 1px solid #444444;
+    padding-bottom: 6px;
+}
+
+.pick-quality-tooltip .picked-stats {
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+.pick-quality-tooltip .picked-stats div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    color: #cccccc;
+}
+
+.pick-quality-tooltip .picked-stats .label {
+    color: #888888;
+}
+
+.pick-quality-tooltip .picked-stats .value {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.pick-quality-tooltip .alternatives {
+    margin-top: 10px;
+}
+
+.pick-quality-tooltip .alternatives h5 {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #888888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pick-quality-tooltip .alternative-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 11px;
+    color: #aaaaaa;
+}
+
+.pick-quality-tooltip .alternative-card .card-name {
+    flex: 1;
+    color: #ffffff;
+}
+
+.pick-quality-tooltip .alternative-card .gihwr {
+    font-weight: 600;
+    color: #4a9eff;
+    margin-left: 8px;
+}
+
+/* Analyze Draft Button */
+.btn-analyze-draft {
+    background-color: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-analyze-draft:hover {
+    background-color: #5ab0ff;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-analyze-draft:active {
+    transform: translateY(0);
+}
+
+.btn-analyze-draft:disabled {
+    background-color: #2d2d2d;
+    color: #888888;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-analyze-draft .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }

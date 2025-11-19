@@ -1,3 +1,99 @@
+export namespace grading {
+	
+	export class DraftGrade {
+	    overall_grade: string;
+	    overall_score: number;
+	    pick_quality_score: number;
+	    color_discipline_score: number;
+	    deck_composition_score: number;
+	    strategic_score: number;
+	    best_picks: string[];
+	    worst_picks: string[];
+	    suggestions: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftGrade(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.overall_grade = source["overall_grade"];
+	        this.overall_score = source["overall_score"];
+	        this.pick_quality_score = source["pick_quality_score"];
+	        this.color_discipline_score = source["color_discipline_score"];
+	        this.deck_composition_score = source["deck_composition_score"];
+	        this.strategic_score = source["strategic_score"];
+	        this.best_picks = source["best_picks"];
+	        this.worst_picks = source["worst_picks"];
+	        this.suggestions = source["suggestions"];
+	    }
+	}
+
+}
+
+export namespace main {
+	
+	export class CardRatingWithTier {
+	    name: string;
+	    color: string;
+	    rarity: string;
+	    mtga_id?: number;
+	    ever_drawn_win_rate: number;
+	    opening_hand_win_rate: number;
+	    ever_drawn_game_win_rate: number;
+	    drawn_win_rate: number;
+	    in_hand_win_rate: number;
+	    ever_drawn_improvement_win_rate: number;
+	    opening_hand_improvement_win_rate: number;
+	    drawn_improvement_win_rate: number;
+	    in_hand_improvement_win_rate: number;
+	    avg_seen: number;
+	    avg_pick: number;
+	    pick_rate?: number;
+	    "# ever_drawn": number;
+	    "# opening_hand": number;
+	    "# games": number;
+	    "# drawn": number;
+	    "# in_hand_drawn": number;
+	    "# games_played"?: number;
+	    "# decks"?: number;
+	    tier: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CardRatingWithTier(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.rarity = source["rarity"];
+	        this.mtga_id = source["mtga_id"];
+	        this.ever_drawn_win_rate = source["ever_drawn_win_rate"];
+	        this.opening_hand_win_rate = source["opening_hand_win_rate"];
+	        this.ever_drawn_game_win_rate = source["ever_drawn_game_win_rate"];
+	        this.drawn_win_rate = source["drawn_win_rate"];
+	        this.in_hand_win_rate = source["in_hand_win_rate"];
+	        this.ever_drawn_improvement_win_rate = source["ever_drawn_improvement_win_rate"];
+	        this.opening_hand_improvement_win_rate = source["opening_hand_improvement_win_rate"];
+	        this.drawn_improvement_win_rate = source["drawn_improvement_win_rate"];
+	        this.in_hand_improvement_win_rate = source["in_hand_improvement_win_rate"];
+	        this.avg_seen = source["avg_seen"];
+	        this.avg_pick = source["avg_pick"];
+	        this.pick_rate = source["pick_rate"];
+	        this["# ever_drawn"] = source["# ever_drawn"];
+	        this["# opening_hand"] = source["# opening_hand"];
+	        this["# games"] = source["# games"];
+	        this["# drawn"] = source["# drawn"];
+	        this["# in_hand_drawn"] = source["# in_hand_drawn"];
+	        this["# games_played"] = source["# games_played"];
+	        this["# decks"] = source["# decks"];
+	        this.tier = source["tier"];
+	    }
+	}
+
+}
+
 export namespace models {
 	
 	export class Account {
@@ -153,6 +249,11 @@ export namespace models {
 	    PickNumber: number;
 	    CardID: string;
 	    Timestamp: time.Time;
+	    PickQualityGrade?: string;
+	    PickQualityRank?: number;
+	    PackBestGIHWR?: number;
+	    PickedCardGIHWR?: number;
+	    AlternativesJSON?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DraftPickSession(source);
@@ -166,6 +267,11 @@ export namespace models {
 	        this.PickNumber = source["PickNumber"];
 	        this.CardID = source["CardID"];
 	        this.Timestamp = this.convertValues(source["Timestamp"], time.Time);
+	        this.PickQualityGrade = source["PickQualityGrade"];
+	        this.PickQualityRank = source["PickQualityRank"];
+	        this.PackBestGIHWR = source["PackBestGIHWR"];
+	        this.PickedCardGIHWR = source["PickedCardGIHWR"];
+	        this.AlternativesJSON = source["AlternativesJSON"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -195,6 +301,12 @@ export namespace models {
 	    EndTime?: time.Time;
 	    Status: string;
 	    TotalPicks: number;
+	    OverallGrade?: string;
+	    OverallScore?: number;
+	    PickQualityScore?: number;
+	    ColorDisciplineScore?: number;
+	    DeckCompositionScore?: number;
+	    StrategicScore?: number;
 	    CreatedAt: time.Time;
 	    UpdatedAt: time.Time;
 	
@@ -212,6 +324,12 @@ export namespace models {
 	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
 	        this.Status = source["Status"];
 	        this.TotalPicks = source["TotalPicks"];
+	        this.OverallGrade = source["OverallGrade"];
+	        this.OverallScore = source["OverallScore"];
+	        this.PickQualityScore = source["PickQualityScore"];
+	        this.ColorDisciplineScore = source["ColorDisciplineScore"];
+	        this.DeckCompositionScore = source["DeckCompositionScore"];
+	        this.StrategicScore = source["StrategicScore"];
 	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
 	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], time.Time);
 	    }
@@ -591,6 +709,110 @@ export namespace models {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace pickquality {
+	
+	export class Alternative {
+	    card_id: string;
+	    card_name: string;
+	    gihwr: number;
+	    rank: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Alternative(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.card_id = source["card_id"];
+	        this.card_name = source["card_name"];
+	        this.gihwr = source["gihwr"];
+	        this.rank = source["rank"];
+	    }
+	}
+	export class PickQuality {
+	    grade: string;
+	    rank: number;
+	    pack_best_gihwr: number;
+	    picked_card_gihwr: number;
+	    alternatives: Alternative[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PickQuality(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.grade = source["grade"];
+	        this.rank = source["rank"];
+	        this.pack_best_gihwr = source["pack_best_gihwr"];
+	        this.picked_card_gihwr = source["picked_card_gihwr"];
+	        this.alternatives = this.convertValues(source["alternatives"], Alternative);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace seventeenlands {
+	
+	export class ColorRating {
+	    color_name: string;
+	    colors?: string[];
+	    is_splash?: boolean;
+	    splash_color?: string;
+	    win_rate: number;
+	    match_win_rate?: number;
+	    game_win_rate?: number;
+	    "# games": number;
+	    "# matches"?: number;
+	    "# wins"?: number;
+	    "# losses"?: number;
+	    "# decks"?: number;
+	    avg_mainboard?: number;
+	    avg_sideboard?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorRating(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.color_name = source["color_name"];
+	        this.colors = source["colors"];
+	        this.is_splash = source["is_splash"];
+	        this.splash_color = source["splash_color"];
+	        this.win_rate = source["win_rate"];
+	        this.match_win_rate = source["match_win_rate"];
+	        this.game_win_rate = source["game_win_rate"];
+	        this["# games"] = source["# games"];
+	        this["# matches"] = source["# matches"];
+	        this["# wins"] = source["# wins"];
+	        this["# losses"] = source["# losses"];
+	        this["# decks"] = source["# decks"];
+	        this.avg_mainboard = source["avg_mainboard"];
+	        this.avg_sideboard = source["avg_sideboard"];
+	    }
 	}
 
 }

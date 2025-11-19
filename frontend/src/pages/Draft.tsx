@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade } from '../../wailsjs/go/main/App';
+import { models, pickquality, grading } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
+import TierList from '../components/TierList';
+import { DraftGrade } from '../components/DraftGrade';
 import './Draft.css';
 
 interface DraftState {
@@ -24,6 +26,7 @@ interface HistoricalDraftDetailState {
     picks: models.DraftPickSession[];
     packs: models.DraftPackSession[];
     pickedCards: models.SetCard[];
+    grade: grading.DraftGrade | null;
     loading: boolean;
     error: string | null;
 }
@@ -49,11 +52,14 @@ const Draft: React.FC = () => {
         picks: [],
         packs: [],
         pickedCards: [],
+        grade: null,
         loading: false,
         error: null,
     });
 
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
 
     useEffect(() => {
         // Fix any draft sessions that should be marked as completed
@@ -119,11 +125,20 @@ const Draft: React.FC = () => {
             const pickedCardsResults = await Promise.all(pickedCardsPromises);
             const pickedCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
 
+            // Try to load grade if it exists
+            let grade: grading.DraftGrade | null = null;
+            try {
+                grade = await GetDraftGrade(session.ID);
+            } catch {
+                // Grade doesn't exist yet, that's okay
+            }
+
             setHistoricalDetailState({
                 session,
                 picks: picks || [],
                 packs: packs || [],
                 pickedCards,
+                grade,
                 loading: false,
                 error: null,
             });
@@ -143,6 +158,7 @@ const Draft: React.FC = () => {
             picks: [],
             packs: [],
             pickedCards: [],
+            grade: null,
             loading: false,
             error: null,
         });
@@ -201,6 +217,59 @@ const Draft: React.FC = () => {
         return new Set(state.picks.map(pick => pick.CardID));
     };
 
+    const handleAnalyzeDraft = async () => {
+        if (!state.session) return;
+
+        try {
+            setIsAnalyzing(true);
+            await AnalyzeSessionPickQuality(state.session.ID);
+            // Reload picks to get updated quality data
+            await loadActiveDraft();
+        } catch (error) {
+            console.error('Failed to analyze draft:', error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const getPickQualityClass = (grade: string | undefined): string => {
+        if (!grade) return '';
+        switch (grade) {
+            case 'A+':
+                return 'quality-a-plus';
+            case 'A':
+                return 'quality-a';
+            case 'B':
+                return 'quality-b';
+            case 'C':
+                return 'quality-c';
+            case 'D':
+                return 'quality-d';
+            case 'F':
+                return 'quality-f';
+            default:
+                return '';
+        }
+    };
+
+    const loadPickAlternatives = async (sessionID: string, packNum: number, pickNum: number) => {
+        const key = `${sessionID}-${packNum}-${pickNum}`;
+        if (pickAlternatives.has(key)) {
+            return pickAlternatives.get(key);
+        }
+
+        try {
+            const alternatives = await GetPickAlternatives(sessionID, packNum, pickNum);
+            if (alternatives) {
+                setPickAlternatives(prev => new Map(prev).set(key, alternatives));
+                return alternatives;
+            }
+        } catch (error) {
+            console.error('Failed to load pick alternatives:', error);
+        }
+        return null;
+    };
+
     if (state.loading) {
         return (
             <div className="draft-container">
@@ -226,6 +295,16 @@ const Draft: React.FC = () => {
                         <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
                         <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
                     </div>
+                    {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
+                        <DraftGrade
+                            sessionID={historicalDetailState.session.ID}
+                            showCalculateButton={true}
+                            onGradeCalculated={async (grade) => {
+                                // Reload the grade to refresh best/worst pick highlighting
+                                setHistoricalDetailState(prev => ({ ...prev, grade }));
+                            }}
+                        />
+                    )}
                 </div>
 
                 <div className="draft-content">
@@ -260,8 +339,24 @@ const Draft: React.FC = () => {
                             <div className="pick-history-grid">
                                 {historicalDetailState.picks.map((pick) => {
                                     const card = historicalDetailState.pickedCards.find(c => c.ArenaID === pick.CardID);
+                                    const hasQuality = pick.PickQualityGrade !== null && pick.PickQualityGrade !== undefined;
+                                    const altKey = `${pick.SessionID}-${pick.PackNumber}-${pick.PickNumber}`;
+                                    const alternatives = pickAlternatives.get(altKey);
+
+                                    // Check if this pick is in best/worst picks
+                                    const isBestPick = historicalDetailState.grade?.best_picks?.some(bp =>
+                                        card && bp.includes(card.Name)
+                                    );
+                                    const isWorstPick = historicalDetailState.grade?.worst_picks?.some(wp =>
+                                        card && wp.includes(card.Name)
+                                    );
+
+                                    let highlightClass = '';
+                                    if (isBestPick) highlightClass = 'best-pick-highlight';
+                                    if (isWorstPick) highlightClass = 'worst-pick-highlight';
+
                                     return (
-                                        <div key={pick.ID} className="pick-history-item">
+                                        <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
                                             <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                             {card && card.ImageURLSmall && (
                                                 <img
@@ -270,10 +365,50 @@ const Draft: React.FC = () => {
                                                     title={card.Name}
                                                     onClick={() => handleCardHover(card)}
                                                     style={{ cursor: 'pointer' }}
+                                                    onMouseEnter={() => {
+                                                        if (hasQuality && !alternatives) {
+                                                            loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                        }
+                                                    }}
                                                 />
                                             )}
                                             {card && !card.ImageURLSmall && (
                                                 <div className="card-name-small">{card.Name}</div>
+                                            )}
+                                            {hasQuality && (
+                                                <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                    {pick.PickQualityGrade}
+                                                </div>
+                                            )}
+                                            {hasQuality && alternatives && (
+                                                <div className="pick-quality-tooltip">
+                                                    <h4>Pick Quality Analysis</h4>
+                                                    <div className="picked-stats">
+                                                        <div>
+                                                            <span className="label">Grade:</span>
+                                                            <span className="value">{alternatives.grade}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="label">Rank in Pack:</span>
+                                                            <span className="value">#{alternatives.rank}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="label">GIHWR:</span>
+                                                            <span className="value">{alternatives.picked_card_gihwr.toFixed(1)}%</span>
+                                                        </div>
+                                                    </div>
+                                                    {alternatives.alternatives && alternatives.alternatives.length > 0 && (
+                                                        <div className="alternatives">
+                                                            <h5>Better Options in Pack:</h5>
+                                                            {alternatives.alternatives.slice(0, 3).map((alt: pickquality.Alternative, idx: number) => (
+                                                                <div key={idx} className="alternative-card">
+                                                                    <span className="card-name">{alt.card_name}</span>
+                                                                    <span className="gihwr">{alt.gihwr.toFixed(1)}%</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     );
@@ -383,7 +518,10 @@ const Draft: React.FC = () => {
                                     <div key={session.ID} className="draft-card">
                                         <div className="draft-card-header">
                                             <h3>{session.EventName}</h3>
-                                            <span className="draft-set-badge">{session.SetCode}</span>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <span className="draft-set-badge">{session.SetCode}</span>
+                                                <DraftGrade sessionID={session.ID} compact={true} />
+                                            </div>
                                         </div>
                                         <div className="draft-card-info">
                                             <div className="draft-stat">
@@ -423,11 +561,29 @@ const Draft: React.FC = () => {
     return (
         <div className="draft-container">
             <div className="draft-header">
-                <h1>Draft Assistant</h1>
-                <div className="draft-info">
-                    <span className="draft-event">{state.session.EventName}</span>
-                    <span className="draft-set">Set: {state.session.SetCode}</span>
-                    <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div>
+                        <h1>Draft Assistant</h1>
+                        <div className="draft-info">
+                            <span className="draft-event">{state.session.EventName}</span>
+                            <span className="draft-set">Set: {state.session.SetCode}</span>
+                            <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
+                        </div>
+                    </div>
+                    <button
+                        className="btn-analyze-draft"
+                        onClick={handleAnalyzeDraft}
+                        disabled={isAnalyzing || state.picks.length === 0}
+                    >
+                        {isAnalyzing ? (
+                            <>
+                                <div className="spinner"></div>
+                                Analyzing...
+                            </>
+                        ) : (
+                            '🎯 Analyze Pick Quality'
+                        )}
+                    </button>
                 </div>
             </div>
 
@@ -456,7 +612,7 @@ const Draft: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Right: Pick History */}
+                {/* Right: Pick History and Tier List */}
                 <div className="draft-details-section">
                     {/* Pick History */}
                     <div className="pick-history">
@@ -464,6 +620,10 @@ const Draft: React.FC = () => {
                         <div className="pick-history-grid">
                             {state.picks.map((pick) => {
                                 const card = state.setCards.find(c => c.ArenaID === pick.CardID);
+                                const hasQuality = pick.PickQualityGrade !== null && pick.PickQualityGrade !== undefined;
+                                const altKey = `${pick.SessionID}-${pick.PackNumber}-${pick.PickNumber}`;
+                                const alternatives = pickAlternatives.get(altKey);
+
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
                                         <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
@@ -474,16 +634,69 @@ const Draft: React.FC = () => {
                                                 title={card.Name}
                                                 onClick={() => handleCardHover(card)}
                                                 style={{ cursor: 'pointer' }}
+                                                onMouseEnter={() => {
+                                                    if (hasQuality && !alternatives) {
+                                                        loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                    }
+                                                }}
                                             />
                                         )}
                                         {card && !card.ImageURLSmall && (
                                             <div className="card-name-small">{card.Name}</div>
+                                        )}
+                                        {hasQuality && (
+                                            <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                {pick.PickQualityGrade}
+                                            </div>
+                                        )}
+                                        {hasQuality && alternatives && (
+                                            <div className="pick-quality-tooltip">
+                                                <h4>Pick Quality Analysis</h4>
+                                                <div className="picked-stats">
+                                                    <div>
+                                                        <span className="label">Grade:</span>
+                                                        <span className="value">{alternatives.grade}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="label">Rank in Pack:</span>
+                                                        <span className="value">#{alternatives.rank}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="label">GIHWR:</span>
+                                                        <span className="value">{alternatives.picked_card_gihwr.toFixed(1)}%</span>
+                                                    </div>
+                                                </div>
+                                                {alternatives.alternatives && alternatives.alternatives.length > 0 && (
+                                                    <div className="alternatives">
+                                                        <h5>Better Options in Pack:</h5>
+                                                        {alternatives.alternatives.slice(0, 3).map((alt: pickquality.Alternative, idx: number) => (
+                                                            <div key={idx} className="alternative-card">
+                                                                <span className="card-name">{alt.card_name}</span>
+                                                                <span className="gihwr">{alt.gihwr.toFixed(1)}%</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 );
                             })}
                         </div>
                     </div>
+
+                    {/* Tier List */}
+                    <TierList
+                        setCode={state.session.SetCode}
+                        draftFormat={state.session.EventName}
+                        pickedCardIds={pickedCardIds}
+                        onCardClick={(arenaId) => {
+                            const card = state.setCards.find(c => c.ArenaID === String(arenaId));
+                            if (card) {
+                                handleCardHover(card);
+                            }
+                        }}
+                    />
                 </div>
 
                 {/* Card Details Overlay */}
