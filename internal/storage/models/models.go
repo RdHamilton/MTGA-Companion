@@ -333,6 +333,11 @@ type DraftSession struct {
 	ColorDisciplineScore *float64 // Component score (0-20)
 	DeckCompositionScore *float64 // Component score (0-25)
 	StrategicScore       *float64 // Component score (0-15)
+	PredictedWinRate     *float64 // Predicted win rate (0.0-1.0)
+	PredictedWinRateMin  *float64 // Lower confidence bound
+	PredictedWinRateMax  *float64 // Upper confidence bound
+	PredictionFactors    *string  // JSON breakdown of prediction factors
+	PredictedAt          *time.Time
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }

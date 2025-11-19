@@ -20,6 +20,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/pickquality"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/prediction"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -1594,4 +1595,40 @@ func (a *App) GetDraftGrade(sessionID string) (*grading.DraftGrade, error) {
 		// Best/worst picks and suggestions would need to be recalculated
 		// or stored separately - for now just return the scores
 	}, nil
+}
+
+// PredictDraftWinRate calculates and stores the win rate prediction for a draft session
+func (a *App) PredictDraftWinRate(sessionID string) (*prediction.DeckPrediction, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Create prediction service
+	predictionService := prediction.NewService(a.service.GetDB())
+
+	// Calculate prediction
+	pred, err := predictionService.PredictSessionWinRate(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to predict win rate: %v", err)}
+	}
+
+	return pred, nil
+}
+
+// GetDraftWinRatePrediction retrieves the stored win rate prediction for a draft session
+func (a *App) GetDraftWinRatePrediction(sessionID string) (*prediction.DeckPrediction, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Create prediction service
+	predictionService := prediction.NewService(a.service.GetDB())
+
+	// Get stored prediction
+	pred, err := predictionService.GetSessionPrediction(sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get prediction: %v", err)}
+	}
+
+	return pred, nil
 }

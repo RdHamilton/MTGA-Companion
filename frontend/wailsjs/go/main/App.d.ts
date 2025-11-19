@@ -4,6 +4,7 @@ import {grading} from '../models';
 import {models} from '../models';
 import {main} from '../models';
 import {seventeenlands} from '../models';
+import {prediction} from '../models';
 import {storage} from '../models';
 import {pickquality} from '../models';
 import {time} from '../models';
@@ -50,6 +51,8 @@ export function GetDraftPicks(arg1:string):Promise<Array<models.DraftPickSession
 
 export function GetDraftSession(arg1:string):Promise<models.DraftSession>;
 
+export function GetDraftWinRatePrediction(arg1:string):Promise<prediction.DeckPrediction>;
+
 export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribution>>;
 
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
@@ -79,6 +82,8 @@ export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:
 export function ImportFromFile():Promise<void>;
 
 export function Initialize(arg1:string):Promise<void>;
+
+export function PredictDraftWinRate(arg1:string):Promise<prediction.DeckPrediction>;
 
 export function ReconnectToDaemon():Promise<void>;
 
