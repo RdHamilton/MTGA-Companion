@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses, AnalyzeSessionPickQuality, GetPickAlternatives } from '../../wailsjs/go/main/App';
+import { models, pickquality } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import TierList from '../components/TierList';
 import './Draft.css';
@@ -55,6 +55,8 @@ const Draft: React.FC = () => {
     });
 
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
 
     useEffect(() => {
         // Fix any draft sessions that should be marked as completed
@@ -202,6 +204,59 @@ const Draft: React.FC = () => {
         return new Set(state.picks.map(pick => pick.CardID));
     };
 
+    const handleAnalyzeDraft = async () => {
+        if (!state.session) return;
+
+        try {
+            setIsAnalyzing(true);
+            await AnalyzeSessionPickQuality(state.session.ID);
+            // Reload picks to get updated quality data
+            await loadActiveDraft();
+        } catch (error) {
+            console.error('Failed to analyze draft:', error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const getPickQualityClass = (grade: string | undefined): string => {
+        if (!grade) return '';
+        switch (grade) {
+            case 'A+':
+                return 'quality-a-plus';
+            case 'A':
+                return 'quality-a';
+            case 'B':
+                return 'quality-b';
+            case 'C':
+                return 'quality-c';
+            case 'D':
+                return 'quality-d';
+            case 'F':
+                return 'quality-f';
+            default:
+                return '';
+        }
+    };
+
+    const loadPickAlternatives = async (sessionID: string, packNum: number, pickNum: number) => {
+        const key = `${sessionID}-${packNum}-${pickNum}`;
+        if (pickAlternatives.has(key)) {
+            return pickAlternatives.get(key);
+        }
+
+        try {
+            const alternatives = await GetPickAlternatives(sessionID, packNum, pickNum);
+            if (alternatives) {
+                setPickAlternatives(prev => new Map(prev).set(key, alternatives));
+                return alternatives;
+            }
+        } catch (error) {
+            console.error('Failed to load pick alternatives:', error);
+        }
+        return null;
+    };
+
     if (state.loading) {
         return (
             <div className="draft-container">
@@ -261,6 +316,10 @@ const Draft: React.FC = () => {
                             <div className="pick-history-grid">
                                 {historicalDetailState.picks.map((pick) => {
                                     const card = historicalDetailState.pickedCards.find(c => c.ArenaID === pick.CardID);
+                                    const hasQuality = pick.PickQualityGrade !== null && pick.PickQualityGrade !== undefined;
+                                    const altKey = `${pick.SessionID}-${pick.PackNumber}-${pick.PickNumber}`;
+                                    const alternatives = pickAlternatives.get(altKey);
+
                                     return (
                                         <div key={pick.ID} className="pick-history-item">
                                             <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
@@ -271,10 +330,50 @@ const Draft: React.FC = () => {
                                                     title={card.Name}
                                                     onClick={() => handleCardHover(card)}
                                                     style={{ cursor: 'pointer' }}
+                                                    onMouseEnter={() => {
+                                                        if (hasQuality && !alternatives) {
+                                                            loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                        }
+                                                    }}
                                                 />
                                             )}
                                             {card && !card.ImageURLSmall && (
                                                 <div className="card-name-small">{card.Name}</div>
+                                            )}
+                                            {hasQuality && (
+                                                <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                    {pick.PickQualityGrade}
+                                                </div>
+                                            )}
+                                            {hasQuality && alternatives && (
+                                                <div className="pick-quality-tooltip">
+                                                    <h4>Pick Quality Analysis</h4>
+                                                    <div className="picked-stats">
+                                                        <div>
+                                                            <span className="label">Grade:</span>
+                                                            <span className="value">{alternatives.grade}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="label">Rank in Pack:</span>
+                                                            <span className="value">#{alternatives.rank}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="label">GIHWR:</span>
+                                                            <span className="value">{alternatives.picked_card_gihwr.toFixed(1)}%</span>
+                                                        </div>
+                                                    </div>
+                                                    {alternatives.alternatives && alternatives.alternatives.length > 0 && (
+                                                        <div className="alternatives">
+                                                            <h5>Better Options in Pack:</h5>
+                                                            {alternatives.alternatives.slice(0, 3).map((alt: pickquality.Alternative, idx: number) => (
+                                                                <div key={idx} className="alternative-card">
+                                                                    <span className="card-name">{alt.card_name}</span>
+                                                                    <span className="gihwr">{alt.gihwr.toFixed(1)}%</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     );
@@ -424,11 +523,29 @@ const Draft: React.FC = () => {
     return (
         <div className="draft-container">
             <div className="draft-header">
-                <h1>Draft Assistant</h1>
-                <div className="draft-info">
-                    <span className="draft-event">{state.session.EventName}</span>
-                    <span className="draft-set">Set: {state.session.SetCode}</span>
-                    <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div>
+                        <h1>Draft Assistant</h1>
+                        <div className="draft-info">
+                            <span className="draft-event">{state.session.EventName}</span>
+                            <span className="draft-set">Set: {state.session.SetCode}</span>
+                            <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
+                        </div>
+                    </div>
+                    <button
+                        className="btn-analyze-draft"
+                        onClick={handleAnalyzeDraft}
+                        disabled={isAnalyzing || state.picks.length === 0}
+                    >
+                        {isAnalyzing ? (
+                            <>
+                                <div className="spinner"></div>
+                                Analyzing...
+                            </>
+                        ) : (
+                            '🎯 Analyze Pick Quality'
+                        )}
+                    </button>
                 </div>
             </div>
 
@@ -465,6 +582,10 @@ const Draft: React.FC = () => {
                         <div className="pick-history-grid">
                             {state.picks.map((pick) => {
                                 const card = state.setCards.find(c => c.ArenaID === pick.CardID);
+                                const hasQuality = pick.PickQualityGrade !== null && pick.PickQualityGrade !== undefined;
+                                const altKey = `${pick.SessionID}-${pick.PackNumber}-${pick.PickNumber}`;
+                                const alternatives = pickAlternatives.get(altKey);
+
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
                                         <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
@@ -475,10 +596,50 @@ const Draft: React.FC = () => {
                                                 title={card.Name}
                                                 onClick={() => handleCardHover(card)}
                                                 style={{ cursor: 'pointer' }}
+                                                onMouseEnter={() => {
+                                                    if (hasQuality && !alternatives) {
+                                                        loadPickAlternatives(pick.SessionID, pick.PackNumber, pick.PickNumber);
+                                                    }
+                                                }}
                                             />
                                         )}
                                         {card && !card.ImageURLSmall && (
                                             <div className="card-name-small">{card.Name}</div>
+                                        )}
+                                        {hasQuality && (
+                                            <div className={`pick-quality-badge ${getPickQualityClass(pick.PickQualityGrade)}`}>
+                                                {pick.PickQualityGrade}
+                                            </div>
+                                        )}
+                                        {hasQuality && alternatives && (
+                                            <div className="pick-quality-tooltip">
+                                                <h4>Pick Quality Analysis</h4>
+                                                <div className="picked-stats">
+                                                    <div>
+                                                        <span className="label">Grade:</span>
+                                                        <span className="value">{alternatives.grade}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="label">Rank in Pack:</span>
+                                                        <span className="value">#{alternatives.rank}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="label">GIHWR:</span>
+                                                        <span className="value">{alternatives.picked_card_gihwr.toFixed(1)}%</span>
+                                                    </div>
+                                                </div>
+                                                {alternatives.alternatives && alternatives.alternatives.length > 0 && (
+                                                    <div className="alternatives">
+                                                        <h5>Better Options in Pack:</h5>
+                                                        {alternatives.alternatives.slice(0, 3).map((alt: pickquality.Alternative, idx: number) => (
+                                                            <div key={idx} className="alternative-card">
+                                                                <span className="card-name">{alt.card_name}</span>
+                                                                <span className="gihwr">{alt.gihwr.toFixed(1)}%</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 );

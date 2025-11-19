@@ -4,7 +4,10 @@ import {models} from '../models';
 import {main} from '../models';
 import {seventeenlands} from '../models';
 import {storage} from '../models';
+import {pickquality} from '../models';
 import {time} from '../models';
+
+export function AnalyzeSessionPickQuality(arg1:string):Promise<void>;
 
 export function ClearAllData():Promise<void>;
 
@@ -47,6 +50,8 @@ export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribu
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;
+
+export function GetPickAlternatives(arg1:string,arg2:number,arg3:number):Promise<pickquality.PickQuality>;
 
 export function GetQuestHistory(arg1:string,arg2:string,arg3:number):Promise<Array<models.Quest>>;
 
