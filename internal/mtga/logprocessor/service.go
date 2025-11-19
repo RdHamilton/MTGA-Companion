@@ -672,31 +672,37 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 		expectedPicks = 45
 	}
 
-	// In replay mode, check if session already exists to avoid overwriting metadata
-	if s.replayMode {
-		existingSession, err := s.storage.DraftRepo().GetSession(ctx, data.SessionID)
-		if err == nil && existingSession != nil {
-			// Session exists - only update picks/packs, don't recreate session
-			log.Printf("DEBUG: Session %s already exists, only adding new picks/packs", data.SessionID)
-
-			// Store new picks (INSERT OR REPLACE will handle duplicates)
-			for _, pick := range data.Picks {
-				if err := s.storage.DraftRepo().SavePick(ctx, pick); err != nil {
-					log.Printf("Warning: Failed to save pick: %v", err)
-				}
-			}
-
-			// Store new packs (INSERT OR REPLACE will handle duplicates)
-			for _, pack := range data.Packs {
-				if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
-					log.Printf("Warning: Failed to save pack: %v", err)
-				}
-			}
-
-			return nil
+	// Check if session already exists to avoid overwriting metadata
+	// This applies to BOTH replay mode AND real-time mode because:
+	// - Real-time: Log poller batches entries every 5 seconds, so picks come in multiple batches
+	// - Replay: Events processed one at a time
+	existingSession, err := s.storage.DraftRepo().GetSession(ctx, data.SessionID)
+	if err == nil && existingSession != nil {
+		// Session exists - only update picks/packs, don't recreate session
+		if s.replayMode {
+			log.Printf("DEBUG: [REPLAY] Session %s already exists, only adding new picks/packs", data.SessionID)
 		}
-		// Session doesn't exist yet, create it below
-		log.Printf("DEBUG: Session %s doesn't exist, creating new session", data.SessionID)
+
+		// Store new picks (INSERT OR REPLACE will handle duplicates)
+		for _, pick := range data.Picks {
+			if err := s.storage.DraftRepo().SavePick(ctx, pick); err != nil {
+				log.Printf("Warning: Failed to save pick: %v", err)
+			}
+		}
+
+		// Store new packs (INSERT OR REPLACE will handle duplicates)
+		for _, pack := range data.Packs {
+			if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
+				log.Printf("Warning: Failed to save pack: %v", err)
+			}
+		}
+
+		return nil
+	}
+
+	// Session doesn't exist yet, create it
+	if s.replayMode {
+		log.Printf("DEBUG: [REPLAY] Session %s doesn't exist, creating new session", data.SessionID)
 	}
 
 	// Create draft session (first time or non-replay mode)
