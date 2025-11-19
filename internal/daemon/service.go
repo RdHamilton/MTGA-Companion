@@ -31,6 +31,9 @@ type Service struct {
 	cancel       context.CancelFunc
 	startTime    time.Time
 
+	// Replay engine for testing
+	replayEngine *ReplayEngine
+
 	// Health tracking
 	healthMu       sync.RWMutex
 	lastLogRead    time.Time
@@ -43,7 +46,7 @@ type Service struct {
 func New(config *Config, storage *storage.Service) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &Service{
+	s := &Service{
 		config:       config,
 		storage:      storage,
 		logProcessor: logprocessor.NewService(storage),
@@ -51,6 +54,11 @@ func New(config *Config, storage *storage.Service) *Service {
 		ctx:          ctx,
 		cancel:       cancel,
 	}
+
+	// Initialize replay engine
+	s.replayEngine = NewReplayEngine(s)
+
+	return s
 }
 
 // Start starts the daemon service.
@@ -1108,4 +1116,29 @@ func (s *Service) archiveOnShutdown() error {
 
 	log.Println("✓ Archived Player.log before shutdown")
 	return nil
+}
+
+// StartReplay starts replay of a log file with the specified speed and filter.
+func (s *Service) StartReplay(logPath string, speed float64, filterType string) error {
+	return s.replayEngine.Start(logPath, speed, filterType)
+}
+
+// PauseReplay pauses the active replay.
+func (s *Service) PauseReplay() error {
+	return s.replayEngine.Pause()
+}
+
+// ResumeReplay resumes a paused replay.
+func (s *Service) ResumeReplay() error {
+	return s.replayEngine.Resume()
+}
+
+// StopReplay stops the active replay.
+func (s *Service) StopReplay() error {
+	return s.replayEngine.Stop()
+}
+
+// GetReplayStatus returns the current replay status.
+func (s *Service) GetReplayStatus() map[string]interface{} {
+	return s.replayEngine.GetStatus()
 }
