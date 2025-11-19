@@ -17,6 +17,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -1301,4 +1302,96 @@ func (a *App) FixDraftSessionStatuses() (int, error) {
 	}
 
 	return updated, nil
+}
+
+// CardRatingWithTier represents a card rating with calculated tier.
+type CardRatingWithTier struct {
+	seventeenlands.CardRating
+	Tier string `json:"tier"` // S, A, B, C, D, or F
+}
+
+// GetCardRatings returns 17Lands card ratings for a set and draft format.
+func (a *App) GetCardRatings(setCode string, draftFormat string) ([]CardRatingWithTier, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get ratings from repository
+	ratings, _, err := a.service.DraftRatingsRepo().GetCardRatings(a.ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card ratings: %v", err)}
+	}
+
+	// Add tier to each rating
+	result := make([]CardRatingWithTier, len(ratings))
+	for i, rating := range ratings {
+		result[i] = CardRatingWithTier{
+			CardRating: rating,
+			Tier:       calculateTier(rating.GIHWR),
+		}
+	}
+
+	return result, nil
+}
+
+// GetCardRatingByArenaID returns the 17Lands rating for a specific card.
+func (a *App) GetCardRatingByArenaID(setCode string, draftFormat string, arenaID string) (*CardRatingWithTier, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	rating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, draftFormat, arenaID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card rating: %v", err)}
+	}
+
+	if rating == nil {
+		return nil, nil
+	}
+
+	return &CardRatingWithTier{
+		CardRating: *rating,
+		Tier:       calculateTier(rating.GIHWR),
+	}, nil
+}
+
+// GetColorRatings returns 17Lands color combination ratings for a set and draft format.
+func (a *App) GetColorRatings(setCode string, draftFormat string) ([]seventeenlands.ColorRating, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	ratings, _, err := a.service.DraftRatingsRepo().GetColorRatings(a.ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get color ratings: %v", err)}
+	}
+
+	return ratings, nil
+}
+
+// calculateTier determines the tier (S, A, B, C, D, F) based on GIHWR percentage.
+// Tier thresholds:
+// - S Tier (Bombs): GIHWR ≥ 60% - Format-defining cards
+// - A Tier: 57-59% - Excellent cards, high picks
+// - B Tier: 54-56% - Good playables
+// - C Tier: 51-53% - Filler/role players
+// - D Tier: 48-50% - Below average
+// - F Tier: < 48% - Avoid/sideboard
+func calculateTier(gihwr float64) string {
+	if gihwr >= 60 {
+		return "S"
+	}
+	if gihwr >= 57 {
+		return "A"
+	}
+	if gihwr >= 54 {
+		return "B"
+	}
+	if gihwr >= 51 {
+		return "C"
+	}
+	if gihwr >= 48 {
+		return "D"
+	}
+	return "F"
 }

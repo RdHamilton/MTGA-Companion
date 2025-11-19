@@ -38,6 +38,18 @@ export function GetCardByArenaID(arg1) {
   return window['go']['main']['App']['GetCardByArenaID'](arg1);
 }
 
+export function GetCardRatingByArenaID(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetCardRatingByArenaID'](arg1, arg2, arg3);
+}
+
+export function GetCardRatings(arg1, arg2) {
+  return window['go']['main']['App']['GetCardRatings'](arg1, arg2);
+}
+
+export function GetColorRatings(arg1, arg2) {
+  return window['go']['main']['App']['GetColorRatings'](arg1, arg2);
+}
+
 export function GetCompletedDraftSessions(arg1) {
   return window['go']['main']['App']['GetCompletedDraftSessions'](arg1);
 }
