@@ -593,34 +593,47 @@ func (r *ReplayEngine) GetStatus() map[string]interface{} {
 func (r *ReplayEngine) clearDraftSessions() error {
 	log.Println("DEBUG: clearDraftSessions() started")
 	ctx := context.Background()
+	db := r.service.storage.GetDB()
 
-	// Count existing sessions before delete
-	var countBefore int
-	countQuery := `SELECT COUNT(*) FROM draft_sessions`
-	if err := r.service.storage.GetDB().QueryRowContext(ctx, countQuery).Scan(&countBefore); err != nil {
-		log.Printf("DEBUG: Failed to count existing sessions: %v", err)
-	} else {
-		log.Printf("DEBUG: Found %d existing draft session(s) to delete", countBefore)
+	// Count existing data before delete
+	var sessionsBefore, picksBefore, packsBefore int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&sessionsBefore)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&picksBefore)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&packsBefore)
+	log.Printf("DEBUG: Before delete - Sessions: %d, Picks: %d, Packs: %d", sessionsBefore, picksBefore, packsBefore)
+
+	// Explicitly delete picks and packs first (in case CASCADE isn't enabled)
+	// This ensures we don't have orphaned picks/packs
+	log.Println("DEBUG: Deleting draft_picks...")
+	if _, err := db.ExecContext(ctx, `DELETE FROM draft_picks`); err != nil {
+		log.Printf("WARNING: Failed to delete draft_picks: %v", err)
 	}
 
-	// Delete all draft sessions (cascade will delete picks and packs)
-	query := `DELETE FROM draft_sessions`
-	result, err := r.service.storage.GetDB().ExecContext(ctx, query)
+	log.Println("DEBUG: Deleting draft_packs...")
+	if _, err := db.ExecContext(ctx, `DELETE FROM draft_packs`); err != nil {
+		log.Printf("WARNING: Failed to delete draft_packs: %v", err)
+	}
+
+	log.Println("DEBUG: Deleting draft_sessions...")
+	result, err := db.ExecContext(ctx, `DELETE FROM draft_sessions`)
 	if err != nil {
 		return fmt.Errorf("delete draft sessions: %w", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
-	log.Printf("DEBUG: DELETE query affected %d row(s)", rowsAffected)
+	log.Printf("DEBUG: Deleted %d session(s)", rowsAffected)
 
-	// Count sessions after delete to verify
-	var countAfter int
-	if err := r.service.storage.GetDB().QueryRowContext(ctx, countQuery).Scan(&countAfter); err != nil {
-		log.Printf("DEBUG: Failed to count sessions after delete: %v", err)
-	} else {
-		log.Printf("DEBUG: %d session(s) remaining after delete (should be 0)", countAfter)
+	// Count remaining data to verify cleanup
+	var sessionsAfter, picksAfter, packsAfter int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&sessionsAfter)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&picksAfter)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&packsAfter)
+	log.Printf("DEBUG: After delete - Sessions: %d, Picks: %d, Packs: %d", sessionsAfter, picksAfter, packsAfter)
+
+	if picksAfter > 0 || packsAfter > 0 {
+		log.Printf("⚠️  WARNING: %d pick(s) and %d pack(s) still remain after delete!", picksAfter, packsAfter)
 	}
 
-	log.Printf("Cleared %d draft session(s) from database", rowsAffected)
+	log.Printf("✓ Cleared %d session(s), %d pick(s), %d pack(s) from database", sessionsBefore, picksBefore, packsBefore)
 	return nil
 }
