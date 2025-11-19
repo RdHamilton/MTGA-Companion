@@ -238,7 +238,7 @@ const Draft: React.FC = () => {
                                     <div
                                         key={card.ID}
                                         className="card-item picked"
-                                        onMouseEnter={() => handleCardHover(card)}
+                                        onClick={() => handleCardHover(card)}
                                     >
                                         {card.ImageURLSmall ? (
                                             <img src={card.ImageURLSmall} alt={card.Name} />
@@ -268,7 +268,8 @@ const Draft: React.FC = () => {
                                                     src={card.ImageURLSmall}
                                                     alt={card.Name}
                                                     title={card.Name}
-                                                    onMouseEnter={() => handleCardHover(card)}
+                                                    onClick={() => handleCardHover(card)}
+                                                    style={{ cursor: 'pointer' }}
                                                 />
                                             )}
                                             {card && !card.ImageURLSmall && (
@@ -441,7 +442,7 @@ const Draft: React.FC = () => {
                                 <div
                                     key={card.ID}
                                     className={`card-item ${isPicked ? 'picked' : ''}`}
-                                    onMouseEnter={() => handleCardHover(card)}
+                                    onClick={() => handleCardHover(card)}
                                 >
                                     {card.ImageURLSmall ? (
                                         <img src={card.ImageURLSmall} alt={card.Name} />
@@ -471,7 +472,8 @@ const Draft: React.FC = () => {
                                                 src={card.ImageURLSmall}
                                                 alt={card.Name}
                                                 title={card.Name}
-                                                onMouseEnter={() => handleCardHover(card)}
+                                                onClick={() => handleCardHover(card)}
+                                                style={{ cursor: 'pointer' }}
                                             />
                                         )}
                                         {card && !card.ImageURLSmall && (
