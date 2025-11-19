@@ -1118,9 +1118,9 @@ func (s *Service) archiveOnShutdown() error {
 	return nil
 }
 
-// StartReplay starts replay of a log file with the specified speed and filter.
-func (s *Service) StartReplay(logPath string, speed float64, filterType string) error {
-	return s.replayEngine.Start(logPath, speed, filterType)
+// StartReplay starts replay of one or more log files with the specified speed and filter.
+func (s *Service) StartReplay(logPaths []string, speed float64, filterType string, pauseOnDraft bool) error {
+	return s.replayEngine.Start(logPaths, speed, filterType, pauseOnDraft)
 }
 
 // PauseReplay pauses the active replay.

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade } from '../../wailsjs/go/main/App';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade } from '../../wailsjs/go/main/App';
 import { models, pickquality, grading } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
+import { getReplayState } from '../App';
 import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';
 import { WinRatePrediction } from '../components/WinRatePrediction';
@@ -63,18 +64,11 @@ const Draft: React.FC = () => {
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
 
     useEffect(() => {
-        // Fix any draft sessions that should be marked as completed
-        FixDraftSessionStatuses().then((count) => {
-            if (count > 0) {
-                console.log(`Fixed ${count} draft session(s) status`);
-            }
-            // Load active draft after fixing statuses
-            loadActiveDraft();
-        }).catch((error) => {
-            console.error('Failed to fix draft session statuses:', error);
-            // Still load active draft even if fix fails
-            loadActiveDraft();
-        });
+        // Load active draft immediately
+        // Note: We don't call FixDraftSessionStatuses() here because:
+        // 1. It interferes with replay mode (marks replayed sessions as completed)
+        // 2. Session status management should be handled by the daemon, not the frontend
+        loadActiveDraft();
 
         // Listen for draft updates from backend
         const unsubscribe = EventsOn('draft:updated', () => {
@@ -573,8 +567,39 @@ const Draft: React.FC = () => {
     // Active draft view
     const pickedCardIds = getPickedCardIds();
 
+    // Check if we're in replay mode
+    const replayState = getReplayState();
+    const isReplayMode = replayState.isActive;
+    const isReplayPaused = replayState.isPaused;
+
     return (
         <div className="draft-container">
+            {/* Replay Mode Banner */}
+            {isReplayMode && (
+                <div style={{
+                    background: isReplayPaused ? '#ff9800' : '#4a9eff',
+                    color: 'white',
+                    padding: '12px 20px',
+                    margin: '0 0 16px 0',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontWeight: 'bold',
+                }}>
+                    {isReplayPaused ? '⏸️' : '▶️'}
+                    <span>
+                        {isReplayPaused ? 'Replay Paused' : 'Replay Active'} -
+                        Draft events are being replayed. The draft data will populate as events are processed.
+                    </span>
+                    {isReplayPaused && (
+                        <span style={{ marginLeft: 'auto', fontSize: '0.9em' }}>
+                            Go to Settings to resume
+                        </span>
+                    )}
+                </div>
+            )}
+
             <div className="draft-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>

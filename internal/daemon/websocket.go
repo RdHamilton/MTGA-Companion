@@ -100,8 +100,9 @@ func (s *WebSocketServer) Broadcast(event Event) {
 	event.Timestamp = time.Now()
 	select {
 	case s.broadcast <- event:
+		log.Printf("Broadcast: Queued event %s for %d client(s)", event.Type, s.ClientCount())
 	default:
-		log.Println("Warning: Broadcast channel full, dropping event")
+		log.Printf("Warning: Broadcast channel full, dropping event %s", event.Type)
 	}
 }
 
@@ -224,8 +225,40 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 				}
 			}()
 		case "start_replay":
-			// Extract parameters
-			filePath, _ := msg["file_path"].(string)
+			// Extract parameters - support both single file_path and multiple file_paths
+			var filePaths []string
+
+			// Check for new format (array of paths)
+			if paths, ok := msg["file_paths"].([]interface{}); ok {
+				for _, p := range paths {
+					if pathStr, ok := p.(string); ok {
+						filePaths = append(filePaths, pathStr)
+					}
+				}
+			}
+
+			// Fallback to old format (single path) for backward compatibility
+			if len(filePaths) == 0 {
+				if filePath, ok := msg["file_path"].(string); ok && filePath != "" {
+					filePaths = []string{filePath}
+				}
+			}
+
+			if len(filePaths) == 0 {
+				log.Println("No file paths provided in start_replay command")
+				errEvent := Event{
+					Type: "replay:error",
+					Data: map[string]interface{}{
+						"error": "No file paths provided",
+					},
+					Timestamp: time.Now(),
+				}
+				if err := conn.WriteJSON(errEvent); err != nil {
+					log.Printf("Error sending replay error: %v", err)
+				}
+				continue
+			}
+
 			speed := 1.0
 			if s, ok := msg["speed"].(float64); ok {
 				speed = s
@@ -234,11 +267,15 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 			if f, ok := msg["filter"].(string); ok {
 				filterType = f
 			}
+			pauseOnDraft := false
+			if p, ok := msg["pause_on_draft"].(bool); ok {
+				pauseOnDraft = p
+			}
 
-			log.Printf("Received start_replay command (file: %s, speed: %.1fx, filter: %s)", filePath, speed, filterType)
+			log.Printf("Received start_replay command (%d file(s), speed: %.1fx, filter: %s, pauseOnDraft: %v)", len(filePaths), speed, filterType, pauseOnDraft)
 
-			// Start replay
-			if err := s.service.StartReplay(filePath, speed, filterType); err != nil {
+			// Start replay with multiple files
+			if err := s.service.StartReplay(filePaths, speed, filterType, pauseOnDraft); err != nil {
 				log.Printf("Failed to start replay: %v", err)
 				errEvent := Event{
 					Type: "replay:error",
@@ -314,19 +351,24 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 // handleBroadcasts handles broadcasting events to all clients.
 func (s *WebSocketServer) handleBroadcasts() {
 	for event := range s.broadcast {
+		log.Printf("handleBroadcasts: Processing event %s for %d client(s)", event.Type, len(s.clients))
 		s.clientsMu.RLock()
+		clientCount := 0
 		for client := range s.clients {
 			if err := client.WriteJSON(event); err != nil {
-				log.Printf("Error broadcasting to client: %v", err)
+				log.Printf("Error broadcasting %s to client: %v", event.Type, err)
 				if err := client.Close(); err != nil {
 					log.Printf("Error closing client after broadcast error: %v", err)
 				}
 				s.clientsMu.Lock()
 				delete(s.clients, client)
 				s.clientsMu.Unlock()
+			} else {
+				clientCount++
 			}
 		}
 		s.clientsMu.RUnlock()
+		log.Printf("handleBroadcasts: Successfully sent %s to %d client(s)", event.Type, clientCount)
 	}
 }
 

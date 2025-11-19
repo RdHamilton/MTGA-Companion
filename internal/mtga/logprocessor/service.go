@@ -15,15 +15,17 @@ import (
 // This service encapsulates all log processing logic to avoid duplication
 // between CLI and GUI implementations.
 type Service struct {
-	storage *storage.Service
-	dryRun  bool // When true, parse entries but don't store to database (for replay testing)
+	storage    *storage.Service
+	dryRun     bool // When true, parse entries but don't store to database (for replay testing)
+	replayMode bool // When true, keep draft sessions as "in_progress" for UI testing
 }
 
 // NewService creates a new log processor service.
 func NewService(storage *storage.Service) *Service {
 	return &Service{
-		storage: storage,
-		dryRun:  false,
+		storage:    storage,
+		dryRun:     false,
+		replayMode: false,
 	}
 }
 
@@ -36,6 +38,15 @@ func (s *Service) SetDryRun(enabled bool) {
 		log.Println("⚠️  Log processor in DRY RUN mode - data will NOT be stored to database")
 	} else {
 		log.Println("✓ Log processor in NORMAL mode - data will be stored to database")
+	}
+}
+
+// SetReplayMode enables or disables replay mode.
+// In replay mode, draft sessions are kept as "in_progress" to enable UI testing of Active Draft view.
+func (s *Service) SetReplayMode(enabled bool) {
+	s.replayMode = enabled
+	if enabled {
+		log.Println("🎬 Log processor in REPLAY MODE - draft sessions will remain active for UI testing")
 	}
 }
 
@@ -614,18 +625,22 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 
 		// Determine status
 		status := "in_progress"
-		if hasEnd {
-			status = "completed"
-		} else {
-			// Also mark as completed if all picks are done
-			// Quick Draft = 42 picks (3 packs * 14 cards)
-			// Premier Draft = 45 picks (3 packs * 15 cards)
-			expectedPicks := 42 // Default for QuickDraft
-			if draftType == "PremierDraft" {
-				expectedPicks = 45
-			}
-			if len(picks) >= expectedPicks {
+		// In replay mode, keep sessions as "in_progress" for UI testing
+		// This allows testers to see the Active Draft view populate in real-time
+		if !s.replayMode {
+			if hasEnd {
 				status = "completed"
+			} else {
+				// Also mark as completed if all picks are done
+				// Quick Draft = 42 picks (3 packs * 14 cards)
+				// Premier Draft = 45 picks (3 packs * 15 cards)
+				expectedPicks := 42 // Default for QuickDraft
+				if draftType == "PremierDraft" {
+					expectedPicks = 45
+				}
+				if len(picks) >= expectedPicks {
+					status = "completed"
+				}
 			}
 		}
 
