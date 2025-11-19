@@ -17,6 +17,7 @@ type QuestData struct {
 	Rewards          string // ChestDescription as JSON string
 	AssignedAt       time.Time
 	CompletedAt      *time.Time
+	LastSeenAt       *time.Time // Tracks when quest was last seen in QuestGetQuests response
 	Completed        bool
 	Rerolled         bool
 }
@@ -63,11 +64,13 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 								// Update or add quest
 								if existing, exists := questMap[quest.QuestID]; exists {
-									// Update existing quest progress
+									// Update existing quest progress and last seen timestamp
 									existing.EndingProgress = quest.EndingProgress
 									existing.CanSwap = quest.CanSwap
+									existing.LastSeenAt = &timestamp
 								} else {
-									// New quest
+									// New quest - set last seen to current timestamp
+									quest.LastSeenAt = &timestamp
 									questMap[quest.QuestID] = quest
 									questsFound++
 								}

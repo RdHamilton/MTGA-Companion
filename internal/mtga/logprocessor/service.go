@@ -272,6 +272,7 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 			Rewards:          questData.Rewards,
 			AssignedAt:       questData.AssignedAt,
 			CompletedAt:      questData.CompletedAt,
+			LastSeenAt:       questData.LastSeenAt,
 			Rerolled:         questData.Rerolled,
 		}
 

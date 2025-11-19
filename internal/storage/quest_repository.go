@@ -45,11 +45,18 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 			completedAt = &rounded
 		}
 
+		var lastSeenAt *time.Time
+		if quest.LastSeenAt != nil {
+			rounded := quest.LastSeenAt.Round(0)
+			lastSeenAt = &rounded
+		}
+
 		updateQuery := `
 			UPDATE quests
 			SET ending_progress = ?,
 				completed = ?,
 				completed_at = ?,
+				last_seen_at = ?,
 				can_swap = ?
 			WHERE id = ?
 		`
@@ -58,6 +65,7 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 			quest.EndingProgress,
 			quest.Completed,
 			completedAt,
+			lastSeenAt,
 			quest.CanSwap,
 			existingID,
 		)
@@ -77,8 +85,8 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	query := `
 		INSERT INTO quests (
 			quest_id, quest_type, goal, starting_progress, ending_progress,
-			completed, can_swap, rewards, assigned_at, completed_at, rerolled
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			completed, can_swap, rewards, assigned_at, completed_at, last_seen_at, rerolled
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// Strip monotonic clock from timestamps for SQLite compatibility
@@ -89,11 +97,17 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		completedAt = &rounded
 	}
 
+	var lastSeenAt *time.Time
+	if quest.LastSeenAt != nil {
+		rounded := quest.LastSeenAt.Round(0)
+		lastSeenAt = &rounded
+	}
+
 	result, err := r.db.Exec(query,
 		quest.QuestID, quest.QuestType, quest.Goal,
 		quest.StartingProgress, quest.EndingProgress,
 		quest.Completed, quest.CanSwap, quest.Rewards,
-		assignedAt, completedAt, quest.Rerolled,
+		assignedAt, completedAt, lastSeenAt, quest.Rerolled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save quest: %w", err)
@@ -109,23 +123,24 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 }
 
 // GetActiveQuests returns all incomplete quests (one per unique quest_id)
-// Only returns quests that were last seen within the past 72 hours (3 days) to filter out
-// stale data from historical log files while allowing for multi-day quests.
-// Note: This is a workaround until we implement proper "last seen in QuestGetQuests" tracking.
+// Only returns quests that were last seen in a recent QuestGetQuests response (within 1 hour).
+// This prevents stale quest data from historical log files from appearing as "active".
 func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
-		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.last_seen_at, q.rerolled, q.created_at
 		FROM quests q
 		INNER JOIN (
 			SELECT quest_id, MAX(created_at) as max_created
 			FROM quests
 			WHERE completed = 0
-			  AND datetime(created_at) >= datetime('now', '-72 hours')
+			  AND last_seen_at IS NOT NULL
+			  AND datetime(last_seen_at) >= datetime('now', '-1 hour')
 			GROUP BY quest_id
 		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
 		WHERE q.completed = 0
-		  AND datetime(q.created_at) >= datetime('now', '-72 hours')
+		  AND q.last_seen_at IS NOT NULL
+		  AND datetime(q.last_seen_at) >= datetime('now', '-1 hour')
 		ORDER BY q.assigned_at DESC
 	`
 
@@ -142,7 +157,7 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 func (r *QuestRepository) GetQuestHistory(startDate, endDate *time.Time, limit int) ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
-		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.last_seen_at, q.rerolled, q.created_at
 		FROM quests q
 		INNER JOIN (
 			SELECT quest_id, MAX(created_at) as max_created
@@ -284,19 +299,20 @@ func (r *QuestRepository) GetQuestStats(startDate, endDate *time.Time) (*models.
 func (r *QuestRepository) GetQuestByID(id int) (*models.Quest, error) {
 	query := `
 		SELECT id, quest_id, quest_type, goal, starting_progress, ending_progress,
-		       completed, can_swap, rewards, assigned_at, completed_at, rerolled, created_at
+		       completed, can_swap, rewards, assigned_at, completed_at, last_seen_at, rerolled, created_at
 		FROM quests
 		WHERE id = ?
 	`
 
 	quest := &models.Quest{}
 	var completedAt sql.NullTime
+	var lastSeenAt sql.NullTime
 
 	err := r.db.QueryRow(query, id).Scan(
 		&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
 		&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
 		&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
-		&completedAt, &quest.Rerolled, &quest.CreatedAt,
+		&completedAt, &lastSeenAt, &quest.Rerolled, &quest.CreatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -308,6 +324,10 @@ func (r *QuestRepository) GetQuestByID(id int) (*models.Quest, error) {
 
 	if completedAt.Valid {
 		quest.CompletedAt = &completedAt.Time
+	}
+
+	if lastSeenAt.Valid {
+		quest.LastSeenAt = &lastSeenAt.Time
 	}
 
 	return quest, nil
@@ -352,7 +372,7 @@ func (r *QuestRepository) MarkQuestsCompletedByGraphState(completedQuestNumbers 
 	// This maps to Quest1-7 in the graph state
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
-		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.rerolled, q.created_at
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.last_seen_at, q.rerolled, q.created_at
 		FROM quests q
 		INNER JOIN (
 			SELECT quest_id, MAX(created_at) as max_created
@@ -435,12 +455,13 @@ func (r *QuestRepository) scanQuests(rows *sql.Rows) ([]*models.Quest, error) {
 	for rows.Next() {
 		quest := &models.Quest{}
 		var completedAt sql.NullTime
+		var lastSeenAt sql.NullTime
 
 		err := rows.Scan(
 			&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
 			&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
 			&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
-			&completedAt, &quest.Rerolled, &quest.CreatedAt,
+			&completedAt, &lastSeenAt, &quest.Rerolled, &quest.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan quest: %w", err)
@@ -448,6 +469,10 @@ func (r *QuestRepository) scanQuests(rows *sql.Rows) ([]*models.Quest, error) {
 
 		if completedAt.Valid {
 			quest.CompletedAt = &completedAt.Time
+		}
+
+		if lastSeenAt.Valid {
+			quest.LastSeenAt = &lastSeenAt.Time
 		}
 
 		quests = append(quests, quest)
