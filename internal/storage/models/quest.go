@@ -15,6 +15,7 @@ type Quest struct {
 	Rewards          string     `json:"rewards"` // JSON string
 	AssignedAt       time.Time  `json:"assigned_at"`
 	CompletedAt      *time.Time `json:"completed_at,omitempty"`
+	LastSeenAt       *time.Time `json:"last_seen_at,omitempty"` // Tracks when quest was last seen in QuestGetQuests response
 	Rerolled         bool       `json:"rerolled"`
 	CreatedAt        time.Time  `json:"created_at"`
 }
