@@ -664,6 +664,14 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 
 // storeDraftSession stores a complete draft session with picks and packs.
 func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData) error {
+	// Calculate expected total picks based on draft type
+	// Quick Draft = 42 picks (3 packs * 14 cards)
+	// Premier Draft = 45 picks (3 packs * 15 cards)
+	expectedPicks := 42 // Default for QuickDraft
+	if data.DraftType == "PremierDraft" {
+		expectedPicks = 45
+	}
+
 	// Create draft session
 	session := &models.DraftSession{
 		ID:         data.SessionID,
@@ -673,7 +681,7 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 		StartTime:  data.StartTime,
 		EndTime:    data.EndTime,
 		Status:     data.Status,
-		TotalPicks: len(data.Picks),
+		TotalPicks: expectedPicks, // Use expected total, not current pick count
 		CreatedAt:  data.StartTime,
 		UpdatedAt:  time.Now(),
 	}

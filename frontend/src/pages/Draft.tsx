@@ -186,11 +186,28 @@ const Draft: React.FC = () => {
                 GetSetCards(session.SetCode),
             ]);
 
+            // In replay mode, show only picked cards for better visualization of progress
+            // In normal mode, show all set cards to help with draft decisions
+            const replayState = getReplayState();
+            let displayCards = setCards || [];
+
+            if (replayState.isActive && picks && picks.length > 0) {
+                // Get unique card IDs from picks
+                const uniqueCardIds = new Set((picks || []).map(p => p.CardID));
+
+                // Fetch each picked card
+                const pickedCardsPromises = Array.from(uniqueCardIds).map(cardId =>
+                    GetCardByArenaID(cardId).catch(() => null)
+                );
+                const pickedCardsResults = await Promise.all(pickedCardsPromises);
+                displayCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
+            }
+
             setState({
                 session,
                 picks: picks || [],
                 packs: packs || [],
-                setCards: setCards || [],
+                setCards: displayCards,
                 loading: false,
                 error: null,
             });
@@ -363,7 +380,7 @@ const Draft: React.FC = () => {
 
                                     return (
                                         <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
-                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
                                             <div className="card-image-container">
                                                 {card && card.ImageURLSmall && (
                                                     <img
@@ -628,9 +645,9 @@ const Draft: React.FC = () => {
             </div>
 
             <div className="draft-content">
-                {/* Left: Card Grid (~25% width) - ALL SET CARDS */}
+                {/* Left: Card Grid (~25% width) */}
                 <div className="card-grid-section">
-                    <h2>Set Cards ({state.setCards.length})</h2>
+                    <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({state.setCards.length})</h2>
                     <div className="card-grid">
                         {state.setCards.map(card => {
                             const isPicked = pickedCardIds.has(card.ArenaID);
@@ -666,7 +683,7 @@ const Draft: React.FC = () => {
 
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
-                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
                                         <div className="card-image-container">
                                             {card && card.ImageURLSmall && (
                                                 <img
