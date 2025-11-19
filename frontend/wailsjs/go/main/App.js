@@ -14,6 +14,10 @@ export function ExportToJSON() {
   return window['go']['main']['App']['ExportToJSON']();
 }
 
+export function FetchSetCards(arg1) {
+  return window['go']['main']['App']['FetchSetCards'](arg1);
+}
+
 export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }
@@ -112,6 +116,10 @@ export function Initialize(arg1) {
 
 export function ReconnectToDaemon() {
   return window['go']['main']['App']['ReconnectToDaemon']();
+}
+
+export function RefreshSetCards(arg1) {
+  return window['go']['main']['App']['RefreshSetCards'](arg1);
 }
 
 export function SetDaemonPort(arg1) {

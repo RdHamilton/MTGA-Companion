@@ -15,6 +15,8 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -24,6 +26,7 @@ import (
 type App struct {
 	ctx         context.Context
 	service     *storage.Service
+	setFetcher  *setcache.Fetcher
 	poller      *logreader.Poller
 	pollerStop  context.CancelFunc
 	pollerMu    sync.Mutex
@@ -117,6 +120,11 @@ func (a *App) Initialize(dbPath string) error {
 		return err
 	}
 	a.service = storage.NewService(db)
+
+	// Initialize set card fetcher
+	scryfallClient := scryfall.NewClient()
+	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
+
 	return nil
 }
 
@@ -1167,9 +1175,26 @@ func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error
 }
 
 // GetSetCards returns all cards for a given set code.
+// Automatically fetches and caches from Scryfall if not already cached.
 func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 	if a.service == nil {
 		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Check if set is already cached
+	isCached, err := a.service.SetCardRepo().IsSetCached(a.ctx, setCode)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to check set cache: %v", err)}
+	}
+
+	// If not cached, fetch from Scryfall
+	if !isCached {
+		log.Printf("Set %s not cached, fetching from Scryfall...", setCode)
+		count, err := a.setFetcher.FetchAndCacheSet(a.ctx, setCode)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Failed to fetch set cards from Scryfall: %v", err)}
+		}
+		log.Printf("Fetched and cached %d cards for set %s", count, setCode)
 	}
 
 	cards, err := a.service.SetCardRepo().GetCardsBySet(a.ctx, setCode)
@@ -1178,6 +1203,39 @@ func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 	}
 
 	return cards, nil
+}
+
+// FetchSetCards manually fetches and caches set cards from Scryfall.
+// Returns the number of cards fetched and cached.
+func (a *App) FetchSetCards(setCode string) (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Manually fetching set %s from Scryfall...", setCode)
+	count, err := a.setFetcher.FetchAndCacheSet(a.ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to fetch set cards: %v", err)}
+	}
+
+	log.Printf("Successfully fetched and cached %d cards for set %s", count, setCode)
+	return count, nil
+}
+
+// RefreshSetCards deletes and re-fetches all cards for a set.
+func (a *App) RefreshSetCards(setCode string) (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Refreshing set %s from Scryfall...", setCode)
+	count, err := a.setFetcher.RefreshSet(a.ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to refresh set cards: %v", err)}
+	}
+
+	log.Printf("Successfully refreshed %d cards for set %s", count, setCode)
+	return count, nil
 }
 
 // GetCardByArenaID returns a card by its Arena ID.

@@ -10,6 +10,8 @@ export function ExportToCSV():Promise<void>;
 
 export function ExportToJSON():Promise<void>;
 
+export function FetchSetCards(arg1:string):Promise<number>;
+
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
@@ -59,6 +61,8 @@ export function ImportFromFile():Promise<void>;
 export function Initialize(arg1:string):Promise<void>;
 
 export function ReconnectToDaemon():Promise<void>;
+
+export function RefreshSetCards(arg1:string):Promise<number>;
 
 export function SetDaemonPort(arg1:number):Promise<void>;
 
