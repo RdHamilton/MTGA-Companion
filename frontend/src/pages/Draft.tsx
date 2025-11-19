@@ -3,6 +3,7 @@ import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDr
 import { models, pickquality } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import TierList from '../components/TierList';
+import { DraftGrade } from '../components/DraftGrade';
 import './Draft.css';
 
 interface DraftState {
@@ -282,6 +283,15 @@ const Draft: React.FC = () => {
                         <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
                         <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
                     </div>
+                    {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
+                        <DraftGrade
+                            sessionID={historicalDetailState.session.ID}
+                            showCalculateButton={true}
+                            onGradeCalculated={() => {
+                                console.log('Grade calculated for draft:', historicalDetailState.session?.ID);
+                            }}
+                        />
+                    )}
                 </div>
 
                 <div className="draft-content">
@@ -483,7 +493,10 @@ const Draft: React.FC = () => {
                                     <div key={session.ID} className="draft-card">
                                         <div className="draft-card-header">
                                             <h3>{session.EventName}</h3>
-                                            <span className="draft-set-badge">{session.SetCode}</span>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <span className="draft-set-badge">{session.SetCode}</span>
+                                                <DraftGrade sessionID={session.ID} compact={true} />
+                                            </div>
                                         </div>
                                         <div className="draft-card-info">
                                             <div className="draft-stat">

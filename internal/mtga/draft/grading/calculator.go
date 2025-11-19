@@ -11,12 +11,12 @@ import (
 
 // DraftGrade represents the overall grade and component scores for a draft.
 type DraftGrade struct {
-	OverallGrade         string  `json:"overall_grade"`          // A+, A, A-, B+, etc.
-	OverallScore         int     `json:"overall_score"`          // 0-100
-	PickQualityScore     float64 `json:"pick_quality_score"`     // 0-40
-	ColorDisciplineScore float64 `json:"color_discipline_score"` // 0-20
-	DeckCompositionScore float64 `json:"deck_composition_score"` // 0-25
-	StrategicScore       float64 `json:"strategic_score"`        // 0-15
+	OverallGrade         string   `json:"overall_grade"`          // A+, A, A-, B+, etc.
+	OverallScore         int      `json:"overall_score"`          // 0-100
+	PickQualityScore     float64  `json:"pick_quality_score"`     // 0-40
+	ColorDisciplineScore float64  `json:"color_discipline_score"` // 0-20
+	DeckCompositionScore float64  `json:"deck_composition_score"` // 0-25
+	StrategicScore       float64  `json:"strategic_score"`        // 0-15
 	BestPicks            []string `json:"best_picks"`             // Top 3 card names
 	WorstPicks           []string `json:"worst_picks"`            // Bottom 3 card names
 	Suggestions          []string `json:"suggestions"`            // Improvement suggestions
