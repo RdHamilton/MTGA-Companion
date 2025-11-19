@@ -269,26 +269,45 @@ const Draft: React.FC = () => {
                         {selectedCard && (
                             <div className="card-details">
                                 <h3>{selectedCard.Name}</h3>
+                                <p className="card-detail-type">{selectedCard.Types || 'Unknown Type'}</p>
+                                <p className="card-detail-set">
+                                    <span>{selectedCard.SetCode}</span>
+                                    <span>•</span>
+                                    <span>{selectedCard.Rarity}</span>
+                                </p>
                                 {selectedCard.ImageURL && (
                                     <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
                                 )}
-                                <div className="card-stats">
-                                    <div className="stat">
-                                        <span className="stat-label">Mana Cost:</span>
-                                        <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
-                                    </div>
-                                    <div className="stat">
-                                        <span className="stat-label">Type:</span>
-                                        <span className="stat-value">{selectedCard.Types || 'N/A'}</span>
-                                    </div>
-                                    <div className="stat">
-                                        <span className="stat-label">Rarity:</span>
-                                        <span className="stat-value">{selectedCard.Rarity}</span>
+                                <div className="card-stats-section">
+                                    <h4>Card Stats</h4>
+                                    <div className="card-stats">
+                                        <div className="stat">
+                                            <span className="stat-label">Mana Cost</span>
+                                            <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
+                                        </div>
+                                        <div className="stat">
+                                            <span className="stat-label">CMC</span>
+                                            <span className="stat-value">{selectedCard.CMC || 0}</span>
+                                        </div>
+                                        {selectedCard.Power && (
+                                            <div className="stat">
+                                                <span className="stat-label">Power</span>
+                                                <span className="stat-value">{selectedCard.Power}</span>
+                                            </div>
+                                        )}
+                                        {selectedCard.Toughness && (
+                                            <div className="stat">
+                                                <span className="stat-label">Toughness</span>
+                                                <span className="stat-value">{selectedCard.Toughness}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="card-text">
-                                    <p>{selectedCard.Text}</p>
-                                </div>
+                                {selectedCard.Text && (
+                                    <div className="card-text">
+                                        <p>{selectedCard.Text}</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -446,26 +465,45 @@ const Draft: React.FC = () => {
                     {selectedCard && (
                         <div className="card-details">
                             <h3>{selectedCard.Name}</h3>
+                            <p className="card-detail-type">{selectedCard.Types || 'Unknown Type'}</p>
+                            <p className="card-detail-set">
+                                <span>{selectedCard.SetCode}</span>
+                                <span>•</span>
+                                <span>{selectedCard.Rarity}</span>
+                            </p>
                             {selectedCard.ImageURL && (
                                 <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
                             )}
-                            <div className="card-stats">
-                                <div className="stat">
-                                    <span className="stat-label">Mana Cost:</span>
-                                    <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
-                                </div>
-                                <div className="stat">
-                                    <span className="stat-label">Type:</span>
-                                    <span className="stat-value">{selectedCard.Types || 'N/A'}</span>
-                                </div>
-                                <div className="stat">
-                                    <span className="stat-label">Rarity:</span>
-                                    <span className="stat-value">{selectedCard.Rarity}</span>
+                            <div className="card-stats-section">
+                                <h4>Card Stats</h4>
+                                <div className="card-stats">
+                                    <div className="stat">
+                                        <span className="stat-label">Mana Cost</span>
+                                        <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
+                                    </div>
+                                    <div className="stat">
+                                        <span className="stat-label">CMC</span>
+                                        <span className="stat-value">{selectedCard.CMC || 0}</span>
+                                    </div>
+                                    {selectedCard.Power && (
+                                        <div className="stat">
+                                            <span className="stat-label">Power</span>
+                                            <span className="stat-value">{selectedCard.Power}</span>
+                                        </div>
+                                    )}
+                                    {selectedCard.Toughness && (
+                                        <div className="stat">
+                                            <span className="stat-label">Toughness</span>
+                                            <span className="stat-value">{selectedCard.Toughness}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="card-text">
-                                <p>{selectedCard.Text}</p>
-                            </div>
+                            {selectedCard.Text && (
+                                <div className="card-text">
+                                    <p>{selectedCard.Text}</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
