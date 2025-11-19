@@ -392,36 +392,36 @@ const Settings = () => {
 
           <div className="setting-item">
             <label className="setting-label">
-              Import Data
-              <span className="setting-description">Import match history from a file</span>
+              Import JSON Export
+              <span className="setting-description">Import match data from a JSON file exported by this app (matches only, not full log data)</span>
             </label>
             <div className="setting-control">
               <button className="action-button" onClick={handleImportData}>
-                Import from File
+                Import from JSON
               </button>
             </div>
           </div>
 
           <div className="setting-item">
             <label className="setting-label">
-              Import Log File
+              Import Single Log File
               <span className="setting-description">
-                Import a historical MTGA log file (Player.log or UTC_Log) to recover data from backups or before daemon installation
+                Import one MTGA log file from anywhere (backup drive, shared file, etc.). Processes the selected file and imports all data (matches, decks, quests, drafts).
               </span>
             </label>
             <div className="setting-control">
               <button className="action-button" onClick={handleImportLogFile}>
-                Import Log File
+                Select Log File...
               </button>
             </div>
           </div>
 
           <div className="setting-item">
             <label className="setting-label">
-              Replay Historical Logs
+              Replay All MTGA Logs (Daemon Only)
               <span className="setting-description">
-                Process all historical MTGA log files through the daemon. This replays logs chronologically
-                to ensure all game data, statistics, and quest progression are tracked correctly.
+                Auto-discover and process ALL log files from your MTGA installation directory in chronological order.
+                Use this for complete recovery after fresh install or extended daemon downtime. Requires daemon connection.
               </span>
             </label>
             <div className="setting-control">
