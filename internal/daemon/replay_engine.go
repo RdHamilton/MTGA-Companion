@@ -253,22 +253,24 @@ func (r *ReplayEngine) streamEntries() {
 			}
 		}
 
-		// Check if this is a draft entry that should trigger auto-pause
+		// Check if this is a draft pick entry that should trigger auto-pause
 		r.mu.RLock()
-		shouldPauseOnDraft := r.pauseOnDraft && !r.isPaused
+		pauseOnDraft := r.pauseOnDraft
 		filterType := r.filterType
 		r.mu.RUnlock()
 
-		isDraft := shouldPauseOnDraft && r.isDraftEntry(entry)
+		// Determine if we should pause after this entry
+		// When pauseOnDraft is enabled, pause after EVERY pick event (not just the first)
+		isDraftPick := pauseOnDraft && r.isDraftPickEntry(entry)
 
 		// For draft replay mode, process each draft event immediately (no batching)
 		// This allows the UI to update incrementally as each pick is made
 		if filterType == "draft" && r.isDraftEntry(entry) {
 			// Process this draft event immediately
-			log.Printf("Processing draft event immediately (entry %d)", i)
+			log.Printf("Processing draft event immediately (entry %d, isPick=%v)", i, isDraftPick)
 			r.service.processEntries([]*logreader.LogEntry{entry})
 
-			// Emit draft:updated to refresh UI
+			// Emit draft:updated to refresh UI after processing
 			r.service.wsServer.Broadcast(Event{
 				Type: "draft:updated",
 				Data: map[string]interface{}{
@@ -287,8 +289,8 @@ func (r *ReplayEngine) streamEntries() {
 			}
 		}
 
-		// NOW pause if this was a draft entry (after processing it)
-		if isDraft {
+		// Pause after EACH pick event when pauseOnDraft is enabled (not just the first)
+		if isDraftPick {
 			log.Printf("Draft event detected at entry %d - auto-pausing AFTER processing", i)
 
 			r.mu.Lock()
@@ -463,6 +465,15 @@ func (r *ReplayEngine) isDraftEntry(entry *logreader.LogEntry) bool {
 		strings.Contains(raw, "DraftPick") ||
 		strings.Contains(raw, "DraftMakePick") ||
 		strings.Contains(raw, "DraftStatus")
+}
+
+// isDraftPickEntry checks if a log entry is specifically a draft PICK event (not status).
+// Used for pause-after-pick logic during replay testing.
+func (r *ReplayEngine) isDraftPickEntry(entry *logreader.LogEntry) bool {
+	raw := entry.Raw
+	// Only match actual pick events, not status updates
+	return (strings.Contains(raw, "DraftPick") && strings.Contains(raw, "==>")) ||
+		(strings.Contains(raw, "DraftMakePick") && strings.Contains(raw, "==>"))
 }
 
 // isMatchEntry checks if a log entry is related to match events.
