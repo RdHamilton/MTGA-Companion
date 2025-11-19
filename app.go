@@ -1251,3 +1251,54 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 
 	return card, nil
 }
+
+// FixDraftSessionStatuses updates draft sessions that should be marked as completed
+// based on their pick counts (42 for Quick Draft, 45 for Premier Draft).
+func (a *App) FixDraftSessionStatuses() (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get all active sessions
+	activeSessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get active sessions: %v", err)}
+	}
+
+	updated := 0
+	for _, session := range activeSessions {
+		// Get picks for this session
+		picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, session.ID)
+		if err != nil {
+			log.Printf("Failed to get picks for session %s: %v", session.ID, err)
+			continue
+		}
+
+		// Determine expected picks based on draft type
+		expectedPicks := 42 // Quick Draft
+		if session.DraftType == "PremierDraft" {
+			expectedPicks = 45
+		}
+
+		// If session has all expected picks, mark as completed
+		if len(picks) >= expectedPicks {
+			// Use the timestamp of the last pick as end time
+			var endTime *time.Time
+			if len(picks) > 0 {
+				lastPickTime := picks[len(picks)-1].Timestamp
+				endTime = &lastPickTime
+			}
+
+			err := a.service.DraftRepo().UpdateSessionStatus(a.ctx, session.ID, "completed", endTime)
+			if err != nil {
+				log.Printf("Failed to update session %s status: %v", session.ID, err)
+				continue
+			}
+
+			log.Printf("Updated session %s to completed (%d/%d picks)", session.ID, len(picks), expectedPicks)
+			updated++
+		}
+	}
+
+	return updated, nil
+}

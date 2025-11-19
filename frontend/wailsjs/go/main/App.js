@@ -18,6 +18,10 @@ export function FetchSetCards(arg1) {
   return window['go']['main']['App']['FetchSetCards'](arg1);
 }
 
+export function FixDraftSessionStatuses() {
+  return window['go']['main']['App']['FixDraftSessionStatuses']();
+}
+
 export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID } from '../../wailsjs/go/main/App';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, FixDraftSessionStatuses } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import './Draft.css';
@@ -56,7 +56,18 @@ const Draft: React.FC = () => {
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
 
     useEffect(() => {
-        loadActiveDraft();
+        // Fix any draft sessions that should be marked as completed
+        FixDraftSessionStatuses().then((count) => {
+            if (count > 0) {
+                console.log(`Fixed ${count} draft session(s) status`);
+            }
+            // Load active draft after fixing statuses
+            loadActiveDraft();
+        }).catch((error) => {
+            console.error('Failed to fix draft session statuses:', error);
+            // Still load active draft even if fix fails
+            loadActiveDraft();
+        });
 
         // Listen for draft updates from backend
         const unsubscribe = EventsOn('draft:updated', () => {

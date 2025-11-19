@@ -517,6 +517,17 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 		status := "in_progress"
 		if hasEnd {
 			status = "completed"
+		} else {
+			// Also mark as completed if all picks are done
+			// Quick Draft = 42 picks (3 packs * 14 cards)
+			// Premier Draft = 45 picks (3 packs * 15 cards)
+			expectedPicks := 42 // Default for QuickDraft
+			if draftType == "PremierDraft" {
+				expectedPicks = 45
+			}
+			if len(picks) >= expectedPicks {
+				status = "completed"
+			}
 		}
 
 		session := &draftSessionData{

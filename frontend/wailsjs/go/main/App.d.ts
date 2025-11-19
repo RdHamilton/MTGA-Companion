@@ -12,6 +12,8 @@ export function ExportToJSON():Promise<void>;
 
 export function FetchSetCards(arg1:string):Promise<number>;
 
+export function FixDraftSessionStatuses():Promise<number>;
+
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
