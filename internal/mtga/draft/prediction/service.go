@@ -58,7 +58,7 @@ func (s *Service) PredictSessionWinRate(ctx context.Context, sessionID string) (
 
 		// Get card rating from 17Lands data
 		rating, err := s.ratingsRepo.GetCardRatingByArenaID(ctx, session.SetCode, "QuickDraft", pick.CardID)
-		if err != nil {
+		if err != nil || rating == nil {
 			// If we can't find the rating, use a neutral baseline
 			log.Printf("Warning: No rating found for card %s in set %s, using baseline", pick.CardID, session.SetCode)
 			cards = append(cards, Card{
