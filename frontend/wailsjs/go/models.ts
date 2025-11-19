@@ -91,6 +91,34 @@ export namespace main {
 	        this.tier = source["tier"];
 	    }
 	}
+	export class ImportLogFileResult {
+	    fileName: string;
+	    entriesRead: number;
+	    matchesStored: number;
+	    gamesStored: number;
+	    decksStored: number;
+	    ranksStored: number;
+	    questsStored: number;
+	    draftsStored: number;
+	    picksStored: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportLogFileResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileName = source["fileName"];
+	        this.entriesRead = source["entriesRead"];
+	        this.matchesStored = source["matchesStored"];
+	        this.gamesStored = source["gamesStored"];
+	        this.decksStored = source["decksStored"];
+	        this.ranksStored = source["ranksStored"];
+	        this.questsStored = source["questsStored"];
+	        this.draftsStored = source["draftsStored"];
+	        this.picksStored = source["picksStored"];
+	    }
+	}
 
 }
 
