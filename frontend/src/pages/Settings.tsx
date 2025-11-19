@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import './Settings.css';
 
@@ -35,6 +35,11 @@ const Settings = () => {
   const [replayToolProgress, setReplayToolProgress] = useState<any>(null);
   const [replaySpeed, setReplaySpeed] = useState(1.0);
   const [replayFilter, setReplayFilter] = useState('all');
+
+  // 17Lands data settings
+  const [setCode, setSetCode] = useState('');
+  const [draftFormat, setDraftFormat] = useState('PremierDraft');
+  const [isFetchingRatings, setIsFetchingRatings] = useState(false);
 
   // Load connection status on mount
   useEffect(() => {
@@ -301,6 +306,47 @@ const Settings = () => {
     } catch (error) {
       console.error('Failed to stop replay:', error);
       alert(`Failed to stop replay: ${error}`);
+    }
+  };
+
+  // 17Lands handlers
+  const handleFetchSetRatings = async () => {
+    if (!setCode || setCode.trim() === '') {
+      alert('Please enter a set code (e.g., BLB, DSK, FDN, ATB)');
+      return;
+    }
+
+    setIsFetchingRatings(true);
+    try {
+      await FetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      alert(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!\n\nThe data is now cached and ready for use in drafts.`);
+    } catch (error) {
+      console.error('Failed to fetch ratings:', error);
+      alert(`Failed to fetch 17Lands ratings: ${error}\n\nMake sure:\n- Set code is correct (e.g., BLB, DSK, FDN)\n- You have internet connection\n- 17Lands has data for this set`);
+    } finally {
+      setIsFetchingRatings(false);
+    }
+  };
+
+  const handleRefreshSetRatings = async () => {
+    if (!setCode || setCode.trim() === '') {
+      alert('Please enter a set code (e.g., BLB, DSK, FDN, ATB)');
+      return;
+    }
+
+    if (!confirm(`This will delete and re-download all ratings for ${setCode.toUpperCase()} (${draftFormat}).\n\nContinue?`)) {
+      return;
+    }
+
+    setIsFetchingRatings(true);
+    try {
+      await RefreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      alert(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`);
+    } catch (error) {
+      console.error('Failed to refresh ratings:', error);
+      alert(`Failed to refresh 17Lands ratings: ${error}`);
+    } finally {
+      setIsFetchingRatings(false);
     }
   };
 
@@ -791,6 +837,93 @@ const Settings = () => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* 17Lands Data Management */}
+        <div className="settings-section">
+          <h2 className="section-title">17Lands Card Ratings</h2>
+          <div className="setting-description" style={{ marginBottom: '16px', color: '#aaa' }}>
+            Download card ratings and tier lists from 17Lands for draft assistance.
+            Ratings are used in the Active Draft page to show pick quality and recommendations.
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Set Code
+              <span className="setting-description">
+                The MTG set code (e.g., BLB = Bloomburrow, DSK = Duskmourn, FDN = Foundations, ATB = Avatar: The Last Airbender)
+              </span>
+            </label>
+            <div className="setting-control">
+              <input
+                type="text"
+                value={setCode}
+                onChange={(e) => setSetCode(e.target.value.toUpperCase())}
+                placeholder="e.g., BLB, DSK, FDN, ATB"
+                className="text-input"
+                style={{ width: '200px', textTransform: 'uppercase' }}
+                maxLength={5}
+              />
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Draft Format
+              <span className="setting-description">Choose between Premier Draft (BO1) or Quick Draft ratings</span>
+            </label>
+            <div className="setting-control">
+              <select
+                className="select-input"
+                value={draftFormat}
+                onChange={(e) => setDraftFormat(e.target.value)}
+                style={{ width: '200px' }}
+              >
+                <option value="PremierDraft">Premier Draft (BO1)</option>
+                <option value="QuickDraft">Quick Draft</option>
+                <option value="TradDraft">Traditional Draft (BO3)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Fetch Ratings
+              <span className="setting-description">Download and cache 17Lands ratings for the selected set and format</span>
+            </label>
+            <div className="setting-control">
+              <button
+                className="action-button primary"
+                onClick={handleFetchSetRatings}
+                disabled={isFetchingRatings || !setCode}
+                style={{ marginRight: '8px' }}
+              >
+                {isFetchingRatings ? 'Fetching...' : 'Fetch Ratings'}
+              </button>
+              <button
+                className="action-button"
+                onClick={handleRefreshSetRatings}
+                disabled={isFetchingRatings || !setCode}
+              >
+                Refresh (Re-download)
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
+            <strong>💡 Common Set Codes:</strong>
+            <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', fontSize: '0.9em' }}>
+              <div>• FDN - Foundations</div>
+              <div>• DSK - Duskmourn</div>
+              <div>• BLB - Bloomburrow</div>
+              <div>• OTJ - Outlaws of Thunder Junction</div>
+              <div>• MKM - Murders at Karlov Manor</div>
+              <div>• LCI - Lost Caverns of Ixalan</div>
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '0.9em', color: '#aaa' }}>
+              For Avatar: The Last Airbender, try "ATB" or check 17Lands.com for the official code.
+            </div>
+          </div>
         </div>
 
         {/* Theme Preferences */}
