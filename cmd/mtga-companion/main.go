@@ -170,6 +170,12 @@ func main() {
 		return
 	}
 
+	// Check if this is a replay command
+	if len(os.Args) > 1 && os.Args[1] == "replay" {
+		runReplayCommand()
+		return
+	}
+
 	// Check if this is a draft command
 	if len(os.Args) > 1 && os.Args[1] == "draft" {
 		runDraftCommand()
@@ -5863,4 +5869,185 @@ func runDaemonCommand() {
 	}
 
 	fmt.Println("Daemon stopped.")
+}
+
+// runReplayCommand handles the replay command for testing with historical logs.
+func runReplayCommand() {
+	fs := flag.NewFlagSet("replay", flag.ExitOnError)
+	file := fs.String("file", "", "Path to log file to replay (required)")
+	speed := fs.Float64("speed", 1.0, "Replay speed multiplier (1.0 = real-time, 2.0 = 2x speed, etc.)")
+	filter := fs.String("filter", "all", "Filter entries by type: all, draft, match, event")
+	dbPath := fs.String("db-path", "", "Database path (default: ~/.mtga-companion/data.db)")
+	port := fs.Int("port", 9999, "Daemon port for replay")
+
+	fs.Usage = func() {
+		fmt.Println("Usage: mtga-companion replay --file <log-file> [options]")
+		fmt.Println()
+		fmt.Println("Replay historical MTGA log files with simulated timing for testing.")
+		fmt.Println()
+		fmt.Println("Options:")
+		fs.PrintDefaults()
+		fmt.Println()
+		fmt.Println("Examples:")
+		fmt.Println("  # Replay at normal speed")
+		fmt.Println("  mtga-companion replay --file Player.log")
+		fmt.Println()
+		fmt.Println("  # Replay at 5x speed")
+		fmt.Println("  mtga-companion replay --file Player.log --speed 5")
+		fmt.Println()
+		fmt.Println("  # Replay only draft events")
+		fmt.Println("  mtga-companion replay --file Player.log --filter draft")
+		fmt.Println()
+		fmt.Println("  # Replay only matches")
+		fmt.Println("  mtga-companion replay --file Player.log --filter match")
+		fmt.Println()
+		fmt.Println("Filter types:")
+		fmt.Println("  all    - All log entries (no filtering)")
+		fmt.Println("  draft  - Draft picks and status")
+		fmt.Println("  match  - Match/game events")
+		fmt.Println("  event  - Tournament/event entries")
+	}
+
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing replay flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Validate required arguments
+	if *file == "" {
+		fmt.Fprintf(os.Stderr, "Error: --file is required\n\n")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	// Validate file exists
+	if _, err := os.Stat(*file); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: Log file not found: %s\n", *file)
+		os.Exit(1)
+	}
+
+	// Validate speed
+	if *speed <= 0 || *speed > 100 {
+		fmt.Fprintf(os.Stderr, "Error: Speed must be between 0 and 100, got %.2f\n", *speed)
+		os.Exit(1)
+	}
+
+	// Validate filter
+	validFilters := map[string]bool{"all": true, "draft": true, "match": true, "event": true}
+	if !validFilters[*filter] {
+		fmt.Fprintf(os.Stderr, "Error: Invalid filter '%s'. Must be one of: all, draft, match, event\n", *filter)
+		os.Exit(1)
+	}
+
+	fmt.Println("MTGA Companion - Log Replay")
+	fmt.Println("===========================")
+	fmt.Println()
+	fmt.Printf("File:   %s\n", *file)
+	fmt.Printf("Speed:  %.1fx\n", *speed)
+	fmt.Printf("Filter: %s\n", *filter)
+	fmt.Println()
+
+	// Setup database
+	finalDBPath := *dbPath
+	if finalDBPath == "" {
+		finalDBPath = getDBPath()
+	}
+
+	fmt.Printf("Opening database: %s\n", finalDBPath)
+
+	// Open database
+	storageConfig := storage.DefaultConfig(finalDBPath)
+	storageConfig.AutoMigrate = true
+	db, err := storage.Open(storageConfig)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
+
+	stor := storage.NewService(db)
+	defer func() {
+		if err := stor.Close(); err != nil {
+			log.Printf("Error closing service: %v", err)
+		}
+	}()
+
+	// Create daemon config (for replay engine)
+	daemonConfig := daemon.DefaultConfig()
+	daemonConfig.Port = *port
+	daemonConfig.DBPath = finalDBPath
+
+	// Create daemon service
+	daemonService := daemon.New(daemonConfig, stor)
+
+	fmt.Println("Starting daemon for replay...")
+	if err := daemonService.Start(); err != nil {
+		log.Fatalf("Failed to start daemon: %v", err)
+	}
+
+	// Give daemon a moment to start
+	time.Sleep(500 * time.Millisecond)
+
+	fmt.Println()
+	fmt.Println("Starting replay...")
+	fmt.Println("Press Ctrl+C to stop")
+	fmt.Println()
+
+	// Start replay
+	if err := daemonService.StartReplay(*file, *speed, *filter); err != nil {
+		log.Fatalf("Failed to start replay: %v", err)
+	}
+
+	// Wait for replay to complete or Ctrl+C
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Monitor replay status
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			status := daemonService.GetReplayStatus()
+			if !status["isActive"].(bool) {
+				// Replay completed
+				fmt.Println()
+				fmt.Println("✓ Replay completed")
+				goto cleanup
+			}
+
+			// Print progress
+			percentComplete := status["percentComplete"].(float64)
+			currentEntry := status["currentEntry"].(int)
+			totalEntries := status["totalEntries"].(int)
+			elapsed := status["elapsed"].(float64)
+
+			fmt.Printf("\rProgress: %.1f%% (%d/%d entries) - Elapsed: %.1fs",
+				percentComplete, currentEntry, totalEntries, elapsed)
+
+		case <-sigChan:
+			fmt.Println()
+			fmt.Println()
+			fmt.Println("Stopping replay...")
+			if err := daemonService.StopReplay(); err != nil {
+				log.Printf("Error stopping replay: %v", err)
+			}
+			goto cleanup
+		}
+	}
+
+cleanup:
+	fmt.Println()
+	fmt.Println("Shutting down...")
+
+	// Stop daemon
+	if err := daemonService.Stop(); err != nil {
+		log.Printf("Error stopping daemon: %v", err)
+	}
+
+	fmt.Println("Replay stopped.")
 }
