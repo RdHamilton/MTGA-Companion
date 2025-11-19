@@ -13,6 +13,7 @@ import (
 
 // MTGASetToScryfall maps MTGA set codes to Scryfall set codes.
 var MTGASetToScryfall = map[string]string{
+	"TLA": "tla", // Avatar: The Last Airbender
 	"TDM": "tdm", // Tarkir Dragonstorm
 	"DSK": "dsk", // Duskmourn: House of Horror
 	"BLB": "blb", // Bloomburrow
