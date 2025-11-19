@@ -113,6 +113,10 @@ func (r *ReplayEngine) Start(logPath string, speed float64, filterType string) e
 
 	log.Printf("Starting replay: %d entries, %.1fx speed, filter: %s", len(entries), speed, filterType)
 
+	// Enable dry run mode to prevent database pollution
+	r.service.logProcessor.SetDryRun(true)
+	log.Println("⚠️  REPLAY MODE: Data will be parsed and broadcast but NOT stored to database")
+
 	// Broadcast replay started event
 	r.service.wsServer.Broadcast(Event{
 		Type: "replay:started",
@@ -136,6 +140,9 @@ func (r *ReplayEngine) streamEntries() {
 		r.isActive = false
 		r.isPaused = false
 		r.mu.Unlock()
+
+		// Disable dry run mode - return to normal operation
+		r.service.logProcessor.SetDryRun(false)
 
 		// Broadcast replay completed event
 		r.service.wsServer.Broadcast(Event{
