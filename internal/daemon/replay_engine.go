@@ -122,6 +122,15 @@ func (r *ReplayEngine) Start(logPaths []string, speed float64, filterType string
 	log.Printf("Starting replay: %d entries from %d file(s), %.1fx speed, filter: %s, pauseOnDraft: %v",
 		len(allEntries), len(logPaths), speed, filterType, pauseOnDraft)
 
+	// Clear existing draft sessions when replaying draft events for clean testing
+	if filterType == "draft" {
+		if err := r.clearDraftSessions(); err != nil {
+			log.Printf("Warning: Failed to clear draft sessions: %v", err)
+		} else {
+			log.Println("✓ Cleared existing draft sessions for clean replay")
+		}
+	}
+
 	// Enable replay mode to keep draft sessions as "in_progress" for Active Draft UI testing
 	r.service.logProcessor.SetReplayMode(true)
 	log.Println("📝  REPLAY MODE: Data will be processed and stored normally for UI testing")
@@ -244,21 +253,38 @@ func (r *ReplayEngine) streamEntries() {
 			}
 		}
 
-		// Add to batch
-		batch = append(batch, entry)
-
 		// Check if this is a draft entry that should trigger auto-pause
 		r.mu.RLock()
 		shouldPauseOnDraft := r.pauseOnDraft && !r.isPaused
+		filterType := r.filterType
 		r.mu.RUnlock()
 
 		isDraft := shouldPauseOnDraft && r.isDraftEntry(entry)
 
-		// Process batch BEFORE pausing so draft sessions are created
-		if isDraft || len(batch) >= batchSize || i == len(r.entries)-1 {
-			log.Printf("Processing batch of %d entries (isDraft=%v, batchFull=%v, isLast=%v)", len(batch), isDraft, len(batch) >= batchSize, i == len(r.entries)-1)
-			r.service.processEntries(batch)
-			batch = batch[:0] // Clear batch
+		// For draft replay mode, process each draft event immediately (no batching)
+		// This allows the UI to update incrementally as each pick is made
+		if filterType == "draft" && r.isDraftEntry(entry) {
+			// Process this draft event immediately
+			log.Printf("Processing draft event immediately (entry %d)", i)
+			r.service.processEntries([]*logreader.LogEntry{entry})
+
+			// Emit draft:updated to refresh UI
+			r.service.wsServer.Broadcast(Event{
+				Type: "draft:updated",
+				Data: map[string]interface{}{
+					"message": "Draft data updated",
+				},
+			})
+		} else {
+			// Add to batch for non-draft entries
+			batch = append(batch, entry)
+
+			// Process batch when full or at end
+			if len(batch) >= batchSize || i == len(r.entries)-1 {
+				log.Printf("Processing batch of %d entries (batchFull=%v, isLast=%v)", len(batch), len(batch) >= batchSize, i == len(r.entries)-1)
+				r.service.processEntries(batch)
+				batch = batch[:0] // Clear batch
+			}
 		}
 
 		// NOW pause if this was a draft entry (after processing it)
@@ -545,4 +571,20 @@ func (r *ReplayEngine) GetStatus() map[string]interface{} {
 		"speed":           r.speed,
 		"filter":          r.filterType,
 	}
+}
+
+// clearDraftSessions removes all existing draft sessions from the database.
+// This ensures a clean state when replaying draft events for testing.
+func (r *ReplayEngine) clearDraftSessions() error {
+	ctx := context.Background()
+
+	// Delete all draft sessions (cascade will delete picks and packs)
+	query := `DELETE FROM draft_sessions`
+	_, err := r.service.storage.GetDB().ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("delete draft sessions: %w", err)
+	}
+
+	log.Println("Cleared all draft sessions from database")
+	return nil
 }
