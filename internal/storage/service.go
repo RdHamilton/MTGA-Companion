@@ -1820,7 +1820,9 @@ func (s *Service) GetProcessedLogFiles(ctx context.Context) ([]ProcessedLogFile,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query processed log files: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close() // Explicitly ignore error - cleanup operation
+	}()
 
 	var files []ProcessedLogFile
 	for rows.Next() {
