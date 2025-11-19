@@ -126,6 +126,10 @@ export function GetRankProgressionTimeline(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetRankProgressionTimeline'](arg1, arg2, arg3, arg4);
 }
 
+export function GetReplayStatus() {
+  return window['go']['main']['App']['GetReplayStatus']();
+}
+
 export function GetSetCards(arg1) {
   return window['go']['main']['App']['GetSetCards'](arg1);
 }
@@ -158,6 +162,10 @@ export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
 }
 
+export function PauseReplay() {
+  return window['go']['main']['App']['PauseReplay']();
+}
+
 export function PredictDraftWinRate(arg1) {
   return window['go']['main']['App']['PredictDraftWinRate'](arg1);
 }
@@ -174,6 +182,10 @@ export function RefreshSetRatings(arg1, arg2) {
   return window['go']['main']['App']['RefreshSetRatings'](arg1, arg2);
 }
 
+export function ResumeReplay() {
+  return window['go']['main']['App']['ResumeReplay']();
+}
+
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
 }
@@ -182,8 +194,16 @@ export function StartPoller() {
   return window['go']['main']['App']['StartPoller']();
 }
 
+export function StartReplayWithFileDialog(arg1, arg2) {
+  return window['go']['main']['App']['StartReplayWithFileDialog'](arg1, arg2);
+}
+
 export function StopPoller() {
   return window['go']['main']['App']['StopPoller']();
+}
+
+export function StopReplay() {
+  return window['go']['main']['App']['StopReplay']();
 }
 
 export function SwitchToDaemonMode() {

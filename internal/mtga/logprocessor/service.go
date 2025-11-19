@@ -16,12 +16,26 @@ import (
 // between CLI and GUI implementations.
 type Service struct {
 	storage *storage.Service
+	dryRun  bool // When true, parse entries but don't store to database (for replay testing)
 }
 
 // NewService creates a new log processor service.
 func NewService(storage *storage.Service) *Service {
 	return &Service{
 		storage: storage,
+		dryRun:  false,
+	}
+}
+
+// SetDryRun enables or disables dry run mode.
+// In dry run mode, entries are parsed but not stored to the database.
+// This is used for replay testing to avoid polluting the database.
+func (s *Service) SetDryRun(enabled bool) {
+	s.dryRun = enabled
+	if enabled {
+		log.Println("⚠️  Log processor in DRY RUN mode - data will NOT be stored to database")
+	} else {
+		log.Println("✓ Log processor in NORMAL mode - data will be stored to database")
 	}
 }
 
@@ -95,6 +109,14 @@ func (s *Service) processArenaStats(ctx context.Context, entries []*logreader.Lo
 
 	// Store stats if we have match data
 	if arenaStats != nil && (arenaStats.TotalMatches > 0 || arenaStats.TotalGames > 0) {
+		if s.dryRun {
+			// Dry run mode: count what would be stored but don't actually store
+			log.Printf("[DRY RUN] Would store arena stats: %d matches, %d games", arenaStats.TotalMatches, arenaStats.TotalGames)
+			result.MatchesStored = arenaStats.TotalMatches
+			result.GamesStored = arenaStats.TotalGames
+			return nil
+		}
+
 		if err := s.storage.StoreArenaStats(ctx, arenaStats, entries); err != nil {
 			log.Printf("Warning: Failed to store arena stats: %v", err)
 			return err
@@ -168,35 +190,44 @@ func (s *Service) processDecks(ctx context.Context, entries []*logreader.LogEntr
 			modified = time.Now()
 		}
 
-		err := s.storage.StoreDeckFromParser(
-			ctx,
-			deck.DeckID,
-			deck.Name,
-			deck.Format,
-			deck.Description,
-			created,
-			modified,
-			deck.LastPlayed,
-			mainDeck,
-			sideboard,
-		)
-		if err != nil {
-			log.Printf("Warning: Failed to store deck %s: %v", deck.Name, err)
-		} else {
+		if s.dryRun {
+			// Dry run mode: just count, don't store
 			storedCount++
+		} else {
+			err := s.storage.StoreDeckFromParser(
+				ctx,
+				deck.DeckID,
+				deck.Name,
+				deck.Format,
+				deck.Description,
+				created,
+				modified,
+				deck.LastPlayed,
+				mainDeck,
+				sideboard,
+			)
+			if err != nil {
+				log.Printf("Warning: Failed to store deck %s: %v", deck.Name, err)
+			} else {
+				storedCount++
+			}
 		}
 	}
 
 	if storedCount > 0 {
 		result.DecksStored = storedCount
-		log.Printf("✓ Stored %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
+		if s.dryRun {
+			log.Printf("[DRY RUN] Would store %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
+		} else {
+			log.Printf("✓ Stored %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
 
-		// Infer deck IDs for matches after storing decks
-		inferredCount, err := s.storage.InferDeckIDsForMatches(ctx)
-		if err != nil {
-			log.Printf("Warning: Failed to infer deck IDs: %v", err)
-		} else if inferredCount > 0 {
-			log.Printf("✓ Linked %d match(es) to decks", inferredCount)
+			// Infer deck IDs for matches after storing decks
+			inferredCount, err := s.storage.InferDeckIDsForMatches(ctx)
+			if err != nil {
+				log.Printf("Warning: Failed to infer deck IDs: %v", err)
+			} else if inferredCount > 0 {
+				log.Printf("✓ Linked %d match(es) to decks", inferredCount)
+			}
 		}
 	}
 
@@ -220,20 +251,29 @@ func (s *Service) processRankUpdates(ctx context.Context, entries []*logreader.L
 	storedCount := 0
 	for _, update := range rankUpdates {
 		// Small delay between operations to avoid database lock contention
-		if storedCount > 0 {
+		if storedCount > 0 && !s.dryRun {
 			time.Sleep(25 * time.Millisecond)
 		}
 
-		if err := s.storage.StoreRankUpdate(ctx, update); err != nil {
-			log.Printf("Warning: Failed to store rank update: %v", err)
-		} else {
+		if s.dryRun {
+			// Dry run mode: just count, don't store
 			storedCount++
+		} else {
+			if err := s.storage.StoreRankUpdate(ctx, update); err != nil {
+				log.Printf("Warning: Failed to store rank update: %v", err)
+			} else {
+				storedCount++
+			}
 		}
 	}
 
 	if storedCount > 0 {
 		result.RanksStored = storedCount
-		log.Printf("✓ Stored %d/%d rank update(s)", storedCount, len(rankUpdates))
+		if s.dryRun {
+			log.Printf("[DRY RUN] Would store %d/%d rank update(s)", storedCount, len(rankUpdates))
+		} else {
+			log.Printf("✓ Stored %d/%d rank update(s)", storedCount, len(rankUpdates))
+		}
 	}
 
 	return nil
@@ -256,37 +296,49 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 	storedCount := 0
 	for _, questData := range quests {
 		// Small delay between operations to avoid database lock contention
-		if storedCount > 0 {
+		if storedCount > 0 && !s.dryRun {
 			time.Sleep(25 * time.Millisecond)
 		}
 
-		// Convert QuestData to storage model
-		quest := &models.Quest{
-			QuestID:          questData.QuestID,
-			QuestType:        questData.QuestType,
-			Goal:             questData.Goal,
-			StartingProgress: questData.StartingProgress,
-			EndingProgress:   questData.EndingProgress,
-			Completed:        questData.Completed,
-			CanSwap:          questData.CanSwap,
-			Rewards:          questData.Rewards,
-			AssignedAt:       questData.AssignedAt,
-			CompletedAt:      questData.CompletedAt,
-			LastSeenAt:       questData.LastSeenAt,
-			Rerolled:         questData.Rerolled,
-		}
-
-		// Save quest to database
-		if err := s.storage.Quests().Save(quest); err != nil {
-			log.Printf("Warning: Failed to store quest %s: %v", questData.QuestID, err)
-		} else {
+		if s.dryRun {
+			// Dry run mode: just count, don't store
 			storedCount++
+			if questData.Completed {
+				result.QuestsCompleted++
+			}
+		} else {
+			// Convert QuestData to storage model
+			quest := &models.Quest{
+				QuestID:          questData.QuestID,
+				QuestType:        questData.QuestType,
+				Goal:             questData.Goal,
+				StartingProgress: questData.StartingProgress,
+				EndingProgress:   questData.EndingProgress,
+				Completed:        questData.Completed,
+				CanSwap:          questData.CanSwap,
+				Rewards:          questData.Rewards,
+				AssignedAt:       questData.AssignedAt,
+				CompletedAt:      questData.CompletedAt,
+				LastSeenAt:       questData.LastSeenAt,
+				Rerolled:         questData.Rerolled,
+			}
+
+			// Save quest to database
+			if err := s.storage.Quests().Save(quest); err != nil {
+				log.Printf("Warning: Failed to store quest %s: %v", questData.QuestID, err)
+			} else {
+				storedCount++
+			}
 		}
 	}
 
 	if storedCount > 0 {
 		result.QuestsStored = storedCount
-		log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
+		if s.dryRun {
+			log.Printf("[DRY RUN] Would store %d/%d quest(s), %d completed", storedCount, len(quests), result.QuestsCompleted)
+		} else {
+			log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
+		}
 	}
 
 	return nil
@@ -303,6 +355,12 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 	}
 
 	if len(graphStates) == 0 {
+		return nil
+	}
+
+	if s.dryRun {
+		// Dry run mode: parse but don't update
+		log.Println("[DRY RUN] Would process graph state (mastery pass, daily/weekly wins) but skipping in dry run mode")
 		return nil
 	}
 
@@ -400,18 +458,28 @@ func (s *Service) processDrafts(ctx context.Context, entries []*logreader.LogEnt
 	storedCount := 0
 	pickCount := 0
 	for _, session := range sessions {
-		if err := s.storeDraftSession(ctx, session); err != nil {
-			log.Printf("Warning: Failed to store draft session: %v", err)
-			continue
+		if s.dryRun {
+			// Dry run mode: just count, don't store
+			storedCount++
+			pickCount += len(session.Picks)
+		} else {
+			if err := s.storeDraftSession(ctx, session); err != nil {
+				log.Printf("Warning: Failed to store draft session: %v", err)
+				continue
+			}
+			storedCount++
+			pickCount += len(session.Picks)
 		}
-		storedCount++
-		pickCount += len(session.Picks)
 	}
 
 	if storedCount > 0 {
 		result.DraftsStored = storedCount
 		result.DraftPicksStored = pickCount
-		log.Printf("✓ Stored %d draft session(s) with %d pick(s)", storedCount, pickCount)
+		if s.dryRun {
+			log.Printf("[DRY RUN] Would store %d draft session(s) with %d pick(s)", storedCount, pickCount)
+		} else {
+			log.Printf("✓ Stored %d draft session(s) with %d pick(s)", storedCount, pickCount)
+		}
 	}
 
 	return nil

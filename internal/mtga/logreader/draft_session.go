@@ -33,7 +33,8 @@ func ParseDraftSessionEvent(entry *LogEntry) (*DraftSessionEvent, error) {
 	// Check for draft start: Client.SceneChange with toSceneName="Draft"
 	if sceneChange, ok := entry.JSON["toSceneName"]; ok && sceneChange == "Draft" {
 		context, _ := entry.JSON["context"].(string)
-		if context != "BotDraft" && context != "PremierDraft" {
+		// BotDraft = Quick Draft, HumanDraft = Premier/Traditional Draft
+		if context != "BotDraft" && context != "HumanDraft" {
 			return nil, nil // Not a draft we're tracking
 		}
 
@@ -54,14 +55,24 @@ func ParseDraftSessionEvent(entry *LogEntry) (*DraftSessionEvent, error) {
 		}
 	}
 
-	// Check for BotDraftDraftStatus (initial draft state)
+	// Check for BotDraftDraftStatus (Quick Draft initial state)
 	if strings.Contains(entry.Raw, "BotDraftDraftStatus") && strings.Contains(entry.Raw, "<==") {
 		return parseDraftStatus(entry)
 	}
 
-	// Check for BotDraftDraftPick (player made a pick)
+	// Check for BotDraftDraftPick (Quick Draft pick)
 	if strings.Contains(entry.Raw, "BotDraftDraftPick") && strings.Contains(entry.Raw, "==>") {
 		return parseDraftPick(entry)
+	}
+
+	// Check for EventPlayerDraftMakePick (Premier Draft pick)
+	if strings.Contains(entry.Raw, "EventPlayerDraftMakePick") && strings.Contains(entry.Raw, "==>") {
+		return parsePremierDraftPick(entry)
+	}
+
+	// Check for Draft.Notify (Premier Draft pack notification)
+	if strings.Contains(entry.Raw, "Draft.Notify") {
+		return parsePremierDraftNotify(entry)
 	}
 
 	return nil, nil
@@ -183,6 +194,89 @@ func parseDraftPick(entry *LogEntry) (*DraftSessionEvent, error) {
 		PickNumber:   pickNumber,
 		SelectedCard: selectedCard,
 		Timestamp:    time.Now(),
+	}, nil
+}
+
+// parsePremierDraftPick parses an EventPlayerDraftMakePick request (Premier Draft).
+// Example: ==> EventPlayerDraftMakePick {"request":"{\"DraftId\":\"...\",\"GrpIds\":[97380],\"Pack\":1,\"Pick\":1}"}
+func parsePremierDraftPick(entry *LogEntry) (*DraftSessionEvent, error) {
+	// The request is nested in a JSON string
+	requestStr, ok := entry.JSON["request"].(string)
+	if !ok {
+		return nil, nil
+	}
+
+	var request map[string]interface{}
+	if err := json.Unmarshal([]byte(requestStr), &request); err != nil {
+		return nil, fmt.Errorf("parse premier draft pick request: %w", err)
+	}
+
+	// Extract draft ID
+	draftID, _ := request["DraftId"].(string)
+
+	// Extract pack and pick numbers (1-indexed in Premier Draft)
+	packNumber := 0
+	if pn, ok := request["Pack"].(float64); ok {
+		packNumber = int(pn) - 1 // Convert to 0-indexed
+	}
+
+	pickNumber := 0
+	if pn, ok := request["Pick"].(float64); ok {
+		pickNumber = int(pn)
+	}
+
+	// Extract selected card IDs
+	selectedCard := []string{}
+	if grpIds, ok := request["GrpIds"].([]interface{}); ok {
+		for _, cardID := range grpIds {
+			if idFloat, ok := cardID.(float64); ok {
+				selectedCard = append(selectedCard, fmt.Sprintf("%d", int(idFloat)))
+			}
+		}
+	}
+
+	return &DraftSessionEvent{
+		Type:         "pick_made",
+		SessionID:    draftID,
+		PackNumber:   packNumber,
+		PickNumber:   pickNumber,
+		SelectedCard: selectedCard,
+		Timestamp:    time.Now(),
+	}, nil
+}
+
+// parsePremierDraftNotify parses a Draft.Notify message (Premier Draft pack update).
+// Example: Draft.Notify {"draftId":"...","SelfPick":2,"SelfPack":1,"PackCards":"97530,97468,..."}
+func parsePremierDraftNotify(entry *LogEntry) (*DraftSessionEvent, error) {
+	// Extract draft ID
+	draftID, _ := entry.JSON["draftId"].(string)
+
+	// Extract pack and pick numbers (1-indexed)
+	packNumber := 0
+	if pn, ok := entry.JSON["SelfPack"].(float64); ok {
+		packNumber = int(pn) - 1 // Convert to 0-indexed
+	}
+
+	pickNumber := 0
+	if pn, ok := entry.JSON["SelfPick"].(float64); ok {
+		pickNumber = int(pn)
+	}
+
+	// Extract pack cards (comma-separated string)
+	draftPack := []string{}
+	if packCardsStr, ok := entry.JSON["PackCards"].(string); ok {
+		if packCardsStr != "" {
+			draftPack = strings.Split(packCardsStr, ",")
+		}
+	}
+
+	return &DraftSessionEvent{
+		Type:       "status_updated",
+		SessionID:  draftID,
+		PackNumber: packNumber,
+		PickNumber: pickNumber,
+		DraftPack:  draftPack,
+		Timestamp:  time.Now(),
 	}, nil
 }
 

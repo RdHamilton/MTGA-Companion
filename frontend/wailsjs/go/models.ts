@@ -119,6 +119,32 @@ export namespace main {
 	        this.picksStored = source["picksStored"];
 	    }
 	}
+	export class ReplayStatus {
+	    isActive: boolean;
+	    isPaused: boolean;
+	    currentEntry: number;
+	    totalEntries: number;
+	    percentComplete: number;
+	    elapsed: number;
+	    speed: number;
+	    filter: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReplayStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isActive = source["isActive"];
+	        this.isPaused = source["isPaused"];
+	        this.currentEntry = source["currentEntry"];
+	        this.totalEntries = source["totalEntries"];
+	        this.percentComplete = source["percentComplete"];
+	        this.elapsed = source["elapsed"];
+	        this.speed = source["speed"];
+	        this.filter = source["filter"];
+	    }
+	}
 
 }
 
