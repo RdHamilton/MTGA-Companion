@@ -109,6 +109,9 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 }
 
 // GetActiveQuests returns all incomplete quests (one per unique quest_id)
+// Only returns quests that were last seen within the past 72 hours (3 days) to filter out
+// stale data from historical log files while allowing for multi-day quests.
+// Note: This is a workaround until we implement proper "last seen in QuestGetQuests" tracking.
 func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
@@ -118,9 +121,11 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 			SELECT quest_id, MAX(created_at) as max_created
 			FROM quests
 			WHERE completed = 0
+			  AND datetime(created_at) >= datetime('now', '-72 hours')
 			GROUP BY quest_id
 		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
 		WHERE q.completed = 0
+		  AND datetime(q.created_at) >= datetime('now', '-72 hours')
 		ORDER BY q.assigned_at DESC
 	`
 
