@@ -123,12 +123,16 @@ func (r *ReplayEngine) Start(logPaths []string, speed float64, filterType string
 		len(allEntries), len(logPaths), speed, filterType, pauseOnDraft)
 
 	// Clear existing draft sessions when replaying draft events for clean testing
+	log.Printf("DEBUG: filterType='%s', checking if we should clear draft sessions", filterType)
 	if filterType == "draft" {
+		log.Println("DEBUG: Calling clearDraftSessions()...")
 		if err := r.clearDraftSessions(); err != nil {
-			log.Printf("Warning: Failed to clear draft sessions: %v", err)
+			log.Printf("❌ ERROR: Failed to clear draft sessions: %v", err)
 		} else {
-			log.Println("✓ Cleared existing draft sessions for clean replay")
+			log.Println("✅ SUCCESS: Cleared existing draft sessions for clean replay")
 		}
+	} else {
+		log.Printf("DEBUG: Skipping clearDraftSessions() because filterType='%s' (not 'draft')", filterType)
 	}
 
 	// Enable replay mode to keep draft sessions as "in_progress" for Active Draft UI testing
@@ -587,15 +591,36 @@ func (r *ReplayEngine) GetStatus() map[string]interface{} {
 // clearDraftSessions removes all existing draft sessions from the database.
 // This ensures a clean state when replaying draft events for testing.
 func (r *ReplayEngine) clearDraftSessions() error {
+	log.Println("DEBUG: clearDraftSessions() started")
 	ctx := context.Background()
+
+	// Count existing sessions before delete
+	var countBefore int
+	countQuery := `SELECT COUNT(*) FROM draft_sessions`
+	if err := r.service.storage.GetDB().QueryRowContext(ctx, countQuery).Scan(&countBefore); err != nil {
+		log.Printf("DEBUG: Failed to count existing sessions: %v", err)
+	} else {
+		log.Printf("DEBUG: Found %d existing draft session(s) to delete", countBefore)
+	}
 
 	// Delete all draft sessions (cascade will delete picks and packs)
 	query := `DELETE FROM draft_sessions`
-	_, err := r.service.storage.GetDB().ExecContext(ctx, query)
+	result, err := r.service.storage.GetDB().ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("delete draft sessions: %w", err)
 	}
 
-	log.Println("Cleared all draft sessions from database")
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("DEBUG: DELETE query affected %d row(s)", rowsAffected)
+
+	// Count sessions after delete to verify
+	var countAfter int
+	if err := r.service.storage.GetDB().QueryRowContext(ctx, countQuery).Scan(&countAfter); err != nil {
+		log.Printf("DEBUG: Failed to count sessions after delete: %v", err)
+	} else {
+		log.Printf("DEBUG: %d session(s) remaining after delete (should be 0)", countAfter)
+	}
+
+	log.Printf("Cleared %d draft session(s) from database", rowsAffected)
 	return nil
 }
