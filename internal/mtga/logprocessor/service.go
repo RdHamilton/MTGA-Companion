@@ -500,13 +500,18 @@ type draftSessionData struct {
 
 // groupDraftEvents groups draft events into complete sessions.
 func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*draftSessionData {
-	// Group events by event name (each draft run has same event name)
+	// Group events by event name (Quick Draft) or session ID (Premier Draft)
 	eventGroups := make(map[string][]*logreader.DraftSessionEvent)
 	for _, event := range events {
-		if event.EventName == "" {
-			continue
+		// Use EventName for Quick Draft, SessionID for Premier Draft
+		groupKey := event.EventName
+		if groupKey == "" {
+			groupKey = event.SessionID
 		}
-		eventGroups[event.EventName] = append(eventGroups[event.EventName], event)
+		if groupKey == "" {
+			continue // Skip events with neither EventName nor SessionID
+		}
+		eventGroups[groupKey] = append(eventGroups[groupKey], event)
 	}
 
 	var sessions []*draftSessionData
@@ -535,20 +540,37 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			startTime = eventList[0].Timestamp
 		}
 
-		// Extract set code and draft type from event name
+		// Extract set code, draft type, event name, and session ID from events
 		setCode := ""
 		draftType := "QuickDraft"
+		sessionID := eventName // Default to group key (EventName or SessionID)
+		actualEventName := eventName
+
 		for _, event := range eventList {
+			// session_info events (from EventJoin) have complete metadata
+			if event.Type == "session_info" {
+				if event.EventName != "" {
+					actualEventName = event.EventName
+				}
+				if event.SetCode != "" {
+					setCode = event.SetCode
+				}
+				if event.SessionID != "" {
+					sessionID = event.SessionID
+				}
+			}
 			if event.SetCode != "" {
 				setCode = event.SetCode
 			}
-			if event.Context == "PremierDraft" {
+			// HumanDraft = Premier/Traditional Draft, BotDraft = Quick Draft
+			if event.Context == "HumanDraft" {
 				draftType = "PremierDraft"
 			}
+			// Use SessionID if available (Premier Draft)
+			if event.SessionID != "" {
+				sessionID = event.SessionID
+			}
 		}
-
-		// Create session ID from event name
-		sessionID := eventName
 
 		// Build picks and packs from events
 		picks := []*models.DraftPickSession{}
@@ -582,6 +604,14 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			}
 		}
 
+		// Fallback: If set_code is still missing, try to infer from card IDs
+		if setCode == "" && len(picks) > 0 {
+			setCode = s.inferSetCodeFromCardID(picks[0].CardID)
+			if setCode != "" {
+				log.Printf("Inferred set code %s from card ID %s for session %s", setCode, picks[0].CardID, sessionID)
+			}
+		}
+
 		// Determine status
 		status := "in_progress"
 		if hasEnd {
@@ -601,7 +631,7 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 
 		session := &draftSessionData{
 			SessionID: sessionID,
-			EventName: eventName,
+			EventName: actualEventName,
 			SetCode:   setCode,
 			DraftType: draftType,
 			StartTime: startTime,
@@ -652,4 +682,21 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 	}
 
 	return nil
+}
+
+// inferSetCodeFromCardID attempts to determine the set code by looking up a card ID
+// in the draft_card_ratings table. Returns empty string if not found.
+func (s *Service) inferSetCodeFromCardID(cardID string) string {
+	ctx := context.Background()
+
+	// Query draft_card_ratings for this card ID
+	query := `SELECT DISTINCT set_code FROM draft_card_ratings WHERE arena_id = ? LIMIT 1`
+	var setCode string
+	err := s.storage.GetDB().QueryRowContext(ctx, query, cardID).Scan(&setCode)
+	if err != nil {
+		// Card not found in ratings - this is expected if ratings haven't been fetched yet
+		return ""
+	}
+
+	return setCode
 }

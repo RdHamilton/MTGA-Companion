@@ -569,6 +569,12 @@
 }
 
 /* Pick Quality Indicators */
+.card-image-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
 .pick-quality-badge {
     position: absolute;
     top: 2px;
@@ -604,6 +610,11 @@
 
 .quality-f {
     background: linear-gradient(135deg, #ff4444 0%, #ff6666 100%); /* Red */
+}
+
+.quality-n-a {
+    background: linear-gradient(135deg, #666666 0%, #888888 100%); /* Gray */
+    color: #ffffff;
 }
 
 /* Pick Quality Tooltip */

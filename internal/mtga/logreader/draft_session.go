@@ -75,6 +75,11 @@ func ParseDraftSessionEvent(entry *LogEntry) (*DraftSessionEvent, error) {
 		return parsePremierDraftNotify(entry)
 	}
 
+	// Check for EventJoin (captures event name for Premier Draft)
+	if strings.Contains(entry.Raw, "EventJoin") && strings.Contains(entry.Raw, "<==") {
+		return parseEventJoin(entry)
+	}
+
 	return nil, nil
 }
 
@@ -277,6 +282,32 @@ func parsePremierDraftNotify(entry *LogEntry) (*DraftSessionEvent, error) {
 		PickNumber: pickNumber,
 		DraftPack:  draftPack,
 		Timestamp:  time.Now(),
+	}, nil
+}
+
+// parseEventJoin parses an EventJoin response to capture event name and session ID.
+// Example: <== EventJoin(...) {"Course":{"CourseId":"...","InternalEventName":"PremierDraft_TLA_20251118",...}}
+func parseEventJoin(entry *LogEntry) (*DraftSessionEvent, error) {
+	// Check if this is a draft event (Premier or Quick Draft)
+	course, ok := entry.JSON["Course"].(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+
+	eventName, _ := course["InternalEventName"].(string)
+	if !strings.Contains(eventName, "Draft") {
+		return nil, nil // Not a draft event
+	}
+
+	courseID, _ := course["CourseId"].(string)
+	setCode := extractSetCode(eventName)
+
+	return &DraftSessionEvent{
+		Type:      "session_info",
+		SessionID: courseID,
+		EventName: eventName,
+		SetCode:   setCode,
+		Timestamp: time.Now(),
 	}, nil
 }
 

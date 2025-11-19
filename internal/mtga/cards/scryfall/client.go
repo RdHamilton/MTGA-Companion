@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -77,10 +78,10 @@ func (c *Client) GetSet(ctx context.Context, code string) (*Set, error) {
 
 // SearchCards performs a full-text search for cards.
 func (c *Client) SearchCards(ctx context.Context, query string) (*SearchResult, error) {
-	url := fmt.Sprintf("%s/cards/search?q=%s", baseURL, query)
+	requestURL := fmt.Sprintf("%s/cards/search?q=%s", baseURL, url.QueryEscape(query))
 
 	var result SearchResult
-	if err := c.doRequest(ctx, url, &result); err != nil {
+	if err := c.doRequest(ctx, requestURL, &result); err != nil {
 		return nil, fmt.Errorf("failed to search cards with query '%s': %w", query, err)
 	}
 
@@ -122,6 +123,12 @@ func (c *Client) GetMigrations(ctx context.Context) (*MigrationList, error) {
 	}
 
 	return &migrations, nil
+}
+
+// DoRequestRaw performs a raw HTTP GET request to any Scryfall URL.
+// This is useful for following pagination URLs provided by Scryfall.
+func (c *Client) DoRequestRaw(ctx context.Context, url string, result interface{}) error {
+	return c.doRequest(ctx, url, result)
 }
 
 // doRequest performs an HTTP request with rate limiting and retry logic.

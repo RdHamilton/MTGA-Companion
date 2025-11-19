@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, RecalculateAllDraftGrades } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import './Settings.css';
 
@@ -40,6 +40,8 @@ const Settings = () => {
   const [setCode, setSetCode] = useState('');
   const [draftFormat, setDraftFormat] = useState('PremierDraft');
   const [isFetchingRatings, setIsFetchingRatings] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [recalculateMessage, setRecalculateMessage] = useState('');
 
   // Load connection status on mount
   useEffect(() => {
@@ -347,6 +349,34 @@ const Settings = () => {
       alert(`Failed to refresh 17Lands ratings: ${error}`);
     } finally {
       setIsFetchingRatings(false);
+    }
+  };
+
+  const handleRecalculateGrades = async () => {
+    console.log('[RecalculateGrades] Button clicked');
+    console.log('[RecalculateGrades] Starting recalculation...');
+
+    setIsRecalculating(true);
+    setRecalculateMessage('');
+
+    try {
+      console.log('[RecalculateGrades] Calling RecalculateAllDraftGrades()...');
+      const count = await RecalculateAllDraftGrades();
+      console.log('[RecalculateGrades] Recalculation complete, count:', count);
+
+      setRecalculateMessage(`✓ Successfully recalculated ${count} draft session(s)! Draft grades and predictions have been updated.`);
+
+      // Clear message after 5 seconds
+      setTimeout(() => setRecalculateMessage(''), 5000);
+    } catch (error) {
+      console.error('[RecalculateGrades] Error:', error);
+      setRecalculateMessage(`✗ Failed to recalculate draft grades: ${error}`);
+
+      // Clear error message after 8 seconds
+      setTimeout(() => setRecalculateMessage(''), 8000);
+    } finally {
+      setIsRecalculating(false);
+      console.log('[RecalculateGrades] Finished');
     }
   };
 
@@ -907,6 +937,40 @@ const Settings = () => {
               >
                 Refresh (Re-download)
               </button>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Recalculate Draft Grades
+              <span className="setting-description">Update all draft grades and predictions with the latest 17Lands card ratings</span>
+            </label>
+            <div className="setting-control">
+              <button
+                className="action-button"
+                onClick={handleRecalculateGrades}
+                disabled={isRecalculating}
+                style={{
+                  background: '#4a9eff',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isRecalculating ? 'Recalculating...' : 'Recalculate All Drafts'}
+              </button>
+              {recalculateMessage && (
+                <div style={{
+                  marginLeft: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  background: recalculateMessage.startsWith('✓') ? '#2d4a2d' : '#4a2d2d',
+                  color: recalculateMessage.startsWith('✓') ? '#7cfc00' : '#ff6b6b',
+                  fontSize: '0.9em',
+                  display: 'inline-block'
+                }}>
+                  {recalculateMessage}
+                </div>
+              )}
             </div>
           </div>
 

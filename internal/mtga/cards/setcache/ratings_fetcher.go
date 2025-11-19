@@ -3,7 +3,9 @@ package setcache
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
@@ -37,31 +39,50 @@ func (f *RatingsFetcher) FetchAndCacheRatings(ctx context.Context, setCode, draf
 
 	// Map MTGA set code to 17Lands expansion code
 	expansion := mapSetCodeTo17Lands(setCode)
+	log.Printf("[17Lands] Fetching card ratings for expansion=%s, format=%s", expansion, draftFormat)
 
-	// Fetch card ratings
+	// Fetch card ratings (doesn't require date range)
 	cardRatings, err := f.seventeenLandsClient.GetCardRatings(ctx, seventeenlands.QueryParams{
 		Expansion: expansion,
 		Format:    draftFormat,
 	})
 	if err != nil {
+		log.Printf("[17Lands] Error fetching card ratings: %v", err)
 		return fmt.Errorf("fetch card ratings from 17Lands: %w", err)
 	}
+	log.Printf("[17Lands] Received %d card ratings", len(cardRatings))
 
-	// Fetch color ratings
+	// Check if card ratings are empty (17Lands might not have data yet)
+	if len(cardRatings) == 0 {
+		return fmt.Errorf("17Lands returned no card ratings for set %s (%s) - data may not be available yet for this recently released set", setCode, draftFormat)
+	}
+
+	// Fetch color ratings (requires date range)
+	// Use default date range: last 17 days to capture sufficient data
+	endDate := getCurrentDateString()
+	startDate := getDateDaysAgo(17)
+	log.Printf("[17Lands] Fetching color ratings for expansion=%s, eventType=%s, dates=%s to %s", expansion, draftFormat, startDate, endDate)
 	colorRatings, err := f.seventeenLandsClient.GetColorRatings(ctx, seventeenlands.QueryParams{
 		Expansion: expansion,
 		EventType: draftFormat,
+		StartDate: startDate,
+		EndDate:   endDate,
 	})
 	if err != nil {
+		log.Printf("[17Lands] Error fetching color ratings: %v", err)
 		return fmt.Errorf("fetch color ratings from 17Lands: %w", err)
 	}
+	log.Printf("[17Lands] Received %d color ratings", len(colorRatings))
 
 	// Save to database
+	log.Printf("[17Lands] Saving %d card ratings and %d color ratings to database", len(cardRatings), len(colorRatings))
 	err = f.ratingsRepo.SaveSetRatings(ctx, setCode, draftFormat, cardRatings, colorRatings)
 	if err != nil {
+		log.Printf("[17Lands] Error saving ratings to database: %v", err)
 		return fmt.Errorf("save ratings to database: %w", err)
 	}
 
+	log.Printf("[17Lands] Successfully cached %d card ratings and %d color ratings for %s (%s)", len(cardRatings), len(colorRatings), setCode, draftFormat)
 	return nil
 }
 
@@ -109,4 +130,14 @@ func mapSetCodeTo17Lands(setCode string) string {
 	}
 
 	return code
+}
+
+// getCurrentDateString returns today's date in YYYY-MM-DD format.
+func getCurrentDateString() string {
+	return time.Now().Format("2006-01-02")
+}
+
+// getDateDaysAgo returns the date N days ago in YYYY-MM-DD format.
+func getDateDaysAgo(days int) string {
+	return time.Now().AddDate(0, 0, -days).Format("2006-01-02")
 }

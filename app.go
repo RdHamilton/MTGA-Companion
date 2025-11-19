@@ -131,8 +131,10 @@ func (a *App) Initialize(dbPath string) error {
 	scryfallClient := scryfall.NewClient()
 	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
 
-	// Initialize 17Lands ratings fetcher
-	seventeenlandsClient := seventeenlands.NewClient(seventeenlands.DefaultClientOptions())
+	// Initialize 17Lands ratings fetcher with longer timeout for initial data fetches
+	options := seventeenlands.DefaultClientOptions()
+	options.Timeout = 120 * time.Second // 2 minutes for large dataset downloads
+	seventeenlandsClient := seventeenlands.NewClient(options)
 	a.ratingsFetcher = setcache.NewRatingsFetcher(seventeenlandsClient, a.service.DraftRatingsRepo())
 
 	return nil
@@ -1774,6 +1776,17 @@ func (a *App) AnalyzeSessionPickQuality(sessionID string) error {
 			continue
 		}
 
+		// Ensure we have card image data (FetchCardByName checks cache first)
+		pickedRating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, session.SetCode, session.EventName, pick.CardID)
+		if err == nil && pickedRating != nil && pickedRating.Name != "" {
+			card, err := a.setFetcher.FetchCardByName(a.ctx, session.SetCode, pickedRating.Name, pick.CardID)
+			if err != nil {
+				log.Printf("Warning: Failed to fetch card %s (ID: %s) by name: %v", pickedRating.Name, pick.CardID, err)
+			} else if card != nil {
+				log.Printf("✓ Fetched/cached card: %s (ID: %s)", pickedRating.Name, pick.CardID)
+			}
+		}
+
 		// Analyze pick quality
 		quality, err := analyzer.AnalyzePick(a.ctx, session.SetCode, session.EventName, pack.CardIDs, pick.CardID)
 		if err != nil {
@@ -1969,4 +1982,273 @@ func (a *App) GetDraftWinRatePrediction(sessionID string) (*prediction.DeckPredi
 	}
 
 	return pred, nil
+}
+
+// RecalculateAllDraftGrades recalculates grades and predictions for all draft sessions.
+// This is useful after fetching new 17Lands data to update grades with actual card ratings.
+// It also backfills pick quality data and fetches missing card metadata.
+func (a *App) RecalculateAllDraftGrades() (int, error) {
+	if a.service == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Recalculating all draft grades...")
+
+	// Get all draft sessions (both active and completed)
+	activeSessions, err := a.service.DraftRepo().GetActiveSessions(a.ctx)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get active sessions: %v", err)}
+	}
+
+	completedSessions, err := a.service.DraftRepo().GetCompletedSessions(a.ctx, 1000)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get completed sessions: %v", err)}
+	}
+
+	// Combine all sessions
+	allSessions := append(activeSessions, completedSessions...)
+	log.Printf("Found %d draft sessions to recalculate", len(allSessions))
+
+	// Fetch missing card metadata for all unique sets
+	uniqueSets := make(map[string]bool)
+	for _, session := range allSessions {
+		if session.SetCode != "" {
+			uniqueSets[session.SetCode] = true
+		}
+	}
+	for setCode := range uniqueSets {
+		log.Printf("Fetching card metadata for set %s...", setCode)
+		count, err := a.RefreshSetCards(setCode)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch card metadata for %s: %v", setCode, err)
+		} else if count == 0 {
+			log.Printf("Scryfall returned 0 cards for %s (likely no Arena IDs yet). Will fetch by name as needed.", setCode)
+		} else {
+			log.Printf("Cached %d cards for set %s", count, setCode)
+		}
+	}
+
+	// Recalculate grade and prediction for each session
+	successCount := 0
+	for _, session := range allSessions {
+		log.Printf("Recalculating session %s (%s - %s)", session.ID, session.SetCode, session.DraftType)
+
+		// Backfill pick quality data with latest ratings
+		if session.SetCode != "" {
+			err := a.backfillPickQualityData(session.ID, session.SetCode, session.DraftType)
+			if err != nil {
+				log.Printf("Warning: Failed to backfill pick quality for session %s: %v", session.ID, err)
+			} else {
+				log.Printf("✓ Backfilled pick quality data for session %s", session.ID)
+			}
+		}
+
+		// Recalculate grade
+		_, err := a.CalculateDraftGrade(session.ID)
+		if err != nil {
+			log.Printf("Warning: Failed to recalculate grade for session %s: %v", session.ID, err)
+			continue
+		}
+
+		// Recalculate prediction
+		_, err = a.PredictDraftWinRate(session.ID)
+		if err != nil {
+			log.Printf("Warning: Failed to recalculate prediction for session %s: %v", session.ID, err)
+			// Don't fail - continue even if prediction fails
+		}
+
+		successCount++
+	}
+
+	log.Printf("Successfully recalculated %d/%d draft sessions", successCount, len(allSessions))
+	return successCount, nil
+}
+
+// backfillPickQualityData updates pick quality data for all picks in a session
+// using the latest 17Lands card ratings.
+func (a *App) backfillPickQualityData(sessionID, setCode, draftFormat string) error {
+	// Get all picks for this session
+	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("get picks: %w", err)
+	}
+
+	// Get all packs for this session
+	packs, err := a.service.DraftRepo().GetPacksBySession(a.ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("get packs: %w", err)
+	}
+
+	// Create pack lookup map
+	packMap := make(map[string]*models.DraftPackSession)
+	for _, pack := range packs {
+		key := fmt.Sprintf("%d_%d", pack.PackNumber, pack.PickNumber)
+		packMap[key] = pack
+	}
+
+	// Update each pick
+	updatedCount := 0
+	for _, pick := range picks {
+		// Get corresponding pack
+		packKey := fmt.Sprintf("%d_%d", pick.PackNumber, pick.PickNumber)
+		pack, hasPack := packMap[packKey]
+		if !hasPack {
+			// No pack data - mark as N/A since we can't calculate pick quality without alternatives
+			log.Printf("[DEBUG] No pack data for pick %d (P%dP%d) - marking as N/A", pick.ID, pick.PackNumber+1, pick.PickNumber+1)
+			if err := a.service.DraftRepo().UpdatePickQuality(a.ctx, pick.ID, "N/A", 0, 0.0, 0.0, "[]"); err != nil {
+				log.Printf("Warning: Failed to update pick quality for pick %d: %v", pick.ID, err)
+			} else {
+				updatedCount++
+			}
+			continue
+		}
+
+		// Get rating for picked card
+		pickedRating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, draftFormat, pick.CardID)
+
+		var grade string
+		if err != nil || pickedRating == nil {
+			// No rating available for this card - mark as N/A
+			log.Printf("[DEBUG] No rating found for card ID %s in set %s - marking as N/A", pick.CardID, setCode)
+			grade = "N/A"
+
+			// Still try to fetch card image from Scryfall by looking up from set_cards table
+			card, err := a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+			if err != nil || card == nil {
+				log.Printf("[DEBUG] No cached card found for Arena ID %s", pick.CardID)
+			}
+
+			// Save pick with N/A grade
+			if err := a.service.DraftRepo().UpdatePickQuality(a.ctx, pick.ID, grade, 0, 0.0, 0.0, "[]"); err != nil {
+				log.Printf("Warning: Failed to update pick quality for pick %d: %v", pick.ID, err)
+			} else {
+				updatedCount++
+			}
+			continue
+		}
+
+		log.Printf("[DEBUG] Found rating for card ID %s: name='%s'", pick.CardID, pickedRating.Name)
+
+		// Ensure we have Scryfall card data for images (FetchCardByName checks cache first)
+		if pickedRating.Name != "" {
+			log.Printf("[DEBUG] Attempting to fetch card: %s (ID: %s)", pickedRating.Name, pick.CardID)
+			card, err := a.setFetcher.FetchCardByName(a.ctx, setCode, pickedRating.Name, pick.CardID)
+			if err != nil {
+				log.Printf("Warning: Failed to fetch card %s (ID: %s) by name: %v", pickedRating.Name, pick.CardID, err)
+			} else if card != nil {
+				log.Printf("✓ Fetched/cached card: %s (ID: %s)", pickedRating.Name, pick.CardID)
+			} else {
+				log.Printf("[DEBUG] FetchCardByName returned nil for %s (ID: %s)", pickedRating.Name, pick.CardID)
+			}
+		} else {
+			log.Printf("[DEBUG] Skipping fetch - card name is empty for ID %s", pick.CardID)
+		}
+
+		// Get ratings for all cards in pack to find alternatives
+		packRatings := make(map[string]float64)
+		bestGIHWR := 0.0
+		for _, cardID := range pack.CardIDs {
+			rating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, draftFormat, cardID)
+			if err == nil && rating != nil {
+				packRatings[cardID] = rating.GIHWR
+				if rating.GIHWR > bestGIHWR {
+					bestGIHWR = rating.GIHWR
+				}
+			}
+		}
+
+		// Calculate pick quality grade
+		gihwr := pickedRating.GIHWR
+		grade = calculatePickGrade(gihwr, bestGIHWR)
+
+		// Find rank (1 = best pick in pack)
+		rank := 1
+		for _, cardGIHWR := range packRatings {
+			if cardGIHWR > gihwr {
+				rank++
+			}
+		}
+
+		// Build alternatives JSON (top 3 cards)
+		type alternative struct {
+			CardID string  `json:"card_id"`
+			GIHWR  float64 `json:"gihwr"`
+		}
+		alternatives := []alternative{}
+		for cardID, cardGIHWR := range packRatings {
+			if cardID != pick.CardID && cardGIHWR >= gihwr {
+				alternatives = append(alternatives, alternative{CardID: cardID, GIHWR: cardGIHWR})
+			}
+		}
+		// Sort by GIHWR descending
+		for i := 0; i < len(alternatives)-1; i++ {
+			for j := i + 1; j < len(alternatives); j++ {
+				if alternatives[j].GIHWR > alternatives[i].GIHWR {
+					alternatives[i], alternatives[j] = alternatives[j], alternatives[i]
+				}
+			}
+		}
+		// Take top 3
+		if len(alternatives) > 3 {
+			alternatives = alternatives[:3]
+		}
+
+		alternativesJSON := ""
+		if len(alternatives) > 0 {
+			jsonBytes, _ := json.Marshal(alternatives)
+			alternativesJSON = string(jsonBytes)
+		}
+
+		// Update pick in database
+		err = a.service.DraftRepo().UpdatePickQuality(
+			a.ctx,
+			pick.ID,
+			grade,
+			rank,
+			bestGIHWR,
+			gihwr,
+			alternativesJSON,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to update pick quality for pick %d: %v", pick.ID, err)
+			continue
+		}
+
+		updatedCount++
+	}
+
+	log.Printf("Updated pick quality for %d/%d picks in session %s", updatedCount, len(picks), sessionID)
+	return nil
+}
+
+// calculatePickGrade converts GIHWR to a letter grade.
+func calculatePickGrade(gihwr, bestGIHWR float64) string {
+	// Calculate relative quality (how close to best pick)
+	if bestGIHWR == 0 {
+		return "C"
+	}
+
+	ratio := gihwr / bestGIHWR
+
+	if ratio >= 0.95 {
+		return "A+"
+	} else if ratio >= 0.85 {
+		return "A"
+	} else if ratio >= 0.75 {
+		return "A-"
+	} else if ratio >= 0.65 {
+		return "B+"
+	} else if ratio >= 0.55 {
+		return "B"
+	} else if ratio >= 0.45 {
+		return "B-"
+	} else if ratio >= 0.35 {
+		return "C+"
+	} else if ratio >= 0.25 {
+		return "C"
+	} else if ratio >= 0.15 {
+		return "C-"
+	} else {
+		return "D"
+	}
 }
