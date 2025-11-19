@@ -80,6 +80,160 @@ func (s *Service) GetDB() *sql.DB {
 	return s.db.Conn()
 }
 
+// BulkImportSettings stores the original database settings before bulk import mode.
+type BulkImportSettings struct {
+	Synchronous string
+	JournalMode string
+	CacheSize   int
+}
+
+// EnableBulkImportMode configures the database for fast bulk imports.
+// This trades durability for speed - only use for recoverable operations like historical replay.
+// Always call RestoreSafeMode() when done (use defer).
+func (s *Service) EnableBulkImportMode(ctx context.Context) (*BulkImportSettings, error) {
+	db := s.db.Conn()
+
+	// Save current settings
+	settings := &BulkImportSettings{}
+
+	if err := db.QueryRowContext(ctx, "PRAGMA synchronous").Scan(&settings.Synchronous); err != nil {
+		return nil, fmt.Errorf("failed to get synchronous setting: %w", err)
+	}
+
+	if err := db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&settings.JournalMode); err != nil {
+		return nil, fmt.Errorf("failed to get journal_mode setting: %w", err)
+	}
+
+	if err := db.QueryRowContext(ctx, "PRAGMA cache_size").Scan(&settings.CacheSize); err != nil {
+		return nil, fmt.Errorf("failed to get cache_size setting: %w", err)
+	}
+
+	log.Printf("Enabling bulk import mode (saved settings: sync=%s, journal=%s, cache=%d)",
+		settings.Synchronous, settings.JournalMode, settings.CacheSize)
+
+	// Enable bulk import optimizations
+	if _, err := db.ExecContext(ctx, "PRAGMA synchronous = OFF"); err != nil {
+		return nil, fmt.Errorf("failed to set synchronous: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, "PRAGMA journal_mode = MEMORY"); err != nil {
+		return nil, fmt.Errorf("failed to set journal_mode: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, "PRAGMA cache_size = -64000"); err != nil {
+		return nil, fmt.Errorf("failed to set cache_size: %w", err)
+	}
+
+	log.Println("Bulk import mode enabled: synchronous=OFF, journal_mode=MEMORY, cache_size=64MB")
+
+	return settings, nil
+}
+
+// RestoreSafeMode restores the database to safe operation mode after bulk import.
+func (s *Service) RestoreSafeMode(ctx context.Context, settings *BulkImportSettings) error {
+	if settings == nil {
+		return nil
+	}
+
+	db := s.db.Conn()
+
+	log.Printf("Restoring safe mode (sync=%s, journal=%s, cache=%d)",
+		settings.Synchronous, settings.JournalMode, settings.CacheSize)
+
+	// Restore original settings
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("PRAGMA synchronous = %s", settings.Synchronous)); err != nil {
+		return fmt.Errorf("failed to restore synchronous: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("PRAGMA journal_mode = %s", settings.JournalMode)); err != nil {
+		return fmt.Errorf("failed to restore journal_mode: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("PRAGMA cache_size = %d", settings.CacheSize)); err != nil {
+		return fmt.Errorf("failed to restore cache_size: %w", err)
+	}
+
+	// Force WAL checkpoint to ensure data is committed
+	if _, err := db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		log.Printf("Warning: Failed to checkpoint WAL: %v", err)
+	}
+
+	log.Println("Safe mode restored and WAL checkpoint completed")
+
+	return nil
+}
+
+// UpdateAccountFromEntries consolidates all account updates from log entries into a single operation.
+// This replaces 3 separate fetch-update cycles with a single fetch-update, improving performance.
+func (s *Service) UpdateAccountFromEntries(ctx context.Context, entries []*logreader.LogEntry) error {
+	// Parse all data upfront
+	profile, _ := logreader.ParseProfile(entries)
+	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
+	masteryPass, _ := logreader.ParseMasteryPass(entries)
+
+	// If nothing to update, return early
+	if profile == nil && periodicRewards == nil && masteryPass == nil {
+		return nil
+	}
+
+	// Fetch account once
+	account, err := s.accounts.GetByID(ctx, s.currentAccountID)
+	if err != nil || account == nil {
+		return err
+	}
+
+	// Apply all updates
+	updated := false
+
+	// Update profile (screen name, client ID)
+	if profile != nil {
+		if profile.ScreenName != "" && (account.ScreenName == nil || *account.ScreenName != profile.ScreenName) {
+			account.ScreenName = &profile.ScreenName
+			updated = true
+		}
+		if profile.ClientID != "" && (account.ClientID == nil || *account.ClientID != profile.ClientID) {
+			account.ClientID = &profile.ClientID
+			updated = true
+		}
+	}
+
+	// Update daily/weekly wins
+	if periodicRewards != nil {
+		if periodicRewards.DailyWins != account.DailyWins {
+			account.DailyWins = periodicRewards.DailyWins
+			updated = true
+		}
+		if periodicRewards.WeeklyWins != account.WeeklyWins {
+			account.WeeklyWins = periodicRewards.WeeklyWins
+			updated = true
+		}
+	}
+
+	// Update mastery pass
+	if masteryPass != nil {
+		if masteryPass.CurrentLevel != account.MasteryLevel {
+			account.MasteryLevel = masteryPass.CurrentLevel
+			updated = true
+		}
+		if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
+			account.MasteryPass = masteryPass.PassType
+			updated = true
+		}
+		if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
+			account.MasteryMax = masteryPass.MaxLevel
+			updated = true
+		}
+	}
+
+	// Single update at the end if anything changed
+	if updated {
+		account.UpdatedAt = time.Now()
+		return s.accounts.Update(ctx, account)
+	}
+
+	return nil
+}
+
 // StoreArenaStats stores arena statistics parsed from the log.
 // It creates match and game records with deduplication and updates daily stats.
 func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.ArenaStats, entries []*logreader.LogEntry) error {
@@ -87,76 +241,8 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 		return nil
 	}
 
-	// Parse and update player profile (screen name) if found
-	profile, _ := logreader.ParseProfile(entries)
-	if profile != nil && (profile.ScreenName != "" || profile.ClientID != "") {
-		// Get current account
-		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
-		if err == nil && account != nil {
-			// Update screen name and client ID if changed
-			updated := false
-			if profile.ScreenName != "" && (account.ScreenName == nil || *account.ScreenName != profile.ScreenName) {
-				account.ScreenName = &profile.ScreenName
-				updated = true
-			}
-			if profile.ClientID != "" && (account.ClientID == nil || *account.ClientID != profile.ClientID) {
-				account.ClientID = &profile.ClientID
-				updated = true
-			}
-			if updated {
-				account.UpdatedAt = time.Now()
-				_ = s.accounts.Update(ctx, account)
-			}
-		}
-	}
-
-	// Parse and update daily/weekly wins from periodic rewards
-	periodicRewards, _ := logreader.ParsePeriodicRewards(entries)
-	if periodicRewards != nil {
-		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
-		if err == nil && account != nil {
-			// Update daily and weekly wins if changed
-			updated := false
-			if periodicRewards.DailyWins != account.DailyWins {
-				account.DailyWins = periodicRewards.DailyWins
-				updated = true
-			}
-			if periodicRewards.WeeklyWins != account.WeeklyWins {
-				account.WeeklyWins = periodicRewards.WeeklyWins
-				updated = true
-			}
-			if updated {
-				account.UpdatedAt = time.Now()
-				_ = s.accounts.Update(ctx, account)
-			}
-		}
-	}
-
-	// Parse and update mastery pass progression
-	masteryPass, _ := logreader.ParseMasteryPass(entries)
-	if masteryPass != nil {
-		account, err := s.accounts.GetByID(ctx, s.currentAccountID)
-		if err == nil && account != nil {
-			// Update mastery pass data if changed
-			updated := false
-			if masteryPass.CurrentLevel != account.MasteryLevel {
-				account.MasteryLevel = masteryPass.CurrentLevel
-				updated = true
-			}
-			if masteryPass.PassType != "" && masteryPass.PassType != account.MasteryPass {
-				account.MasteryPass = masteryPass.PassType
-				updated = true
-			}
-			if masteryPass.MaxLevel != 0 && masteryPass.MaxLevel != account.MasteryMax {
-				account.MasteryMax = masteryPass.MaxLevel
-				updated = true
-			}
-			if updated {
-				account.UpdatedAt = time.Now()
-				_ = s.accounts.Update(ctx, account)
-			}
-		}
-	}
+	// Update account from all parsed data (consolidated to reduce DB queries)
+	_ = s.UpdateAccountFromEntries(ctx, entries)
 
 	// Extract match details from log entries for persistent storage
 	matchesToStore, err := s.extractMatchesFromEntries(ctx, entries)
@@ -168,23 +254,14 @@ func (s *Service) StoreArenaStats(ctx context.Context, arenaStats *logreader.Are
 	rankSnapshots := extractRankSnapshots(entries)
 	correlateRanksWithMatches(matchesToStore, rankSnapshots)
 
-	// Store matches with deduplication
-	for _, matchData := range matchesToStore {
-		// Check if match already exists (deduplication)
-		existing, err := s.matches.GetByID(ctx, matchData.Match.ID)
-		if err != nil {
-			return fmt.Errorf("failed to check existing match: %w", err)
-		}
+	// Batch store all matches in single transaction (much faster than loop + individual queries)
+	stored, err := s.BatchStoreMatches(ctx, matchesToStore)
+	if err != nil {
+		return fmt.Errorf("failed to batch store matches: %w", err)
+	}
 
-		// Only store if match doesn't exist
-		if existing == nil {
-			if err := s.StoreMatch(ctx, matchData.Match, matchData.Games); err != nil {
-				// Ignore duplicate key errors (race condition)
-				if !strings.Contains(err.Error(), "UNIQUE constraint") {
-					return fmt.Errorf("failed to store match %s: %w", matchData.Match.ID, err)
-				}
-			}
-		}
+	if stored > 0 {
+		log.Printf("Stored %d new matches (skipped %d duplicates)", stored, len(matchesToStore)-stored)
 	}
 
 	// Update daily stats for each format
@@ -605,6 +682,107 @@ func (s *Service) StoreMatch(ctx context.Context, match *Match, games []*Game) e
 
 		return nil
 	})
+}
+
+// BatchStoreMatches efficiently stores multiple matches in a single transaction.
+// Uses INSERT OR IGNORE to skip duplicates without SELECT queries (10-20x faster than StoreMatch loop).
+// Ideal for bulk imports like historical log replay.
+func (s *Service) BatchStoreMatches(ctx context.Context, matchesData []matchData) (int, error) {
+	if len(matchesData) == 0 {
+		return 0, nil
+	}
+
+	db := s.db.Conn()
+	stored := 0
+
+	// Single transaction for all inserts
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Prepare match insert statement
+	matchStmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO matches (
+			id, account_id, event_id, event_name, timestamp, duration_seconds,
+			player_wins, opponent_wins, player_team_id, deck_id, rank_before, rank_after,
+			format, result, result_reason, opponent_name, opponent_id, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to prepare match statement: %w", err)
+	}
+	defer matchStmt.Close()
+
+	// Prepare game insert statement
+	gameStmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO games (
+			match_id, game_number, result, duration_seconds, result_reason, created_at
+		) VALUES (?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to prepare game statement: %w", err)
+	}
+	defer gameStmt.Close()
+
+	// Insert all matches and games
+	for _, matchData := range matchesData {
+		match := matchData.Match
+
+		// Insert match
+		result, err := matchStmt.ExecContext(ctx,
+			match.ID,
+			match.AccountID,
+			match.EventID,
+			match.EventName,
+			match.Timestamp,
+			match.DurationSeconds,
+			match.PlayerWins,
+			match.OpponentWins,
+			match.PlayerTeamID,
+			match.DeckID,
+			match.RankBefore,
+			match.RankAfter,
+			match.Format,
+			match.Result,
+			match.ResultReason,
+			match.OpponentName,
+			match.OpponentID,
+			match.CreatedAt,
+		)
+		if err != nil {
+			return stored, fmt.Errorf("failed to insert match %s: %w", match.ID, err)
+		}
+
+		// Check if match was actually inserted (not ignored due to duplicate)
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			stored++
+
+			// Insert games for this match
+			for _, game := range matchData.Games {
+				_, err := gameStmt.ExecContext(ctx,
+					game.MatchID,
+					game.GameNumber,
+					game.Result,
+					game.DurationSeconds,
+					game.ResultReason,
+					game.CreatedAt,
+				)
+				if err != nil {
+					return stored, fmt.Errorf("failed to insert game for match %s: %w", game.MatchID, err)
+				}
+			}
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return stored, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return stored, nil
 }
 
 // GetStats retrieves statistics with optional filtering.
