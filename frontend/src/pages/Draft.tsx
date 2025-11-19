@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards } from '../../wailsjs/go/main/App';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import './Draft.css';
@@ -19,6 +19,15 @@ interface HistoricalDraftsState {
     error: string | null;
 }
 
+interface HistoricalDraftDetailState {
+    session: models.DraftSession | null;
+    picks: models.DraftPickSession[];
+    packs: models.DraftPackSession[];
+    pickedCards: models.SetCard[];
+    loading: boolean;
+    error: string | null;
+}
+
 const Draft: React.FC = () => {
     const [state, setState] = useState<DraftState>({
         session: null,
@@ -31,6 +40,15 @@ const Draft: React.FC = () => {
 
     const [historicalState, setHistoricalState] = useState<HistoricalDraftsState>({
         sessions: [],
+        loading: false,
+        error: null,
+    });
+
+    const [historicalDetailState, setHistoricalDetailState] = useState<HistoricalDraftDetailState>({
+        session: null,
+        picks: [],
+        packs: [],
+        pickedCards: [],
         loading: false,
         error: null,
     });
@@ -68,6 +86,55 @@ const Draft: React.FC = () => {
                 error: error instanceof Error ? error.message : 'Failed to load historical drafts',
             }));
         }
+    };
+
+    const loadHistoricalDraftDetail = async (session: models.DraftSession) => {
+        try {
+            setHistoricalDetailState(prev => ({ ...prev, loading: true, error: null }));
+
+            // Load picks and packs
+            const [picks, packs] = await Promise.all([
+                GetDraftPicks(session.ID),
+                GetDraftPacks(session.ID),
+            ]);
+
+            // Get unique card IDs from picks
+            const uniqueCardIds = new Set((picks || []).map(p => p.CardID));
+
+            // Fetch each picked card
+            const pickedCardsPromises = Array.from(uniqueCardIds).map(cardId =>
+                GetCardByArenaID(cardId).catch(() => null)
+            );
+            const pickedCardsResults = await Promise.all(pickedCardsPromises);
+            const pickedCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
+
+            setHistoricalDetailState({
+                session,
+                picks: picks || [],
+                packs: packs || [],
+                pickedCards,
+                loading: false,
+                error: null,
+            });
+        } catch (error) {
+            console.error('Failed to load historical draft detail:', error);
+            setHistoricalDetailState(prev => ({
+                ...prev,
+                loading: false,
+                error: error instanceof Error ? error.message : 'Failed to load draft details',
+            }));
+        }
+    };
+
+    const handleBackToGrid = () => {
+        setHistoricalDetailState({
+            session: null,
+            picks: [],
+            packs: [],
+            pickedCards: [],
+            loading: false,
+            error: null,
+        });
     };
 
     const loadActiveDraft = async () => {
@@ -134,6 +201,103 @@ const Draft: React.FC = () => {
         );
     }
 
+    // Historical draft detail view
+    if (!state.session && historicalDetailState.session) {
+        return (
+            <div className="draft-container">
+                <div className="draft-header">
+                    <button className="btn-back" onClick={handleBackToGrid}>
+                        ← Back to Draft History
+                    </button>
+                    <h1>Draft Replay</h1>
+                    <div className="draft-info">
+                        <span className="draft-event">{historicalDetailState.session.EventName}</span>
+                        <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
+                        <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
+                    </div>
+                </div>
+
+                <div className="draft-content">
+                    {/* Left: Picked Cards Only */}
+                    <div className="card-grid-section">
+                        <h2>Picked Cards ({historicalDetailState.pickedCards.length})</h2>
+                        <div className="card-grid">
+                            {historicalDetailState.pickedCards.map(card => {
+                                return (
+                                    <div
+                                        key={card.ID}
+                                        className="card-item picked"
+                                        onMouseEnter={() => handleCardHover(card)}
+                                        onMouseLeave={() => handleCardHover(null)}
+                                    >
+                                        {card.ImageURLSmall ? (
+                                            <img src={card.ImageURLSmall} alt={card.Name} />
+                                        ) : (
+                                            <div className="card-placeholder">{card.Name}</div>
+                                        )}
+                                        <div className="picked-indicator">✓</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Right: Pick History & Details */}
+                    <div className="draft-details-section">
+                        {/* Pick History */}
+                        <div className="pick-history">
+                            <h2>Pick History</h2>
+                            <div className="pick-history-grid">
+                                {historicalDetailState.picks.map((pick) => {
+                                    const card = historicalDetailState.pickedCards.find(c => c.ArenaID === pick.CardID);
+                                    return (
+                                        <div key={pick.ID} className="pick-history-item">
+                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                            {card && card.ImageURLSmall && (
+                                                <img src={card.ImageURLSmall} alt={card.Name} title={card.Name} />
+                                            )}
+                                            {card && !card.ImageURLSmall && (
+                                                <div className="card-name-small">{card.Name}</div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Card Tooltip/Details */}
+                        {selectedCard && (
+                            <div className="card-details">
+                                <h3>{selectedCard.Name}</h3>
+                                {selectedCard.ImageURL && (
+                                    <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
+                                )}
+                                <div className="card-stats">
+                                    <div className="stat">
+                                        <span className="stat-label">Mana Cost:</span>
+                                        <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
+                                    </div>
+                                    <div className="stat">
+                                        <span className="stat-label">Type:</span>
+                                        <span className="stat-value">{selectedCard.Types || 'N/A'}</span>
+                                    </div>
+                                    <div className="stat">
+                                        <span className="stat-label">Rarity:</span>
+                                        <span className="stat-value">{selectedCard.Rarity}</span>
+                                    </div>
+                                </div>
+                                <div className="card-text">
+                                    <p>{selectedCard.Text}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Historical drafts grid view
     if (!state.session) {
         return (
             <div className="draft-container">
@@ -200,7 +364,7 @@ const Draft: React.FC = () => {
                                         <div className="draft-card-actions">
                                             <button
                                                 className="btn-view-replay"
-                                                onClick={() => window.location.href = `/draft/${session.ID}`}
+                                                onClick={() => loadHistoricalDraftDetail(session)}
                                             >
                                                 View Replay
                                             </button>
@@ -215,6 +379,7 @@ const Draft: React.FC = () => {
         );
     }
 
+    // Active draft view
     const pickedCardIds = getPickedCardIds();
 
     return (
@@ -229,7 +394,7 @@ const Draft: React.FC = () => {
             </div>
 
             <div className="draft-content">
-                {/* Left: Card Grid (~25% width) */}
+                {/* Left: Card Grid (~25% width) - ALL SET CARDS */}
                 <div className="card-grid-section">
                     <h2>Set Cards ({state.setCards.length})</h2>
                     <div className="card-grid">
