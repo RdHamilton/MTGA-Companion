@@ -253,7 +253,7 @@ const Draft: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Right: Pick History & Details */}
+                    {/* Right: Pick History */}
                     <div className="draft-details-section">
                         {/* Pick History */}
                         <div className="pick-history">
@@ -265,7 +265,13 @@ const Draft: React.FC = () => {
                                         <div key={pick.ID} className="pick-history-item">
                                             <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                             {card && card.ImageURLSmall && (
-                                                <img src={card.ImageURLSmall} alt={card.Name} title={card.Name} />
+                                                <img
+                                                    src={card.ImageURLSmall}
+                                                    alt={card.Name}
+                                                    title={card.Name}
+                                                    onMouseEnter={() => handleCardHover(card)}
+                                                    onMouseLeave={() => handleCardHover(null)}
+                                                />
                                             )}
                                             {card && !card.ImageURLSmall && (
                                                 <div className="card-name-small">{card.Name}</div>
@@ -275,54 +281,57 @@ const Draft: React.FC = () => {
                                 })}
                             </div>
                         </div>
-
-                        {/* Card Tooltip/Details */}
-                        {selectedCard && (
-                            <div className="card-details">
-                                <h3>{selectedCard.Name}</h3>
-                                <p className="card-detail-type">{selectedCard.Types || 'Unknown Type'}</p>
-                                <p className="card-detail-set">
-                                    <span>{selectedCard.SetCode}</span>
-                                    <span>•</span>
-                                    <span>{selectedCard.Rarity}</span>
-                                </p>
-                                {selectedCard.ImageURL && (
-                                    <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
-                                )}
-                                <div className="card-stats-section">
-                                    <h4>Card Stats</h4>
-                                    <div className="card-stats">
-                                        <div className="stat">
-                                            <span className="stat-label">Mana Cost</span>
-                                            <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
-                                        </div>
-                                        <div className="stat">
-                                            <span className="stat-label">CMC</span>
-                                            <span className="stat-value">{selectedCard.CMC || 0}</span>
-                                        </div>
-                                        {selectedCard.Power && (
-                                            <div className="stat">
-                                                <span className="stat-label">Power</span>
-                                                <span className="stat-value">{selectedCard.Power}</span>
-                                            </div>
-                                        )}
-                                        {selectedCard.Toughness && (
-                                            <div className="stat">
-                                                <span className="stat-label">Toughness</span>
-                                                <span className="stat-value">{selectedCard.Toughness}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {selectedCard.Text && (
-                                    <div className="card-text">
-                                        <p>{selectedCard.Text}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
+
+                {/* Card Details Overlay */}
+                {selectedCard && (
+                    <>
+                        <div className="card-details-overlay-backdrop" onClick={() => handleCardHover(null)} />
+                        <div className="card-details-overlay">
+                            <h3>{selectedCard.Name}</h3>
+                            <p className="card-detail-type">{selectedCard.Types || 'Unknown Type'}</p>
+                            <p className="card-detail-set">
+                                <span>{selectedCard.SetCode}</span>
+                                <span>•</span>
+                                <span>{selectedCard.Rarity}</span>
+                            </p>
+                            {selectedCard.ImageURL && (
+                                <img src={selectedCard.ImageURL} alt={selectedCard.Name} className="card-detail-image" />
+                            )}
+                            <div className="card-stats-section">
+                                <h4>Card Stats</h4>
+                                <div className="card-stats">
+                                    <div className="stat">
+                                        <span className="stat-label">Mana Cost</span>
+                                        <span className="stat-value">{selectedCard.ManaCost || 'N/A'}</span>
+                                    </div>
+                                    <div className="stat">
+                                        <span className="stat-label">CMC</span>
+                                        <span className="stat-value">{selectedCard.CMC || 0}</span>
+                                    </div>
+                                    {selectedCard.Power && (
+                                        <div className="stat">
+                                            <span className="stat-label">Power</span>
+                                            <span className="stat-value">{selectedCard.Power}</span>
+                                        </div>
+                                    )}
+                                    {selectedCard.Toughness && (
+                                        <div className="stat">
+                                            <span className="stat-label">Toughness</span>
+                                            <span className="stat-value">{selectedCard.Toughness}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {selectedCard.Text && (
+                                <div className="card-text">
+                                    <p>{selectedCard.Text}</p>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
         );
     }
@@ -449,7 +458,7 @@ const Draft: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Right: Pick History & Details */}
+                {/* Right: Pick History */}
                 <div className="draft-details-section">
                     {/* Pick History */}
                     <div className="pick-history">
@@ -461,7 +470,13 @@ const Draft: React.FC = () => {
                                     <div key={pick.ID} className="pick-history-item">
                                         <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                         {card && card.ImageURLSmall && (
-                                            <img src={card.ImageURLSmall} alt={card.Name} title={card.Name} />
+                                            <img
+                                                src={card.ImageURLSmall}
+                                                alt={card.Name}
+                                                title={card.Name}
+                                                onMouseEnter={() => handleCardHover(card)}
+                                                onMouseLeave={() => handleCardHover(null)}
+                                            />
                                         )}
                                         {card && !card.ImageURLSmall && (
                                             <div className="card-name-small">{card.Name}</div>
@@ -471,10 +486,13 @@ const Draft: React.FC = () => {
                             })}
                         </div>
                     </div>
+                </div>
 
-                    {/* Card Tooltip/Details */}
-                    {selectedCard && (
-                        <div className="card-details">
+                {/* Card Details Overlay */}
+                {selectedCard && (
+                    <>
+                        <div className="card-details-overlay-backdrop" onClick={() => handleCardHover(null)} />
+                        <div className="card-details-overlay">
                             <h3>{selectedCard.Name}</h3>
                             <p className="card-detail-type">{selectedCard.Types || 'Unknown Type'}</p>
                             <p className="card-detail-set">
@@ -516,8 +534,8 @@ const Draft: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                    )}
-                </div>
+                    </>
+                )}
             </div>
         </div>
     );
