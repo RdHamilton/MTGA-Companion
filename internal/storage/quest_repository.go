@@ -47,8 +47,9 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 
 		var lastSeenAt *time.Time
 		if quest.LastSeenAt != nil {
-			rounded := quest.LastSeenAt.Round(0)
-			lastSeenAt = &rounded
+			// Convert to UTC to avoid timezone in string representation
+			utc := quest.LastSeenAt.UTC().Round(0)
+			lastSeenAt = &utc
 		}
 
 		updateQuery := `
@@ -99,8 +100,9 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 
 	var lastSeenAt *time.Time
 	if quest.LastSeenAt != nil {
-		rounded := quest.LastSeenAt.Round(0)
-		lastSeenAt = &rounded
+		// Convert to UTC to avoid timezone in string representation
+		utc := quest.LastSeenAt.UTC().Round(0)
+		lastSeenAt = &utc
 	}
 
 	result, err := r.db.Exec(query,
