@@ -23,6 +23,7 @@ type DraftRepository interface {
 	SavePick(ctx context.Context, pick *models.DraftPickSession) error
 	GetPicksBySession(ctx context.Context, sessionID string) ([]*models.DraftPickSession, error)
 	GetPickByNumber(ctx context.Context, sessionID string, packNum, pickNum int) (*models.DraftPickSession, error)
+	UpdatePickQuality(ctx context.Context, pickID int, grade string, rank int, packBestGIHWR, pickedCardGIHWR float64, alternativesJSON string) error
 
 	// Packs
 	SavePack(ctx context.Context, pack *models.DraftPackSession) error
@@ -243,7 +244,8 @@ func (r *draftRepository) SavePick(ctx context.Context, pick *models.DraftPickSe
 // GetPicksBySession retrieves all picks for a draft session.
 func (r *draftRepository) GetPicksBySession(ctx context.Context, sessionID string) ([]*models.DraftPickSession, error) {
 	query := `
-		SELECT id, session_id, pack_number, pick_number, card_id, timestamp
+		SELECT id, session_id, pack_number, pick_number, card_id, timestamp,
+			pick_quality_grade, pick_quality_rank, pack_best_gihwr, picked_card_gihwr, alternatives_json
 		FROM draft_picks
 		WHERE session_id = ?
 		ORDER BY pack_number, pick_number
@@ -259,6 +261,11 @@ func (r *draftRepository) GetPicksBySession(ctx context.Context, sessionID strin
 	picks := []*models.DraftPickSession{}
 	for rows.Next() {
 		pick := &models.DraftPickSession{}
+		var grade sql.NullString
+		var rank sql.NullInt64
+		var packBestGIHWR sql.NullFloat64
+		var pickedCardGIHWR sql.NullFloat64
+		var alternativesJSON sql.NullString
 
 		err := rows.Scan(
 			&pick.ID,
@@ -267,9 +274,31 @@ func (r *draftRepository) GetPicksBySession(ctx context.Context, sessionID strin
 			&pick.PickNumber,
 			&pick.CardID,
 			&pick.Timestamp,
+			&grade,
+			&rank,
+			&packBestGIHWR,
+			&pickedCardGIHWR,
+			&alternativesJSON,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		if grade.Valid {
+			pick.PickQualityGrade = &grade.String
+		}
+		if rank.Valid {
+			rankInt := int(rank.Int64)
+			pick.PickQualityRank = &rankInt
+		}
+		if packBestGIHWR.Valid {
+			pick.PackBestGIHWR = &packBestGIHWR.Float64
+		}
+		if pickedCardGIHWR.Valid {
+			pick.PickedCardGIHWR = &pickedCardGIHWR.Float64
+		}
+		if alternativesJSON.Valid {
+			pick.AlternativesJSON = &alternativesJSON.String
 		}
 
 		picks = append(picks, pick)
@@ -415,4 +444,19 @@ func (r *draftRepository) GetPack(ctx context.Context, sessionID string, packNum
 	}
 
 	return pack, nil
+}
+
+// UpdatePickQuality updates the pick quality analysis fields for a pick.
+func (r *draftRepository) UpdatePickQuality(ctx context.Context, pickID int, grade string, rank int, packBestGIHWR, pickedCardGIHWR float64, alternativesJSON string) error {
+	query := `
+		UPDATE draft_picks
+		SET pick_quality_grade = ?,
+			pick_quality_rank = ?,
+			pack_best_gihwr = ?,
+			picked_card_gihwr = ?,
+			alternatives_json = ?
+		WHERE id = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, grade, rank, packBestGIHWR, pickedCardGIHWR, alternativesJSON, pickID)
+	return err
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/pickquality"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -1394,4 +1395,130 @@ func calculateTier(gihwr float64) string {
 		return "D"
 	}
 	return "F"
+}
+
+// AnalyzeSessionPickQuality calculates pick quality for all picks in a draft session.
+// This should be called after a draft session is completed to analyze all picks.
+func (a *App) AnalyzeSessionPickQuality(sessionID string) error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Get session to get set code and draft format
+	session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get session: %v", err)}
+	}
+	if session == nil {
+		return &AppError{Message: "Session not found"}
+	}
+
+	// Get all picks for this session
+	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get picks: %v", err)}
+	}
+
+	// Create pick quality analyzer
+	analyzer := pickquality.NewAnalyzer(
+		a.service.DraftRatingsRepo(),
+		a.service.SetCardRepo(),
+	)
+
+	// Analyze each pick
+	for _, pick := range picks {
+		// Get the pack for this pick
+		pack, err := a.service.DraftRepo().GetPack(a.ctx, sessionID, pick.PackNumber, pick.PickNumber)
+		if err != nil || pack == nil {
+			log.Printf("Warning: Could not get pack for pick %d (P%dP%d): %v", pick.ID, pick.PackNumber+1, pick.PickNumber+1, err)
+			continue
+		}
+
+		// Analyze pick quality
+		quality, err := analyzer.AnalyzePick(a.ctx, session.SetCode, session.EventName, pack.CardIDs, pick.CardID)
+		if err != nil {
+			log.Printf("Warning: Could not analyze pick %d: %v", pick.ID, err)
+			continue
+		}
+
+		// Serialize alternatives to JSON
+		alternativesJSON, err := pickquality.SerializeAlternatives(quality.Alternatives)
+		if err != nil {
+			log.Printf("Warning: Could not serialize alternatives for pick %d: %v", pick.ID, err)
+			continue
+		}
+
+		// Update pick quality in database
+		err = a.service.DraftRepo().UpdatePickQuality(
+			a.ctx,
+			pick.ID,
+			quality.Grade,
+			quality.Rank,
+			quality.PackBestGIHWR,
+			quality.PickedCardGIHWR,
+			alternativesJSON,
+		)
+		if err != nil {
+			log.Printf("Warning: Could not update pick quality for pick %d: %v", pick.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// GetPickAlternatives returns alternative picks for a specific pick.
+// Used to show tooltips with "You could have picked..." information.
+func (a *App) GetPickAlternatives(sessionID string, packNum, pickNum int) (*pickquality.PickQuality, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get session
+	session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get session: %v", err)}
+	}
+	if session == nil {
+		return nil, &AppError{Message: "Session not found"}
+	}
+
+	// Get the pick
+	pick, err := a.service.DraftRepo().GetPickByNumber(a.ctx, sessionID, packNum, pickNum)
+	if err != nil || pick == nil {
+		return nil, &AppError{Message: "Pick not found"}
+	}
+
+	// If pick quality is already calculated, deserialize and return
+	if pick.PickQualityGrade != nil && pick.AlternativesJSON != nil {
+		alternatives, err := pickquality.DeserializeAlternatives(*pick.AlternativesJSON)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Failed to parse alternatives: %v", err)}
+		}
+
+		return &pickquality.PickQuality{
+			Grade:           *pick.PickQualityGrade,
+			Rank:            *pick.PickQualityRank,
+			PackBestGIHWR:   *pick.PackBestGIHWR,
+			PickedCardGIHWR: *pick.PickedCardGIHWR,
+			Alternatives:    alternatives,
+		}, nil
+	}
+
+	// Otherwise, calculate it on the fly
+	pack, err := a.service.DraftRepo().GetPack(a.ctx, sessionID, packNum, pickNum)
+	if err != nil || pack == nil {
+		return nil, &AppError{Message: "Pack not found"}
+	}
+
+	analyzer := pickquality.NewAnalyzer(
+		a.service.DraftRatingsRepo(),
+		a.service.SetCardRepo(),
+	)
+
+	quality, err := analyzer.AnalyzePick(a.ctx, session.SetCode, session.EventName, pack.CardIDs, pick.CardID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to analyze pick: %v", err)}
+	}
+
+	return quality, nil
 }

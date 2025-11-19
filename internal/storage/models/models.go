@@ -333,12 +333,17 @@ type DraftSession struct {
 
 // DraftPickSession represents a single pick made during a draft session.
 type DraftPickSession struct {
-	ID         int
-	SessionID  string
-	PackNumber int
-	PickNumber int
-	CardID     string
-	Timestamp  time.Time
+	ID                 int
+	SessionID          string
+	PackNumber         int
+	PickNumber         int
+	CardID             string
+	Timestamp          time.Time
+	PickQualityGrade   *string  // A+, A, B, C, D, F
+	PickQualityRank    *int     // Rank in pack (1 = best)
+	PackBestGIHWR      *float64 // Best GIHWR in pack
+	PickedCardGIHWR    *float64 // GIHWR of picked card
+	AlternativesJSON   *string  // JSON array of alternative picks
 }
 
 // DraftPackSession represents the cards available in a pack during a draft.

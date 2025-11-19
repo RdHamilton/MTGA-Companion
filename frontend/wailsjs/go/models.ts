@@ -216,6 +216,11 @@ export namespace models {
 	    PickNumber: number;
 	    CardID: string;
 	    Timestamp: time.Time;
+	    PickQualityGrade?: string;
+	    PickQualityRank?: number;
+	    PackBestGIHWR?: number;
+	    PickedCardGIHWR?: number;
+	    AlternativesJSON?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DraftPickSession(source);
@@ -229,6 +234,11 @@ export namespace models {
 	        this.PickNumber = source["PickNumber"];
 	        this.CardID = source["CardID"];
 	        this.Timestamp = this.convertValues(source["Timestamp"], time.Time);
+	        this.PickQualityGrade = source["PickQualityGrade"];
+	        this.PickQualityRank = source["PickQualityRank"];
+	        this.PackBestGIHWR = source["PackBestGIHWR"];
+	        this.PickedCardGIHWR = source["PickedCardGIHWR"];
+	        this.AlternativesJSON = source["AlternativesJSON"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
