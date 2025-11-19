@@ -18,6 +18,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/pickquality"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -1521,4 +1522,76 @@ func (a *App) GetPickAlternatives(sessionID string, packNum, pickNum int) (*pick
 	}
 
 	return quality, nil
+}
+
+// CalculateDraftGrade calculates and stores the overall grade for a draft session.
+// This should be called after pick quality analysis is complete.
+func (a *App) CalculateDraftGrade(sessionID string) (*grading.DraftGrade, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Create grade calculator
+	calculator := grading.NewCalculator(
+		a.service.DraftRepo(),
+		a.service.DraftRatingsRepo(),
+		a.service.SetCardRepo(),
+	)
+
+	// Calculate grade
+	grade, err := calculator.CalculateGrade(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to calculate grade: %v", err)}
+	}
+
+	// Store grade in database
+	err = a.service.DraftRepo().UpdateSessionGrade(
+		a.ctx,
+		sessionID,
+		grade.OverallGrade,
+		grade.OverallScore,
+		grade.PickQualityScore,
+		grade.ColorDisciplineScore,
+		grade.DeckCompositionScore,
+		grade.StrategicScore,
+	)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to store grade: %v", err)}
+	}
+
+	return grade, nil
+}
+
+// GetDraftGrade retrieves the stored grade for a draft session.
+// If the grade hasn't been calculated yet, returns nil.
+func (a *App) GetDraftGrade(sessionID string) (*grading.DraftGrade, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get session to check if grade exists
+	session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get session: %v", err)}
+	}
+	if session == nil {
+		return nil, &AppError{Message: "Session not found"}
+	}
+
+	// If no grade calculated yet, return nil
+	if session.OverallGrade == nil {
+		return nil, nil
+	}
+
+	// Return stored grade
+	return &grading.DraftGrade{
+		OverallGrade:         *session.OverallGrade,
+		OverallScore:         *session.OverallScore,
+		PickQualityScore:     *session.PickQualityScore,
+		ColorDisciplineScore: *session.ColorDisciplineScore,
+		DeckCompositionScore: *session.DeckCompositionScore,
+		StrategicScore:       *session.StrategicScore,
+		// Best/worst picks and suggestions would need to be recalculated
+		// or stored separately - for now just return the scores
+	}, nil
 }

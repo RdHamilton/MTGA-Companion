@@ -1,3 +1,36 @@
+export namespace grading {
+	
+	export class DraftGrade {
+	    overall_grade: string;
+	    overall_score: number;
+	    pick_quality_score: number;
+	    color_discipline_score: number;
+	    deck_composition_score: number;
+	    strategic_score: number;
+	    best_picks: string[];
+	    worst_picks: string[];
+	    suggestions: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftGrade(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.overall_grade = source["overall_grade"];
+	        this.overall_score = source["overall_score"];
+	        this.pick_quality_score = source["pick_quality_score"];
+	        this.color_discipline_score = source["color_discipline_score"];
+	        this.deck_composition_score = source["deck_composition_score"];
+	        this.strategic_score = source["strategic_score"];
+	        this.best_picks = source["best_picks"];
+	        this.worst_picks = source["worst_picks"];
+	        this.suggestions = source["suggestions"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class CardRatingWithTier {
@@ -268,6 +301,12 @@ export namespace models {
 	    EndTime?: time.Time;
 	    Status: string;
 	    TotalPicks: number;
+	    OverallGrade?: string;
+	    OverallScore?: number;
+	    PickQualityScore?: number;
+	    ColorDisciplineScore?: number;
+	    DeckCompositionScore?: number;
+	    StrategicScore?: number;
 	    CreatedAt: time.Time;
 	    UpdatedAt: time.Time;
 	
@@ -285,6 +324,12 @@ export namespace models {
 	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
 	        this.Status = source["Status"];
 	        this.TotalPicks = source["TotalPicks"];
+	        this.OverallGrade = source["OverallGrade"];
+	        this.OverallScore = source["OverallScore"];
+	        this.PickQualityScore = source["PickQualityScore"];
+	        this.ColorDisciplineScore = source["ColorDisciplineScore"];
+	        this.DeckCompositionScore = source["DeckCompositionScore"];
+	        this.StrategicScore = source["StrategicScore"];
 	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
 	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], time.Time);
 	    }

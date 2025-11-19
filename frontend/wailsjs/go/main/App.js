@@ -6,6 +6,10 @@ export function AnalyzeSessionPickQuality(arg1) {
   return window['go']['main']['App']['AnalyzeSessionPickQuality'](arg1);
 }
 
+export function CalculateDraftGrade(arg1) {
+  return window['go']['main']['App']['CalculateDraftGrade'](arg1);
+}
+
 export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
@@ -64,6 +68,10 @@ export function GetConnectionStatus() {
 
 export function GetCurrentAccount() {
   return window['go']['main']['App']['GetCurrentAccount']();
+}
+
+export function GetDraftGrade(arg1) {
+  return window['go']['main']['App']['GetDraftGrade'](arg1);
 }
 
 export function GetDraftPacks(arg1) {

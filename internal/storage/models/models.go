@@ -319,16 +319,22 @@ type AchievementStats struct {
 
 // DraftSession represents a Quick Draft session parsed from MTGA logs.
 type DraftSession struct {
-	ID         string
-	EventName  string
-	SetCode    string
-	DraftType  string
-	StartTime  time.Time
-	EndTime    *time.Time
-	Status     string // "in_progress", "completed", "abandoned"
-	TotalPicks int
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID                   string
+	EventName            string
+	SetCode              string
+	DraftType            string
+	StartTime            time.Time
+	EndTime              *time.Time
+	Status               string // "in_progress", "completed", "abandoned"
+	TotalPicks           int
+	OverallGrade         *string  // A+, A, A-, B+, etc.
+	OverallScore         *int     // 0-100
+	PickQualityScore     *float64 // Component score (0-40)
+	ColorDisciplineScore *float64 // Component score (0-20)
+	DeckCompositionScore *float64 // Component score (0-25)
+	StrategicScore       *float64 // Component score (0-15)
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // DraftPickSession represents a single pick made during a draft session.

@@ -29,6 +29,9 @@ type DraftRepository interface {
 	SavePack(ctx context.Context, pack *models.DraftPackSession) error
 	GetPacksBySession(ctx context.Context, sessionID string) ([]*models.DraftPackSession, error)
 	GetPack(ctx context.Context, sessionID string, packNum, pickNum int) (*models.DraftPackSession, error)
+
+	// Grades
+	UpdateSessionGrade(ctx context.Context, sessionID string, overallGrade string, overallScore int, pickQuality, colorDiscipline, deckComposition, strategic float64) error
 }
 
 type draftRepository struct {
@@ -63,7 +66,9 @@ func (r *draftRepository) CreateSession(ctx context.Context, session *models.Dra
 // GetSession retrieves a draft session by ID.
 func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.DraftSession, error) {
 	query := `
-		SELECT id, event_name, set_code, draft_type, start_time, end_time, status, total_picks, created_at, updated_at
+		SELECT id, event_name, set_code, draft_type, start_time, end_time, status, total_picks,
+			overall_grade, overall_score, pick_quality_score, color_discipline_score,
+			deck_composition_score, strategic_score, created_at, updated_at
 		FROM draft_sessions
 		WHERE id = ?
 	`
@@ -71,6 +76,12 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 
 	session := &models.DraftSession{}
 	var endTime sql.NullTime
+	var overallGrade sql.NullString
+	var overallScore sql.NullInt64
+	var pickQuality sql.NullFloat64
+	var colorDiscipline sql.NullFloat64
+	var deckComposition sql.NullFloat64
+	var strategic sql.NullFloat64
 
 	err := row.Scan(
 		&session.ID,
@@ -81,6 +92,12 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 		&endTime,
 		&session.Status,
 		&session.TotalPicks,
+		&overallGrade,
+		&overallScore,
+		&pickQuality,
+		&colorDiscipline,
+		&deckComposition,
+		&strategic,
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	)
@@ -93,6 +110,25 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 
 	if endTime.Valid {
 		session.EndTime = &endTime.Time
+	}
+	if overallGrade.Valid {
+		session.OverallGrade = &overallGrade.String
+	}
+	if overallScore.Valid {
+		score := int(overallScore.Int64)
+		session.OverallScore = &score
+	}
+	if pickQuality.Valid {
+		session.PickQualityScore = &pickQuality.Float64
+	}
+	if colorDiscipline.Valid {
+		session.ColorDisciplineScore = &colorDiscipline.Float64
+	}
+	if deckComposition.Valid {
+		session.DeckCompositionScore = &deckComposition.Float64
+	}
+	if strategic.Valid {
+		session.StrategicScore = &strategic.Float64
 	}
 
 	return session, nil
@@ -458,5 +494,22 @@ func (r *draftRepository) UpdatePickQuality(ctx context.Context, pickID int, gra
 		WHERE id = ?
 	`
 	_, err := r.db.ExecContext(ctx, query, grade, rank, packBestGIHWR, pickedCardGIHWR, alternativesJSON, pickID)
+	return err
+}
+
+// UpdateSessionGrade updates the grade fields for a draft session.
+func (r *draftRepository) UpdateSessionGrade(ctx context.Context, sessionID string, overallGrade string, overallScore int, pickQuality, colorDiscipline, deckComposition, strategic float64) error {
+	query := `
+		UPDATE draft_sessions
+		SET overall_grade = ?,
+			overall_score = ?,
+			pick_quality_score = ?,
+			color_discipline_score = ?,
+			deck_composition_score = ?,
+			strategic_score = ?,
+			updated_at = ?
+		WHERE id = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, overallGrade, overallScore, pickQuality, colorDiscipline, deckComposition, strategic, time.Now(), sessionID)
 	return err
 }
