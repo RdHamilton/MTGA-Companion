@@ -69,6 +69,13 @@ func (s *Service) Start() error {
 		log.Printf("Auto-detected log path: %s", logPath)
 	}
 
+	// Run startup recovery to process any missed log files
+	// This captures data from UTC_Log files and Player-prev.log created while daemon was stopped
+	if err := s.StartupRecovery(); err != nil {
+		// Log error but don't fail startup - we can still monitor new entries
+		log.Printf("Warning: Startup recovery failed: %v", err)
+	}
+
 	// Create and start log poller
 	pollerConfig := logreader.DefaultPollerConfig(logPath)
 	pollerConfig.Interval = s.config.PollInterval
@@ -553,6 +560,101 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	log.Println("Restarting log poller...")
 	if err := s.restartPoller(); err != nil {
 		return fmt.Errorf("failed to restart poller: %w", err)
+	}
+
+	return nil
+}
+
+// StartupRecovery processes any unprocessed log files on daemon startup.
+// This captures data from UTC_Log files and Player-prev.log that may have been
+// created while the daemon was stopped, preventing data loss from daemon downtime.
+func (s *Service) StartupRecovery() error {
+	log.Println("Starting startup recovery to process any missed log files...")
+
+	// Discover all available log files
+	logFiles, err := s.discoverLogFiles()
+	if err != nil {
+		return fmt.Errorf("failed to discover log files: %w", err)
+	}
+
+	if len(logFiles) == 0 {
+		log.Println("No log files found for startup recovery")
+		return nil
+	}
+
+	log.Printf("Found %d log file(s), checking for unprocessed files...", len(logFiles))
+
+	processedCount := 0
+	skippedCount := 0
+	var totalEntries, totalMatches int
+
+	for _, logFile := range logFiles {
+		// Skip Player.log as it's being actively monitored by the poller
+		if logFile.Name == "Player.log" {
+			continue
+		}
+
+		// Check if we've already processed this file
+		alreadyProcessed, err := s.storage.HasProcessedLogFile(s.ctx, logFile.Name)
+		if err != nil {
+			log.Printf("Warning: Failed to check if %s was processed: %v", logFile.Name, err)
+			continue
+		}
+
+		if alreadyProcessed {
+			skippedCount++
+			continue
+		}
+
+		// Process this unprocessed file
+		log.Printf("Processing unprocessed file: %s", logFile.Name)
+
+		// Read all entries from the file
+		entries, err := s.readLogFile(logFile.Path)
+		if err != nil {
+			log.Printf("Warning: Failed to read %s: %v", logFile.Name, err)
+			continue
+		}
+
+		if len(entries) == 0 {
+			log.Printf("Skipping %s (no entries found)", logFile.Name)
+			continue
+		}
+
+		// Process entries through business logic
+		result, err := s.logProcessor.ProcessLogEntries(s.ctx, entries)
+		if err != nil {
+			log.Printf("Warning: Failed to process entries from %s: %v", logFile.Name, err)
+			continue
+		}
+
+		// Get file size for tracking
+		fileInfo, err := os.Stat(logFile.Path)
+		var fileSizeBytes int64
+		if err == nil {
+			fileSizeBytes = fileInfo.Size()
+		}
+
+		// Mark file as processed
+		err = s.storage.MarkLogFileProcessed(s.ctx, logFile.Name, len(entries), result.MatchesStored, fileSizeBytes)
+		if err != nil {
+			log.Printf("Warning: Failed to mark %s as processed: %v", logFile.Name, err)
+			// Continue anyway - we've already processed the data
+		}
+
+		log.Printf("✓ Processed %s: %d entries, %d matches, %d decks, %d quests",
+			logFile.Name, len(entries), result.MatchesStored, result.DecksStored, result.QuestsStored)
+
+		processedCount++
+		totalEntries += len(entries)
+		totalMatches += result.MatchesStored
+	}
+
+	if processedCount > 0 {
+		log.Printf("Startup recovery complete: processed %d file(s) (%d entries, %d matches), skipped %d already-processed file(s)",
+			processedCount, totalEntries, totalMatches, skippedCount)
+	} else {
+		log.Printf("Startup recovery complete: all %d file(s) already processed, no new data to recover", skippedCount)
 	}
 
 	return nil

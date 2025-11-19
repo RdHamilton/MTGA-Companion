@@ -1777,6 +1777,85 @@ func (s *Service) SaveMatch(ctx context.Context, match *models.Match) error {
 	return s.matches.Create(ctx, match)
 }
 
+// HasProcessedLogFile checks if a log file has already been processed.
+func (s *Service) HasProcessedLogFile(ctx context.Context, filename string) (bool, error) {
+	db := s.db.Conn()
+
+	var exists bool
+	err := db.QueryRowContext(ctx, `
+		SELECT EXISTS(SELECT 1 FROM processed_log_files WHERE filename = ?)
+	`, filename).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check processed log file: %w", err)
+	}
+
+	return exists, nil
+}
+
+// MarkLogFileProcessed marks a log file as processed in the database.
+func (s *Service) MarkLogFileProcessed(ctx context.Context, filename string, entryCount, matchesFound int, fileSizeBytes int64) error {
+	db := s.db.Conn()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO processed_log_files (
+			filename, processed_at, entry_count, matches_found, file_size_bytes
+		) VALUES (?, ?, ?, ?, ?)
+	`, filename, time.Now(), entryCount, matchesFound, fileSizeBytes)
+	if err != nil {
+		return fmt.Errorf("failed to mark log file as processed: %w", err)
+	}
+
+	return nil
+}
+
+// GetProcessedLogFiles returns a list of all processed log files.
+func (s *Service) GetProcessedLogFiles(ctx context.Context) ([]ProcessedLogFile, error) {
+	db := s.db.Conn()
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT filename, processed_at, entry_count, matches_found, file_size_bytes, created_at
+		FROM processed_log_files
+		ORDER BY processed_at DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query processed log files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []ProcessedLogFile
+	for rows.Next() {
+		var file ProcessedLogFile
+		err := rows.Scan(
+			&file.Filename,
+			&file.ProcessedAt,
+			&file.EntryCount,
+			&file.MatchesFound,
+			&file.FileSizeBytes,
+			&file.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan processed log file: %w", err)
+		}
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating processed log files: %w", err)
+	}
+
+	return files, nil
+}
+
+// ProcessedLogFile represents a log file that has been processed.
+type ProcessedLogFile struct {
+	Filename      string
+	ProcessedAt   time.Time
+	EntryCount    int
+	MatchesFound  int
+	FileSizeBytes int64
+	CreatedAt     time.Time
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()
