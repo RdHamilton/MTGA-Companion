@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ClearAllData, TriggerReplayLogs } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import './Settings.css';
 
@@ -166,6 +166,33 @@ const Settings = () => {
     } catch (error) {
       console.error('Import failed:', error);
       alert(`Failed to import data: ${error}`);
+    }
+  };
+
+  const handleImportLogFile = async () => {
+    try {
+      const result = await ImportLogFile();
+
+      // User cancelled
+      if (!result) {
+        return;
+      }
+
+      // Show success message with detailed results
+      alert(
+        `Successfully imported ${result.fileName}!\n\n` +
+        `Entries Read: ${result.entriesRead}\n` +
+        `Matches: ${result.matchesStored}\n` +
+        `Games: ${result.gamesStored}\n` +
+        `Decks: ${result.decksStored}\n` +
+        `Ranks: ${result.ranksStored}\n` +
+        `Quests: ${result.questsStored}\n` +
+        `Drafts: ${result.draftsStored}\n\n` +
+        `Refresh the page to see updated statistics.`
+      );
+    } catch (error) {
+      console.error('Log import failed:', error);
+      alert(`Failed to import log file: ${error}`);
     }
   };
 
@@ -371,6 +398,20 @@ const Settings = () => {
             <div className="setting-control">
               <button className="action-button" onClick={handleImportData}>
                 Import from File
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Import Log File
+              <span className="setting-description">
+                Import a historical MTGA log file (Player.log or UTC_Log) to recover data from backups or before daemon installation
+              </span>
+            </label>
+            <div className="setting-control">
+              <button className="action-button" onClick={handleImportLogFile}>
+                Import Log File
               </button>
             </div>
           </div>

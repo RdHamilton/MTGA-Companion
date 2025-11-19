@@ -150,6 +150,10 @@ export function ImportFromFile() {
   return window['go']['main']['App']['ImportFromFile']();
 }
 
+export function ImportLogFile() {
+  return window['go']['main']['App']['ImportLogFile']();
+}
+
 export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
 }

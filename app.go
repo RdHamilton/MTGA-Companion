@@ -21,6 +21,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/pickquality"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/prediction"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -1071,6 +1072,124 @@ func (a *App) ClearAllData() error {
 
 	log.Println("Successfully cleared all match history")
 	return nil
+}
+
+// ImportLogFileResult represents the result of importing a log file.
+type ImportLogFileResult struct {
+	FileName      string `json:"fileName"`
+	EntriesRead   int    `json:"entriesRead"`
+	MatchesStored int    `json:"matchesStored"`
+	GamesStored   int    `json:"gamesStored"`
+	DecksStored   int    `json:"decksStored"`
+	RanksStored   int    `json:"ranksStored"`
+	QuestsStored  int    `json:"questsStored"`
+	DraftsStored  int    `json:"draftsStored"`
+	PicksStored   int    `json:"picksStored"`
+}
+
+// ImportLogFile imports historical MTGA log file data into the database.
+// This allows users to import log files from backups, shared files, or pre-daemon installation.
+func (a *App) ImportLogFile() (*ImportLogFileResult, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select log file
+	filePath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Import MTGA Log File",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "MTGA Log Files (*.log)", Pattern: "*.log"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to open file dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil, nil
+	}
+
+	log.Printf("Importing log file: %s", filePath)
+
+	// Read log file
+	reader, err := logreader.NewReader(filePath)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to open log file: %v", err)}
+	}
+	defer func() {
+		_ = reader.Close() // Ignore close error (read-only file)
+	}()
+
+	// Read all entries
+	entries, err := reader.ReadAll()
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to read log file: %v", err)}
+	}
+
+	if len(entries) == 0 {
+		return nil, &AppError{Message: "Log file contains no entries"}
+	}
+
+	log.Printf("Read %d entries from log file", len(entries))
+
+	// Process entries using log processor
+	logProcessor := logprocessor.NewService(a.service)
+	result, err := logProcessor.ProcessLogEntries(a.ctx, entries)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to process log entries: %v", err)}
+	}
+
+	// Extract file name from path
+	fileName := filepath.Base(filePath)
+
+	log.Printf("Successfully imported %s: %d entries, %d matches, %d decks, %d quests, %d drafts",
+		fileName, len(entries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
+
+	// Emit events to frontend for data refresh
+	if result.MatchesStored > 0 || result.GamesStored > 0 {
+		wailsruntime.EventsEmit(a.ctx, "stats:updated", map[string]interface{}{
+			"matches": result.MatchesStored,
+			"games":   result.GamesStored,
+		})
+	}
+
+	if result.DecksStored > 0 {
+		wailsruntime.EventsEmit(a.ctx, "deck:updated", map[string]interface{}{
+			"count": result.DecksStored,
+		})
+	}
+
+	if result.RanksStored > 0 {
+		wailsruntime.EventsEmit(a.ctx, "rank:updated", map[string]interface{}{
+			"count": result.RanksStored,
+		})
+	}
+
+	if result.QuestsStored > 0 {
+		wailsruntime.EventsEmit(a.ctx, "quest:updated", map[string]interface{}{
+			"count": result.QuestsStored,
+		})
+	}
+
+	if result.DraftsStored > 0 {
+		wailsruntime.EventsEmit(a.ctx, "draft:updated", map[string]interface{}{
+			"count": result.DraftsStored,
+			"picks": result.DraftPicksStored,
+		})
+	}
+
+	return &ImportLogFileResult{
+		FileName:      fileName,
+		EntriesRead:   len(entries),
+		MatchesStored: result.MatchesStored,
+		GamesStored:   result.GamesStored,
+		DecksStored:   result.DecksStored,
+		RanksStored:   result.RanksStored,
+		QuestsStored:  result.QuestsStored,
+		DraftsStored:  result.DraftsStored,
+		PicksStored:   result.DraftPicksStored,
+	}, nil
 }
 
 // TriggerReplayLogs sends a command to the daemon to replay historical logs.

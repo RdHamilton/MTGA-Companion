@@ -83,6 +83,8 @@ export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:
 
 export function ImportFromFile():Promise<void>;
 
+export function ImportLogFile():Promise<main.ImportLogFileResult>;
+
 export function Initialize(arg1:string):Promise<void>;
 
 export function PredictDraftWinRate(arg1:string):Promise<prediction.DeckPrediction>;
