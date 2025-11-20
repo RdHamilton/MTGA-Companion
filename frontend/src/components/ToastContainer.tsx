@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import Toast from './Toast';
+import { getReplayState, subscribeToReplayState } from '../App';
 
 interface ToastData {
   id: number;
@@ -12,6 +13,9 @@ let toastIdCounter = 0;
 
 const ToastContainer = () => {
   const [toasts, setToasts] = useState<ToastData[]>([]);
+  const isReplayActiveRef = useRef(getReplayState().isActive);
+  const draftUpdateCountRef = useRef(0);
+  const draftUpdateTimerRef = useRef<number | null>(null);
 
   const addToast = useCallback((message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = toastIdCounter++;
@@ -25,6 +29,24 @@ const ToastContainer = () => {
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  // Subscribe to replay state changes
+  useEffect(() => {
+    const unsubscribe = subscribeToReplayState((state) => {
+      isReplayActiveRef.current = state.isActive;
+
+      // Clear pending draft updates when replay stops
+      if (!state.isActive) {
+        draftUpdateCountRef.current = 0;
+        if (draftUpdateTimerRef.current) {
+          clearTimeout(draftUpdateTimerRef.current);
+          draftUpdateTimerRef.current = null;
+        }
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -78,11 +100,34 @@ const ToastContainer = () => {
       }
     });
 
-    // Listen for draft update events
+    // Listen for draft update events with spam protection during replay
     const unsubscribeDraft = EventsOn('draft:updated', (data: any) => {
       const count = data?.count || 0;
       const picks = data?.picks || 0;
 
+      // During replay, batch draft updates to prevent spam
+      if (isReplayActiveRef.current) {
+        draftUpdateCountRef.current++;
+
+        // Clear existing timer
+        if (draftUpdateTimerRef.current) {
+          clearTimeout(draftUpdateTimerRef.current);
+        }
+
+        // Show batched toast after 2 seconds of no new updates
+        draftUpdateTimerRef.current = setTimeout(() => {
+          if (draftUpdateCountRef.current > 0) {
+            addToast(
+              `Replay: ${draftUpdateCountRef.current} draft update${draftUpdateCountRef.current !== 1 ? 's' : ''} processed`,
+              'info'
+            );
+            draftUpdateCountRef.current = 0;
+          }
+        }, 2000);
+        return;
+      }
+
+      // Normal mode: show toast immediately
       if (count > 0) {
         addToast(
           `Draft session${count > 1 ? 's' : ''} stored! (${count} session${count > 1 ? 's' : ''}, ${picks} pick${picks !== 1 ? 's' : ''})`,
@@ -96,6 +141,9 @@ const ToastContainer = () => {
       if (unsubscribeRank) unsubscribeRank();
       if (unsubscribeQuest) unsubscribeQuest();
       if (unsubscribeDraft) unsubscribeDraft();
+      if (draftUpdateTimerRef.current) {
+        clearTimeout(draftUpdateTimerRef.current);
+      }
     };
   }, [addToast]);
 

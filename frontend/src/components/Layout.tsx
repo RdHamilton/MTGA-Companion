@@ -187,8 +187,8 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       )}
 
-      {/* Floating Replay Control Banner - Only shown when replay is paused and not on settings page */}
-      {replayActive && replayPaused && location.pathname !== '/settings' && (
+      {/* Floating Replay Control Banner - Only shown when replay is paused, not on settings or draft page */}
+      {replayActive && replayPaused && location.pathname !== '/settings' && location.pathname !== '/draft' && (
         <div style={{
           position: 'fixed',
           bottom: '60px',
