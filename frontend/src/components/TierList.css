@@ -6,7 +6,6 @@
     background-color: #1e1e1e;
     border-radius: 8px;
     height: 100%;
-    min-height: 0;
     overflow: hidden;
 }
 
@@ -160,13 +159,13 @@
     flex-direction: column;
     gap: 16px;
     overflow-y: auto;
-    min-height: 0;
 }
 
 .tier-group {
+    flex-shrink: 0;
     background-color: #2d2d2d;
     border-radius: 8px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .tier-group-header {
