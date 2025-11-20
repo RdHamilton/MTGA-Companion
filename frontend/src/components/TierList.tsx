@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetCardRatings, RefreshSetRatings } from '../../wailsjs/go/main/App';
-import { main } from '../../wailsjs/go/models';
+import { GetCardRatings, RefreshSetRatings, GetSetCards } from '../../wailsjs/go/main/App';
+import { main, models } from '../../wailsjs/go/models';
 import './TierList.css';
 
 type CardRating = main.CardRatingWithTier;
@@ -17,6 +17,7 @@ type SortDirection = 'asc' | 'desc';
 
 const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds, onCardClick }) => {
     const [ratings, setRatings] = useState<CardRating[]>([]);
+    const [setCards, setSetCards] = useState<models.SetCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -25,6 +26,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
     const [selectedRarities, setSelectedRarities] = useState<Set<string>>(new Set());
     const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['S', 'A', 'B', 'C', 'D', 'F']));
+    const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
     const [showPickedOnly, setShowPickedOnly] = useState(false);
 
     // Sorting
@@ -39,8 +41,12 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
         try {
             setLoading(true);
             setError(null);
-            const data = await GetCardRatings(setCode, draftFormat);
-            setRatings(data || []);
+            const [ratingsData, cardsData] = await Promise.all([
+                GetCardRatings(setCode, draftFormat),
+                GetSetCards(setCode)
+            ]);
+            setRatings(ratingsData || []);
+            setSetCards(cardsData || []);
         } catch (err) {
             console.error('Failed to load card ratings:', err);
             setError(err instanceof Error ? err.message : 'Failed to load card ratings');
@@ -132,8 +138,22 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
             // Rarity filter
             if (selectedRarities.size > 0 && !selectedRarities.has(rating.rarity)) return false;
 
-            // Type filter (would need card type data from backend)
-            // For now, skip type filtering until we have that data
+            // Type filter - look up card in setCards to get type information
+            if (selectedTypes.size > 0) {
+                const card = setCards.find(c => c.Name === rating.name);
+                if (card && card.Types && card.Types.length > 0) {
+                    const hasMatchingType = card.Types.some(type =>
+                        selectedTypes.has(type) ||
+                        Array.from(selectedTypes).some(selectedType =>
+                            type.toLowerCase().includes(selectedType.toLowerCase())
+                        )
+                    );
+                    if (!hasMatchingType) return false;
+                } else {
+                    // If we don't have type data for this card, exclude it when filtering by type
+                    return false;
+                }
+            }
 
             return true;
         })
@@ -277,6 +297,22 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                 onClick={() => toggleFilter(selectedRarities, setSelectedRarities, rarity)}
                             >
                                 {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Type Filter */}
+                <div className="filter-group">
+                    <label>Types:</label>
+                    <div className="filter-buttons">
+                        {['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact'].map(type => (
+                            <button
+                                key={type}
+                                className={`filter-btn type-btn ${selectedTypes.has(type) ? 'active' : ''}`}
+                                onClick={() => toggleFilter(selectedTypes, setSelectedTypes, type)}
+                            >
+                                {type}
                             </button>
                         ))}
                     </div>
