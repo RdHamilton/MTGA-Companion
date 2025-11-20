@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade } from '../../wailsjs/go/main/App';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { models, pickquality, grading } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { getReplayState } from '../App';
@@ -73,6 +73,7 @@ const Draft: React.FC = () => {
         // Listen for draft updates from backend
         const unsubscribe = EventsOn('draft:updated', () => {
             // Refresh both active draft and historical drafts when draft data changes
+            console.log('[Draft.tsx] Received draft:updated event, calling loadActiveDraft()');
             loadActiveDraft();
         });
 
@@ -161,12 +162,15 @@ const Draft: React.FC = () => {
 
     const loadActiveDraft = async () => {
         try {
+            console.log('[loadActiveDraft] Starting...');
             setState(prev => ({ ...prev, loading: true, error: null }));
 
             // Get active draft sessions
             const sessions = await GetActiveDraftSessions();
+            console.log('[loadActiveDraft] Got sessions:', sessions?.length || 0);
 
             if (!sessions || sessions.length === 0) {
+                console.log('[loadActiveDraft] No active sessions, loading historical drafts');
                 setState(prev => ({
                     ...prev,
                     loading: false,
@@ -178,6 +182,7 @@ const Draft: React.FC = () => {
             }
 
             const session = sessions[0]; // Use first active session
+            console.log('[loadActiveDraft] Session:', session.ID, 'SetCode:', session.SetCode);
 
             // Load draft data
             const [picks, packs, setCards] = await Promise.all([
@@ -185,15 +190,56 @@ const Draft: React.FC = () => {
                 GetDraftPacks(session.ID),
                 GetSetCards(session.SetCode),
             ]);
+            console.log('[loadActiveDraft] Picks:', picks?.length || 0, 'Packs:', packs?.length || 0, 'SetCards:', setCards?.length || 0);
 
+            // In replay mode, show only picked cards for better visualization of progress
+            // In normal mode, show all set cards to help with draft decisions
+            const replayState = getReplayState();
+            let displayCards = setCards || [];
+            console.log('[loadActiveDraft] Replay mode:', replayState.isActive);
+
+            if (replayState.isActive && picks && picks.length > 0) {
+                console.log('[loadActiveDraft] Fetching', picks.length, 'picked cards for replay mode');
+                // Get unique card IDs from picks
+                const uniqueCardIds = new Set((picks || []).map(p => p.CardID));
+                console.log('[loadActiveDraft] Unique card IDs:', Array.from(uniqueCardIds));
+
+                // Fetch each picked card
+                const pickedCardsPromises = Array.from(uniqueCardIds).map(cardId =>
+                    GetCardByArenaID(cardId).catch(() => null)
+                );
+                const pickedCardsResults = await Promise.all(pickedCardsPromises);
+                displayCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
+                console.log('[loadActiveDraft] Fetched', displayCards.length, 'cards successfully');
+            }
+
+            console.log('[loadActiveDraft] Setting state with', displayCards.length, 'display cards');
             setState({
                 session,
                 picks: picks || [],
                 packs: packs || [],
-                setCards: setCards || [],
+                setCards: displayCards,
                 loading: false,
                 error: null,
             });
+
+            // Auto-analyze picks after draft loads (if picks exist)
+            if (session.ID && picks && picks.length > 0) {
+                console.log('[loadActiveDraft] Auto-analyzing', picks.length, 'picks for session', session.ID);
+                try {
+                    await AnalyzeSessionPickQuality(session.ID);
+                    console.log('[loadActiveDraft] Auto-analysis complete');
+                    // Reload picks to get updated quality data
+                    const updatedPicks = await GetDraftPicks(session.ID);
+                    setState(prev => ({
+                        ...prev,
+                        picks: updatedPicks || [],
+                    }));
+                } catch (error) {
+                    console.error('[loadActiveDraft] Failed to auto-analyze picks:', error);
+                    // Don't set error state - this is a non-critical failure
+                }
+            }
         } catch (error) {
             console.error('Failed to load draft:', error);
             setState(prev => ({
@@ -574,29 +620,51 @@ const Draft: React.FC = () => {
 
     return (
         <div className="draft-container">
-            {/* Replay Mode Banner */}
+            {/* Replay Controls - Bottom Left */}
             {isReplayMode && (
-                <div style={{
-                    background: isReplayPaused ? '#ff9800' : '#4a9eff',
-                    color: 'white',
-                    padding: '12px 20px',
-                    margin: '0 0 16px 0',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontWeight: 'bold',
-                }}>
-                    {isReplayPaused ? '⏸️' : '▶️'}
-                    <span>
-                        {isReplayPaused ? 'Replay Paused' : 'Replay Active'} -
-                        Draft events are being replayed. The draft data will populate as events are processed.
-                    </span>
-                    {isReplayPaused && (
-                        <span style={{ marginLeft: 'auto', fontSize: '0.9em' }}>
-                            Go to Settings to resume
-                        </span>
+                <div className="replay-controls">
+                    {isReplayPaused ? (
+                        <button
+                            className="replay-btn replay-resume"
+                            onClick={async () => {
+                                try {
+                                    await ResumeReplay();
+                                } catch (error) {
+                                    console.error('Failed to resume replay:', error);
+                                }
+                            }}
+                            title="Resume replay"
+                        >
+                            ▶️ Resume
+                        </button>
+                    ) : (
+                        <button
+                            className="replay-btn replay-pause"
+                            onClick={async () => {
+                                try {
+                                    await PauseReplay();
+                                } catch (error) {
+                                    console.error('Failed to pause replay:', error);
+                                }
+                            }}
+                            title="Pause replay"
+                        >
+                            ⏸️ Pause
+                        </button>
                     )}
+                    <button
+                        className="replay-btn replay-stop"
+                        onClick={async () => {
+                            try {
+                                await StopReplay();
+                            } catch (error) {
+                                console.error('Failed to stop replay:', error);
+                            }
+                        }}
+                        title="Stop replay and return to normal mode"
+                    >
+                        ⏹️ Stop
+                    </button>
                 </div>
             )}
 
@@ -628,12 +696,14 @@ const Draft: React.FC = () => {
             </div>
 
             <div className="draft-content">
-                {/* Left: Card Grid (~25% width) - ALL SET CARDS */}
+                {/* Left: Card Grid (~25% width) */}
                 <div className="card-grid-section">
-                    <h2>Set Cards ({state.setCards.length})</h2>
+                    <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({state.setCards.length})</h2>
                     <div className="card-grid">
                         {state.setCards.map(card => {
                             const isPicked = pickedCardIds.has(card.ArenaID);
+                            const pick = isPicked ? state.picks.find(p => p.CardID === card.ArenaID) : null;
+                            const hasGrade = pick && pick.PickQualityGrade;
                             return (
                                 <div
                                     key={card.ID}
@@ -646,6 +716,11 @@ const Draft: React.FC = () => {
                                         <div className="card-placeholder">{card.Name}</div>
                                     )}
                                     {isPicked && <div className="picked-indicator">✓</div>}
+                                    {hasGrade && (
+                                        <div className={`pick-quality-badge ${getPickQualityClass(pick!.PickQualityGrade)}`}>
+                                            {pick!.PickQualityGrade}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -730,7 +805,7 @@ const Draft: React.FC = () => {
                     {/* Tier List */}
                     <TierList
                         setCode={state.session.SetCode}
-                        draftFormat={state.session.EventName}
+                        draftFormat={state.session.DraftType}
                         pickedCardIds={pickedCardIds}
                         onCardClick={(arenaId) => {
                             const card = state.setCards.find(c => c.ArenaID === String(arenaId));

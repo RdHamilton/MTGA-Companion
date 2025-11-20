@@ -58,6 +58,7 @@ export namespace main {
 	    "# games_played"?: number;
 	    "# decks"?: number;
 	    tier: string;
+	    colors: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CardRatingWithTier(source);
@@ -89,6 +90,7 @@ export namespace main {
 	        this["# games_played"] = source["# games_played"];
 	        this["# decks"] = source["# decks"];
 	        this.tier = source["tier"];
+	        this.colors = source["colors"];
 	    }
 	}
 	export class ImportLogFileResult {

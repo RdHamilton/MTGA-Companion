@@ -122,6 +122,19 @@ func (r *ReplayEngine) Start(logPaths []string, speed float64, filterType string
 	log.Printf("Starting replay: %d entries from %d file(s), %.1fx speed, filter: %s, pauseOnDraft: %v",
 		len(allEntries), len(logPaths), speed, filterType, pauseOnDraft)
 
+	// Clear existing draft sessions when replaying draft events for clean testing
+	log.Printf("DEBUG: filterType='%s', checking if we should clear draft sessions", filterType)
+	if filterType == "draft" {
+		log.Println("DEBUG: Calling clearDraftSessions()...")
+		if err := r.clearDraftSessions(); err != nil {
+			log.Printf("❌ ERROR: Failed to clear draft sessions: %v", err)
+		} else {
+			log.Println("✅ SUCCESS: Cleared existing draft sessions for clean replay")
+		}
+	} else {
+		log.Printf("DEBUG: Skipping clearDraftSessions() because filterType='%s' (not 'draft')", filterType)
+	}
+
 	// Enable replay mode to keep draft sessions as "in_progress" for Active Draft UI testing
 	r.service.logProcessor.SetReplayMode(true)
 	log.Println("📝  REPLAY MODE: Data will be processed and stored normally for UI testing")
@@ -244,25 +257,44 @@ func (r *ReplayEngine) streamEntries() {
 			}
 		}
 
-		// Add to batch
-		batch = append(batch, entry)
-
-		// Check if this is a draft entry that should trigger auto-pause
+		// Check if this is a draft pick entry that should trigger auto-pause
 		r.mu.RLock()
-		shouldPauseOnDraft := r.pauseOnDraft && !r.isPaused
+		pauseOnDraft := r.pauseOnDraft
+		filterType := r.filterType
 		r.mu.RUnlock()
 
-		isDraft := shouldPauseOnDraft && r.isDraftEntry(entry)
+		// Determine if we should pause after this entry
+		// When pauseOnDraft is enabled, pause after EVERY pick event (not just the first)
+		isDraftPick := pauseOnDraft && r.isDraftPickEntry(entry)
 
-		// Process batch BEFORE pausing so draft sessions are created
-		if isDraft || len(batch) >= batchSize || i == len(r.entries)-1 {
-			log.Printf("Processing batch of %d entries (isDraft=%v, batchFull=%v, isLast=%v)", len(batch), isDraft, len(batch) >= batchSize, i == len(r.entries)-1)
-			r.service.processEntries(batch)
-			batch = batch[:0] // Clear batch
+		// For draft replay mode, process each draft event immediately (no batching)
+		// This allows the UI to update incrementally as each pick is made
+		if filterType == "draft" && r.isDraftEntry(entry) {
+			// Process this draft event immediately
+			log.Printf("Processing draft event immediately (entry %d, isPick=%v)", i, isDraftPick)
+			r.service.processEntries([]*logreader.LogEntry{entry})
+
+			// Emit draft:updated to refresh UI after processing
+			r.service.wsServer.Broadcast(Event{
+				Type: "draft:updated",
+				Data: map[string]interface{}{
+					"message": "Draft data updated",
+				},
+			})
+		} else {
+			// Add to batch for non-draft entries
+			batch = append(batch, entry)
+
+			// Process batch when full or at end
+			if len(batch) >= batchSize || i == len(r.entries)-1 {
+				log.Printf("Processing batch of %d entries (batchFull=%v, isLast=%v)", len(batch), len(batch) >= batchSize, i == len(r.entries)-1)
+				r.service.processEntries(batch)
+				batch = batch[:0] // Clear batch
+			}
 		}
 
-		// NOW pause if this was a draft entry (after processing it)
-		if isDraft {
+		// Pause after EACH pick event when pauseOnDraft is enabled (not just the first)
+		if isDraftPick {
 			log.Printf("Draft event detected at entry %d - auto-pausing AFTER processing", i)
 
 			r.mu.Lock()
@@ -439,6 +471,15 @@ func (r *ReplayEngine) isDraftEntry(entry *logreader.LogEntry) bool {
 		strings.Contains(raw, "DraftStatus")
 }
 
+// isDraftPickEntry checks if a log entry is specifically a draft PICK event (not status).
+// Used for pause-after-pick logic during replay testing.
+func (r *ReplayEngine) isDraftPickEntry(entry *logreader.LogEntry) bool {
+	raw := entry.Raw
+	// Only match actual pick events, not status updates
+	return (strings.Contains(raw, "DraftPick") && strings.Contains(raw, "==>")) ||
+		(strings.Contains(raw, "DraftMakePick") && strings.Contains(raw, "==>"))
+}
+
 // isMatchEntry checks if a log entry is related to match events.
 func (r *ReplayEngine) isMatchEntry(entry *logreader.LogEntry) bool {
 	raw := entry.Raw
@@ -545,4 +586,54 @@ func (r *ReplayEngine) GetStatus() map[string]interface{} {
 		"speed":           r.speed,
 		"filter":          r.filterType,
 	}
+}
+
+// clearDraftSessions removes all existing draft sessions from the database.
+// This ensures a clean state when replaying draft events for testing.
+func (r *ReplayEngine) clearDraftSessions() error {
+	log.Println("DEBUG: clearDraftSessions() started")
+	ctx := context.Background()
+	db := r.service.storage.GetDB()
+
+	// Count existing data before delete
+	var sessionsBefore, picksBefore, packsBefore int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&sessionsBefore)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&picksBefore)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&packsBefore)
+	log.Printf("DEBUG: Before delete - Sessions: %d, Picks: %d, Packs: %d", sessionsBefore, picksBefore, packsBefore)
+
+	// Explicitly delete picks and packs first (in case CASCADE isn't enabled)
+	// This ensures we don't have orphaned picks/packs
+	log.Println("DEBUG: Deleting draft_picks...")
+	if _, err := db.ExecContext(ctx, `DELETE FROM draft_picks`); err != nil {
+		log.Printf("WARNING: Failed to delete draft_picks: %v", err)
+	}
+
+	log.Println("DEBUG: Deleting draft_packs...")
+	if _, err := db.ExecContext(ctx, `DELETE FROM draft_packs`); err != nil {
+		log.Printf("WARNING: Failed to delete draft_packs: %v", err)
+	}
+
+	log.Println("DEBUG: Deleting draft_sessions...")
+	result, err := db.ExecContext(ctx, `DELETE FROM draft_sessions`)
+	if err != nil {
+		return fmt.Errorf("delete draft sessions: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("DEBUG: Deleted %d session(s)", rowsAffected)
+
+	// Count remaining data to verify cleanup
+	var sessionsAfter, picksAfter, packsAfter int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&sessionsAfter)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&picksAfter)
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&packsAfter)
+	log.Printf("DEBUG: After delete - Sessions: %d, Picks: %d, Packs: %d", sessionsAfter, picksAfter, packsAfter)
+
+	if picksAfter > 0 || packsAfter > 0 {
+		log.Printf("⚠️  WARNING: %d pick(s) and %d pack(s) still remain after delete!", picksAfter, packsAfter)
+	}
+
+	log.Printf("✓ Cleared %d session(s), %d pick(s), %d pack(s) from database", sessionsBefore, picksBefore, packsBefore)
+	return nil
 }
