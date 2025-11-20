@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
-import { models, pickquality, grading } from '../../wailsjs/go/models';
+import React, { useState, useEffect, useMemo } from 'react';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
+import { models, pickquality, grading, main } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { getReplayState } from '../App';
 import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';
 import { WinRatePrediction } from '../components/WinRatePrediction';
+import CardsToLookFor from '../components/CardsToLookFor';
+import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
 interface DraftState {
@@ -13,6 +15,7 @@ interface DraftState {
     picks: models.DraftPickSession[];
     packs: models.DraftPackSession[];
     setCards: models.SetCard[];
+    ratings: main.CardRatingWithTier[];
     loading: boolean;
     error: string | null;
 }
@@ -39,6 +42,7 @@ const Draft: React.FC = () => {
         picks: [],
         packs: [],
         setCards: [],
+        ratings: [],
         loading: true,
         error: null,
     });
@@ -185,40 +189,28 @@ const Draft: React.FC = () => {
             console.log('[loadActiveDraft] Session:', session.ID, 'SetCode:', session.SetCode);
 
             // Load draft data
-            const [picks, packs, setCards] = await Promise.all([
+            console.log('[loadActiveDraft] Loading data for session:', session.ID, 'SetCode:', session.SetCode);
+            const [picks, packs, setCards, ratings] = await Promise.all([
                 GetDraftPicks(session.ID),
                 GetDraftPacks(session.ID),
                 GetSetCards(session.SetCode),
+                GetCardRatings(session.SetCode, session.DraftType),
             ]);
-            console.log('[loadActiveDraft] Picks:', picks?.length || 0, 'Packs:', packs?.length || 0, 'SetCards:', setCards?.length || 0);
+            console.log('[loadActiveDraft] Data loaded successfully:');
+            console.log('  - Picks:', picks?.length || 0);
+            console.log('  - Packs:', packs?.length || 0);
+            console.log('  - SetCards:', setCards?.length || 0);
+            console.log('  - Ratings:', ratings?.length || 0);
 
-            // In replay mode, show only picked cards for better visualization of progress
-            // In normal mode, show all set cards to help with draft decisions
-            const replayState = getReplayState();
-            let displayCards = setCards || [];
-            console.log('[loadActiveDraft] Replay mode:', replayState.isActive);
-
-            if (replayState.isActive && picks && picks.length > 0) {
-                console.log('[loadActiveDraft] Fetching', picks.length, 'picked cards for replay mode');
-                // Get unique card IDs from picks
-                const uniqueCardIds = new Set((picks || []).map(p => p.CardID));
-                console.log('[loadActiveDraft] Unique card IDs:', Array.from(uniqueCardIds));
-
-                // Fetch each picked card
-                const pickedCardsPromises = Array.from(uniqueCardIds).map(cardId =>
-                    GetCardByArenaID(cardId).catch(() => null)
-                );
-                const pickedCardsResults = await Promise.all(pickedCardsPromises);
-                displayCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
-                console.log('[loadActiveDraft] Fetched', displayCards.length, 'cards successfully');
-            }
-
-            console.log('[loadActiveDraft] Setting state with', displayCards.length, 'display cards');
+            // Always store ALL set cards for synergy analysis
+            // In replay mode, we'll filter the display later in the render
+            console.log('[loadActiveDraft] Setting state with all set cards');
             setState({
                 session,
                 picks: picks || [],
                 packs: packs || [],
-                setCards: displayCards,
+                setCards: setCards || [],
+                ratings: ratings || [],
                 loading: false,
                 error: null,
             });
@@ -256,6 +248,11 @@ const Draft: React.FC = () => {
 
     const getPickedCardIds = (): Set<string> => {
         return new Set(state.picks.map(pick => pick.CardID));
+    };
+
+    const getPickedCards = (): models.SetCard[] => {
+        const pickedCardIds = getPickedCardIds();
+        return state.setCards.filter(card => pickedCardIds.has(card.ArenaID));
     };
 
     const handleAnalyzeDraft = async () => {
@@ -312,6 +309,43 @@ const Draft: React.FC = () => {
         }
         return null;
     };
+
+    // ========================================
+    // HOOKS MUST BE CALLED UNCONDITIONALLY
+    // Call all hooks at the top before any conditional returns
+    // ========================================
+
+    // Get replay state
+    const replayState = getReplayState();
+    const isReplayMode = replayState.isActive;
+    const isReplayPaused = replayState.isPaused;
+
+    // Compute display cards for active draft (used in render)
+    const pickedCardIds = state.session ? getPickedCardIds() : new Set<string>();
+    const displayCards = useMemo(() => {
+        if (!state.session) return [];
+        console.log('[displayCards] Computing display cards. isReplayMode:', isReplayMode, 'picks:', state.picks.length, 'setCards:', state.setCards.length);
+        if (isReplayMode && state.picks.length > 0) {
+            // Recalculate picked card IDs inside useMemo to ensure correct dependencies
+            const pickedIds = new Set(state.picks.map(pick => pick.CardID));
+            const filtered = state.setCards.filter(card => pickedIds.has(card.ArenaID));
+            console.log('[displayCards] Replay mode: filtered to', filtered.length, 'picked cards');
+            return filtered;
+        }
+        console.log('[displayCards] Normal mode: showing all', state.setCards.length, 'cards');
+        return state.setCards;
+    }, [state.session, isReplayMode, state.setCards, state.picks]);
+
+    // Calculate synergy analysis for highlighting
+    const synergyAnalysis = useMemo(() => {
+        if (!state.session) return { types: [], colors: { colors: [], count: 0, percentage: 0 }, curve: { avgCMC: 0, archetype: 'midrange' as const, gaps: [] }, pickedCardsCount: 0 };
+        const pickedCards = getPickedCards();
+        return analyzeSynergies(pickedCards);
+    }, [state.session, state.picks, state.setCards]);
+
+    // ========================================
+    // NOW WE CAN DO CONDITIONAL RENDERING
+    // ========================================
 
     if (state.loading) {
         return (
@@ -610,13 +644,8 @@ const Draft: React.FC = () => {
         );
     }
 
-    // Active draft view
-    const pickedCardIds = getPickedCardIds();
-
-    // Check if we're in replay mode
-    const replayState = getReplayState();
-    const isReplayMode = replayState.isActive;
-    const isReplayPaused = replayState.isPaused;
+    // Active draft view - all hooks have been called at the top already
+    console.log('[Draft] Rendering active draft. DisplayCards:', displayCards.length, 'Picks:', state.picks.length);
 
     return (
         <div className="draft-container">
@@ -698,16 +727,17 @@ const Draft: React.FC = () => {
             <div className="draft-content">
                 {/* Left: Card Grid (~25% width) */}
                 <div className="card-grid-section">
-                    <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({state.setCards.length})</h2>
+                    <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({displayCards.length})</h2>
                     <div className="card-grid">
-                        {state.setCards.map(card => {
+                        {displayCards.map(card => {
                             const isPicked = pickedCardIds.has(card.ArenaID);
                             const pick = isPicked ? state.picks.find(p => p.CardID === card.ArenaID) : null;
                             const hasGrade = pick && pick.PickQualityGrade;
+                            const hasSynergy = !isPicked && shouldHighlightCard(card, synergyAnalysis);
                             return (
                                 <div
                                     key={card.ID}
-                                    className={`card-item ${isPicked ? 'picked' : ''}`}
+                                    className={`card-item ${isPicked ? 'picked' : ''} ${hasSynergy ? 'synergy-highlight' : ''}`}
                                     onClick={() => handleCardHover(card)}
                                 >
                                     {card.ImageURLSmall ? (
@@ -716,6 +746,7 @@ const Draft: React.FC = () => {
                                         <div className="card-placeholder">{card.Name}</div>
                                     )}
                                     {isPicked && <div className="picked-indicator">✓</div>}
+                                    {hasSynergy && !isPicked && <div className="synergy-indicator">★</div>}
                                     {hasGrade && (
                                         <div className={`pick-quality-badge ${getPickQualityClass(pick!.PickQualityGrade)}`}>
                                             {pick!.PickQualityGrade}
@@ -725,6 +756,16 @@ const Draft: React.FC = () => {
                             );
                         })}
                     </div>
+                </div>
+
+                {/* Middle: Cards to Look For Panel */}
+                <div className="cards-to-look-for-section">
+                    <CardsToLookFor
+                        pickedCards={getPickedCards()}
+                        availableCards={state.setCards}
+                        ratings={state.ratings}
+                        onCardClick={(card) => handleCardHover(card)}
+                    />
                 </div>
 
                 {/* Right: Pick History and Tier List */}

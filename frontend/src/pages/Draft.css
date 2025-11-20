@@ -52,6 +52,14 @@
     overflow: hidden;
 }
 
+/* Cards to Look For Section (~25% width) */
+.cards-to-look-for-section {
+    flex: 0 0 25%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 .card-grid-section h2 {
     margin: 0 0 15px 0;
     font-size: 18px;
@@ -93,6 +101,16 @@
     box-shadow: 0 4px 16px rgba(68, 255, 136, 0.8);
 }
 
+.card-item.synergy-highlight {
+    border-color: #ffaa44;
+    box-shadow: 0 0 8px rgba(255, 170, 68, 0.5);
+}
+
+.card-item.synergy-highlight:hover {
+    border-color: #ffaa44;
+    box-shadow: 0 4px 16px rgba(255, 170, 68, 0.8);
+}
+
 .card-item img {
     width: 100%;
     height: 100%;
@@ -129,13 +147,31 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Draft Details Section */
+.synergy-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background-color: #ffaa44;
+    color: #1e1e1e;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Draft Details Section (~50% width - remaining space) */
 .draft-details-section {
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 20px;
     overflow-y: auto;
+    min-width: 0; /* Allow flex shrinking */
 }
 
 /* Pick History */
