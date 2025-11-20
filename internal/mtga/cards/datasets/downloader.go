@@ -140,7 +140,7 @@ func (d *Downloader) downloadFile(ctx context.Context, url, destPath string) err
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -152,7 +152,7 @@ func (d *Downloader) downloadFile(ctx context.Context, url, destPath string) err
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	// Copy response body to file
 	written, err := io.Copy(out, resp.Body)
@@ -171,21 +171,21 @@ func (d *Downloader) decompressGzip(gzPath, csvPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open gzipped file: %w", err)
 	}
-	defer gzFile.Close()
+	defer func() { _ = gzFile.Close() }()
 
 	// Create gzip reader
 	gr, err := gzip.NewReader(gzFile)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gr.Close()
+	defer func() { _ = gr.Close() }()
 
 	// Create CSV file
 	csvFile, err := os.Create(csvPath)
 	if err != nil {
 		return fmt.Errorf("failed to create CSV file: %w", err)
 	}
-	defer csvFile.Close()
+	defer func() { _ = csvFile.Close() }()
 
 	// Decompress
 	written, err := io.Copy(csvFile, gr)

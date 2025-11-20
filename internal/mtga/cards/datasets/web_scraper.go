@@ -106,7 +106,7 @@ func (w *WebScraper) FetchCardRatings(ctx context.Context, setCode, format strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -165,7 +165,7 @@ func (w *WebScraper) IsDatasetAvailable(ctx context.Context, setCode, format str
 		log.Printf("[WebScraper] Failed to check dataset availability: %v", err)
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Dataset is available if status is 200 OK
 	available := resp.StatusCode == http.StatusOK
