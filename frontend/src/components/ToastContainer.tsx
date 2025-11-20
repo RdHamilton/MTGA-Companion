@@ -15,7 +15,7 @@ const ToastContainer = () => {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const isReplayActiveRef = useRef(getReplayState().isActive);
   const draftUpdateCountRef = useRef(0);
-  const draftUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const draftUpdateTimerRef = useRef<number | null>(null);
 
   const addToast = useCallback((message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = toastIdCounter++;
