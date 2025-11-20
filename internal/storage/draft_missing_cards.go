@@ -10,16 +10,46 @@ import (
 
 // GetMissingCardsAnalysis calculates which cards from the initial pack have been taken by other players.
 func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string, packNum, pickNum int) (*models.MissingCardsAnalysis, error) {
+	// Can't calculate missing cards for P1P1 (no initial pack to compare)
+	if pickNum <= 1 {
+		return &models.MissingCardsAnalysis{
+			SessionID:    sessionID,
+			PackNumber:   packNum,
+			PickNumber:   pickNum,
+			MissingCards: []models.MissingCard{},
+			TotalMissing: 0,
+			BombsMissing: 0,
+		}, nil
+	}
+
 	// Get the initial pack (pick 1) for this pack number
 	initialPack, err := s.DraftRepo().GetPack(ctx, sessionID, packNum, 1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get initial pack: %w", err)
+	if err != nil || initialPack == nil {
+		// Pack data not available - return empty analysis
+		log.Printf("Warning: Initial pack not found for session %s, pack %d: %v", sessionID, packNum, err)
+		return &models.MissingCardsAnalysis{
+			SessionID:    sessionID,
+			PackNumber:   packNum,
+			PickNumber:   pickNum,
+			MissingCards: []models.MissingCard{},
+			TotalMissing: 0,
+			BombsMissing: 0,
+		}, nil
 	}
 
 	// Get the current pack
 	currentPack, err := s.DraftRepo().GetPack(ctx, sessionID, packNum, pickNum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current pack: %w", err)
+	if err != nil || currentPack == nil {
+		// Current pack not available - return empty analysis
+		log.Printf("Warning: Current pack not found for session %s, pack %d, pick %d: %v", sessionID, packNum, pickNum, err)
+		return &models.MissingCardsAnalysis{
+			SessionID:    sessionID,
+			PackNumber:   packNum,
+			PickNumber:   pickNum,
+			MissingCards: []models.MissingCard{},
+			TotalMissing: 0,
+			BombsMissing: 0,
+		}, nil
 	}
 
 	// Get all picks made from this pack so far
@@ -41,14 +71,23 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 
 	// Get session info for ratings
 	session, err := s.DraftRepo().GetSession(ctx, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
+	if err != nil || session == nil {
+		log.Printf("Warning: Session not found for %s: %v", sessionID, err)
+		return &models.MissingCardsAnalysis{
+			SessionID:    sessionID,
+			PackNumber:   packNum,
+			PickNumber:   pickNum,
+			MissingCards: []models.MissingCard{},
+			TotalMissing: 0,
+			BombsMissing: 0,
+		}, nil
 	}
 
 	// Fetch all ratings for this set once
 	allRatings, _, err := s.DraftRatingsRepo().GetCardRatings(ctx, session.SetCode, session.DraftType)
 	if err != nil {
 		log.Printf("Warning: Failed to get ratings for %s/%s: %v", session.SetCode, session.DraftType, err)
+		// Continue without ratings - we can still show missing cards without win rates
 	}
 
 	// Build a map for fast lookup
@@ -80,7 +119,7 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 	for _, cardID := range missingCardIDs {
 		// Get card info
 		card, err := s.SetCardRepo().GetCardByArenaID(ctx, cardID)
-		if err != nil {
+		if err != nil || card == nil {
 			log.Printf("Warning: Failed to get card %s: %v", cardID, err)
 			continue
 		}

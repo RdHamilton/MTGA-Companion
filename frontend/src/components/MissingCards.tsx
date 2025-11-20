@@ -31,33 +31,26 @@ const MissingCards = ({ sessionID, packNumber, pickNumber }: MissingCardsProps) 
 
     try {
       const result = await GetMissingCards(sessionID, packNumber, pickNumber);
-      setAnalysis(result);
+      // Only set analysis if we have actual missing cards
+      if (result && result.TotalMissing > 0) {
+        setAnalysis(result);
+      } else {
+        setAnalysis(null);
+      }
     } catch (err) {
       console.error('Failed to load missing cards:', err);
-      setError('Failed to load missing cards');
+      // Don't show error to user - just log it and hide component
+      // This is expected when pack data isn't available yet
+      setAnalysis(null);
+      setError(null);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="missing-cards-container">
-        <div className="missing-cards-loading">Loading missing cards...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="missing-cards-container">
-        <div className="missing-cards-error">{error}</div>
-      </div>
-    );
-  }
-
-  if (!analysis || analysis.TotalMissing === 0) {
-    return null; // Don't show anything if no missing cards
+  // Don't show anything while loading or if there's no data
+  if (loading || error || !analysis || analysis.TotalMissing === 0) {
+    return null;
   }
 
   return (
