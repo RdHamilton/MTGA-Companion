@@ -496,6 +496,18 @@ func (s *Service) processDrafts(ctx context.Context, entries []*logreader.LogEnt
 	return nil
 }
 
+// isUUID checks if a string looks like a UUID (e.g., "73e1c7a3-75ee-4b38-b32b-d6854e5c6c9c")
+func isUUID(s string) bool {
+	// UUID format: 8-4-4-4-12 hexadecimal characters separated by hyphens
+	if len(s) != 36 {
+		return false
+	}
+	if s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
+		return false
+	}
+	return true
+}
+
 // draftSessionData holds all data for a complete draft session.
 type draftSessionData struct {
 	SessionID string
@@ -553,9 +565,19 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 
 		// Extract set code, draft type, event name, and session ID from events
 		setCode := ""
+		// Default draft type detection:
+		// - If grouped by UUID (SessionID), it's PremierDraft
+		// - If grouped by EventName string, it's QuickDraft
+		// - Context field (HumanDraft/BotDraft) overrides this
 		draftType := "QuickDraft"
+		if isUUID(eventName) {
+			// Grouped by SessionID (UUID format) = Premier Draft
+			draftType = "PremierDraft"
+			log.Printf("[Draft Detection] Group key is UUID format - defaulting to PremierDraft")
+		}
 		sessionID := eventName // Default to group key (EventName or SessionID)
 		actualEventName := eventName
+		detectedContexts := []string{} // Track all contexts seen
 
 		for _, event := range eventList {
 			// session_info events (from EventJoin) have complete metadata
@@ -573,14 +595,28 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			if event.SetCode != "" {
 				setCode = event.SetCode
 			}
+			// Track all contexts for debugging
+			if event.Context != "" {
+				detectedContexts = append(detectedContexts, event.Context)
+			}
 			// HumanDraft = Premier/Traditional Draft, BotDraft = Quick Draft
 			if event.Context == "HumanDraft" {
+				log.Printf("[Draft Detection] Found HumanDraft context - setting type to PremierDraft")
 				draftType = "PremierDraft"
+			} else if event.Context == "BotDraft" {
+				log.Printf("[Draft Detection] Found BotDraft context - keeping type as QuickDraft")
 			}
 			// Use SessionID if available (Premier Draft)
 			if event.SessionID != "" {
 				sessionID = event.SessionID
 			}
+		}
+
+		// Log draft type detection results
+		if len(detectedContexts) > 0 {
+			log.Printf("[Draft Detection] Group=%s, Contexts=%v, FinalType=%s", eventName, detectedContexts, draftType)
+		} else {
+			log.Printf("[Draft Detection] Group=%s, NO contexts found - defaulting to %s", eventName, draftType)
 		}
 
 		// Build picks and packs from events
@@ -694,6 +730,19 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 		for _, pack := range data.Packs {
 			if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
 				log.Printf("Warning: Failed to save pack: %v", err)
+			}
+		}
+
+		// Check if draft is complete (has all expected picks)
+		// Get updated pick count
+		picks, err := s.storage.DraftRepo().GetPicksBySession(ctx, data.SessionID)
+		if err == nil && len(picks) >= expectedPicks && existingSession.Status == "in_progress" {
+			// Draft is complete - mark it as completed
+			endTime := time.Now()
+			if err := s.storage.DraftRepo().UpdateSessionStatus(ctx, data.SessionID, "completed", &endTime); err != nil {
+				log.Printf("Warning: Failed to mark draft session as completed: %v", err)
+			} else {
+				log.Printf("✓ Draft session %s marked as completed (%d/%d picks)", data.SessionID, len(picks), expectedPicks)
 			}
 		}
 

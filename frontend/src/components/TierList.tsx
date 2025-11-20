@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetCardRatings } from '../../wailsjs/go/main/App';
+import { GetCardRatings, RefreshSetRatings } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 import './TierList.css';
 
@@ -19,6 +19,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     const [ratings, setRatings] = useState<CardRating[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Filters
     const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
@@ -44,6 +45,22 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
             setError(err instanceof Error ? err.message : 'Failed to load card ratings');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        try {
+            setRefreshing(true);
+            setError(null);
+            console.log(`Refreshing 17Lands data for ${setCode} / ${draftFormat}...`);
+            await RefreshSetRatings(setCode, draftFormat);
+            console.log('Refresh complete, reloading ratings...');
+            await loadRatings();
+        } catch (err) {
+            console.error('Failed to refresh card ratings:', err);
+            setError(err instanceof Error ? err.message : 'Failed to refresh card ratings');
+        } finally {
+            setRefreshing(false);
         }
     };
 
@@ -89,11 +106,6 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
         }
     };
 
-    const getConfidenceIndicator = (gihCount: number): string => {
-        if (gihCount >= 1000) return '✓'; // High confidence
-        if (gihCount >= 500) return '~'; // Medium confidence
-        return '⚠️'; // Low confidence
-    };
 
     // Filter and sort ratings
     const filteredRatings = ratings
@@ -101,8 +113,14 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
             // Tier filter
             if (!selectedTiers.has(rating.tier)) return false;
 
-            // Color filter
-            if (selectedColors.size > 0 && !selectedColors.has(rating.color)) return false;
+            // Color filter - show card if ANY of its colors match ANY selected color
+            if (selectedColors.size > 0) {
+                const cardColors = rating.colors && rating.colors.length > 0
+                    ? rating.colors
+                    : [rating.color];
+                const hasMatchingColor = cardColors.some(color => selectedColors.has(color));
+                if (!hasMatchingColor) return false;
+            }
 
             // Rarity filter
             if (selectedRarities.size > 0 && !selectedRarities.has(rating.rarity)) return false;
@@ -176,6 +194,14 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                     <span>{filteredRatings.length} cards</span>
                     <span>•</span>
                     <span>17Lands data</span>
+                    <button
+                        className="refresh-button"
+                        onClick={handleRefresh}
+                        disabled={refreshing || loading}
+                        title="Refresh 17Lands data from API"
+                    >
+                        {refreshing ? '⟳ Refreshing...' : '↻ Refresh'}
+                    </button>
                 </div>
             </div>
 
@@ -260,19 +286,26 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                             <th onClick={() => handleSort('rarity')} className="sortable">
                                                 Rarity {sortColumn === 'rarity' && (sortDirection === 'asc' ? '▲' : '▼')}
                                             </th>
-                                            <th onClick={() => handleSort('gihwr')} className="sortable">
+                                            <th
+                                                onClick={() => handleSort('gihwr')}
+                                                className="sortable"
+                                                title="Games In Hand Win Rate - Win rate when this card is in your hand during the game"
+                                            >
                                                 GIHWR {sortColumn === 'gihwr' && (sortDirection === 'asc' ? '▲' : '▼')}
                                             </th>
-                                            <th onClick={() => handleSort('alsa')} className="sortable">
+                                            <th
+                                                onClick={() => handleSort('alsa')}
+                                                className="sortable"
+                                                title="Average Last Seen At - Average pick number when this card is last seen in packs (lower = picked earlier = better)"
+                                            >
                                                 ALSA {sortColumn === 'alsa' && (sortDirection === 'asc' ? '▲' : '▼')}
                                             </th>
-                                            <th>Samples</th>
+                                            <th title="Card tier based on GIHWR (S = Bomb, A = Excellent, B = Good, C = Playable, D = Below Average, F = Avoid)">TIER</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {tierCards.map((rating) => {
                                             const isPicked = rating.mtga_id ? pickedCardIds.has(String(rating.mtga_id)) : false;
-                                            const confidence = getConfidenceIndicator(rating['# ever_drawn']);
 
                                             return (
                                                 <tr
@@ -284,13 +317,20 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                                         {isPicked && <span className="picked-marker">✓</span>}
                                                         {rating.name}
                                                     </td>
-                                                    <td className="card-color">{getColorSymbol(rating.color)}</td>
+                                                    <td className="card-color">
+                                                        {rating.colors && rating.colors.length > 0
+                                                            ? rating.colors.map(c => getColorSymbol(c)).join('')
+                                                            : getColorSymbol(rating.color)}
+                                                    </td>
                                                     <td className="card-rarity">{rating.rarity}</td>
                                                     <td className="card-gihwr">{rating.ever_drawn_win_rate.toFixed(1)}%</td>
                                                     <td className="card-alsa">{rating.avg_seen.toFixed(1)}</td>
-                                                    <td className="card-samples">
-                                                        <span className={`confidence-${confidence === '✓' ? 'high' : confidence === '~' ? 'med' : 'low'}`}>
-                                                            {confidence} {rating['# ever_drawn'].toLocaleString()}
+                                                    <td className="card-tier">
+                                                        <span
+                                                            className="tier-badge-inline"
+                                                            style={{ color: getTierColor(rating.tier), fontWeight: 700 }}
+                                                        >
+                                                            {rating.tier}
                                                         </span>
                                                     </td>
                                                 </tr>

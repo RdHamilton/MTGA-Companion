@@ -40,12 +40,20 @@ type App struct {
 	ipcClientMu    sync.Mutex
 	daemonMode     bool
 	daemonPort     int // Configurable daemon port
+
+	// Track in-flight card fetches to avoid duplicates
+	cardFetchMu     sync.Mutex
+	inFlightFetches map[string]bool // map[arenaID]isFetching
+	ratingsEnsureMu sync.Mutex
+	inFlightRatings map[string]bool // map[setCode-eventName]isFetching
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		daemonPort: 9999, // Default daemon port
+		daemonPort:      9999, // Default daemon port
+		inFlightFetches: make(map[string]bool),
+		inFlightRatings: make(map[string]bool),
 	}
 }
 
@@ -673,6 +681,14 @@ func (a *App) setupEventHandlers() {
 		log.Printf("✅ [Backend→Frontend] Emitting replay:draft_detected to frontend via wailsruntime.EventsEmit")
 		wailsruntime.EventsEmit(a.ctx, "replay:draft_detected", data)
 		log.Printf("✅ [Backend→Frontend] EventsEmit call completed for replay:draft_detected")
+	})
+
+	// Handle draft:updated events from daemon
+	a.ipcClient.On("draft:updated", func(data map[string]interface{}) {
+		log.Printf("✅ [IPC→Backend] Received draft:updated event from daemon: %v", data)
+		log.Printf("✅ [Backend→Frontend] Emitting draft:updated to frontend via wailsruntime.EventsEmit")
+		wailsruntime.EventsEmit(a.ctx, "draft:updated", data)
+		log.Printf("✅ [Backend→Frontend] EventsEmit call completed for draft:updated")
 	})
 
 	// Handle disconnect events
@@ -1434,9 +1450,54 @@ func (a *App) GetActiveDraftSessions() ([]*models.DraftSession, error) {
 	log.Printf("🎯 [GetActiveDraftSessions] Returning %d active session(s)", len(sessions))
 	for i, s := range sessions {
 		log.Printf("🎯 [GetActiveDraftSessions] Session %d: ID=%s, Status=%s, SetCode=%s, TotalPicks=%d", i, s.ID, s.Status, s.SetCode, s.TotalPicks)
+
+		// Ensure 17Lands ratings are fetched for this draft
+		if s.SetCode != "" && s.DraftType != "" {
+			go a.ensureRatingsForDraft(s.SetCode, s.DraftType)
+		}
 	}
 
 	return sessions, nil
+}
+
+// ensureRatingsForDraft ensures 17Lands ratings are cached for a draft.
+// Runs in background to avoid blocking the UI. Uses mutex to prevent duplicate fetches.
+func (a *App) ensureRatingsForDraft(setCode, eventName string) {
+	ctx := context.Background()
+	key := fmt.Sprintf("%s-%s", setCode, eventName)
+
+	// Check if already being fetched
+	a.ratingsEnsureMu.Lock()
+	if a.inFlightRatings[key] {
+		a.ratingsEnsureMu.Unlock()
+		return // Already fetching
+	}
+
+	// Check if ratings are already cached and fresh
+	_, lastFetch, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, eventName)
+	if err == nil && !lastFetch.IsZero() && time.Since(lastFetch) < 24*time.Hour {
+		a.ratingsEnsureMu.Unlock()
+		return // Already cached and fresh
+	}
+
+	// Mark as in-flight
+	a.inFlightRatings[key] = true
+	a.ratingsEnsureMu.Unlock()
+
+	// Fetch ratings (outside mutex)
+	defer func() {
+		a.ratingsEnsureMu.Lock()
+		delete(a.inFlightRatings, key)
+		a.ratingsEnsureMu.Unlock()
+	}()
+
+	log.Printf("[ensureRatingsForDraft] Fetching 17Lands ratings for %s / %s", setCode, eventName)
+	err = a.ratingsFetcher.FetchAndCacheRatings(ctx, setCode, eventName)
+	if err != nil {
+		log.Printf("[ensureRatingsForDraft] Failed to fetch ratings: %v", err)
+	} else {
+		log.Printf("[ensureRatingsForDraft] Successfully cached ratings for %s / %s", setCode, eventName)
+	}
 }
 
 // GetCompletedDraftSessions returns recently completed draft sessions.
@@ -1477,12 +1538,95 @@ func (a *App) GetDraftPicks(sessionID string) ([]*models.DraftPickSession, error
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
+	log.Printf("[GetDraftPicks] Called for session %s", sessionID)
+
 	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
 	if err != nil {
+		log.Printf("[GetDraftPicks] Error getting picks: %v", err)
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft picks: %v", err)}
 	}
 
+	log.Printf("[GetDraftPicks] Found %d picks for session %s", len(picks), sessionID)
+
+	// Fetch card images for picked cards synchronously (serialized to avoid database locks)
+	if len(picks) > 0 {
+		session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+		if err != nil {
+			log.Printf("[GetDraftPicks] Error getting session: %v", err)
+		} else if session == nil {
+			log.Printf("[GetDraftPicks] Session is nil")
+		} else {
+			log.Printf("[GetDraftPicks] Fetching cards for %d picks (SetCode=%s, DraftType=%s)", len(picks), session.SetCode, session.DraftType)
+			a.fetchCardsForPicksSync(session.SetCode, session.DraftType, picks)
+			log.Printf("[GetDraftPicks] Finished fetching cards")
+		}
+	}
+
 	return picks, nil
+}
+
+// fetchCardsForPicksSync fetches card metadata for all picked cards using 17Lands ratings.
+// This ensures card images are available even if Scryfall doesn't have Arena IDs yet.
+// Fetches cards serially (one at a time) to avoid database lock contention.
+// Uses global mutex to ensure only one card fetch happens at a time across all requests.
+func (a *App) fetchCardsForPicksSync(setCode, eventName string, picks []*models.DraftPickSession) {
+	log.Printf("[fetchCardsForPicksSync] Starting to fetch %d cards for %s/%s", len(picks), setCode, eventName)
+
+	for i, pick := range picks {
+		log.Printf("[fetchCardsForPicksSync] Processing pick %d/%d: CardID=%s", i+1, len(picks), pick.CardID)
+
+		// Check if card is already cached (fast check, no lock needed)
+		cachedCard, err := a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+		if err == nil && cachedCard != nil {
+			log.Printf("[fetchCardsForPicksSync] Card %s already cached (Name=%s)", pick.CardID, cachedCard.Name)
+			continue // Already cached
+		}
+
+		// Acquire global lock to ensure serial card fetching
+		a.cardFetchMu.Lock()
+
+		// Double-check cache after acquiring lock (another request might have fetched it)
+		cachedCard, err = a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+		if err == nil && cachedCard != nil {
+			log.Printf("[fetchCardsForPicksSync] Card %s cached after lock (Name=%s)", pick.CardID, cachedCard.Name)
+			a.cardFetchMu.Unlock()
+			continue // Already cached
+		}
+
+		// Get card name from 17Lands ratings
+		log.Printf("[fetchCardsForPicksSync] Looking up rating for card %s in %s/%s", pick.CardID, setCode, eventName)
+		rating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, eventName, pick.CardID)
+		if err != nil {
+			log.Printf("[fetchCardsForPicksSync] Error getting rating for card %s: %v", pick.CardID, err)
+			a.cardFetchMu.Unlock()
+			continue
+		}
+		if rating == nil || rating.Name == "" {
+			log.Printf("[fetchCardsForPicksSync] No rating or name found for card %s", pick.CardID)
+			a.cardFetchMu.Unlock()
+			continue // No rating or name available
+		}
+
+		// Fetch card from Scryfall by name (with lock held to serialize database writes)
+		log.Printf("[fetchCardsForPicksSync] Fetching card from Scryfall: %s (ID: %s)", rating.Name, pick.CardID)
+		card, err := a.setFetcher.FetchCardByName(a.ctx, setCode, rating.Name, pick.CardID)
+		if err != nil {
+			log.Printf("[fetchCardsForPicksSync] Failed to fetch card %s (ID: %s): %v", rating.Name, pick.CardID, err)
+		} else {
+			log.Printf("[fetchCardsForPicksSync] Successfully fetched and cached card: %s (ID: %s)", rating.Name, pick.CardID)
+			if card != nil {
+				log.Printf("[fetchCardsForPicksSync] Card details: Name=%s, ImageURL=%s", card.Name, card.ImageURL)
+			}
+		}
+
+		// Release lock after card is fetched and saved
+		a.cardFetchMu.Unlock()
+
+		// Small delay to avoid hammering Scryfall API
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	log.Printf("[fetchCardsForPicksSync] Finished fetching cards for %s/%s", setCode, eventName)
 }
 
 // GetDraftPacks returns all packs for a draft session.
@@ -1610,11 +1754,20 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
+	log.Printf("[GetCardByArenaID] Looking up card with ArenaID: %s", arenaID)
+
 	card, err := a.service.SetCardRepo().GetCardByArenaID(a.ctx, arenaID)
 	if err != nil {
+		log.Printf("[GetCardByArenaID] Error looking up card %s: %v", arenaID, err)
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get card: %v", err)}
 	}
 
+	if card == nil {
+		log.Printf("[GetCardByArenaID] Card %s not found in database", arenaID)
+		return nil, nil
+	}
+
+	log.Printf("[GetCardByArenaID] Found card %s: Name=%s", arenaID, card.Name)
 	return card, nil
 }
 
@@ -1679,7 +1832,8 @@ func (a *App) FixDraftSessionStatuses() (int, error) {
 // CardRatingWithTier represents a card rating with calculated tier.
 type CardRatingWithTier struct {
 	seventeenlands.CardRating
-	Tier string `json:"tier"` // S, A, B, C, D, or F
+	Tier   string   `json:"tier"`   // S, A, B, C, D, or F
+	Colors []string `json:"colors"` // All colors in mana cost (e.g., ["W", "U"])
 }
 
 // GetCardRatings returns 17Lands card ratings for a set and draft format.
@@ -1694,12 +1848,31 @@ func (a *App) GetCardRatings(setCode string, draftFormat string) ([]CardRatingWi
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get card ratings: %v", err)}
 	}
 
-	// Add tier to each rating
+	// Build a map of arena ID to colors by fetching set cards
+	arenaIDToColors := make(map[string][]string)
+	for _, rating := range ratings {
+		if rating.MTGAID != 0 {
+			arenaID := fmt.Sprintf("%d", rating.MTGAID)
+			card, err := a.service.SetCardRepo().GetCardByArenaID(a.ctx, arenaID)
+			if err == nil && card != nil && len(card.Colors) > 0 {
+				arenaIDToColors[arenaID] = card.Colors
+			}
+		}
+	}
+
+	// Add tier and colors to each rating
 	result := make([]CardRatingWithTier, len(ratings))
 	for i, rating := range ratings {
+		arenaID := fmt.Sprintf("%d", rating.MTGAID)
+		colors := arenaIDToColors[arenaID]
+		// If no colors found in set_cards, fall back to single color from rating
+		if len(colors) == 0 && rating.Color != "" && rating.Color != "C" {
+			colors = []string{rating.Color}
+		}
 		result[i] = CardRatingWithTier{
 			CardRating: rating,
 			Tier:       calculateTier(rating.GIHWR),
+			Colors:     colors,
 		}
 	}
 

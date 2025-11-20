@@ -26,9 +26,32 @@
 
 .tier-list-info {
     display: flex;
-    gap: 8px;
+    gap: 12px;
+    align-items: center;
     font-size: 13px;
     color: #888888;
+}
+
+.refresh-button {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #4a9eff;
+    background-color: #1e1e1e;
+    color: #4a9eff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+    background-color: #4a9eff;
+    color: #1e1e1e;
+}
+
+.refresh-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Filters */
@@ -234,20 +257,14 @@
     color: #ffaa44;
 }
 
-.card-samples {
-    font-size: 12px;
+.card-tier {
+    font-size: 14px;
+    text-align: center;
 }
 
-.confidence-high {
-    color: #44ff88;
-}
-
-.confidence-med {
-    color: #ffaa44;
-}
-
-.confidence-low {
-    color: #ff8844;
+.tier-badge-inline {
+    font-weight: 700;
+    font-size: 14px;
 }
 
 /* Loading & Error States */

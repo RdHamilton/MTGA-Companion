@@ -617,6 +617,44 @@
     color: #ffffff;
 }
 
+/* Card Tier Badge (overall card quality from 17Lands) */
+.card-tier-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1e1e1e;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+}
+
+.tier-s {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); /* Gold */
+}
+
+.tier-a {
+    background: linear-gradient(135deg, #c0c0c0 0%, #e0e0e0 100%); /* Silver */
+}
+
+.tier-b {
+    background: linear-gradient(135deg, #cd7f32 0%, #e69559 100%); /* Bronze */
+}
+
+.tier-c {
+    background: linear-gradient(135deg, #4a9eff 0%, #6ab0ff 100%); /* Blue */
+}
+
+.tier-d {
+    background: linear-gradient(135deg, #ff8844 0%, #ff9966 100%); /* Orange */
+}
+
+.tier-f {
+    background: linear-gradient(135deg, #ff4444 0%, #ff6666 100%); /* Red */
+}
+
 /* Pick Quality Tooltip */
 .pick-quality-tooltip {
     position: absolute;
@@ -743,4 +781,71 @@
     border-top-color: #ffffff;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+/* Replay Controls - Bottom Left */
+.replay-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 8px;
+    background-color: rgba(30, 30, 30, 0.95);
+    padding: 8px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.replay-btn {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border: 1px solid #4a9eff;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.replay-btn:hover {
+    background-color: #3d3d3d;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.replay-btn:active {
+    transform: translateY(0);
+}
+
+.replay-btn.replay-pause {
+    border-color: #ffaa44;
+}
+
+.replay-btn.replay-pause:hover {
+    background-color: #ffaa44;
+    color: #1e1e1e;
+}
+
+.replay-btn.replay-resume {
+    border-color: #44ff88;
+}
+
+.replay-btn.replay-resume:hover {
+    background-color: #44ff88;
+    color: #1e1e1e;
+}
+
+.replay-btn.replay-stop {
+    border-color: #ff4444;
+}
+
+.replay-btn.replay-stop:hover {
+    background-color: #ff4444;
+    color: #ffffff;
 }
