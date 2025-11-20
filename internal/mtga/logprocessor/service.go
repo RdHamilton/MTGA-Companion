@@ -600,10 +600,11 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 				detectedContexts = append(detectedContexts, event.Context)
 			}
 			// HumanDraft = Premier/Traditional Draft, BotDraft = Quick Draft
-			if event.Context == "HumanDraft" {
+			switch event.Context {
+			case "HumanDraft":
 				log.Printf("[Draft Detection] Found HumanDraft context - setting type to PremierDraft")
 				draftType = "PremierDraft"
-			} else if event.Context == "BotDraft" {
+			case "BotDraft":
 				log.Printf("[Draft Detection] Found BotDraft context - keeping type as QuickDraft")
 			}
 			// Use SessionID if available (Premier Draft)
