@@ -409,7 +409,7 @@ const Draft: React.FC = () => {
 
                                     return (
                                         <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
-                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
+                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                             <div className="card-image-container">
                                                 {card && card.ImageURLSmall && (
                                                     <img
@@ -741,7 +741,7 @@ const Draft: React.FC = () => {
 
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
-                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
+                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
                                         <div className="card-image-container">
                                             {card && card.ImageURLSmall && (
                                                 <img
