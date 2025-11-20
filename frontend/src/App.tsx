@@ -11,6 +11,7 @@ import ResultBreakdown from './pages/ResultBreakdown';
 import Quests from './pages/Quests';
 import Events from './pages/Events';
 import Draft from './pages/Draft';
+import TierList from './pages/TierList';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import { EventsOn } from '../wailsjs/runtime/runtime';
@@ -153,6 +154,7 @@ function App() {
           <Route path="/quests" element={<Quests />} />
           <Route path="/events" element={<Events />} />
           <Route path="/draft" element={<Draft />} />
+          <Route path="/tier-list" element={<TierList />} />
           <Route path="/charts/win-rate-trend" element={<WinRateTrend />} />
           <Route path="/charts/deck-performance" element={<DeckPerformance />} />
           <Route path="/charts/rank-progression" element={<RankProgression />} />
