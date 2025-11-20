@@ -152,6 +152,11 @@
     border-color: #ffaa44;
 }
 
+.type-btn.active {
+    color: #a78bfa;
+    border-color: #a78bfa;
+}
+
 /* Tier Groups */
 .tier-groups {
     flex: 1;
