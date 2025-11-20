@@ -14,6 +14,10 @@ export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
 
+export function ClearDatasetCache() {
+  return window['go']['main']['App']['ClearDatasetCache']();
+}
+
 export function ExportToCSV() {
   return window['go']['main']['App']['ExportToCSV']();
 }
@@ -72,6 +76,10 @@ export function GetConnectionStatus() {
 
 export function GetCurrentAccount() {
   return window['go']['main']['App']['GetCurrentAccount']();
+}
+
+export function GetDatasetSource(arg1, arg2) {
+  return window['go']['main']['App']['GetDatasetSource'](arg1, arg2);
 }
 
 export function GetDraftGrade(arg1) {

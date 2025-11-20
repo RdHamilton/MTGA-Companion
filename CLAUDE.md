@@ -675,3 +675,4 @@ Follow the guidelines from https://go.dev/doc/effective_go:
 - Run ./scripts/dev.sh before creating the PR
 - Can you also try to make sure that we adhere to material design standards.  We should aim for simplicity but control design that is aesteticly pleasing.
 - When creating issues always cleanly organize them by version and milestone.  If an appropriate project doesn't exist create it.
+- We are using wails desktop for the UI not web

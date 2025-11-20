@@ -11,7 +11,7 @@ import (
 // DraftRatingsRepository provides methods for managing cached 17Lands ratings.
 type DraftRatingsRepository interface {
 	// SaveSetRatings saves card and color ratings for a set.
-	SaveSetRatings(ctx context.Context, setCode, draftFormat string, cardRatings []seventeenlands.CardRating, colorRatings []seventeenlands.ColorRating) error
+	SaveSetRatings(ctx context.Context, setCode, draftFormat string, cardRatings []seventeenlands.CardRating, colorRatings []seventeenlands.ColorRating, dataSource string) error
 
 	// GetCardRatings retrieves cached card ratings for a set.
 	GetCardRatings(ctx context.Context, setCode, draftFormat string) ([]seventeenlands.CardRating, time.Time, error)
@@ -39,7 +39,7 @@ func NewDraftRatingsRepository(db *sql.DB) DraftRatingsRepository {
 }
 
 // SaveSetRatings saves card and color ratings for a set.
-func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, draftFormat string, cardRatings []seventeenlands.CardRating, colorRatings []seventeenlands.ColorRating) error {
+func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, draftFormat string, cardRatings []seventeenlands.CardRating, colorRatings []seventeenlands.ColorRating, dataSource string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -52,8 +52,8 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 	cardStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO draft_card_ratings (
 			set_code, draft_format, arena_id, name, color, rarity,
-			gihwr, ohwr, alsa, ata, gih_count, cached_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			gihwr, ohwr, alsa, ata, gih_count, data_source, cached_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(set_code, draft_format, arena_id) DO UPDATE SET
 			name = excluded.name,
 			color = excluded.color,
@@ -63,6 +63,7 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 			alsa = excluded.alsa,
 			ata = excluded.ata,
 			gih_count = excluded.gih_count,
+			data_source = excluded.data_source,
 			cached_at = excluded.cached_at
 	`)
 	if err != nil {
@@ -86,6 +87,7 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 			card.ALSA,
 			card.ATA,
 			card.GIH,
+			dataSource,
 			cachedAt,
 		)
 		if err != nil {

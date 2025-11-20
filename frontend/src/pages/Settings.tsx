@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, RecalculateAllDraftGrades } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
@@ -45,6 +45,8 @@ const Settings = () => {
   const [isFetchingRatings, setIsFetchingRatings] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [recalculateMessage, setRecalculateMessage] = useState('');
+  const [dataSource, setDataSource] = useState<string>('');
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   // Load connection status on mount
   useEffect(() => {
@@ -319,7 +321,21 @@ const Settings = () => {
     setIsFetchingRatings(true);
     try {
       await FetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
-      showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})! The data is now cached and ready for use in drafts.`, 'success');
+
+      // Check data source after fetching
+      try {
+        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
+        setDataSource(source);
+
+        const sourceLabel = source === 's3' ? 'S3 public datasets' :
+                          source === 'web_api' ? 'web API' :
+                          source === 'legacy_api' ? 'legacy API' : source;
+
+        showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}! The data is now cached and ready for use in drafts.`, 'success');
+      } catch (err) {
+        console.error('Failed to get data source:', err);
+        showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})! The data is now cached and ready for use in drafts.`, 'success');
+      }
     } catch (error) {
       console.error('Failed to fetch ratings:', error);
       showToast.show(`Failed to fetch 17Lands ratings: ${error}. Make sure: Set code is correct (e.g., TLA, BLB, DSK, FDN), you have internet connection, and 17Lands has data for this set.`, 'error');
@@ -334,14 +350,24 @@ const Settings = () => {
       return;
     }
 
-    if (!confirm(`This will delete and re-download all ratings for ${setCode.toUpperCase()} (${draftFormat}).\n\nContinue?`)) {
-      return;
-    }
-
     setIsFetchingRatings(true);
     try {
       await RefreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
-      showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`, 'success');
+
+      // Check data source after refreshing
+      try {
+        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
+        setDataSource(source);
+
+        const sourceLabel = source === 's3' ? 'S3 public datasets' :
+                          source === 'web_api' ? 'web API' :
+                          source === 'legacy_api' ? 'legacy API' : source;
+
+        showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!`, 'success');
+      } catch (err) {
+        console.error('Failed to get data source:', err);
+        showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`, 'success');
+      }
     } catch (error) {
       console.error('Failed to refresh ratings:', error);
       showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
@@ -375,6 +401,19 @@ const Settings = () => {
     } finally {
       setIsRecalculating(false);
       console.log('[RecalculateGrades] Finished');
+    }
+  };
+
+  const handleClearDatasetCache = async () => {
+    setIsClearingCache(true);
+    try {
+      await ClearDatasetCache();
+      showToast.show('Successfully cleared dataset cache! Cached CSV files have been deleted to free up disk space. Ratings in the database are preserved.', 'success');
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      showToast.show(`Failed to clear dataset cache: ${error}`, 'error');
+    } finally {
+      setIsClearingCache(false);
     }
   };
 
@@ -1011,6 +1050,37 @@ const Settings = () => {
               )}
             </div>
           </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Clear Dataset Cache
+              <span className="setting-description">Remove cached 17Lands CSV files to free up disk space (ratings in database are preserved)</span>
+            </label>
+            <div className="setting-control">
+              <button
+                className="action-button"
+                onClick={handleClearDatasetCache}
+                disabled={isClearingCache}
+                style={{
+                  background: '#ff6b6b',
+                  color: 'white'
+                }}
+              >
+                {isClearingCache ? 'Clearing...' : 'Clear Dataset Cache'}
+              </button>
+            </div>
+          </div>
+
+          {dataSource && (
+            <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d4a2d', borderRadius: '8px', border: '1px solid #4a9eff' }}>
+              <strong>📊 Current Data Source:</strong> {
+                dataSource === 's3' ? 'S3 Public Datasets (recommended, uses locally cached game data)' :
+                dataSource === 'web_api' ? 'Web API (fallback for new sets like TLA)' :
+                dataSource === 'legacy_api' ? 'Legacy API (older mode)' :
+                dataSource
+              }
+            </div>
+          )}
 
           <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
             <strong>💡 Common Set Codes:</strong>

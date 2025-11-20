@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
@@ -14,14 +15,24 @@ import (
 // RatingsFetcher handles fetching and caching 17Lands ratings for draft sets.
 type RatingsFetcher struct {
 	seventeenLandsClient *seventeenlands.Client
+	datasetService       *datasets.Service
 	ratingsRepo          repository.DraftRatingsRepository
 }
 
 // NewRatingsFetcher creates a new ratings fetcher.
+// Deprecated: Use NewRatingsFetcherWithDatasets instead.
 func NewRatingsFetcher(client *seventeenlands.Client, ratingsRepo repository.DraftRatingsRepository) *RatingsFetcher {
 	return &RatingsFetcher{
 		seventeenLandsClient: client,
 		ratingsRepo:          ratingsRepo,
+	}
+}
+
+// NewRatingsFetcherWithDatasets creates a new ratings fetcher with dataset service support.
+func NewRatingsFetcherWithDatasets(datasetService *datasets.Service, ratingsRepo repository.DraftRatingsRepository) *RatingsFetcher {
+	return &RatingsFetcher{
+		datasetService: datasetService,
+		ratingsRepo:    ratingsRepo,
 	}
 }
 
@@ -39,50 +50,78 @@ func (f *RatingsFetcher) FetchAndCacheRatings(ctx context.Context, setCode, draf
 
 	// Map MTGA set code to 17Lands expansion code
 	expansion := mapSetCodeTo17Lands(setCode)
-	log.Printf("[17Lands] Fetching card ratings for expansion=%s, format=%s", expansion, draftFormat)
+	log.Printf("[RatingsFetcher] Fetching card ratings for expansion=%s, format=%s", expansion, draftFormat)
 
-	// Fetch card ratings (doesn't require date range)
-	cardRatings, err := f.seventeenLandsClient.GetCardRatings(ctx, seventeenlands.QueryParams{
-		Expansion: expansion,
-		Format:    draftFormat,
-	})
-	if err != nil {
-		log.Printf("[17Lands] Error fetching card ratings: %v", err)
-		return fmt.Errorf("fetch card ratings from 17Lands: %w", err)
+	var cardRatings []seventeenlands.CardRating
+	var dataSource string
+
+	// Try new dataset service first (S3 or web API fallback)
+	if f.datasetService != nil {
+		log.Printf("[RatingsFetcher] Using dataset service (S3 + web API fallback)")
+		cardRatings, err = f.datasetService.GetCardRatings(ctx, expansion, draftFormat)
+		if err == nil && len(cardRatings) > 0 {
+			dataSource = f.datasetService.GetDataSource(ctx, expansion, draftFormat)
+			log.Printf("[RatingsFetcher] Successfully fetched %d ratings from dataset service (source: %s)", len(cardRatings), dataSource)
+		} else {
+			log.Printf("[RatingsFetcher] Dataset service failed or returned no data: %v", err)
+		}
 	}
-	log.Printf("[17Lands] Received %d card ratings", len(cardRatings))
+
+	// Fallback to old client if dataset service failed or unavailable
+	if f.datasetService == nil || len(cardRatings) == 0 {
+		if f.seventeenLandsClient == nil {
+			return fmt.Errorf("no data source available (dataset service and client both unavailable)")
+		}
+
+		log.Printf("[RatingsFetcher] Falling back to legacy API client")
+		cardRatings, err = f.seventeenLandsClient.GetCardRatings(ctx, seventeenlands.QueryParams{
+			Expansion: expansion,
+			Format:    draftFormat,
+		})
+		if err != nil {
+			log.Printf("[RatingsFetcher] Error fetching card ratings from legacy client: %v", err)
+			return fmt.Errorf("fetch card ratings from 17Lands: %w", err)
+		}
+		dataSource = "api" // Legacy API
+		log.Printf("[RatingsFetcher] Received %d card ratings from legacy API", len(cardRatings))
+	}
 
 	// Check if card ratings are empty (17Lands might not have data yet)
 	if len(cardRatings) == 0 {
 		return fmt.Errorf("17Lands returned no card ratings for set %s (%s) - data may not be available yet for this recently released set", setCode, draftFormat)
 	}
 
-	// Fetch color ratings (requires date range)
-	// Use default date range: last 17 days to capture sufficient data
-	endDate := getCurrentDateString()
-	startDate := getDateDaysAgo(17)
-	log.Printf("[17Lands] Fetching color ratings for expansion=%s, eventType=%s, dates=%s to %s", expansion, draftFormat, startDate, endDate)
-	colorRatings, err := f.seventeenLandsClient.GetColorRatings(ctx, seventeenlands.QueryParams{
-		Expansion: expansion,
-		EventType: draftFormat,
-		StartDate: startDate,
-		EndDate:   endDate,
-	})
-	if err != nil {
-		log.Printf("[17Lands] Error fetching color ratings: %v", err)
-		return fmt.Errorf("fetch color ratings from 17Lands: %w", err)
+	// Fetch color ratings (still using legacy client for now)
+	// TODO: Implement color ratings in dataset service
+	var colorRatings []seventeenlands.ColorRating
+	if f.seventeenLandsClient != nil {
+		endDate := getCurrentDateString()
+		startDate := getDateDaysAgo(17)
+		log.Printf("[RatingsFetcher] Fetching color ratings for expansion=%s, eventType=%s, dates=%s to %s", expansion, draftFormat, startDate, endDate)
+		colorRatings, err = f.seventeenLandsClient.GetColorRatings(ctx, seventeenlands.QueryParams{
+			Expansion: expansion,
+			EventType: draftFormat,
+			StartDate: startDate,
+			EndDate:   endDate,
+		})
+		if err != nil {
+			log.Printf("[RatingsFetcher] Error fetching color ratings: %v", err)
+			// Don't fail if color ratings unavailable
+			colorRatings = []seventeenlands.ColorRating{}
+		} else {
+			log.Printf("[RatingsFetcher] Received %d color ratings", len(colorRatings))
+		}
 	}
-	log.Printf("[17Lands] Received %d color ratings", len(colorRatings))
 
 	// Save to database
-	log.Printf("[17Lands] Saving %d card ratings and %d color ratings to database", len(cardRatings), len(colorRatings))
-	err = f.ratingsRepo.SaveSetRatings(ctx, setCode, draftFormat, cardRatings, colorRatings)
+	log.Printf("[RatingsFetcher] Saving %d card ratings and %d color ratings to database (source: %s)", len(cardRatings), len(colorRatings), dataSource)
+	err = f.ratingsRepo.SaveSetRatings(ctx, setCode, draftFormat, cardRatings, colorRatings, dataSource)
 	if err != nil {
-		log.Printf("[17Lands] Error saving ratings to database: %v", err)
+		log.Printf("[RatingsFetcher] Error saving ratings to database: %v", err)
 		return fmt.Errorf("save ratings to database: %w", err)
 	}
 
-	log.Printf("[17Lands] Successfully cached %d card ratings and %d color ratings for %s (%s)", len(cardRatings), len(colorRatings), setCode, draftFormat)
+	log.Printf("[RatingsFetcher] Successfully cached %d card ratings and %d color ratings for %s (%s) from %s", len(cardRatings), len(colorRatings), setCode, draftFormat, dataSource)
 	return nil
 }
 
