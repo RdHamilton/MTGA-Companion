@@ -1662,6 +1662,20 @@ func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error
 	return packs, nil
 }
 
+// GetMissingCards analyzes which cards from the initial pack have been taken by other players.
+func (a *App) GetMissingCards(sessionID string, packNum, pickNum int) (*models.MissingCardsAnalysis, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	analysis, err := a.service.GetMissingCardsAnalysis(a.ctx, sessionID, packNum, pickNum)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get missing cards: %v", err)}
+	}
+
+	return analysis, nil
+}
+
 // GetSetCards returns all cards for a given set code.
 // Automatically fetches and caches from Scryfall if not already cached.
 func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {

@@ -367,6 +367,29 @@ type DraftPackSession struct {
 	Timestamp  time.Time
 }
 
+// MissingCard represents a card that was in the initial pack but has been taken.
+type MissingCard struct {
+	CardID           string
+	CardName         string
+	GIHWR            float64
+	Tier             string
+	PickedAt         int     // Which pick number it was likely taken (relative to pack)
+	WheelProbability float64 // Probability of wheeling back (0-100)
+}
+
+// MissingCardsAnalysis represents analysis of cards missing from a pack.
+type MissingCardsAnalysis struct {
+	SessionID    string
+	PackNumber   int
+	PickNumber   int
+	InitialCards []string // Card IDs from P1P1, P2P1, or P3P1
+	CurrentCards []string // Card IDs currently in pack
+	PickedByMe   []string // Card IDs I've picked from this pack
+	MissingCards []MissingCard
+	TotalMissing int
+	BombsMissing int // Count of A+ or S-tier cards missing
+}
+
 // SetCard represents a card from a specific MTG set, cached from Scryfall.
 type SetCard struct {
 	ID            int
