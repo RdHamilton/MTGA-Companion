@@ -681,6 +681,14 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			}
 		}
 
+		// If actualEventName is still a UUID (not overridden by EventJoin), construct it from draft type and set code
+		if isUUID(actualEventName) && setCode != "" {
+			// Construct event name from draft type and set code
+			// Format: "PremierDraft" or "QuickDraft" (no date suffix needed for database lookup)
+			actualEventName = draftType
+			log.Printf("[Draft Detection] EventName was UUID, constructed from draft type: %s", actualEventName)
+		}
+
 		session := &draftSessionData{
 			SessionID: sessionID,
 			EventName: actualEventName,

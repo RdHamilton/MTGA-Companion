@@ -15,6 +15,8 @@ export function CalculateDraftGrade(arg1:string):Promise<grading.DraftGrade>;
 
 export function ClearAllData():Promise<void>;
 
+export function ClearDatasetCache():Promise<void>;
+
 export function ExportToCSV():Promise<void>;
 
 export function ExportToJSON():Promise<void>;
@@ -44,6 +46,8 @@ export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.Draf
 export function GetConnectionStatus():Promise<Record<string, any>>;
 
 export function GetCurrentAccount():Promise<models.Account>;
+
+export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
 
 export function GetDraftGrade(arg1:string):Promise<grading.DraftGrade>;
 

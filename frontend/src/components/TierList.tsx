@@ -25,6 +25,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
     const [selectedRarities, setSelectedRarities] = useState<Set<string>>(new Set());
     const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['S', 'A', 'B', 'C', 'D', 'F']));
+    const [showPickedOnly, setShowPickedOnly] = useState(false);
 
     // Sorting
     const [sortColumn, setSortColumn] = useState<SortColumn>('gihwr');
@@ -110,6 +111,12 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     // Filter and sort ratings
     const filteredRatings = ratings
         .filter(rating => {
+            // Picked cards filter
+            if (showPickedOnly) {
+                const isPicked = rating.mtga_id ? pickedCardIds.has(String(rating.mtga_id)) : false;
+                if (!isPicked) return false;
+            }
+
             // Tier filter
             if (!selectedTiers.has(rating.tier)) return false;
 
@@ -207,6 +214,22 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
 
             {/* Filters */}
             <div className="tier-list-filters">
+                {/* Picked Cards Filter */}
+                <div className="filter-group">
+                    <label className="checkbox-label">
+                        <input
+                            type="checkbox"
+                            checked={showPickedOnly}
+                            onChange={(e) => setShowPickedOnly(e.target.checked)}
+                            className="filter-checkbox"
+                        />
+                        <span>Show Picked Cards Only</span>
+                        {showPickedOnly && pickedCardIds.size > 0 && (
+                            <span className="picked-count"> ({pickedCardIds.size} picked)</span>
+                        )}
+                    </label>
+                </div>
+
                 {/* Tier Filter */}
                 <div className="filter-group">
                     <label>Tiers:</label>

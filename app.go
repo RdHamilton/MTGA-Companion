@@ -15,6 +15,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
@@ -33,6 +34,7 @@ type App struct {
 	service        *storage.Service
 	setFetcher     *setcache.Fetcher
 	ratingsFetcher *setcache.RatingsFetcher
+	datasetService *datasets.Service // 17Lands dataset service (S3 + web API)
 	poller         *logreader.Poller
 	pollerStop     context.CancelFunc
 	pollerMu       sync.Mutex
@@ -139,11 +141,28 @@ func (a *App) Initialize(dbPath string) error {
 	scryfallClient := scryfall.NewClient()
 	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
 
-	// Initialize 17Lands ratings fetcher with longer timeout for initial data fetches
-	options := seventeenlands.DefaultClientOptions()
-	options.Timeout = 120 * time.Second // 2 minutes for large dataset downloads
-	seventeenlandsClient := seventeenlands.NewClient(options)
-	a.ratingsFetcher = setcache.NewRatingsFetcher(seventeenlandsClient, a.service.DraftRatingsRepo())
+	// Initialize dataset service for 17Lands data (S3 + web API fallback)
+	datasetService, err := datasets.NewService(datasets.DefaultServiceOptions())
+	if err != nil {
+		log.Printf("Failed to initialize dataset service: %v (falling back to legacy API)", err)
+		datasetService = nil
+	}
+
+	// Store dataset service in app
+	a.datasetService = datasetService
+
+	// Initialize 17Lands ratings fetcher with dataset service
+	if datasetService != nil {
+		log.Println("✅ Using dataset service (S3 public datasets + web API fallback)")
+		a.ratingsFetcher = setcache.NewRatingsFetcherWithDatasets(datasetService, a.service.DraftRatingsRepo())
+	} else {
+		// Fallback to legacy API client
+		log.Println("⚠️  Using legacy 17Lands API client")
+		options := seventeenlands.DefaultClientOptions()
+		options.Timeout = 120 * time.Second // 2 minutes for large dataset downloads
+		seventeenlandsClient := seventeenlands.NewClient(options)
+		a.ratingsFetcher = setcache.NewRatingsFetcher(seventeenlandsClient, a.service.DraftRatingsRepo())
+	}
 
 	return nil
 }
@@ -1746,6 +1765,36 @@ func (a *App) RefreshSetRatings(setCode string, draftFormat string) error {
 
 	log.Printf("Successfully refreshed ratings for set %s, format %s", setCode, draftFormat)
 	return nil
+}
+
+// ClearDatasetCache clears all cached 17Lands datasets to free up disk space.
+// This removes the locally cached CSV files but keeps the ratings in the database.
+func (a *App) ClearDatasetCache() error {
+	if a.datasetService == nil {
+		// No dataset service means legacy API mode - nothing to clear
+		log.Println("No dataset cache to clear (using legacy API mode)")
+		return nil
+	}
+
+	log.Println("Clearing 17Lands dataset cache...")
+	err := a.datasetService.ClearCache()
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to clear dataset cache: %v", err)}
+	}
+
+	log.Println("Successfully cleared dataset cache")
+	return nil
+}
+
+// GetDatasetSource returns the data source for a given set and format ("s3" or "web_api").
+// Returns "unknown" if dataset service is not available.
+func (a *App) GetDatasetSource(setCode string, draftFormat string) string {
+	if a.datasetService == nil {
+		return "legacy_api"
+	}
+
+	source := a.datasetService.GetDataSource(a.ctx, setCode, draftFormat)
+	return source
 }
 
 // GetCardByArenaID returns a card by its Arena ID.
