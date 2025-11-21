@@ -1,13 +1,12 @@
 import React, { useMemo } from 'react';
-import { models } from '../../wailsjs/go/models';
-import { main } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 import { analyzeSynergies, calculateCardSynergyScore, getSynergyReason } from '../utils/synergy';
 import './CardsToLookFor.css';
 
 interface CardsToLookForProps {
     pickedCards: models.SetCard[];
     availableCards: models.SetCard[];
-    ratings: main.CardRatingWithTier[];
+    ratings: gui.CardRatingWithTier[];
     onCardClick?: (card: models.SetCard) => void;
 }
 
@@ -43,7 +42,7 @@ const CardsToLookFor: React.FC<CardsToLookForProps> = ({
         const unpickedCards = availableCards.filter(c => !pickedArenaIds.has(c.ArenaID));
 
         // Create rating lookup map
-        const ratingMap = new Map<number, main.CardRatingWithTier>();
+        const ratingMap = new Map<number, gui.CardRatingWithTier>();
         ratings.forEach(r => {
             if (r.mtga_id) {
                 ratingMap.set(r.mtga_id, r);
