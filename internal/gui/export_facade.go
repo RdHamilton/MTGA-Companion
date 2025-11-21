@@ -28,6 +28,7 @@ func NewExportFacade(services *Services) *ExportFacade {
 }
 
 // ExportToJSON exports all match data to a JSON file.
+// Uses the Builder pattern for cleaner configuration.
 func (e *ExportFacade) ExportToJSON(ctx context.Context) error {
 	if e.services.Storage == nil {
 		return &AppError{Message: "Database not initialized"}
@@ -56,15 +57,14 @@ func (e *ExportFacade) ExportToJSON(ctx context.Context) error {
 		return &AppError{Message: fmt.Sprintf("Failed to get matches: %v", err)}
 	}
 
-	// Export to JSON
-	exporter := export.NewExporter(export.Options{
-		Format:     export.FormatJSON,
-		FilePath:   filePath,
-		PrettyJSON: true,
-		Overwrite:  true,
-	})
-
-	if err := exporter.Export(matches); err != nil {
+	// Export to JSON using builder pattern
+	err = export.NewExportBuilder().
+		WithFormat(export.FormatJSON).
+		WithFilePath(filePath).
+		WithPrettyJSON(true).
+		WithOverwrite(true).
+		Export(matches)
+	if err != nil {
 		return &AppError{Message: fmt.Sprintf("Failed to export to JSON: %v", err)}
 	}
 
@@ -73,6 +73,7 @@ func (e *ExportFacade) ExportToJSON(ctx context.Context) error {
 }
 
 // ExportToCSV exports all match data to a CSV file.
+// Uses the Builder pattern for cleaner configuration.
 func (e *ExportFacade) ExportToCSV(ctx context.Context) error {
 	if e.services.Storage == nil {
 		return &AppError{Message: "Database not initialized"}
@@ -101,14 +102,13 @@ func (e *ExportFacade) ExportToCSV(ctx context.Context) error {
 		return &AppError{Message: fmt.Sprintf("Failed to get matches: %v", err)}
 	}
 
-	// Export to CSV
-	exporter := export.NewExporter(export.Options{
-		Format:    export.FormatCSV,
-		FilePath:  filePath,
-		Overwrite: true,
-	})
-
-	if err := exporter.Export(matches); err != nil {
+	// Export to CSV using builder pattern
+	err = export.NewExportBuilder().
+		WithFormat(export.FormatCSV).
+		WithFilePath(filePath).
+		WithOverwrite(true).
+		Export(matches)
+	if err != nil {
 		return &AppError{Message: fmt.Sprintf("Failed to export to CSV: %v", err)}
 	}
 
@@ -207,6 +207,109 @@ type ImportLogFileResult struct {
 	QuestsStored  int    `json:"questsStored"`
 	DraftsStored  int    `json:"draftsStored"`
 	PicksStored   int    `json:"picksStored"`
+}
+
+// ExportDraftsToJSON exports draft session data to a JSON file.
+// Uses the Builder pattern for flexible export configuration.
+func (e *ExportFacade) ExportDraftsToJSON(ctx context.Context) error {
+	if e.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select save location
+	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: fmt.Sprintf("mtga-drafts-%s.json", time.Now().Format("2006-01-02")),
+		Title:           "Export Drafts to JSON",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON Files (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open save dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Get all draft sessions
+	activeSessions, err := e.services.Storage.DraftRepo().GetActiveSessions(ctx)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get active drafts: %v", err)}
+	}
+
+	completedSessions, err := e.services.Storage.DraftRepo().GetCompletedSessions(ctx, 1000)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get completed drafts: %v", err)}
+	}
+
+	allSessions := append(activeSessions, completedSessions...)
+
+	// Export to JSON using builder pattern
+	err = export.NewExportBuilder().
+		WithFormat(export.FormatJSON).
+		WithFilePath(filePath).
+		WithPrettyJSON(true).
+		WithOverwrite(true).
+		Export(allSessions)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to export drafts to JSON: %v", err)}
+	}
+
+	log.Printf("Successfully exported %d draft sessions to %s", len(allSessions), filePath)
+	return nil
+}
+
+// ExportDraftsToCSV exports draft session data to a CSV file.
+// Uses the Builder pattern for flexible export configuration.
+func (e *ExportFacade) ExportDraftsToCSV(ctx context.Context) error {
+	if e.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Prompt user to select save location
+	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: fmt.Sprintf("mtga-drafts-%s.csv", time.Now().Format("2006-01-02")),
+		Title:           "Export Drafts to CSV",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "CSV Files (*.csv)", Pattern: "*.csv"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to open save dialog: %v", err)}
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Get all draft sessions
+	activeSessions, err := e.services.Storage.DraftRepo().GetActiveSessions(ctx)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get active drafts: %v", err)}
+	}
+
+	completedSessions, err := e.services.Storage.DraftRepo().GetCompletedSessions(ctx, 1000)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get completed drafts: %v", err)}
+	}
+
+	allSessions := append(activeSessions, completedSessions...)
+
+	// Export to CSV using builder pattern
+	err = export.NewExportBuilder().
+		WithFormat(export.FormatCSV).
+		WithFilePath(filePath).
+		WithOverwrite(true).
+		Export(allSessions)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to export drafts to CSV: %v", err)}
+	}
+
+	log.Printf("Successfully exported %d draft sessions to %s", len(allSessions), filePath)
+	return nil
 }
 
 // ImportLogFile imports historical MTGA log file data into the database.
