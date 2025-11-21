@@ -1,0 +1,361 @@
+/* Format Insights Container */
+.format-insights {
+  background-color: #1e1e1e;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #3d3d3d;
+}
+
+/* Header (Collapsible) */
+.insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.insights-header:hover {
+  background-color: #2d2d2d;
+}
+
+.insights-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #aaaaaa;
+}
+
+.btn-refresh-insights {
+  background-color: #3d3d3d;
+  color: #ffffff;
+  border: 1px solid #4d4d4d;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-refresh-insights:hover {
+  background-color: #4d4d4d;
+  border-color: #4a9eff;
+}
+
+/* Content */
+.insights-content {
+  padding: 16px;
+  border-top: 1px solid #3d3d3d;
+}
+
+.insights-loading,
+.insights-empty,
+.insights-error {
+  padding: 20px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.insights-loading,
+.insights-empty {
+  color: #aaaaaa;
+}
+
+.insights-error {
+  color: #ff7d7d;
+}
+
+/* Insights Sections */
+.insights-section {
+  margin-bottom: 24px;
+}
+
+.insights-section:last-child {
+  margin-bottom: 0;
+}
+
+.insights-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: #4a9eff;
+  font-weight: 600;
+  border-bottom: 1px solid #3d3d3d;
+  padding-bottom: 6px;
+}
+
+.insights-section h5 {
+  margin: 12px 0 8px 0;
+  font-size: 0.9rem;
+  color: #aaaaaa;
+  font-weight: 600;
+}
+
+/* Color Rankings */
+.color-rankings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.color-rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.color-rank-item {
+  background-color: #2d2d2d;
+  border-radius: 6px;
+  padding: 12px;
+  border-left: 3px solid #4a9eff;
+}
+
+.rank-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rank-color {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.rank-rating {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.rank-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rank-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: #aaaaaa;
+}
+
+.stat-value {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Format Speed */
+.format-speed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: #2d2d2d;
+  border-radius: 6px;
+}
+
+.speed-badge {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #4a9eff;
+  padding: 8px 24px;
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  border: 2px solid #4a9eff;
+}
+
+.speed-description {
+  font-size: 0.95rem;
+  color: #aaaaaa;
+  text-align: center;
+}
+
+/* Color Analysis */
+.color-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.analysis-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  border-left: 3px solid #4a9eff;
+}
+
+.analysis-label {
+  font-size: 0.9rem;
+  color: #aaaaaa;
+}
+
+.analysis-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Overdrafted Colors */
+.overdrafted-section {
+  margin-top: 16px;
+}
+
+.overdrafted-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.overdrafted-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  border-left: 3px solid #ffaa00;
+}
+
+.od-color {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.od-stats {
+  font-size: 0.8rem;
+  color: #aaaaaa;
+  font-family: 'Courier New', monospace;
+}
+
+/* Top Cards */
+.top-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.top-cards-section {
+  margin-bottom: 0;
+}
+
+.top-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-card-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.top-card-item:hover {
+  background-color: #3d3d3d;
+}
+
+.card-rank {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #4a9eff;
+  min-width: 30px;
+}
+
+.card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.card-rarity {
+  color: #aaaaaa;
+  text-transform: capitalize;
+}
+
+.card-color {
+  color: #4a9eff;
+  font-weight: 600;
+}
+
+.card-gihwr {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 70px;
+}
+
+.gihwr-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #7dff7d;
+}
+
+.gihwr-label {
+  font-size: 0.75rem;
+  color: #aaaaaa;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .color-rankings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .color-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .overdrafted-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-header {
+    padding: 10px 12px;
+  }
+
+  .insights-content {
+    padding: 12px;
+  }
+
+  .insights-title {
+    font-size: 0.9rem;
+  }
+
+  .btn-refresh-insights {
+    padding: 3px 10px;
+    font-size: 0.8rem;
+  }
+}

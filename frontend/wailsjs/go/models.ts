@@ -31,6 +31,169 @@ export namespace grading {
 
 }
 
+export namespace insights {
+	
+	export class OverdraftedColor {
+	    color: string;
+	    win_rate: number;
+	    popularity: number;
+	    delta: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OverdraftedColor(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.color = source["color"];
+	        this.win_rate = source["win_rate"];
+	        this.popularity = source["popularity"];
+	        this.delta = source["delta"];
+	    }
+	}
+	export class ColorAnalysis {
+	    best_mono_color: string;
+	    best_color_pair: string;
+	    deepest_colors: string[];
+	    overdrafted_colors: OverdraftedColor[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorAnalysis(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.best_mono_color = source["best_mono_color"];
+	        this.best_color_pair = source["best_color_pair"];
+	        this.deepest_colors = source["deepest_colors"];
+	        this.overdrafted_colors = this.convertValues(source["overdrafted_colors"], OverdraftedColor);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ColorPowerRank {
+	    color: string;
+	    win_rate: number;
+	    games_played: number;
+	    popularity: number;
+	    rating: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorPowerRank(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.color = source["color"];
+	        this.win_rate = source["win_rate"];
+	        this.games_played = source["games_played"];
+	        this.popularity = source["popularity"];
+	        this.rating = source["rating"];
+	    }
+	}
+	export class FormatSpeed {
+	    speed: string;
+	    avg_game_turn?: number;
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormatSpeed(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.speed = source["speed"];
+	        this.avg_game_turn = source["avg_game_turn"];
+	        this.description = source["description"];
+	    }
+	}
+	export class TopCard {
+	    name: string;
+	    color: string;
+	    rarity: string;
+	    gihwr: number;
+	    cmc?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TopCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.rarity = source["rarity"];
+	        this.gihwr = source["gihwr"];
+	        this.cmc = source["cmc"];
+	    }
+	}
+	export class FormatInsights {
+	    set_code: string;
+	    draft_format: string;
+	    color_rankings: ColorPowerRank[];
+	    top_bombs: TopCard[];
+	    top_removal: TopCard[];
+	    top_creatures: TopCard[];
+	    top_commons: TopCard[];
+	    format_speed: FormatSpeed;
+	    color_analysis?: ColorAnalysis;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormatInsights(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.set_code = source["set_code"];
+	        this.draft_format = source["draft_format"];
+	        this.color_rankings = this.convertValues(source["color_rankings"], ColorPowerRank);
+	        this.top_bombs = this.convertValues(source["top_bombs"], TopCard);
+	        this.top_removal = this.convertValues(source["top_removal"], TopCard);
+	        this.top_creatures = this.convertValues(source["top_creatures"], TopCard);
+	        this.top_commons = this.convertValues(source["top_commons"], TopCard);
+	        this.format_speed = this.convertValues(source["format_speed"], FormatSpeed);
+	        this.color_analysis = this.convertValues(source["color_analysis"], ColorAnalysis);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+
+}
+
 export namespace main {
 	
 	export class CardRatingWithTier {

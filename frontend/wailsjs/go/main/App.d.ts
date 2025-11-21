@@ -7,6 +7,7 @@ import {seventeenlands} from '../models';
 import {metrics} from '../models';
 import {prediction} from '../models';
 import {storage} from '../models';
+import {insights} from '../models';
 import {pickquality} from '../models';
 import {time} from '../models';
 
@@ -65,6 +66,8 @@ export function GetDraftSession(arg1:string):Promise<models.DraftSession>;
 export function GetDraftWinRatePrediction(arg1:string):Promise<prediction.DeckPrediction>;
 
 export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribution>>;
+
+export function GetFormatInsights(arg1:string,arg2:string):Promise<insights.FormatInsights>;
 
 export function GetMatchGames(arg1:string):Promise<Array<models.Game>>;
 

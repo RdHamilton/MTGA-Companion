@@ -10,6 +10,7 @@ import CardsToLookFor from '../components/CardsToLookFor';
 import MissingCards from '../components/MissingCards';
 import DraftStatistics from '../components/DraftStatistics';
 import PerformanceMetrics from '../components/PerformanceMetrics';
+import FormatInsights from '../components/FormatInsights';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
@@ -916,6 +917,15 @@ const Draft: React.FC = () => {
 
                     {/* Performance Metrics (Debug) */}
                     <PerformanceMetrics autoRefresh={true} refreshInterval={5000} />
+
+                    {/* Format Meta Insights */}
+                    {state.session && (
+                        <FormatInsights
+                            setCode={state.session.SetCode}
+                            draftFormat={state.session.EventName}
+                            autoRefresh={false}
+                        />
+                    )}
                 </div>
 
                 {/* Card Details Overlay */}

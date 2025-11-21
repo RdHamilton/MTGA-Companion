@@ -114,6 +114,10 @@ export function GetEventWinDistribution() {
   return window['go']['main']['App']['GetEventWinDistribution']();
 }
 
+export function GetFormatInsights(arg1, arg2) {
+  return window['go']['main']['App']['GetFormatInsights'](arg1, arg2);
+}
+
 export function GetMatchGames(arg1) {
   return window['go']['main']['App']['GetMatchGames'](arg1);
 }
