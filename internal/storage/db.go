@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // SQLite driver
@@ -181,7 +182,7 @@ func IsSQLiteBusy(err error) bool {
 	}
 	// Check for "database is locked" or "SQLITE_BUSY" in error message
 	errMsg := err.Error()
-	return contains(errMsg, "database is locked") || contains(errMsg, "SQLITE_BUSY")
+	return strings.Contains(errMsg, "database is locked") || strings.Contains(errMsg, "SQLITE_BUSY")
 }
 
 // RetryOnBusy retries a function if it returns a SQLITE_BUSY error.
@@ -211,17 +212,4 @@ func RetryOnBusy(fn func() error) error {
 	}
 
 	return fmt.Errorf("operation failed after %d retries: %w", maxRetries, lastErr)
-}
-
-// contains checks if a string contains a substring (case-sensitive).
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		func() bool {
-			for i := 0; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
-				}
-			}
-			return false
-		}())
 }
