@@ -44,14 +44,17 @@ func NewApp() *App {
 		DraftMetrics: metrics.NewDraftMetrics(),
 	}
 
-	// Create app with facades
+	// Create system facade first (it contains the event dispatcher)
+	systemFacade := gui.NewSystemFacade(services)
+
+	// Create app with facades, passing event dispatcher to those that need it
 	return &App{
 		services:     services,
 		matchFacade:  gui.NewMatchFacade(services),
 		draftFacade:  gui.NewDraftFacade(services),
 		cardFacade:   gui.NewCardFacade(services),
-		exportFacade: gui.NewExportFacade(services),
-		systemFacade: gui.NewSystemFacade(services),
+		exportFacade: gui.NewExportFacade(services, systemFacade.GetEventDispatcher()),
+		systemFacade: systemFacade,
 	}
 }
 
