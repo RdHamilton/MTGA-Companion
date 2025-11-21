@@ -198,6 +198,10 @@ export function RefreshSetRatings(arg1, arg2) {
   return window['go']['main']['App']['RefreshSetRatings'](arg1, arg2);
 }
 
+export function RepairDraftSession(arg1) {
+  return window['go']['main']['App']['RepairDraftSession'](arg1);
+}
+
 export function ResumeReplay() {
   return window['go']['main']['App']['ResumeReplay']();
 }

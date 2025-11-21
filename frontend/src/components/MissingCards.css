@@ -53,12 +53,16 @@
   padding: 0 16px 16px 16px;
   max-height: 300px;
   overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
 }
 
 .missing-cards-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  display: table;
+  table-layout: fixed;
 }
 
 .missing-cards-table thead {

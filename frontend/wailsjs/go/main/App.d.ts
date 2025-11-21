@@ -107,6 +107,8 @@ export function RefreshSetCards(arg1:string):Promise<number>;
 
 export function RefreshSetRatings(arg1:string,arg2:string):Promise<void>;
 
+export function RepairDraftSession(arg1:string):Promise<void>;
+
 export function ResumeReplay():Promise<void>;
 
 export function SetDaemonPort(arg1:number):Promise<void>;

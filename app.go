@@ -139,7 +139,7 @@ func (a *App) Initialize(dbPath string) error {
 
 	// Initialize set card fetcher
 	scryfallClient := scryfall.NewClient()
-	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo())
+	a.setFetcher = setcache.NewFetcher(scryfallClient, a.service.SetCardRepo(), a.service.DraftRatingsRepo())
 
 	// Initialize dataset service for 17Lands data (S3 + web API fallback)
 	datasetService, err := datasets.NewService(datasets.DefaultServiceOptions())
@@ -1863,10 +1863,23 @@ func (a *App) FixDraftSessionStatuses() (int, error) {
 			continue
 		}
 
-		// Determine expected picks based on draft type
-		expectedPicks := 42 // Quick Draft
-		if session.DraftType == "PremierDraft" {
-			expectedPicks = 45
+		// Use TotalPicks from session if available (calculated from first pack)
+		expectedPicks := session.TotalPicks
+		if expectedPicks == 0 {
+			// Fallback: try to calculate from first pack
+			packs, err := a.service.DraftRepo().GetPacksBySession(a.ctx, session.ID)
+			if err == nil && len(packs) > 0 {
+				for _, pack := range packs {
+					if pack.PackNumber == 0 && pack.PickNumber == 1 {
+						expectedPicks = len(pack.CardIDs) * 3
+						break
+					}
+				}
+			}
+		}
+		if expectedPicks == 0 {
+			// Last resort fallback
+			expectedPicks = 42
 		}
 
 		// If session has all expected picks, mark as completed
@@ -1890,6 +1903,93 @@ func (a *App) FixDraftSessionStatuses() (int, error) {
 	}
 
 	return updated, nil
+}
+
+// RepairDraftSession repairs a draft session by reconstructing missing first pick packs
+// and recalculating TotalPicks from actual pack size.
+func (a *App) RepairDraftSession(sessionID string) error {
+	if a.service == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("[RepairDraftSession] Repairing session %s", sessionID)
+
+	// Get session
+	session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+	if err != nil || session == nil {
+		return &AppError{Message: fmt.Sprintf("Session not found: %v", err)}
+	}
+
+	// Get all picks
+	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get picks: %v", err)}
+	}
+
+	// Reconstruct missing first picks for each pack
+	for packNum := 0; packNum < 3; packNum++ {
+		// Check if P_N_P1 exists
+		existingPack, err := a.service.DraftRepo().GetPack(a.ctx, sessionID, packNum, 1)
+		if err == nil && existingPack != nil {
+			log.Printf("[RepairDraftSession] P%dP1 already exists, skipping", packNum+1)
+			continue
+		}
+
+		// Get P_N_P2 (pack after first pick)
+		pack2, err := a.service.DraftRepo().GetPack(a.ctx, sessionID, packNum, 2)
+		if err != nil || pack2 == nil {
+			log.Printf("[RepairDraftSession] No P%dP2 found, cannot reconstruct P%dP1", packNum+1, packNum+1)
+			continue
+		}
+
+		// Find cards picked in P_N_P1
+		var pickedCards []string
+		for _, pick := range picks {
+			if pick.PackNumber == packNum && pick.PickNumber == 1 {
+				pickedCards = append(pickedCards, pick.CardID)
+			}
+		}
+
+		if len(pickedCards) == 0 {
+			log.Printf("[RepairDraftSession] No pick found for P%dP1, cannot reconstruct", packNum+1)
+			continue
+		}
+
+		// Reconstruct: P1 = P2 + picked_cards
+		reconstructedPack := &models.DraftPackSession{
+			SessionID:  sessionID,
+			PackNumber: packNum,
+			PickNumber: 1,
+			CardIDs:    append(append([]string{}, pack2.CardIDs...), pickedCards...),
+			Timestamp:  pack2.Timestamp,
+		}
+
+		log.Printf("[RepairDraftSession] Reconstructing P%dP1 with %d cards (P2 had %d, picked %d)",
+			packNum+1, len(reconstructedPack.CardIDs), len(pack2.CardIDs), len(pickedCards))
+
+		if err := a.service.DraftRepo().SavePack(a.ctx, reconstructedPack); err != nil {
+			log.Printf("[RepairDraftSession] Warning: Failed to save reconstructed P%dP1: %v", packNum+1, err)
+		}
+	}
+
+	// Recalculate TotalPicks from first pack size
+	firstPack, err := a.service.DraftRepo().GetPack(a.ctx, sessionID, 0, 1)
+	if err == nil && firstPack != nil {
+		correctTotalPicks := len(firstPack.CardIDs) * 3
+		if correctTotalPicks != session.TotalPicks {
+			log.Printf("[RepairDraftSession] Updating TotalPicks from %d to %d", session.TotalPicks, correctTotalPicks)
+
+			// Update session TotalPicks
+			query := `UPDATE draft_sessions SET total_picks = ? WHERE id = ?`
+			_, err := a.service.GetDB().ExecContext(a.ctx, query, correctTotalPicks, sessionID)
+			if err != nil {
+				return &AppError{Message: fmt.Sprintf("Failed to update TotalPicks: %v", err)}
+			}
+		}
+	}
+
+	log.Printf("[RepairDraftSession] Session %s repaired successfully", sessionID)
+	return nil
 }
 
 // CardRatingWithTier represents a card rating with calculated tier.

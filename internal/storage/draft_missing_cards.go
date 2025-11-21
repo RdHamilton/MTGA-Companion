@@ -10,8 +10,11 @@ import (
 
 // GetMissingCardsAnalysis calculates which cards from the initial pack have been taken by other players.
 func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string, packNum, pickNum int) (*models.MissingCardsAnalysis, error) {
+	log.Printf("[GetMissingCardsAnalysis] Called for session=%s, pack=%d, pick=%d", sessionID, packNum, pickNum)
+
 	// Can't calculate missing cards for P1P1 (no initial pack to compare)
 	if pickNum <= 1 {
+		log.Printf("[GetMissingCardsAnalysis] Pick 1 - returning empty analysis")
 		return &models.MissingCardsAnalysis{
 			SessionID:    sessionID,
 			PackNumber:   packNum,
@@ -26,7 +29,7 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 	initialPack, err := s.DraftRepo().GetPack(ctx, sessionID, packNum, 1)
 	if err != nil || initialPack == nil {
 		// Pack data not available - return empty analysis
-		log.Printf("Warning: Initial pack not found for session %s, pack %d: %v", sessionID, packNum, err)
+		log.Printf("[GetMissingCardsAnalysis] Initial pack not found for session %s, pack %d: %v", sessionID, packNum, err)
 		return &models.MissingCardsAnalysis{
 			SessionID:    sessionID,
 			PackNumber:   packNum,
@@ -36,12 +39,13 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 			BombsMissing: 0,
 		}, nil
 	}
+	log.Printf("[GetMissingCardsAnalysis] Found initial pack with %d cards", len(initialPack.CardIDs))
 
 	// Get the current pack
 	currentPack, err := s.DraftRepo().GetPack(ctx, sessionID, packNum, pickNum)
 	if err != nil || currentPack == nil {
 		// Current pack not available - return empty analysis
-		log.Printf("Warning: Current pack not found for session %s, pack %d, pick %d: %v", sessionID, packNum, pickNum, err)
+		log.Printf("[GetMissingCardsAnalysis] Current pack not found for session %s, pack %d, pick %d: %v", sessionID, packNum, pickNum, err)
 		return &models.MissingCardsAnalysis{
 			SessionID:    sessionID,
 			PackNumber:   packNum,
@@ -51,6 +55,7 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 			BombsMissing: 0,
 		}, nil
 	}
+	log.Printf("[GetMissingCardsAnalysis] Found current pack with %d cards", len(currentPack.CardIDs))
 
 	// Get all picks made from this pack so far
 	allPicks, err := s.DraftRepo().GetPicksBySession(ctx, sessionID)
@@ -63,16 +68,19 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 	for _, pick := range allPicks {
 		if pick.PackNumber == packNum && pick.PickNumber < pickNum {
 			pickedByMe = append(pickedByMe, pick.CardID)
+			log.Printf("[GetMissingCardsAnalysis] My pick P%dP%d: Card %s", pick.PackNumber+1, pick.PickNumber, pick.CardID)
 		}
 	}
 
 	// Calculate missing cards: Initial - Current - PickedByMe
 	missingCardIDs := calculateMissingCards(initialPack.CardIDs, currentPack.CardIDs, pickedByMe)
+	log.Printf("[GetMissingCardsAnalysis] Calculation: Initial=%d cards, Current=%d cards, PickedByMe=%d cards → Missing=%d cards",
+		len(initialPack.CardIDs), len(currentPack.CardIDs), len(pickedByMe), len(missingCardIDs))
 
 	// Get session info for ratings
 	session, err := s.DraftRepo().GetSession(ctx, sessionID)
 	if err != nil || session == nil {
-		log.Printf("Warning: Session not found for %s: %v", sessionID, err)
+		log.Printf("[GetMissingCardsAnalysis] Session not found for %s: %v", sessionID, err)
 		return &models.MissingCardsAnalysis{
 			SessionID:    sessionID,
 			PackNumber:   packNum,
@@ -154,7 +162,7 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 		})
 	}
 
-	return &models.MissingCardsAnalysis{
+	analysis := &models.MissingCardsAnalysis{
 		SessionID:    sessionID,
 		PackNumber:   packNum,
 		PickNumber:   pickNum,
@@ -164,7 +172,9 @@ func (s *Service) GetMissingCardsAnalysis(ctx context.Context, sessionID string,
 		MissingCards: missingCards,
 		TotalMissing: len(missingCards),
 		BombsMissing: bombsCount,
-	}, nil
+	}
+	log.Printf("[GetMissingCardsAnalysis] Returning analysis with %d missing cards, %d bombs", len(missingCards), bombsCount)
+	return analysis, nil
 }
 
 // calculateMissingCards returns card IDs that are in initial but not in current or picked.
