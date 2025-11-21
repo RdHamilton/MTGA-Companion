@@ -42,7 +42,7 @@ const CardsToLookFor: React.FC<CardsToLookForProps> = ({
         const unpickedCards = availableCards.filter(c => !pickedArenaIds.has(c.ArenaID));
 
         // Create rating lookup map
-        const ratingMap = new Map<number, main.CardRatingWithTier>();
+        const ratingMap = new Map<number, gui.CardRatingWithTier>();
         ratings.forEach(r => {
             if (r.mtga_id) {
                 ratingMap.set(r.mtga_id, r);
