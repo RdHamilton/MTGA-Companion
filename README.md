@@ -24,10 +24,17 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Database Storage**: Local SQLite database with migration support
 - **Export System**: Export statistics in CSV or JSON formats
 
-### Draft Support
-- **Draft Tracking**: Record and analyze all your draft picks
-- **Card Data Integration**: 17Lands draft statistics and Scryfall metadata
-- **Draft Overlay**: In-game overlay with pick recommendations (CLI mode)
+### Draft Assistant (NEW in v1.1)
+- **Real-Time Draft Assistant**: Live card recommendations and analysis during drafts
+- **Type Synergy Detection**: Automatic detection of card type synergies with visual indicators
+- **Card Suggestions**: Context-aware recommendations based on your picked cards
+- **Draft Deck Win Rate Predictor**: AI-powered prediction with letter grades (A/B/C/D/F)
+- **Format Meta Insights**: Archetype performance data, best color pairs, overdrafted colors
+- **Archetype Performance Dashboard**: Interactive archetype selection with top cards per archetype
+- **Draft Statistics Dashboard**: Real-time mana curve and color distribution
+- **Missing Cards Detection**: Track cards you don't own from draft packs
+- **Historical Draft Replay**: View and replay past draft pick sequences
+- **Card Data Integration**: 17Lands public datasets and Scryfall metadata
 
 ## Documentation
 
@@ -273,6 +280,7 @@ The application will:
 ### Navigation
 
 - **Match History**: View and filter all your matches
+- **Draft**: Real-time draft assistant with recommendations, synergy detection, and format insights (NEW in v1.1)
 - **Charts**: Visualize your performance data
   - Win Rate Trend: Performance over time
   - Deck Performance: Win rates by deck
