@@ -1,0 +1,164 @@
+/* Performance Metrics Container */
+.performance-metrics {
+  background-color: #1e1e1e;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #3d3d3d;
+}
+
+/* Header (Collapsible) */
+.metrics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.metrics-header:hover {
+  background-color: #2d2d2d;
+}
+
+.metrics-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #aaaaaa;
+}
+
+.btn-reset-metrics {
+  background-color: #3d3d3d;
+  color: #ffffff;
+  border: 1px solid #4d4d4d;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-reset-metrics:hover {
+  background-color: #4d4d4d;
+  border-color: #4a9eff;
+}
+
+/* Content */
+.metrics-content {
+  padding: 16px;
+  border-top: 1px solid #3d3d3d;
+}
+
+.metrics-loading,
+.metrics-empty {
+  padding: 20px;
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 0.9rem;
+}
+
+/* Metrics Sections */
+.metrics-section {
+  margin-bottom: 20px;
+}
+
+.metrics-section:last-child {
+  margin-bottom: 0;
+}
+
+.metrics-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: #4a9eff;
+  font-weight: 600;
+  border-bottom: 1px solid #3d3d3d;
+  padding-bottom: 6px;
+}
+
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  border-left: 3px solid #4a9eff;
+}
+
+.metric-label {
+  font-size: 0.9rem;
+  color: #aaaaaa;
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.metric-value.error-value {
+  color: #ff7d7d;
+}
+
+.metric-value.success-value {
+  color: #7dff7d;
+}
+
+/* Latency Stats */
+.latency-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.latency-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+}
+
+.latency-label {
+  font-size: 0.9rem;
+  color: #aaaaaa;
+}
+
+.latency-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-header {
+    padding: 10px 12px;
+  }
+
+  .metrics-content {
+    padding: 12px;
+  }
+
+  .metrics-title {
+    font-size: 0.9rem;
+  }
+
+  .btn-reset-metrics {
+    padding: 3px 10px;
+    font-size: 0.8rem;
+  }
+}

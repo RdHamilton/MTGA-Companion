@@ -150,6 +150,89 @@ export namespace main {
 
 }
 
+export namespace metrics {
+	
+	export class LatencyStats {
+	    mean: number;
+	    p50: number;
+	    p95: number;
+	    p99: number;
+	    min: number;
+	    max: number;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LatencyStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mean = source["mean"];
+	        this.p50 = source["p50"];
+	        this.p95 = source["p95"];
+	        this.p99 = source["p99"];
+	        this.min = source["min"];
+	        this.max = source["max"];
+	        this.count = source["count"];
+	    }
+	}
+	export class DraftStats {
+	    parse_latency: LatencyStats;
+	    ratings_latency: LatencyStats;
+	    ui_update_latency: LatencyStats;
+	    end_to_end_latency: LatencyStats;
+	    events_processed: number;
+	    packs_rated: number;
+	    api_requests: number;
+	    api_errors: number;
+	    cache_hits: number;
+	    cache_misses: number;
+	    cache_hit_rate: number;
+	    api_success_rate: number;
+	    uptime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.parse_latency = this.convertValues(source["parse_latency"], LatencyStats);
+	        this.ratings_latency = this.convertValues(source["ratings_latency"], LatencyStats);
+	        this.ui_update_latency = this.convertValues(source["ui_update_latency"], LatencyStats);
+	        this.end_to_end_latency = this.convertValues(source["end_to_end_latency"], LatencyStats);
+	        this.events_processed = source["events_processed"];
+	        this.packs_rated = source["packs_rated"];
+	        this.api_requests = source["api_requests"];
+	        this.api_errors = source["api_errors"];
+	        this.cache_hits = source["cache_hits"];
+	        this.cache_misses = source["cache_misses"];
+	        this.cache_hit_rate = source["cache_hit_rate"];
+	        this.api_success_rate = source["api_success_rate"];
+	        this.uptime = source["uptime"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace models {
 	
 	export class Account {
