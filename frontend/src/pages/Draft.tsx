@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
-import { models, pickquality, grading, main } from '../../wailsjs/go/models';
+import { models, pickquality, grading, gui } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { getReplayState } from '../App';
 import TierList from '../components/TierList';
@@ -19,7 +19,7 @@ interface DraftState {
     picks: models.DraftPickSession[];
     packs: models.DraftPackSession[];
     setCards: models.SetCard[];
-    ratings: main.CardRatingWithTier[];
+    ratings: gui.CardRatingWithTier[];
     loading: boolean;
     error: string | null;
 }

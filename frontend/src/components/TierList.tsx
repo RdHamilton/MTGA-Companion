@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { GetCardRatings, RefreshSetRatings, GetSetCards } from '../../wailsjs/go/main/App';
-import { main, models } from '../../wailsjs/go/models';
+import { gui, models } from '../../wailsjs/go/models';
 import './TierList.css';
 
-type CardRating = main.CardRatingWithTier;
+type CardRating = gui.CardRatingWithTier;
 
 interface TierListProps {
     setCode: string;
@@ -131,7 +131,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                 const cardColors = rating.colors && rating.colors.length > 0
                     ? rating.colors
                     : [rating.color];
-                const hasMatchingColor = cardColors.some(color => selectedColors.has(color));
+                const hasMatchingColor = cardColors.some((color: string) => selectedColors.has(color));
                 if (!hasMatchingColor) return false;
             }
 
@@ -363,7 +363,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {tierCards.map((rating) => {
+                                        {tierCards.map((rating: CardRating) => {
                                             const isPicked = rating.mtga_id ? pickedCardIds.has(String(rating.mtga_id)) : false;
 
                                             return (
@@ -378,7 +378,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                                     </td>
                                                     <td className="card-color">
                                                         {rating.colors && rating.colors.length > 0
-                                                            ? rating.colors.map(c => getColorSymbol(c)).join('')
+                                                            ? rating.colors.map((c: string) => getColorSymbol(c)).join('')
                                                             : getColorSymbol(rating.color)}
                                                     </td>
                                                     <td className="card-rarity">{rating.rarity}</td>
