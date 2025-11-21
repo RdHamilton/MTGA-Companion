@@ -1074,15 +1074,16 @@ func (d *DraftFacade) RepairDraftSession(ctx context.Context, sessionID string) 
 
 // GetFormatInsights generates aggregated insights for a draft format.
 // Returns color rankings, top cards, format speed, and other meta analysis.
+// Uses the Strategy pattern to apply format-specific analysis logic.
 func (d *DraftFacade) GetFormatInsights(ctx context.Context, setCode, draftFormat string) (*insights.FormatInsights, error) {
 	if d.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// Create insights analyzer
-	analyzer := insights.NewAnalyzer(d.services.Storage)
+	// Create insights analyzer with format-specific strategy
+	analyzer := insights.NewAnalyzerForFormat(d.services.Storage, draftFormat)
 
-	// Generate insights
+	// Generate insights using the appropriate strategy
 	formatInsights, err := analyzer.AnalyzeFormat(ctx, setCode, draftFormat)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to analyze format: %v", err)}
@@ -1093,15 +1094,16 @@ func (d *DraftFacade) GetFormatInsights(ctx context.Context, setCode, draftForma
 
 // GetArchetypeCards returns top cards for a specific color combination (archetype).
 // colors parameter should be like "W", "UB", "WUR", etc.
+// Uses the Strategy pattern to apply format-specific filtering and analysis.
 func (d *DraftFacade) GetArchetypeCards(ctx context.Context, setCode, draftFormat, colors string) (*insights.ArchetypeCards, error) {
 	if d.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// Create insights analyzer
-	analyzer := insights.NewAnalyzer(d.services.Storage)
+	// Create insights analyzer with format-specific strategy
+	analyzer := insights.NewAnalyzerForFormat(d.services.Storage, draftFormat)
 
-	// Get archetype cards
+	// Get archetype cards using the appropriate strategy
 	archetypeCards, err := analyzer.GetArchetypeCards(ctx, setCode, draftFormat, colors)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get archetype cards: %v", err)}
