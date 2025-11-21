@@ -134,6 +134,9 @@ jobs:
   frontend-tests:
     name: Frontend Component Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
     - name: Checkout code
@@ -168,12 +171,35 @@ jobs:
         flags: frontend
         fail_ci_if_error: false
 
-    - name: Upload test results
+    - name: Coverage Summary
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      if: github.event_name == 'pull_request'
+      with:
+        filename: frontend/coverage/cobertura-coverage.xml
+        badge: true
+        fail_below_min: false
+        format: markdown
+        hide_branch_rate: false
+        hide_complexity: true
+        indicators: true
+        output: both
+        thresholds: '60 80'
+
+    - name: Add Coverage PR Comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        path: code-coverage-results.md
+
+    - name: Upload test results and coverage
       if: always()
       uses: actions/upload-artifact@v5
       with:
         name: frontend-test-results
-        path: frontend/coverage/
+        path: |
+          frontend/coverage/
+          frontend/playwright-report/
         retention-days: 7
 
   # E2E tests with Playwright are commented out because they require a running Wails application
