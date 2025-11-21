@@ -31,6 +31,125 @@ export namespace grading {
 
 }
 
+export namespace gui {
+	
+	export class CardRatingWithTier {
+	    name: string;
+	    color: string;
+	    rarity: string;
+	    mtga_id?: number;
+	    ever_drawn_win_rate: number;
+	    opening_hand_win_rate: number;
+	    ever_drawn_game_win_rate: number;
+	    drawn_win_rate: number;
+	    in_hand_win_rate: number;
+	    ever_drawn_improvement_win_rate: number;
+	    opening_hand_improvement_win_rate: number;
+	    drawn_improvement_win_rate: number;
+	    in_hand_improvement_win_rate: number;
+	    avg_seen: number;
+	    avg_pick: number;
+	    pick_rate?: number;
+	    "# ever_drawn": number;
+	    "# opening_hand": number;
+	    "# games": number;
+	    "# drawn": number;
+	    "# in_hand_drawn": number;
+	    "# games_played"?: number;
+	    "# decks"?: number;
+	    tier: string;
+	    colors: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CardRatingWithTier(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.rarity = source["rarity"];
+	        this.mtga_id = source["mtga_id"];
+	        this.ever_drawn_win_rate = source["ever_drawn_win_rate"];
+	        this.opening_hand_win_rate = source["opening_hand_win_rate"];
+	        this.ever_drawn_game_win_rate = source["ever_drawn_game_win_rate"];
+	        this.drawn_win_rate = source["drawn_win_rate"];
+	        this.in_hand_win_rate = source["in_hand_win_rate"];
+	        this.ever_drawn_improvement_win_rate = source["ever_drawn_improvement_win_rate"];
+	        this.opening_hand_improvement_win_rate = source["opening_hand_improvement_win_rate"];
+	        this.drawn_improvement_win_rate = source["drawn_improvement_win_rate"];
+	        this.in_hand_improvement_win_rate = source["in_hand_improvement_win_rate"];
+	        this.avg_seen = source["avg_seen"];
+	        this.avg_pick = source["avg_pick"];
+	        this.pick_rate = source["pick_rate"];
+	        this["# ever_drawn"] = source["# ever_drawn"];
+	        this["# opening_hand"] = source["# opening_hand"];
+	        this["# games"] = source["# games"];
+	        this["# drawn"] = source["# drawn"];
+	        this["# in_hand_drawn"] = source["# in_hand_drawn"];
+	        this["# games_played"] = source["# games_played"];
+	        this["# decks"] = source["# decks"];
+	        this.tier = source["tier"];
+	        this.colors = source["colors"];
+	    }
+	}
+	export class ImportLogFileResult {
+	    fileName: string;
+	    entriesRead: number;
+	    matchesStored: number;
+	    gamesStored: number;
+	    decksStored: number;
+	    ranksStored: number;
+	    questsStored: number;
+	    draftsStored: number;
+	    picksStored: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportLogFileResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileName = source["fileName"];
+	        this.entriesRead = source["entriesRead"];
+	        this.matchesStored = source["matchesStored"];
+	        this.gamesStored = source["gamesStored"];
+	        this.decksStored = source["decksStored"];
+	        this.ranksStored = source["ranksStored"];
+	        this.questsStored = source["questsStored"];
+	        this.draftsStored = source["draftsStored"];
+	        this.picksStored = source["picksStored"];
+	    }
+	}
+	export class ReplayStatus {
+	    isActive: boolean;
+	    isPaused: boolean;
+	    currentEntry: number;
+	    totalEntries: number;
+	    percentComplete: number;
+	    elapsed: number;
+	    speed: number;
+	    filter: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReplayStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isActive = source["isActive"];
+	        this.isPaused = source["isPaused"];
+	        this.currentEntry = source["currentEntry"];
+	        this.totalEntries = source["totalEntries"];
+	        this.percentComplete = source["percentComplete"];
+	        this.elapsed = source["elapsed"];
+	        this.speed = source["speed"];
+	        this.filter = source["filter"];
+	    }
+	}
+
+}
+
 export namespace insights {
 	
 	export class TopCard {
@@ -229,125 +348,6 @@ export namespace insights {
 	}
 	
 	
-
-}
-
-export namespace main {
-	
-	export class CardRatingWithTier {
-	    name: string;
-	    color: string;
-	    rarity: string;
-	    mtga_id?: number;
-	    ever_drawn_win_rate: number;
-	    opening_hand_win_rate: number;
-	    ever_drawn_game_win_rate: number;
-	    drawn_win_rate: number;
-	    in_hand_win_rate: number;
-	    ever_drawn_improvement_win_rate: number;
-	    opening_hand_improvement_win_rate: number;
-	    drawn_improvement_win_rate: number;
-	    in_hand_improvement_win_rate: number;
-	    avg_seen: number;
-	    avg_pick: number;
-	    pick_rate?: number;
-	    "# ever_drawn": number;
-	    "# opening_hand": number;
-	    "# games": number;
-	    "# drawn": number;
-	    "# in_hand_drawn": number;
-	    "# games_played"?: number;
-	    "# decks"?: number;
-	    tier: string;
-	    colors: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new CardRatingWithTier(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.color = source["color"];
-	        this.rarity = source["rarity"];
-	        this.mtga_id = source["mtga_id"];
-	        this.ever_drawn_win_rate = source["ever_drawn_win_rate"];
-	        this.opening_hand_win_rate = source["opening_hand_win_rate"];
-	        this.ever_drawn_game_win_rate = source["ever_drawn_game_win_rate"];
-	        this.drawn_win_rate = source["drawn_win_rate"];
-	        this.in_hand_win_rate = source["in_hand_win_rate"];
-	        this.ever_drawn_improvement_win_rate = source["ever_drawn_improvement_win_rate"];
-	        this.opening_hand_improvement_win_rate = source["opening_hand_improvement_win_rate"];
-	        this.drawn_improvement_win_rate = source["drawn_improvement_win_rate"];
-	        this.in_hand_improvement_win_rate = source["in_hand_improvement_win_rate"];
-	        this.avg_seen = source["avg_seen"];
-	        this.avg_pick = source["avg_pick"];
-	        this.pick_rate = source["pick_rate"];
-	        this["# ever_drawn"] = source["# ever_drawn"];
-	        this["# opening_hand"] = source["# opening_hand"];
-	        this["# games"] = source["# games"];
-	        this["# drawn"] = source["# drawn"];
-	        this["# in_hand_drawn"] = source["# in_hand_drawn"];
-	        this["# games_played"] = source["# games_played"];
-	        this["# decks"] = source["# decks"];
-	        this.tier = source["tier"];
-	        this.colors = source["colors"];
-	    }
-	}
-	export class ImportLogFileResult {
-	    fileName: string;
-	    entriesRead: number;
-	    matchesStored: number;
-	    gamesStored: number;
-	    decksStored: number;
-	    ranksStored: number;
-	    questsStored: number;
-	    draftsStored: number;
-	    picksStored: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportLogFileResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.fileName = source["fileName"];
-	        this.entriesRead = source["entriesRead"];
-	        this.matchesStored = source["matchesStored"];
-	        this.gamesStored = source["gamesStored"];
-	        this.decksStored = source["decksStored"];
-	        this.ranksStored = source["ranksStored"];
-	        this.questsStored = source["questsStored"];
-	        this.draftsStored = source["draftsStored"];
-	        this.picksStored = source["picksStored"];
-	    }
-	}
-	export class ReplayStatus {
-	    isActive: boolean;
-	    isPaused: boolean;
-	    currentEntry: number;
-	    totalEntries: number;
-	    percentComplete: number;
-	    elapsed: number;
-	    speed: number;
-	    filter: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReplayStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isActive = source["isActive"];
-	        this.isPaused = source["isPaused"];
-	        this.currentEntry = source["currentEntry"];
-	        this.totalEntries = source["totalEntries"];
-	        this.percentComplete = source["percentComplete"];
-	        this.elapsed = source["elapsed"];
-	        this.speed = source["speed"];
-	        this.filter = source["filter"];
-	    }
-	}
 
 }
 

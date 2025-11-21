@@ -3,7 +3,7 @@
 import {grading} from '../models';
 import {models} from '../models';
 import {insights} from '../models';
-import {main} from '../models';
+import {gui} from '../models';
 import {seventeenlands} from '../models';
 import {metrics} from '../models';
 import {prediction} from '../models';
@@ -39,9 +39,9 @@ export function GetArchetypeCards(arg1:string,arg2:string,arg3:string):Promise<i
 
 export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;
 
-export function GetCardRatingByArenaID(arg1:string,arg2:string,arg3:string):Promise<main.CardRatingWithTier>;
+export function GetCardRatingByArenaID(arg1:string,arg2:string,arg3:string):Promise<gui.CardRatingWithTier>;
 
-export function GetCardRatings(arg1:string,arg2:string):Promise<Array<main.CardRatingWithTier>>;
+export function GetCardRatings(arg1:string,arg2:string):Promise<Array<gui.CardRatingWithTier>>;
 
 export function GetColorRatings(arg1:string,arg2:string):Promise<Array<seventeenlands.ColorRating>>;
 
@@ -89,7 +89,7 @@ export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
 export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.Time,arg4:storage.TimelinePeriod):Promise<storage.RankTimeline>;
 
-export function GetReplayStatus():Promise<main.ReplayStatus>;
+export function GetReplayStatus():Promise<gui.ReplayStatus>;
 
 export function GetSetCards(arg1:string):Promise<Array<models.SetCard>>;
 
@@ -103,7 +103,7 @@ export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:
 
 export function ImportFromFile():Promise<void>;
 
-export function ImportLogFile():Promise<main.ImportLogFileResult>;
+export function ImportLogFile():Promise<gui.ImportLogFileResult>;
 
 export function Initialize(arg1:string):Promise<void>;
 
