@@ -457,7 +457,7 @@ func (s *Service) processDrafts(ctx context.Context, entries []*logreader.LogEnt
 	log.Printf("Found %d draft event(s) in entries", len(draftEvents))
 
 	// Group events into sessions
-	sessions := s.groupDraftEvents(draftEvents)
+	sessions := s.groupDraftEvents(ctx, draftEvents)
 
 	if len(sessions) == 0 {
 		return nil
@@ -522,7 +522,7 @@ type draftSessionData struct {
 }
 
 // groupDraftEvents groups draft events into complete sessions.
-func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*draftSessionData {
+func (s *Service) groupDraftEvents(ctx context.Context, events []*logreader.DraftSessionEvent) []*draftSessionData {
 	// Group events by event name (Quick Draft) or session ID (Premier Draft)
 	eventGroups := make(map[string][]*logreader.DraftSessionEvent)
 	for _, event := range events {
@@ -627,6 +627,7 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 		for _, event := range eventList {
 			// Save pack contents
 			if event.Type == "status_updated" && len(event.DraftPack) > 0 {
+				log.Printf("[buildDraftSessions] Found pack data: P%dP%d with %d cards", event.PackNumber, event.PickNumber, len(event.DraftPack))
 				pack := &models.DraftPackSession{
 					SessionID:  sessionID,
 					PackNumber: event.PackNumber,
@@ -652,6 +653,60 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			}
 		}
 
+		// Fetch existing picks and packs from database and merge with new events
+		// This ensures data.Picks and data.Packs always represent the COMPLETE session state,
+		// not just the current batch of events (important for incremental processing)
+		existingPicks, err := s.storage.DraftRepo().GetPicksBySession(ctx, sessionID)
+		if err == nil && len(existingPicks) > 0 {
+			log.Printf("[groupDraftEvents] Merging %d existing picks with %d new picks for session %s",
+				len(existingPicks), len(picks), sessionID)
+			// Create a map of existing picks to avoid duplicates
+			// Key must match database UNIQUE constraint: (session_id, pack_number, pick_number)
+			// Do NOT include card_id in the key - if a new event has a different card_id for the same pack/pick,
+			// prefer the existing DB pick to avoid data loss from INSERT OR REPLACE conflicts
+			pickMap := make(map[string]*models.DraftPickSession)
+			for _, p := range existingPicks {
+				key := fmt.Sprintf("%d-%d", p.PackNumber, p.PickNumber)
+				pickMap[key] = p
+			}
+			// Add new picks only if they don't already exist (prefer existing DB data)
+			for _, p := range picks {
+				key := fmt.Sprintf("%d-%d", p.PackNumber, p.PickNumber)
+				if _, exists := pickMap[key]; !exists {
+					pickMap[key] = p
+				} else {
+					log.Printf("[groupDraftEvents] Skipping duplicate pick P%dP%d (preferring existing DB data)", p.PackNumber, p.PickNumber)
+				}
+			}
+			// Convert map back to slice
+			picks = make([]*models.DraftPickSession, 0, len(pickMap))
+			for _, p := range pickMap {
+				picks = append(picks, p)
+			}
+		}
+
+		existingPacks, err := s.storage.DraftRepo().GetPacksBySession(ctx, sessionID)
+		if err == nil && len(existingPacks) > 0 {
+			log.Printf("[groupDraftEvents] Merging %d existing packs with %d new packs for session %s",
+				len(existingPacks), len(packs), sessionID)
+			// Create a map of existing packs to avoid duplicates
+			packMap := make(map[string]*models.DraftPackSession)
+			for _, p := range existingPacks {
+				key := fmt.Sprintf("%d-%d", p.PackNumber, p.PickNumber)
+				packMap[key] = p
+			}
+			// Add new packs (will overwrite duplicates)
+			for _, p := range packs {
+				key := fmt.Sprintf("%d-%d", p.PackNumber, p.PickNumber)
+				packMap[key] = p
+			}
+			// Convert map back to slice
+			packs = make([]*models.DraftPackSession, 0, len(packMap))
+			for _, p := range packMap {
+				packs = append(packs, p)
+			}
+		}
+
 		// Fallback: If set_code is still missing, try to infer from card IDs
 		if setCode == "" && len(picks) > 0 {
 			setCode = s.inferSetCodeFromCardID(picks[0].CardID)
@@ -668,12 +723,16 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 			if hasEnd {
 				status = "completed"
 			} else {
-				// Also mark as completed if all picks are done
-				// Quick Draft = 42 picks (3 packs * 14 cards)
-				// Premier Draft = 45 picks (3 packs * 15 cards)
-				expectedPicks := 42 // Default for QuickDraft
-				if draftType == "PremierDraft" {
-					expectedPicks = 45
+				// Calculate expected picks from first pack size
+				expectedPicks := 42 // Default fallback
+				if len(packs) > 0 {
+					for _, pack := range packs {
+						if pack.PackNumber == 0 && pack.PickNumber == 1 {
+							packSize := len(pack.CardIDs)
+							expectedPicks = packSize * 3
+							break
+						}
+					}
 				}
 				if len(picks) >= expectedPicks {
 					status = "completed"
@@ -709,12 +768,26 @@ func (s *Service) groupDraftEvents(events []*logreader.DraftSessionEvent) []*dra
 
 // storeDraftSession stores a complete draft session with picks and packs.
 func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData) error {
-	// Calculate expected total picks based on draft type
-	// Quick Draft = 42 picks (3 packs * 14 cards)
-	// Premier Draft = 45 picks (3 packs * 15 cards)
-	expectedPicks := 42 // Default for QuickDraft
-	if data.DraftType == "PremierDraft" {
-		expectedPicks = 45
+	// Calculate expected total picks dynamically from first pack size
+	// Most sets: 3 packs * 14-15 cards = 42-45 picks
+	expectedPicks := 42 // Default fallback
+	if len(data.Packs) > 0 {
+		// Find the first pack (P1P1) to determine pack size
+		for _, pack := range data.Packs {
+			if pack.PackNumber == 0 && pack.PickNumber == 1 {
+				packSize := len(pack.CardIDs)
+				expectedPicks = packSize * 3 // 3 packs total
+				log.Printf("[storeDraftSession] Calculated expectedPicks=%d from first pack size=%d", expectedPicks, packSize)
+				break
+			}
+		}
+	}
+	// Fallback: use draft type if no pack data found
+	if expectedPicks == 42 && len(data.Packs) == 0 {
+		if data.DraftType == "PremierDraft" {
+			expectedPicks = 45 // Traditional assumption
+		}
+		log.Printf("[storeDraftSession] Using fallback expectedPicks=%d for %s", expectedPicks, data.DraftType)
 	}
 
 	// Check if session already exists to avoid overwriting metadata
@@ -736,11 +809,37 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 		}
 
 		// Store new packs (INSERT OR REPLACE will handle duplicates)
+		log.Printf("[storeDraftSession] Storing %d packs for existing session %s", len(data.Packs), data.SessionID)
 		for _, pack := range data.Packs {
 			if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
 				log.Printf("Warning: Failed to save pack: %v", err)
 			}
 		}
+
+		// Update TotalPicks if we now have better data from pack size
+		// This handles the case where session was created with fallback value (45)
+		// but we now have actual pack data that shows correct value (42 for 14-card packs)
+		if existingSession.TotalPicks != expectedPicks && len(data.Packs) > 0 {
+			// Only update if expectedPicks came from actual pack data, not fallback
+			hasFirstPack := false
+			for _, pack := range data.Packs {
+				if pack.PackNumber == 0 && pack.PickNumber == 1 {
+					hasFirstPack = true
+					break
+				}
+			}
+			if hasFirstPack {
+				log.Printf("[storeDraftSession] Updating TotalPicks from %d to %d based on pack size", existingSession.TotalPicks, expectedPicks)
+				if err := s.storage.DraftRepo().UpdateSessionTotalPicks(ctx, data.SessionID, expectedPicks); err != nil {
+					log.Printf("Warning: Failed to update TotalPicks: %v", err)
+				}
+			}
+		}
+
+		// Reconstruct missing first picks (P1P1, P2P1, P3P1)
+		// Premier Draft doesn't emit pack data for pick 1, only for subsequent picks
+		// data.Picks contains complete session state (merged in groupDraftEvents)
+		s.reconstructFirstPicks(ctx, data.SessionID, data.Picks)
 
 		// Check if draft is complete (has all expected picks)
 		// Get updated pick count
@@ -789,13 +888,70 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 	}
 
 	// Store all packs
+	log.Printf("[storeDraftSession] Storing %d packs for new session %s", len(data.Packs), data.SessionID)
 	for _, pack := range data.Packs {
 		if err := s.storage.DraftRepo().SavePack(ctx, pack); err != nil {
 			log.Printf("Warning: Failed to save pack: %v", err)
 		}
 	}
 
+	// Reconstruct missing first picks (P1P1, P2P1, P3P1)
+	// Premier Draft doesn't emit pack data for pick 1, only for subsequent picks
+	s.reconstructFirstPicks(ctx, data.SessionID, data.Picks)
+
 	return nil
+}
+
+// reconstructFirstPicks reconstructs missing P_N_P1 pack data from P_N_P2 + picked card.
+// Premier Draft doesn't emit Draft.Notify for the first pick, so we need to infer it.
+func (s *Service) reconstructFirstPicks(ctx context.Context, sessionID string, picks []*models.DraftPickSession) {
+	// For each pack (0, 1, 2)
+	for packNum := 0; packNum < 3; packNum++ {
+		// Check if we already have P_N_P1 pack data
+		existingPack, err := s.storage.DraftRepo().GetPack(ctx, sessionID, packNum, 1)
+		if err == nil && existingPack != nil {
+			// Already have P1 pack data, skip
+			continue
+		}
+
+		// Try to get P_N_P2 pack (the pack after first pick)
+		pack2, err := s.storage.DraftRepo().GetPack(ctx, sessionID, packNum, 2)
+		if err != nil || pack2 == nil {
+			// No P2 data to reconstruct from
+			continue
+		}
+
+		// Find the card(s) picked in P_N_P1
+		var pickedCards []string
+		for _, pick := range picks {
+			if pick.PackNumber == packNum && pick.PickNumber == 1 {
+				pickedCards = append(pickedCards, pick.CardID)
+			}
+		}
+
+		if len(pickedCards) == 0 {
+			// No pick data for P1, can't reconstruct
+			continue
+		}
+
+		// Reconstruct P1 pack: P1 = P2 + picked_cards
+		reconstructedPack := &models.DraftPackSession{
+			SessionID:  sessionID,
+			PackNumber: packNum,
+			PickNumber: 1,
+			CardIDs:    append([]string{}, pack2.CardIDs...),
+			Timestamp:  pack2.Timestamp,
+		}
+		reconstructedPack.CardIDs = append(reconstructedPack.CardIDs, pickedCards...)
+
+		log.Printf("[reconstructFirstPicks] Reconstructing P%dP1 with %d cards (P2 had %d, picked %d)",
+			packNum+1, len(reconstructedPack.CardIDs), len(pack2.CardIDs), len(pickedCards))
+
+		// Save reconstructed pack
+		if err := s.storage.DraftRepo().SavePack(ctx, reconstructedPack); err != nil {
+			log.Printf("Warning: Failed to save reconstructed P%dP1 pack: %v", packNum+1, err)
+		}
+	}
 }
 
 // inferSetCodeFromCardID attempts to determine the set code by looking up a card ID

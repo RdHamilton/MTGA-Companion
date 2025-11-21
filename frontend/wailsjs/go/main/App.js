@@ -110,6 +110,10 @@ export function GetMatches(arg1) {
   return window['go']['main']['App']['GetMatches'](arg1);
 }
 
+export function GetMissingCards(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetMissingCards'](arg1, arg2, arg3);
+}
+
 export function GetPerformanceMetrics(arg1) {
   return window['go']['main']['App']['GetPerformanceMetrics'](arg1);
 }
@@ -192,6 +196,10 @@ export function RefreshSetCards(arg1) {
 
 export function RefreshSetRatings(arg1, arg2) {
   return window['go']['main']['App']['RefreshSetRatings'](arg1, arg2);
+}
+
+export function RepairDraftSession(arg1) {
+  return window['go']['main']['App']['RepairDraftSession'](arg1);
 }
 
 export function ResumeReplay() {

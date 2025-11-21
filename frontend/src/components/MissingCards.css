@@ -1,0 +1,209 @@
+.missing-cards-container {
+  background-color: #2d2d2d;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #444444;
+  overflow: hidden;
+}
+
+.missing-cards-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.missing-cards-header:hover {
+  background-color: #353535;
+}
+
+.missing-cards-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.missing-cards-icon {
+  font-size: 18px;
+}
+
+.missing-cards-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.missing-cards-bombs {
+  font-size: 13px;
+  color: #ffd700;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.missing-cards-toggle {
+  color: #4a9eff;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.missing-cards-list {
+  padding: 0 16px 16px 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+}
+
+.missing-cards-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  display: table;
+  table-layout: fixed;
+}
+
+.missing-cards-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #2d2d2d;
+  z-index: 1;
+}
+
+.missing-cards-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #aaaaaa;
+  border-bottom: 2px solid #444444;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.missing-cards-table tbody tr {
+  border-bottom: 1px solid #3a3a3a;
+  transition: background-color 0.2s ease;
+}
+
+.missing-cards-table tbody tr:hover {
+  background-color: #353535;
+}
+
+.missing-cards-table td {
+  padding: 10px 12px;
+  color: #cccccc;
+}
+
+.missing-card-name {
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.missing-card-tier {
+  text-align: center;
+}
+
+.tier-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e1e1e;
+  min-width: 30px;
+  text-align: center;
+}
+
+.tier-badge.tier-s {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+}
+
+.tier-badge.tier-a\+ {
+  background: linear-gradient(135deg, #c0c0c0 0%, #e0e0e0 100%);
+}
+
+.tier-badge.tier-a {
+  background: linear-gradient(135deg, #44ff88 0%, #66ffaa 100%);
+}
+
+.tier-badge.tier-b {
+  background: linear-gradient(135deg, #4a9eff 0%, #6ab0ff 100%);
+}
+
+.tier-badge.tier-c {
+  background: linear-gradient(135deg, #ffaa44 0%, #ffbb66 100%);
+}
+
+.tier-badge.tier-d {
+  background: linear-gradient(135deg, #ff8844 0%, #ff9966 100%);
+}
+
+.tier-badge.tier-f {
+  background: linear-gradient(135deg, #ff4444 0%, #ff6666 100%);
+}
+
+.missing-card-gihwr {
+  text-align: center;
+  font-weight: 600;
+  color: #4a9eff;
+}
+
+.missing-card-picked-at {
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 12px;
+}
+
+.missing-card-wheel {
+  text-align: center;
+  font-weight: 600;
+}
+
+.missing-card-wheel:not(:empty) {
+  color: #44ff88;
+}
+
+/* Highlight rows by tier */
+.missing-card-row.tier-s,
+.missing-card-row.tier-a\+ {
+  background-color: rgba(255, 215, 0, 0.05);
+}
+
+.missing-card-row.tier-s:hover,
+.missing-card-row.tier-a\+:hover {
+  background-color: rgba(255, 215, 0, 0.1);
+}
+
+.missing-cards-loading,
+.missing-cards-error {
+  padding: 12px 16px;
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 13px;
+}
+
+.missing-cards-error {
+  color: #ff4444;
+}
+
+/* Scrollbar styling */
+.missing-cards-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.missing-cards-list::-webkit-scrollbar-track {
+  background: #1e1e1e;
+  border-radius: 4px;
+}
+
+.missing-cards-list::-webkit-scrollbar-thumb {
+  background: #4a9eff;
+  border-radius: 4px;
+}
+
+.missing-cards-list::-webkit-scrollbar-thumb:hover {
+  background: #5ab0ff;
+}

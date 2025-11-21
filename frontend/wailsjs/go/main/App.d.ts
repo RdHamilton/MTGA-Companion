@@ -63,6 +63,8 @@ export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribu
 
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
+export function GetMissingCards(arg1:string,arg2:number,arg3:number):Promise<models.MissingCardsAnalysis>;
+
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;
 
 export function GetPickAlternatives(arg1:string,arg2:number,arg3:number):Promise<pickquality.PickQuality>;
@@ -104,6 +106,8 @@ export function ReconnectToDaemon():Promise<void>;
 export function RefreshSetCards(arg1:string):Promise<number>;
 
 export function RefreshSetRatings(arg1:string,arg2:string):Promise<void>;
+
+export function RepairDraftSession(arg1:string):Promise<void>;
 
 export function ResumeReplay():Promise<void>;
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -17,6 +18,7 @@ type DraftRepository interface {
 	GetActiveSessions(ctx context.Context) ([]*models.DraftSession, error)
 	GetCompletedSessions(ctx context.Context, limit int) ([]*models.DraftSession, error)
 	UpdateSessionStatus(ctx context.Context, id string, status string, endTime *time.Time) error
+	UpdateSessionTotalPicks(ctx context.Context, id string, totalPicks int) error
 	IncrementSessionPicks(ctx context.Context, id string) error
 
 	// Picks
@@ -241,6 +243,17 @@ func (r *draftRepository) UpdateSessionStatus(ctx context.Context, id string, st
 	return err
 }
 
+// UpdateSessionTotalPicks updates the total_picks value for a session.
+func (r *draftRepository) UpdateSessionTotalPicks(ctx context.Context, id string, totalPicks int) error {
+	query := `
+		UPDATE draft_sessions
+		SET total_picks = ?, updated_at = ?
+		WHERE id = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, totalPicks, time.Now(), id)
+	return err
+}
+
 // IncrementSessionPicks increments the total_picks counter for a session.
 func (r *draftRepository) IncrementSessionPicks(ctx context.Context, id string) error {
 	query := `
@@ -376,6 +389,9 @@ func (r *draftRepository) GetPickByNumber(ctx context.Context, sessionID string,
 // SavePack saves a draft pack.
 // Uses INSERT OR REPLACE to handle replays where the same pack may be processed multiple times.
 func (r *draftRepository) SavePack(ctx context.Context, pack *models.DraftPackSession) error {
+	log.Printf("[SavePack] Saving pack: session=%s, pack=%d, pick=%d, cards=%d",
+		pack.SessionID, pack.PackNumber, pack.PickNumber, len(pack.CardIDs))
+
 	// Convert []string to JSON for storage
 	cardIDsJSON, err := json.Marshal(pack.CardIDs)
 	if err != nil {
@@ -394,6 +410,7 @@ func (r *draftRepository) SavePack(ctx context.Context, pack *models.DraftPackSe
 		pack.Timestamp,
 	)
 	if err != nil {
+		log.Printf("[SavePack] ERROR saving pack: %v", err)
 		return err
 	}
 
@@ -403,6 +420,7 @@ func (r *draftRepository) SavePack(ctx context.Context, pack *models.DraftPackSe
 	}
 	pack.ID = int(id)
 
+	log.Printf("[SavePack] Successfully saved pack with ID=%d", pack.ID)
 	return nil
 }
 
@@ -452,6 +470,8 @@ func (r *draftRepository) GetPacksBySession(ctx context.Context, sessionID strin
 
 // GetPack retrieves a specific pack by pack and pick number.
 func (r *draftRepository) GetPack(ctx context.Context, sessionID string, packNum, pickNum int) (*models.DraftPackSession, error) {
+	log.Printf("[GetPack] Looking for pack: session=%s, pack=%d, pick=%d", sessionID, packNum, pickNum)
+
 	query := `
 		SELECT id, session_id, pack_number, pick_number, card_ids, timestamp
 		FROM draft_packs
@@ -472,16 +492,20 @@ func (r *draftRepository) GetPack(ctx context.Context, sessionID string, packNum
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("[GetPack] No pack found for session=%s, pack=%d, pick=%d", sessionID, packNum, pickNum)
 			return nil, nil
 		}
+		log.Printf("[GetPack] ERROR querying pack: %v", err)
 		return nil, err
 	}
 
 	// Parse JSON back to []string
 	if err := json.Unmarshal([]byte(cardIDsJSON), &pack.CardIDs); err != nil {
+		log.Printf("[GetPack] ERROR unmarshaling card IDs: %v", err)
 		return nil, err
 	}
 
+	log.Printf("[GetPack] Found pack with %d cards", len(pack.CardIDs))
 	return pack, nil
 }
 

@@ -257,13 +257,17 @@ func parsePremierDraftNotify(entry *LogEntry) (*DraftSessionEvent, error) {
 	draftID, _ := entry.JSON["draftId"].(string)
 
 	// Extract pack and pick numbers (1-indexed)
+	selfPack := 0
 	packNumber := 0
 	if pn, ok := entry.JSON["SelfPack"].(float64); ok {
+		selfPack = int(pn)
 		packNumber = int(pn) - 1 // Convert to 0-indexed
 	}
 
+	selfPick := 0
 	pickNumber := 0
 	if pn, ok := entry.JSON["SelfPick"].(float64); ok {
+		selfPick = int(pn)
 		pickNumber = int(pn)
 	}
 
@@ -274,6 +278,9 @@ func parsePremierDraftNotify(entry *LogEntry) (*DraftSessionEvent, error) {
 			draftPack = strings.Split(packCardsStr, ",")
 		}
 	}
+
+	fmt.Printf("[parsePremierDraftNotify] Draft.Notify: SelfPack=%d, SelfPick=%d -> pack=%d, pick=%d, cards=%d\n",
+		selfPack, selfPick, packNumber, pickNumber, len(draftPack))
 
 	return &DraftSessionEvent{
 		Type:       "status_updated",

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
+import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, FetchSetCards, RefreshSetCards, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
@@ -43,6 +43,7 @@ const Settings = () => {
   const [setCode, setSetCode] = useState('');
   const [draftFormat, setDraftFormat] = useState('PremierDraft');
   const [isFetchingRatings, setIsFetchingRatings] = useState(false);
+  const [isFetchingCards, setIsFetchingCards] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [recalculateMessage, setRecalculateMessage] = useState('');
   const [dataSource, setDataSource] = useState<string>('');
@@ -373,6 +374,42 @@ const Settings = () => {
       showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
     } finally {
       setIsFetchingRatings(false);
+    }
+  };
+
+  const handleFetchSetCards = async () => {
+    if (!setCode || setCode.trim() === '') {
+      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
+      return;
+    }
+
+    setIsFetchingCards(true);
+    try {
+      const count = await FetchSetCards(setCode.trim().toUpperCase());
+      showToast.show(`Successfully fetched ${count} cards for ${setCode.toUpperCase()} from Scryfall! Card data is now cached.`, 'success');
+    } catch (error) {
+      console.error('Failed to fetch cards:', error);
+      showToast.show(`Failed to fetch cards: ${error}. Make sure the set code is correct and you have internet connection.`, 'error');
+    } finally {
+      setIsFetchingCards(false);
+    }
+  };
+
+  const handleRefreshSetCards = async () => {
+    if (!setCode || setCode.trim() === '') {
+      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
+      return;
+    }
+
+    setIsFetchingCards(true);
+    try {
+      const count = await RefreshSetCards(setCode.trim().toUpperCase());
+      showToast.show(`Successfully refreshed ${count} cards for ${setCode.toUpperCase()} from Scryfall!`, 'success');
+    } catch (error) {
+      console.error('Failed to refresh cards:', error);
+      showToast.show(`Failed to refresh cards: ${error}`, 'error');
+    } finally {
+      setIsFetchingCards(false);
     }
   };
 
@@ -1011,6 +1048,30 @@ const Settings = () => {
                 className="action-button"
                 onClick={handleRefreshSetRatings}
                 disabled={isFetchingRatings || !setCode}
+              >
+                Refresh (Re-download)
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <label className="setting-label">
+              Fetch Card Data (Scryfall)
+              <span className="setting-description">Download and cache card details (names, images, text) from Scryfall for the selected set</span>
+            </label>
+            <div className="setting-control">
+              <button
+                className="action-button primary"
+                onClick={handleFetchSetCards}
+                disabled={isFetchingCards || !setCode}
+                style={{ marginRight: '8px' }}
+              >
+                {isFetchingCards ? 'Fetching...' : 'Fetch Card Data'}
+              </button>
+              <button
+                className="action-button"
+                onClick={handleRefreshSetCards}
+                disabled={isFetchingCards || !setCode}
               >
                 Refresh (Re-download)
               </button>

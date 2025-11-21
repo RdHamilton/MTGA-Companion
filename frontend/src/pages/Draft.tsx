@@ -7,6 +7,7 @@ import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';
 import { WinRatePrediction } from '../components/WinRatePrediction';
 import CardsToLookFor from '../components/CardsToLookFor';
+import MissingCards from '../components/MissingCards';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
@@ -443,7 +444,7 @@ const Draft: React.FC = () => {
 
                                     return (
                                         <div key={pick.ID} className={`pick-history-item ${highlightClass}`}>
-                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                            <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
                                             <div className="card-image-container">
                                                 {card && card.ImageURLSmall && (
                                                     <img
@@ -760,6 +761,15 @@ const Draft: React.FC = () => {
 
                 {/* Middle: Cards to Look For Panel */}
                 <div className="cards-to-look-for-section">
+                    {/* Missing Cards Analysis */}
+                    {state.session && state.picks.length > 0 && (
+                        <MissingCards
+                            sessionID={state.session.ID}
+                            packNumber={state.picks[state.picks.length - 1]?.PackNumber ?? 0}
+                            pickNumber={state.picks[state.picks.length - 1]?.PickNumber ?? 1}
+                        />
+                    )}
+
                     <CardsToLookFor
                         pickedCards={getPickedCards()}
                         availableCards={state.setCards}
@@ -782,7 +792,7 @@ const Draft: React.FC = () => {
 
                                 return (
                                     <div key={pick.ID} className="pick-history-item">
-                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber + 1}</div>
+                                        <div className="pick-number">P{pick.PackNumber + 1}P{pick.PickNumber}</div>
                                         <div className="card-image-container">
                                             {card && card.ImageURLSmall && (
                                                 <img
