@@ -15,6 +15,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
@@ -48,6 +49,9 @@ type App struct {
 	inFlightFetches map[string]bool // map[arenaID]isFetching
 	ratingsEnsureMu sync.Mutex
 	inFlightRatings map[string]bool // map[setCode-eventName]isFetching
+
+	// Performance metrics
+	draftMetrics *metrics.DraftMetrics
 }
 
 // NewApp creates a new App application struct
@@ -56,6 +60,7 @@ func NewApp() *App {
 		daemonPort:      9999, // Default daemon port
 		inFlightFetches: make(map[string]bool),
 		inFlightRatings: make(map[string]bool),
+		draftMetrics:    metrics.NewDraftMetrics(),
 	}
 }
 
@@ -1678,6 +1683,22 @@ func (a *App) GetDraftDeckMetrics(sessionID string) (*models.DeckMetrics, error)
 		metrics.TotalCards, metrics.CreatureCount, metrics.CMCAverage)
 
 	return metrics, nil
+}
+
+// GetDraftPerformanceMetrics returns performance metrics for draft operations.
+func (a *App) GetDraftPerformanceMetrics() *metrics.DraftStats {
+	if a.draftMetrics == nil {
+		// Return empty stats if metrics not initialized
+		return &metrics.DraftStats{}
+	}
+	return a.draftMetrics.GetStats()
+}
+
+// ResetDraftPerformanceMetrics resets all performance metrics.
+func (a *App) ResetDraftPerformanceMetrics() {
+	if a.draftMetrics != nil {
+		a.draftMetrics.Reset()
+	}
 }
 
 // fetchCardsForPicksSync fetches card metadata for all picked cards using 17Lands ratings.

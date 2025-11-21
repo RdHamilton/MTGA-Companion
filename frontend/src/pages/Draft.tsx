@@ -9,6 +9,7 @@ import { WinRatePrediction } from '../components/WinRatePrediction';
 import CardsToLookFor from '../components/CardsToLookFor';
 import MissingCards from '../components/MissingCards';
 import DraftStatistics from '../components/DraftStatistics';
+import PerformanceMetrics from '../components/PerformanceMetrics';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
@@ -912,6 +913,9 @@ const Draft: React.FC = () => {
                             }
                         }}
                     />
+
+                    {/* Performance Metrics (Debug) */}
+                    <PerformanceMetrics autoRefresh={true} refreshInterval={5000} />
                 </div>
 
                 {/* Card Details Overlay */}

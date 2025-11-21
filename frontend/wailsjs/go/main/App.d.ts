@@ -4,6 +4,7 @@ import {grading} from '../models';
 import {models} from '../models';
 import {main} from '../models';
 import {seventeenlands} from '../models';
+import {metrics} from '../models';
 import {prediction} from '../models';
 import {storage} from '../models';
 import {pickquality} from '../models';
@@ -54,6 +55,8 @@ export function GetDraftDeckMetrics(arg1:string):Promise<models.DeckMetrics>;
 export function GetDraftGrade(arg1:string):Promise<grading.DraftGrade>;
 
 export function GetDraftPacks(arg1:string):Promise<Array<models.DraftPackSession>>;
+
+export function GetDraftPerformanceMetrics():Promise<metrics.DraftStats>;
 
 export function GetDraftPicks(arg1:string):Promise<Array<models.DraftPickSession>>;
 
@@ -112,6 +115,8 @@ export function RefreshSetCards(arg1:string):Promise<number>;
 export function RefreshSetRatings(arg1:string,arg2:string):Promise<void>;
 
 export function RepairDraftSession(arg1:string):Promise<void>;
+
+export function ResetDraftPerformanceMetrics():Promise<void>;
 
 export function ResumeReplay():Promise<void>;
 

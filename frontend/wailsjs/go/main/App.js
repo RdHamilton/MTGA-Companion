@@ -94,6 +94,10 @@ export function GetDraftPacks(arg1) {
   return window['go']['main']['App']['GetDraftPacks'](arg1);
 }
 
+export function GetDraftPerformanceMetrics() {
+  return window['go']['main']['App']['GetDraftPerformanceMetrics']();
+}
+
 export function GetDraftPicks(arg1) {
   return window['go']['main']['App']['GetDraftPicks'](arg1);
 }
@@ -208,6 +212,10 @@ export function RefreshSetRatings(arg1, arg2) {
 
 export function RepairDraftSession(arg1) {
   return window['go']['main']['App']['RepairDraftSession'](arg1);
+}
+
+export function ResetDraftPerformanceMetrics() {
+  return window['go']['main']['App']['ResetDraftPerformanceMetrics']();
 }
 
 export function ResumeReplay() {
