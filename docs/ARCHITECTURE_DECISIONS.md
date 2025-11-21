@@ -366,6 +366,131 @@ func (a *App) startup(ctx context.Context) {
 
 ---
 
+## ADR-011: Design Pattern Refactoring (v1.2) (2024-11)
+
+**Status**: ✅ Accepted
+
+**Context**:
+- Codebase grew organically with increasing complexity
+- Event handling was scattered with manual `EventsEmit` calls
+- No consistent patterns for complex object creation
+- Daemon operations were difficult to test and reuse
+- Format-specific logic mixed with general logic
+- Need better separation of concerns and maintainability
+
+**Decision**: Implement four design patterns in a phased refactoring:
+1. **Facade Pattern** - Simplify frontend/backend interface
+2. **Strategy Pattern** - Format-specific analysis algorithms
+3. **Builder Pattern** - Complex object construction with fluent API
+4. **Observer Pattern** - Decouple event emission from handlers
+5. **Command Pattern** - Encapsulate operations as objects
+
+**Rationale**:
+
+**Phase 1 - Facade Pattern**:
+- Simplifies `app.go` from 2000+ lines to thin delegation layer
+- Groups related operations into domain-specific facades
+- Clear separation between frontend and backend
+- Single Responsibility Principle for each facade
+
+**Phase 2 - Strategy Pattern**:
+- Premier Draft vs Quick Draft need different analysis (humans vs bots)
+- Eliminates format-checking conditionals throughout code
+- Easy to add new formats (Traditional Draft, Sealed, etc.)
+- Strategies are independently testable
+
+**Phase 3 - Builder Pattern**:
+- Export operations have many configuration options
+- Fluent API makes intent clear: `.WithFormat().WithPrettyJSON().Build()`
+- Centralizes validation logic
+- Reduces boilerplate in export methods
+
+**Phase 4 - Observer Pattern**:
+- 15+ manual `EventsEmit` calls scattered throughout codebase
+- Need to broadcast same events to multiple destinations (frontend, IPC, logs)
+- Adding analytics/metrics would require touching many files
+- EventDispatcher centralizes all event handling
+
+**Phase 4 - Command Pattern**:
+- Daemon operations need retry logic, logging, history
+- Hard to test IPC operations in isolation
+- Want undo capability for certain operations
+- Commands are reusable and composable
+
+**Implementation Details**:
+```
+internal/
+├── commands/           # Command pattern (Phase 4)
+│   ├── command.go     # Interface & executor
+│   ├── replay_command.go
+│   └── startup_command.go
+├── events/            # Observer pattern (Phase 4)
+│   ├── dispatcher.go  # EventDispatcher
+│   └── observers.go   # WailsObserver, IPCObserver, LoggingObserver
+├── export/
+│   └── builder.go     # Builder pattern (Phase 3)
+├── gui/               # Facade pattern (Phase 1)
+│   ├── *_facade.go    # Domain-specific facades
+│   └── services.go    # Shared services
+└── mtga/draft/insights/
+    ├── strategy.go            # Strategy interface (Phase 2)
+    ├── premier_strategy.go    # Premier Draft strategy
+    └── quick_strategy.go      # Quick Draft strategy
+```
+
+**Alternatives Considered**:
+- **No refactoring**: Technical debt would continue to accumulate
+- **Big bang refactoring**: Too risky, prefer incremental approach
+- **Different patterns**:
+  - Factory pattern considered but Strategy is more flexible
+  - Singleton for EventDispatcher considered but instance-based is more testable
+
+**Consequences**:
+
+✅ **Positive Outcomes**:
+- Reduced `app.go` from 2000+ to ~200 lines
+- Clear separation of concerns with facades
+- Easy to add new formats with Strategy pattern
+- Fluent export API improves code readability
+- Centralized event handling via Observer pattern
+- Testable, reusable operations via Command pattern
+- 1,300+ lines of new pattern implementations
+- Better maintainability and extensibility
+
+⚠️ **Trade-offs**:
+- More files to navigate (organized by pattern/domain)
+- Slight learning curve for contributors (documented in `docs/CLAUDE.md`)
+- Pattern overhead for simple operations (but worth it for consistency)
+
+✅ **Code Quality**:
+- All phases passed linting without issues
+- Consistent code formatting with `gofumpt`
+- Comprehensive documentation of patterns
+- No breaking changes to external API
+
+**Metrics**:
+- Phase 1: 690 lines added, 314 removed
+- Phase 2: 738 lines added, 308 removed
+- Phase 3: 298 lines added, 17 removed
+- Phase 4: 1,019 lines added, 67 removed
+- **Total**: 2,745 lines added, 706 removed (net +2,039)
+
+**Related**:
+- PR #480 (Phase 1: Facade Pattern)
+- PR #481 (Phase 2: Strategy Pattern)
+- PR #482 (Phase 3: Builder Pattern)
+- PR #483 (Phase 4: Observer & Command Patterns)
+- Issues #446-#467 (all refactoring tasks)
+- Documentation: `docs/CLAUDE.md` (pattern usage guide)
+
+**Future Enhancements**:
+- Add more strategies for Traditional Draft, Sealed formats
+- Implement analytics observer for usage metrics
+- Add command history UI for debugging
+- Create more builders for complex query construction
+
+---
+
 ## Template for Future ADRs
 
 ```markdown
@@ -410,6 +535,7 @@ func (a *App) startup(ctx context.Context) {
 8. **ADR-008**: Real-time Updates via Events
 9. **ADR-009**: Deck Inference Algorithm
 10. **ADR-010**: Auto-start Poller in GUI
+11. **ADR-011**: Design Pattern Refactoring (v1.2)
 
 ---
 
