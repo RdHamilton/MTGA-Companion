@@ -70,13 +70,25 @@ type OverdraftedColor struct {
 }
 
 // Analyzer aggregates draft data into format-level insights.
+// It uses the Strategy pattern to apply format-specific analysis logic.
 type Analyzer struct {
-	service *storage.Service
+	service  *storage.Service
+	strategy InsightsStrategy
 }
 
-// NewAnalyzer creates a new format insights analyzer.
-func NewAnalyzer(service *storage.Service) *Analyzer {
-	return &Analyzer{service: service}
+// NewAnalyzer creates a new format insights analyzer with a specific strategy.
+func NewAnalyzer(service *storage.Service, strategy InsightsStrategy) *Analyzer {
+	return &Analyzer{
+		service:  service,
+		strategy: strategy,
+	}
+}
+
+// NewAnalyzerForFormat creates a new format insights analyzer with the appropriate
+// strategy based on the draft format.
+func NewAnalyzerForFormat(service *storage.Service, draftFormat string) *Analyzer {
+	strategy := StrategyFactory(context.TODO(), draftFormat)
+	return NewAnalyzer(service, strategy)
 }
 
 // AnalyzeFormat generates insights for a specific format.
@@ -101,286 +113,16 @@ func (a *Analyzer) AnalyzeFormat(ctx context.Context, setCode, draftFormat strin
 		DraftFormat: draftFormat,
 	}
 
-	// Analyze color rankings
-	insights.ColorRankings = a.analyzeColorRankings(colorRatings)
-
-	// Find top cards by category
-	insights.TopBombs = a.findTopBombs(cardRatings)
-	insights.TopRemoval = a.findTopRemoval(cardRatings)
-	insights.TopCreatures = a.findTopCreatures(cardRatings)
-	insights.TopCommons = a.findTopCommons(cardRatings)
-
-	// Analyze format speed
-	insights.FormatSpeed = a.analyzeFormatSpeed(cardRatings)
-
-	// Analyze color depth and overdrafted colors
-	insights.ColorAnalysis = a.analyzeColors(cardRatings, colorRatings)
+	// Use strategy to analyze format-specific insights
+	insights.ColorRankings = a.strategy.AnalyzeColorRankings(colorRatings)
+	insights.TopBombs = a.strategy.FindTopBombs(cardRatings)
+	insights.TopRemoval = a.strategy.FindTopRemoval(cardRatings)
+	insights.TopCreatures = a.strategy.FindTopCreatures(cardRatings)
+	insights.TopCommons = a.strategy.FindTopCommons(cardRatings)
+	insights.FormatSpeed = a.strategy.AnalyzeFormatSpeed(cardRatings)
+	insights.ColorAnalysis = a.strategy.AnalyzeColors(cardRatings, colorRatings)
 
 	return insights, nil
-}
-
-// analyzeColorRankings ranks colors by win rate.
-func (a *Analyzer) analyzeColorRankings(colorRatings []seventeenlands.ColorRating) []ColorPowerRank {
-	if len(colorRatings) == 0 {
-		return []ColorPowerRank{}
-	}
-
-	// Calculate total games for popularity
-	var totalGames int
-	for _, rating := range colorRatings {
-		totalGames += rating.GamesPlayed
-	}
-
-	rankings := make([]ColorPowerRank, 0, len(colorRatings))
-	for _, rating := range colorRatings {
-		// Skip splash combinations
-		if rating.IsSplash {
-			continue
-		}
-
-		popularity := 0.0
-		if totalGames > 0 {
-			popularity = (float64(rating.GamesPlayed) / float64(totalGames)) * 100
-		}
-
-		rank := ColorPowerRank{
-			Color:       rating.ColorName,
-			WinRate:     rating.WinRate * 100, // Convert to percentage
-			GamesPlayed: rating.GamesPlayed,
-			Popularity:  popularity,
-			Rating:      getRating(rating.WinRate * 100),
-		}
-		rankings = append(rankings, rank)
-	}
-
-	// Sort by win rate descending
-	sort.Slice(rankings, func(i, j int) bool {
-		return rankings[i].WinRate > rankings[j].WinRate
-	})
-
-	return rankings
-}
-
-// findTopBombs finds the best rare/mythic cards.
-func (a *Analyzer) findTopBombs(cardRatings []seventeenlands.CardRating) []TopCard {
-	bombs := []TopCard{}
-	for _, card := range cardRatings {
-		if card.Rarity == "rare" || card.Rarity == "mythic" {
-			bombs = append(bombs, TopCard{
-				Name:   card.Name,
-				Color:  card.Color,
-				Rarity: card.Rarity,
-				GIHWR:  card.GIHWR * 100,
-			})
-		}
-	}
-
-	// Sort by GIHWR and take top 10
-	sort.Slice(bombs, func(i, j int) bool {
-		return bombs[i].GIHWR > bombs[j].GIHWR
-	})
-
-	if len(bombs) > 10 {
-		bombs = bombs[:10]
-	}
-
-	return bombs
-}
-
-// findTopRemoval finds the best removal spells (heuristic: name contains common removal keywords).
-func (a *Analyzer) findTopRemoval(cardRatings []seventeenlands.CardRating) []TopCard {
-	// Simple heuristic: common removal keywords
-	removalKeywords := []string{"Destroy", "Exile", "Murder", "Kill", "Deal", "Damage", "Remove", "Bounce"}
-
-	removal := []TopCard{}
-	for _, card := range cardRatings {
-		// Check if card name suggests removal
-		isRemoval := false
-		for _, keyword := range removalKeywords {
-			if contains(card.Name, keyword) {
-				isRemoval = true
-				break
-			}
-		}
-
-		if isRemoval {
-			removal = append(removal, TopCard{
-				Name:   card.Name,
-				Color:  card.Color,
-				Rarity: card.Rarity,
-				GIHWR:  card.GIHWR * 100,
-			})
-		}
-	}
-
-	// Sort by GIHWR and take top 8
-	sort.Slice(removal, func(i, j int) bool {
-		return removal[i].GIHWR > removal[j].GIHWR
-	})
-
-	if len(removal) > 8 {
-		removal = removal[:8]
-	}
-
-	return removal
-}
-
-// findTopCreatures finds the best creatures.
-func (a *Analyzer) findTopCreatures(cardRatings []seventeenlands.CardRating) []TopCard {
-	// Note: We don't have card type info in CardRating, so we can't filter by creature type
-	// This is a limitation - would need to join with set_cards table or add type to ratings
-	// For now, return top cards overall (which are likely creatures)
-	creatures := []TopCard{}
-	for _, card := range cardRatings {
-		creatures = append(creatures, TopCard{
-			Name:   card.Name,
-			Color:  card.Color,
-			Rarity: card.Rarity,
-			GIHWR:  card.GIHWR * 100,
-		})
-	}
-
-	// Sort by GIHWR and take top 15
-	sort.Slice(creatures, func(i, j int) bool {
-		return creatures[i].GIHWR > creatures[j].GIHWR
-	})
-
-	if len(creatures) > 15 {
-		creatures = creatures[:15]
-	}
-
-	return creatures
-}
-
-// findTopCommons finds the best common cards.
-func (a *Analyzer) findTopCommons(cardRatings []seventeenlands.CardRating) []TopCard {
-	commons := []TopCard{}
-	for _, card := range cardRatings {
-		if card.Rarity == "common" {
-			commons = append(commons, TopCard{
-				Name:   card.Name,
-				Color:  card.Color,
-				Rarity: card.Rarity,
-				GIHWR:  card.GIHWR * 100,
-			})
-		}
-	}
-
-	// Sort by GIHWR and take top 20
-	sort.Slice(commons, func(i, j int) bool {
-		return commons[i].GIHWR > commons[j].GIHWR
-	})
-
-	if len(commons) > 20 {
-		commons = commons[:20]
-	}
-
-	return commons
-}
-
-// analyzeFormatSpeed determines if the format is fast/medium/slow.
-func (a *Analyzer) analyzeFormatSpeed(cardRatings []seventeenlands.CardRating) FormatSpeed {
-	// Heuristic: Look at average ALSA/ATA of top cards
-	// Low ALSA = cards picked early = likely bombs/fast cards
-	// High ALSA = cards last late = slow format
-
-	if len(cardRatings) == 0 {
-		return FormatSpeed{
-			Speed:       "Unknown",
-			Description: "Insufficient data to determine format speed",
-		}
-	}
-
-	var totalALSA float64
-	var count int
-	for _, card := range cardRatings {
-		if card.ALSA > 0 {
-			totalALSA += card.ALSA
-			count++
-		}
-	}
-
-	avgALSA := totalALSA / float64(count)
-
-	speed := FormatSpeed{}
-	if avgALSA < 6.0 {
-		speed.Speed = "Fast"
-		speed.Description = "Aggressive format with early picks valued highly"
-	} else if avgALSA < 8.0 {
-		speed.Speed = "Medium"
-		speed.Description = "Balanced format with mix of strategies"
-	} else {
-		speed.Speed = "Slow"
-		speed.Description = "Slower format favoring late-game value"
-	}
-
-	return speed
-}
-
-// analyzeColors provides insights about color depth and overdrafted colors.
-func (a *Analyzer) analyzeColors(cardRatings []seventeenlands.CardRating, colorRatings []seventeenlands.ColorRating) *ColorAnalysis {
-	if len(colorRatings) == 0 {
-		return nil
-	}
-
-	analysis := &ColorAnalysis{
-		DeepestColors:     []string{},
-		OverdraftedColors: []OverdraftedColor{},
-	}
-
-	// Find best mono color and best pair
-	var bestMonoWR, bestPairWR float64
-	for _, rating := range colorRatings {
-		if rating.IsSplash {
-			continue
-		}
-
-		if len(rating.ColorName) == 1 { // Mono color
-			if rating.WinRate > bestMonoWR {
-				bestMonoWR = rating.WinRate
-				analysis.BestMonoColor = rating.ColorName
-			}
-		} else if len(rating.ColorName) == 2 { // Two-color pair
-			if rating.WinRate > bestPairWR {
-				bestPairWR = rating.WinRate
-				analysis.BestColorPair = rating.ColorName
-			}
-		}
-	}
-
-	// Calculate total games for overdrafted analysis
-	var totalGames int
-	for _, rating := range colorRatings {
-		totalGames += rating.GamesPlayed
-	}
-
-	// Find overdrafted colors (high popularity, low win rate)
-	for _, rating := range colorRatings {
-		if rating.IsSplash || len(rating.ColorName) > 2 {
-			continue
-		}
-
-		popularity := (float64(rating.GamesPlayed) / float64(totalGames)) * 100
-		winRate := rating.WinRate * 100
-		delta := popularity - winRate
-
-		// If popularity exceeds win rate by >5%, it's overdrafted
-		if delta > 5.0 {
-			analysis.OverdraftedColors = append(analysis.OverdraftedColors, OverdraftedColor{
-				Color:      rating.ColorName,
-				WinRate:    winRate,
-				Popularity: popularity,
-				Delta:      delta,
-			})
-		}
-	}
-
-	// Sort overdrafted colors by delta
-	sort.Slice(analysis.OverdraftedColors, func(i, j int) bool {
-		return analysis.OverdraftedColors[i].Delta > analysis.OverdraftedColors[j].Delta
-	})
-
-	return analysis
 }
 
 // getRating assigns a letter grade based on win rate.
@@ -448,8 +190,8 @@ func (a *Analyzer) GetArchetypeCards(ctx context.Context, setCode, draftFormat, 
 		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, draftFormat)
 	}
 
-	// Filter cards by color combination
-	filteredCards := filterCardsByColor(cardRatings, colors)
+	// Use strategy to filter cards by color combination
+	filteredCards := a.strategy.FilterCardsByColor(cardRatings, colors)
 
 	archetype := &ArchetypeCards{
 		Colors:       colors,
@@ -460,24 +202,6 @@ func (a *Analyzer) GetArchetypeCards(ctx context.Context, setCode, draftFormat, 
 	}
 
 	return archetype, nil
-}
-
-// filterCardsByColor filters cards to those that match the specified color combination.
-// For example, "UB" will include cards with color "U", "B", or "UB".
-func filterCardsByColor(cards []seventeenlands.CardRating, colors string) []seventeenlands.CardRating {
-	if colors == "" {
-		return cards
-	}
-
-	filtered := []seventeenlands.CardRating{}
-	for _, card := range cards {
-		// Check if card's color is a subset of the requested colors
-		if isColorMatch(card.Color, colors) {
-			filtered = append(filtered, card)
-		}
-	}
-
-	return filtered
 }
 
 // isColorMatch checks if a card's color fits within the specified color combination.
