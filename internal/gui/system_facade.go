@@ -32,6 +32,11 @@ func NewSystemFacade(services *Services) *SystemFacade {
 
 // Initialize initializes the application with database path
 func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
+	// Use default path if empty
+	if dbPath == "" {
+		dbPath = getDefaultDBPath()
+	}
+
 	config := storage.DefaultConfig(dbPath)
 	config.BusyTimeout = 10 * time.Second // Increase timeout to handle concurrent poller operations
 
