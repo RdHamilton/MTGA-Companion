@@ -21,6 +21,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/insights"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/pickquality"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/prediction"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
@@ -2467,6 +2468,25 @@ func (a *App) GetDraftGrade(sessionID string) (*grading.DraftGrade, error) {
 		// Best/worst picks and suggestions would need to be recalculated
 		// or stored separately - for now just return the scores
 	}, nil
+}
+
+// GetFormatInsights generates aggregated insights for a draft format.
+// Returns color rankings, top cards, format speed, and other meta analysis.
+func (a *App) GetFormatInsights(setCode, draftFormat string) (*insights.FormatInsights, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Create insights analyzer
+	analyzer := insights.NewAnalyzer(a.service)
+
+	// Generate insights
+	formatInsights, err := analyzer.AnalyzeFormat(a.ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to analyze format: %v", err)}
+	}
+
+	return formatInsights, nil
 }
 
 // PredictDraftWinRate calculates and stores the win rate prediction for a draft session
