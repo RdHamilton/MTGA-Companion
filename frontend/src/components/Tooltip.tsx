@@ -13,7 +13,7 @@ const Tooltip = ({ content, children, position = 'top', delay = 300 }: TooltipPr
   const [timeoutId, setTimeoutId] = useState<number | null>(null);
 
   const showTooltip = () => {
-    const id = setTimeout(() => {
+    const id = window.setTimeout(() => {
       setIsVisible(true);
     }, delay);
     setTimeoutId(id);

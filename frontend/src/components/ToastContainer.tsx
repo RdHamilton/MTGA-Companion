@@ -115,7 +115,7 @@ const ToastContainer = () => {
         }
 
         // Show batched toast after 2 seconds of no new updates
-        draftUpdateTimerRef.current = setTimeout(() => {
+        draftUpdateTimerRef.current = window.setTimeout(() => {
           if (draftUpdateCountRef.current > 0) {
             addToast(
               `Replay: ${draftUpdateCountRef.current} draft update${draftUpdateCountRef.current !== 1 ? 's' : ''} processed`,

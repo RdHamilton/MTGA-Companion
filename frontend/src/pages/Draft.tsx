@@ -271,7 +271,7 @@ const Draft: React.FC = () => {
         }
 
         // Set new timer to delay execution by 500ms
-        debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = window.setTimeout(() => {
             loadActiveDraft();
         }, 500);
     };
