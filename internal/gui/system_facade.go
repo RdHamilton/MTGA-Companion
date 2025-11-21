@@ -12,6 +12,7 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -19,15 +20,30 @@ import (
 
 // SystemFacade handles system initialization, daemon communication, and replay operations
 type SystemFacade struct {
-	services    *Services
-	pollerMu    sync.Mutex
-	ipcClientMu sync.Mutex
-	pollerStop  context.CancelFunc
+	services        *Services
+	pollerMu        sync.Mutex
+	ipcClientMu     sync.Mutex
+	pollerStop      context.CancelFunc
+	eventDispatcher *events.EventDispatcher
 }
 
 // NewSystemFacade creates a new SystemFacade
 func NewSystemFacade(services *Services) *SystemFacade {
-	return &SystemFacade{services: services}
+	dispatcher := events.NewEventDispatcher()
+
+	// Register Wails observer for frontend events
+	dispatcher.Register(events.NewWailsObserver())
+
+	return &SystemFacade{
+		services:        services,
+		eventDispatcher: dispatcher,
+	}
+}
+
+// GetEventDispatcher returns the event dispatcher instance.
+// Allows other facades to access the dispatcher for emitting events.
+func (s *SystemFacade) GetEventDispatcher() *events.EventDispatcher {
+	return s.eventDispatcher
 }
 
 // Initialize initializes the application with database path
@@ -244,114 +260,146 @@ func (s *SystemFacade) connectToDaemon(ctx context.Context) error {
 }
 
 // setupEventHandlers registers event handlers for daemon events.
+// Uses the EventDispatcher to forward events to all registered observers.
 func (s *SystemFacade) setupEventHandlers(ctx context.Context) {
 	// Handle stats:updated events from daemon
 	s.services.IPCClient.On("stats:updated", func(data map[string]interface{}) {
 		log.Printf("Received stats:updated event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "stats:updated", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "stats:updated",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle rank:updated events from daemon
 	s.services.IPCClient.On("rank:updated", func(data map[string]interface{}) {
 		log.Printf("Received rank:updated event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "rank:updated", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "rank:updated",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle deck:updated events from daemon
 	s.services.IPCClient.On("deck:updated", func(data map[string]interface{}) {
 		log.Printf("Received deck:updated event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "deck:updated", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "deck:updated",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle quest:updated events from daemon
 	s.services.IPCClient.On("quest:updated", func(data map[string]interface{}) {
 		log.Printf("Received quest:updated event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "quest:updated", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "quest:updated",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle achievement:updated events from daemon
 	s.services.IPCClient.On("achievement:updated", func(data map[string]interface{}) {
 		log.Printf("Received achievement:updated event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "achievement:updated", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "achievement:updated",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle daemon:status events
 	s.services.IPCClient.On("daemon:status", func(data map[string]interface{}) {
 		log.Printf("Daemon status: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "daemon:status", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "daemon:status",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle daemon:connected events
 	s.services.IPCClient.On("daemon:connected", func(data map[string]interface{}) {
 		log.Printf("Daemon connected: %v", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "daemon:connected",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle daemon:error events
 	s.services.IPCClient.On("daemon:error", func(data map[string]interface{}) {
 		log.Printf("Daemon error: %v", data)
-
-		// Forward error event to frontend
-		wailsruntime.EventsEmit(ctx, "daemon:error", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "daemon:error",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:started events from daemon
 	s.services.IPCClient.On("replay:started", func(data map[string]interface{}) {
 		log.Printf("Received replay:started event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:started", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:started",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:progress events from daemon
 	s.services.IPCClient.On("replay:progress", func(data map[string]interface{}) {
 		log.Printf("Received replay:progress event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:progress", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:progress",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:paused events from daemon
 	s.services.IPCClient.On("replay:paused", func(data map[string]interface{}) {
 		log.Printf("Received replay:paused event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:paused", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:paused",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:resumed events from daemon
 	s.services.IPCClient.On("replay:resumed", func(data map[string]interface{}) {
 		log.Printf("Received replay:resumed event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:resumed", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:resumed",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:completed events from daemon
 	s.services.IPCClient.On("replay:completed", func(data map[string]interface{}) {
 		log.Printf("Received replay:completed event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:completed", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:completed",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 
 	// Handle replay:error events from daemon
 	s.services.IPCClient.On("replay:error", func(data map[string]interface{}) {
 		log.Printf("Received replay:error event from daemon: %v", data)
-
-		// Forward event to frontend
-		wailsruntime.EventsEmit(ctx, "replay:error", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "replay:error",
+			Data:    data,
+			Context: ctx,
+		})
 	})
 }
 
@@ -366,11 +414,15 @@ func (s *SystemFacade) stopDaemonClient(ctx context.Context) {
 		s.services.DaemonMode = false
 		log.Println("Daemon client stopped")
 
-		// Emit status change event to frontend
+		// Dispatch status change event
 		if ctx != nil {
-			wailsruntime.EventsEmit(ctx, "daemon:status", map[string]interface{}{
-				"status":    "standalone",
-				"connected": false,
+			s.eventDispatcher.Dispatch(events.Event{
+				Type: "daemon:status",
+				Data: map[string]interface{}{
+					"status":    "standalone",
+					"connected": false,
+				},
+				Context: ctx,
 			})
 		}
 	}

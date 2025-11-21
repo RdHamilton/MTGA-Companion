@@ -11,6 +11,7 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logprocessor"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
@@ -19,12 +20,16 @@ import (
 
 // ExportFacade handles exporting and importing data
 type ExportFacade struct {
-	services *Services
+	services        *Services
+	eventDispatcher *events.EventDispatcher
 }
 
 // NewExportFacade creates a new ExportFacade
-func NewExportFacade(services *Services) *ExportFacade {
-	return &ExportFacade{services: services}
+func NewExportFacade(services *Services, eventDispatcher *events.EventDispatcher) *ExportFacade {
+	return &ExportFacade{
+		services:        services,
+		eventDispatcher: eventDispatcher,
+	}
 }
 
 // ExportToJSON exports all match data to a JSON file.
@@ -371,36 +376,56 @@ func (e *ExportFacade) ImportLogFile(ctx context.Context) (*ImportLogFileResult,
 	log.Printf("Successfully imported %s: %d entries, %d matches, %d decks, %d quests, %d drafts",
 		fileName, len(entries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
 
-	// Emit events to frontend for data refresh
+	// Dispatch events for data refresh
 	if result.MatchesStored > 0 || result.GamesStored > 0 {
-		wailsruntime.EventsEmit(ctx, "stats:updated", map[string]interface{}{
-			"matches": result.MatchesStored,
-			"games":   result.GamesStored,
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "stats:updated",
+			Data: map[string]interface{}{
+				"matches": result.MatchesStored,
+				"games":   result.GamesStored,
+			},
+			Context: ctx,
 		})
 	}
 
 	if result.DecksStored > 0 {
-		wailsruntime.EventsEmit(ctx, "deck:updated", map[string]interface{}{
-			"count": result.DecksStored,
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "deck:updated",
+			Data: map[string]interface{}{
+				"count": result.DecksStored,
+			},
+			Context: ctx,
 		})
 	}
 
 	if result.RanksStored > 0 {
-		wailsruntime.EventsEmit(ctx, "rank:updated", map[string]interface{}{
-			"count": result.RanksStored,
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "rank:updated",
+			Data: map[string]interface{}{
+				"count": result.RanksStored,
+			},
+			Context: ctx,
 		})
 	}
 
 	if result.QuestsStored > 0 {
-		wailsruntime.EventsEmit(ctx, "quest:updated", map[string]interface{}{
-			"count": result.QuestsStored,
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "quest:updated",
+			Data: map[string]interface{}{
+				"count": result.QuestsStored,
+			},
+			Context: ctx,
 		})
 	}
 
 	if result.DraftsStored > 0 {
-		wailsruntime.EventsEmit(ctx, "draft:updated", map[string]interface{}{
-			"count": result.DraftsStored,
-			"picks": result.DraftPicksStored,
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "draft:updated",
+			Data: map[string]interface{}{
+				"count": result.DraftsStored,
+				"picks": result.DraftPicksStored,
+			},
+			Context: ctx,
 		})
 	}
 
