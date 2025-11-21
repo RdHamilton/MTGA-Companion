@@ -70,7 +70,7 @@ const Draft: React.FC = () => {
 
     // Refs for deduplication and debouncing
     const loadingRef = useRef<boolean>(false);
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const debounceTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
         // Load active draft immediately
