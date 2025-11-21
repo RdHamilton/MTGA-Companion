@@ -463,17 +463,95 @@ func TestParseLogEntry(t *testing.T) {
 
 ### Frontend Testing
 
-**Future: Unit tests with Vitest**:
+Frontend testing uses **Vitest** for component tests and **Playwright** for E2E tests.
+
+**Component Tests (Vitest + React Testing Library)**:
 ```bash
 cd frontend
-npm test
+
+# Run in watch mode (development)
+npm run test
+
+# Run once (CI)
+npm run test:run
+
+# Run with UI
+npm run test:ui
+
+# Generate coverage report
+npm run test:coverage
 ```
 
-**Future: E2E tests with Playwright**:
+**E2E Tests (Playwright)**:
 ```bash
+# Start the Wails dev server first
+wails dev
+
+# In another terminal:
 cd frontend
+
+# Run E2E tests (headless)
 npm run test:e2e
+
+# Run with interactive UI
+npm run test:e2e:ui
+
+# Run in debug mode
+npm run test:e2e:debug
+
+# View test report
+npx playwright show-report
 ```
+
+**Component Test Example**:
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { render } from '../test/utils/testUtils';
+import { mockWailsApp } from '../test/mocks/wailsApp';
+import Footer from './Footer';
+
+describe('Footer', () => {
+  it('should display match statistics', async () => {
+    // Mock the backend response
+    mockWailsApp.GetStats.mockResolvedValue({
+      TotalMatches: 100,
+      WinRate: 0.6,
+    });
+
+    render(<Footer />);
+
+    // Wait for async data to load
+    await waitFor(() => {
+      expect(screen.getByText('100')).toBeInTheDocument();
+      expect(screen.getByText(/60%/)).toBeInTheDocument();
+    });
+  });
+});
+```
+
+**E2E Test Example**:
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('should navigate to draft view', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.app-container')).toBeVisible();
+
+  await page.getByText('Draft').click();
+  await expect(page).toHaveURL(/\/draft/);
+});
+```
+
+**Testing Best Practices**:
+- Test user behavior, not implementation details
+- Use meaningful test descriptions: "should [do X] when [Y condition]"
+- Mock all Wails backend calls using `mockWailsApp`
+- Use `waitFor` for async operations, not fixed timeouts
+- Test loading states, error states, and empty states
+- Keep tests isolated and independent
+
+For comprehensive testing documentation, see [docs/TESTING.md](./TESTING.md).
 
 ## Code Organization
 

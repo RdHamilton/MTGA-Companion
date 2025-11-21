@@ -8,9 +8,15 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // Exclude E2E tests (Playwright) from Vitest
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/tests/e2e/**', // Exclude Playwright E2E tests
+    ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'cobertura'],
       exclude: [
         'node_modules/',
         'src/test/',
@@ -18,6 +24,7 @@ export default defineConfig({
         '**/*.config.*',
         '**/mockData',
         'dist/',
+        'tests/e2e/', // Exclude E2E tests from coverage
       ],
     },
   },
