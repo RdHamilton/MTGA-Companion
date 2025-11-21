@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { models, pickquality, grading, main } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
@@ -68,6 +68,10 @@ const Draft: React.FC = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
 
+    // Refs for deduplication and debouncing
+    const loadingRef = useRef<boolean>(false);
+    const debounceTimerRef = useRef<number | null>(null);
+
     useEffect(() => {
         // Load active draft immediately
         // Note: We don't call FixDraftSessionStatuses() here because:
@@ -77,13 +81,17 @@ const Draft: React.FC = () => {
 
         // Listen for draft updates from backend
         const unsubscribe = EventsOn('draft:updated', () => {
-            // Refresh both active draft and historical drafts when draft data changes
-            console.log('[Draft.tsx] Received draft:updated event, calling loadActiveDraft()');
-            loadActiveDraft();
+            // Debounce draft:updated events to prevent rapid-fire database queries
+            console.log('[Draft.tsx] Received draft:updated event, debouncing...');
+            debouncedLoadActiveDraft();
         });
 
         return () => {
             if (unsubscribe) unsubscribe();
+            // Clear debounce timer on cleanup
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
         };
     }, []);
 
@@ -166,6 +174,14 @@ const Draft: React.FC = () => {
     };
 
     const loadActiveDraft = async () => {
+        // Deduplication: Skip if already loading
+        if (loadingRef.current) {
+            console.log('[loadActiveDraft] Already loading, skipping duplicate call');
+            return;
+        }
+
+        loadingRef.current = true;
+
         try {
             console.log('[loadActiveDraft] Starting...');
             setState(prev => ({ ...prev, loading: true, error: null }));
@@ -240,7 +256,21 @@ const Draft: React.FC = () => {
                 loading: false,
                 error: error instanceof Error ? error.message : 'Failed to load draft',
             }));
+        } finally {
+            loadingRef.current = false;
         }
+    };
+
+    const debouncedLoadActiveDraft = () => {
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Set new timer to delay execution by 500ms
+        debounceTimerRef.current = setTimeout(() => {
+            loadActiveDraft();
+        }, 500);
     };
 
     const handleCardHover = (card: models.SetCard | null) => {

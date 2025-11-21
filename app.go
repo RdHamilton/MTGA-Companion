@@ -1559,7 +1559,12 @@ func (a *App) GetDraftPicks(sessionID string) ([]*models.DraftPickSession, error
 
 	log.Printf("[GetDraftPicks] Called for session %s", sessionID)
 
-	picks, err := a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+	var picks []*models.DraftPickSession
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		picks, err = a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+		return err
+	})
 	if err != nil {
 		log.Printf("[GetDraftPicks] Error getting picks: %v", err)
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft picks: %v", err)}
@@ -1569,7 +1574,12 @@ func (a *App) GetDraftPicks(sessionID string) ([]*models.DraftPickSession, error
 
 	// Fetch card images for picked cards synchronously (serialized to avoid database locks)
 	if len(picks) > 0 {
-		session, err := a.service.DraftRepo().GetSession(a.ctx, sessionID)
+		var session *models.DraftSession
+		err := storage.RetryOnBusy(func() error {
+			var err error
+			session, err = a.service.DraftRepo().GetSession(a.ctx, sessionID)
+			return err
+		})
 		if err != nil {
 			log.Printf("[GetDraftPicks] Error getting session: %v", err)
 		} else if session == nil {
@@ -1594,8 +1604,13 @@ func (a *App) fetchCardsForPicksSync(setCode, eventName string, picks []*models.
 	for i, pick := range picks {
 		log.Printf("[fetchCardsForPicksSync] Processing pick %d/%d: CardID=%s", i+1, len(picks), pick.CardID)
 
-		// Check if card is already cached (fast check, no lock needed)
-		cachedCard, err := a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+		// Check if card is already cached (fast check, with retry)
+		var cachedCard *models.SetCard
+		err := storage.RetryOnBusy(func() error {
+			var err error
+			cachedCard, err = a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+			return err
+		})
 		if err == nil && cachedCard != nil {
 			log.Printf("[fetchCardsForPicksSync] Card %s already cached (Name=%s)", pick.CardID, cachedCard.Name)
 			continue // Already cached
@@ -1605,16 +1620,25 @@ func (a *App) fetchCardsForPicksSync(setCode, eventName string, picks []*models.
 		a.cardFetchMu.Lock()
 
 		// Double-check cache after acquiring lock (another request might have fetched it)
-		cachedCard, err = a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			cachedCard, err = a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+			return err
+		})
 		if err == nil && cachedCard != nil {
 			log.Printf("[fetchCardsForPicksSync] Card %s cached after lock (Name=%s)", pick.CardID, cachedCard.Name)
 			a.cardFetchMu.Unlock()
 			continue // Already cached
 		}
 
-		// Get card name from 17Lands ratings
+		// Get card name from 17Lands ratings (with retry)
 		log.Printf("[fetchCardsForPicksSync] Looking up rating for card %s in %s/%s", pick.CardID, setCode, eventName)
-		rating, err := a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, eventName, pick.CardID)
+		var rating *seventeenlands.CardRating
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			rating, err = a.service.DraftRatingsRepo().GetCardRatingByArenaID(a.ctx, setCode, eventName, pick.CardID)
+			return err
+		})
 		if err != nil {
 			log.Printf("[fetchCardsForPicksSync] Error getting rating for card %s: %v", pick.CardID, err)
 			a.cardFetchMu.Unlock()
@@ -1628,7 +1652,12 @@ func (a *App) fetchCardsForPicksSync(setCode, eventName string, picks []*models.
 
 		// Fetch card from Scryfall by name (with lock held to serialize database writes)
 		log.Printf("[fetchCardsForPicksSync] Fetching card from Scryfall: %s (ID: %s)", rating.Name, pick.CardID)
-		card, err := a.setFetcher.FetchCardByName(a.ctx, setCode, rating.Name, pick.CardID)
+		var card *models.SetCard
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			card, err = a.setFetcher.FetchCardByName(a.ctx, setCode, rating.Name, pick.CardID)
+			return err
+		})
 		if err != nil {
 			log.Printf("[fetchCardsForPicksSync] Failed to fetch card %s (ID: %s): %v", rating.Name, pick.CardID, err)
 		} else {
@@ -1654,7 +1683,12 @@ func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	packs, err := a.service.DraftRepo().GetPacksBySession(a.ctx, sessionID)
+	var packs []*models.DraftPackSession
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		packs, err = a.service.DraftRepo().GetPacksBySession(a.ctx, sessionID)
+		return err
+	})
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft packs: %v", err)}
 	}
@@ -1668,7 +1702,12 @@ func (a *App) GetMissingCards(sessionID string, packNum, pickNum int) (*models.M
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	analysis, err := a.service.GetMissingCardsAnalysis(a.ctx, sessionID, packNum, pickNum)
+	var analysis *models.MissingCardsAnalysis
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		analysis, err = a.service.GetMissingCardsAnalysis(a.ctx, sessionID, packNum, pickNum)
+		return err
+	})
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get missing cards: %v", err)}
 	}
@@ -1683,8 +1722,13 @@ func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// Check if set is already cached
-	isCached, err := a.service.SetCardRepo().IsSetCached(a.ctx, setCode)
+	// Check if set is already cached (with retry)
+	var isCached bool
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		isCached, err = a.service.SetCardRepo().IsSetCached(a.ctx, setCode)
+		return err
+	})
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to check set cache: %v", err)}
 	}
@@ -1699,7 +1743,12 @@ func (a *App) GetSetCards(setCode string) ([]*models.SetCard, error) {
 		log.Printf("Fetched and cached %d cards for set %s", count, setCode)
 	}
 
-	cards, err := a.service.SetCardRepo().GetCardsBySet(a.ctx, setCode)
+	var cards []*models.SetCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		cards, err = a.service.SetCardRepo().GetCardsBySet(a.ctx, setCode)
+		return err
+	})
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get set cards: %v", err)}
 	}

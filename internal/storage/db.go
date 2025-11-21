@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // SQLite driver
@@ -172,4 +173,43 @@ func (db *DB) Conn() *sql.DB {
 // Ping verifies the database connection is alive.
 func (db *DB) Ping() error {
 	return db.conn.Ping()
+}
+
+// IsSQLiteBusy checks if an error is a SQLite SQLITE_BUSY error.
+func IsSQLiteBusy(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for "database is locked" or "SQLITE_BUSY" in error message
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "database is locked") || strings.Contains(errMsg, "SQLITE_BUSY")
+}
+
+// RetryOnBusy retries a function if it returns a SQLITE_BUSY error.
+// It uses exponential backoff with a maximum of 5 retries.
+func RetryOnBusy(fn func() error) error {
+	const maxRetries = 5
+	baseDelay := 10 * time.Millisecond
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+
+		// If it's not a SQLITE_BUSY error, return immediately
+		if !IsSQLiteBusy(lastErr) {
+			return lastErr
+		}
+
+		// Don't sleep on the last attempt
+		if attempt < maxRetries-1 {
+			// Exponential backoff: 10ms, 20ms, 40ms, 80ms
+			delay := baseDelay * time.Duration(1<<uint(attempt))
+			time.Sleep(delay)
+		}
+	}
+
+	return fmt.Errorf("operation failed after %d retries: %w", maxRetries, lastErr)
 }
