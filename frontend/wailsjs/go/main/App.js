@@ -50,6 +50,10 @@ export function GetActiveQuests() {
   return window['go']['main']['App']['GetActiveQuests']();
 }
 
+export function GetArchetypeCards(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetArchetypeCards'](arg1, arg2, arg3);
+}
+
 export function GetCardByArenaID(arg1) {
   return window['go']['main']['App']['GetCardByArenaID'](arg1);
 }
