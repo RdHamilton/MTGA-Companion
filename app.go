@@ -1602,6 +1602,84 @@ func (a *App) GetDraftPicks(sessionID string) ([]*models.DraftPickSession, error
 	return picks, nil
 }
 
+// GetDraftDeckMetrics calculates comprehensive statistics for drafted cards.
+func (a *App) GetDraftDeckMetrics(sessionID string) (*models.DeckMetrics, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("[GetDraftDeckMetrics] Called for session %s", sessionID)
+
+	// Get session to retrieve SetCode
+	var session *models.DraftSession
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		session, err = a.service.DraftRepo().GetSession(a.ctx, sessionID)
+		return err
+	})
+	if err != nil {
+		log.Printf("[GetDraftDeckMetrics] Error getting session: %v", err)
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft session: %v", err)}
+	}
+	if session == nil {
+		log.Printf("[GetDraftDeckMetrics] Session not found: %s", sessionID)
+		return nil, &AppError{Message: "Draft session not found"}
+	}
+
+	// Get all picks for the session
+	var picks []*models.DraftPickSession
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		picks, err = a.service.DraftRepo().GetPicksBySession(a.ctx, sessionID)
+		return err
+	})
+	if err != nil {
+		log.Printf("[GetDraftDeckMetrics] Error getting picks: %v", err)
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft picks: %v", err)}
+	}
+
+	if len(picks) == 0 {
+		log.Printf("[GetDraftDeckMetrics] No picks found for session %s", sessionID)
+		// Return empty metrics
+		return &models.DeckMetrics{
+			DistributionAll:          make([]int, 7),
+			DistributionCreatures:    make([]int, 7),
+			DistributionNoncreatures: make([]int, 7),
+			TypeBreakdown:            make(map[string]int),
+			ColorDistribution:        make(map[string]int),
+			ColorCounts:              make(map[string]int),
+		}, nil
+	}
+
+	// Get all picked cards
+	pickedCards := make([]models.SetCard, 0, len(picks))
+	for _, pick := range picks {
+		var card *models.SetCard
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			card, err = a.setFetcher.GetCardByArenaID(a.ctx, pick.CardID)
+			return err
+		})
+		if err != nil {
+			log.Printf("[GetDraftDeckMetrics] Error getting card %s: %v", pick.CardID, err)
+			continue
+		}
+		if card != nil {
+			pickedCards = append(pickedCards, *card)
+		}
+	}
+
+	log.Printf("[GetDraftDeckMetrics] Calculating metrics for %d cards", len(pickedCards))
+
+	// Calculate metrics
+	metrics := models.CalculateDeckMetrics(pickedCards)
+
+	log.Printf("[GetDraftDeckMetrics] Metrics calculated: Total=%d, Creatures=%d, AvgCMC=%.2f",
+		metrics.TotalCards, metrics.CreatureCount, metrics.CMCAverage)
+
+	return metrics, nil
+}
+
 // fetchCardsForPicksSync fetches card metadata for all picked cards using 17Lands ratings.
 // This ensures card images are available even if Scryfall doesn't have Arena IDs yet.
 // Fetches cards serially (one at a time) to avoid database lock contention.

@@ -8,6 +8,7 @@ import { DraftGrade } from '../components/DraftGrade';
 import { WinRatePrediction } from '../components/WinRatePrediction';
 import CardsToLookFor from '../components/CardsToLookFor';
 import MissingCards from '../components/MissingCards';
+import DraftStatistics from '../components/DraftStatistics';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
@@ -448,8 +449,16 @@ const Draft: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Right: Pick History */}
+                    {/* Right: Statistics and Pick History */}
                     <div className="draft-details-section">
+                        {/* Draft Statistics */}
+                        {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
+                            <DraftStatistics
+                                sessionID={historicalDetailState.session.ID}
+                                pickCount={historicalDetailState.picks.length}
+                            />
+                        )}
+
                         {/* Pick History */}
                         <div className="pick-history">
                             <h2>Pick History</h2>
@@ -808,8 +817,16 @@ const Draft: React.FC = () => {
                     />
                 </div>
 
-                {/* Right: Pick History and Tier List */}
+                {/* Right: Statistics, Pick History and Tier List */}
                 <div className="draft-details-section">
+                    {/* Draft Statistics */}
+                    {state.picks.length > 0 && (
+                        <DraftStatistics
+                            sessionID={state.session.ID}
+                            pickCount={state.picks.length}
+                        />
+                    )}
+
                     {/* Pick History */}
                     <div className="pick-history">
                         <h2>Pick History</h2>

@@ -49,6 +49,8 @@ export function GetCurrentAccount():Promise<models.Account>;
 
 export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
 
+export function GetDraftDeckMetrics(arg1:string):Promise<models.DeckMetrics>;
+
 export function GetDraftGrade(arg1:string):Promise<grading.DraftGrade>;
 
 export function GetDraftPacks(arg1:string):Promise<Array<models.DraftPackSession>>;

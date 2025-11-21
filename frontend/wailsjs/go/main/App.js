@@ -82,6 +82,10 @@ export function GetDatasetSource(arg1, arg2) {
   return window['go']['main']['App']['GetDatasetSource'](arg1, arg2);
 }
 
+export function GetDraftDeckMetrics(arg1) {
+  return window['go']['main']['App']['GetDraftDeckMetrics'](arg1);
+}
+
 export function GetDraftGrade(arg1) {
   return window['go']['main']['App']['GetDraftGrade'](arg1);
 }

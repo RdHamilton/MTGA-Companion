@@ -1,0 +1,152 @@
+/* Draft Statistics Container */
+.draft-statistics {
+  background-color: #1e1e1e;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  color: #ffffff;
+}
+
+.draft-statistics h2 {
+  margin: 0 0 16px 0;
+  font-size: 1.3rem;
+  color: #ffffff;
+  border-bottom: 2px solid #444;
+  padding-bottom: 8px;
+}
+
+.draft-statistics h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  color: #aaaaaa;
+}
+
+/* Loading/Error States */
+.statistics-loading,
+.statistics-error,
+.statistics-empty {
+  padding: 20px;
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 0.9rem;
+}
+
+.statistics-error {
+  color: #ff7d7d;
+}
+
+/* Summary Stats Grid */
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-box {
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid #3d3d3d;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #aaaaaa;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #4a9eff;
+}
+
+/* Stats Sections */
+.stats-section {
+  margin-bottom: 24px;
+}
+
+.stats-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Type Breakdown */
+.type-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.type-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  border-left: 3px solid #4a9eff;
+}
+
+.type-name {
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.type-count {
+  font-size: 1rem;
+  color: #4a9eff;
+  font-weight: 600;
+}
+
+/* Color Notes */
+.color-notes {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #aaaaaa;
+  text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .draft-statistics {
+    padding: 12px;
+  }
+
+  .draft-statistics h2 {
+    font-size: 1.1rem;
+  }
+
+  .draft-statistics h3 {
+    font-size: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.1rem;
+  }
+}
+
+/* Recharts Customization */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #444;
+}
+
+.recharts-text {
+  fill: #aaaaaa;
+}
+
+.recharts-legend-item-text {
+  color: #ffffff !important;
+}
