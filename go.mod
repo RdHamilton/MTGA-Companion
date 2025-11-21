@@ -6,11 +6,9 @@ toolchain go1.24.10
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-echarts/go-echarts/v2 v2.6.7
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/kardianos/service v1.2.4
-	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/crypto v0.44.0
 	golang.org/x/time v0.14.0

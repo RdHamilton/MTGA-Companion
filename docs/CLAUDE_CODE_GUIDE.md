@@ -117,7 +117,12 @@ At the **end of each significant task** or **end of session**, ask yourself:
 
 ## Project Overview
 
-MTGA-Companion is a cross-platform desktop application (Wails v2 + Go + React) that provides companion functionality for Magic: The Gathering Arena, including match tracking, statistics, and analytics.
+MTGA-Companion is a **service-based application** with two components:
+
+1. **Headless Daemon** (Go) - Background service that monitors MTGA logs, collects data, and stores in SQLite
+2. **Desktop GUI** (Wails v2 + React) - Cross-platform UI that connects to daemon via WebSocket for real-time updates
+
+**Architecture**: Service-oriented, NOT monolithic. Data collection (daemon) is separated from data presentation (GUI).
 
 ## Workflow and Issue Management
 
@@ -341,17 +346,28 @@ MTGA runs on both macOS and Windows. This application:
 
 ### Service-Based Architecture
 
-**Architecture Decision**: Separation of data collection (daemon) from data display (GUI)
+**CRITICAL: This is NOT a monolithic architecture.** MTGA-Companion uses a **service-oriented design** with clear separation of concerns.
+
+**Architecture Decision**: Separation of data collection (daemon) from data presentation (GUI)
+
+**Design Principle**:
+- **Daemon = Data Collection** - Polls logs, stores data, emits events
+- **GUI = Data Presentation** - Displays data, handles UI logic, user interaction
+- **Never mix these concerns** - The daemon must remain headless with no terminal display/charts
+
+---
 
 **Components**:
 
-**1. CLI Daemon** (`cmd/mtga-companion/daemon.go`):
+**1. Headless Daemon** (`cmd/mtga-companion/`):
 - Runs as background service (24/7 operation)
 - Monitors MTGA `Player.log` file continuously
 - Parses log entries and stores in database
 - Broadcasts events to connected clients via WebSocket
 - Auto-starts on system boot (macOS: launchd, Windows: Service, Linux: systemd)
 - Lightweight (~10-20 MB RAM)
+- **HEADLESS**: Outputs structured logs only, NO terminal display, charts, or formatted output
+- **Core commands**: `daemon`, `service`, `migrate`, `backup`, `replay` (testing)
 
 **2. GUI Application** (`main.go`, `app.go`):
 - Wails desktop app (Go backend + React frontend)
@@ -359,6 +375,8 @@ MTGA runs on both macOS and Windows. This application:
 - Receives real-time events for data updates
 - Falls back to standalone mode if daemon unavailable
 - Memory: ~50-100 MB (includes WebView)
+- **ALL presentation logic** - Charts, tables, statistics, draft recommendations
+- **UI-only**: No log polling or database writes (daemon handles that)
 
 **3. Shared Components**:
 - **Log Processor** (`internal/mtga/logprocessor/`): Shared log parsing logic
@@ -415,6 +433,29 @@ MTGA → Player.log → GUI (embedded poller + parser) → Database → User
 - `draft:started` - Draft session began
 - `draft:pick` - Card picked in draft
 - See [docs/DAEMON_API.md](docs/DAEMON_API.md) for complete event reference
+
+**Daemon Code Constraints**:
+
+✅ **Daemon SHOULD use**:
+- `internal/daemon` - Daemon server logic
+- `internal/mtga/logprocessor` - Log parsing
+- `internal/mtga/logreader` - Log file reading
+- `internal/storage` - Database access
+- `internal/ipc` - WebSocket server (NOT client)
+- Standard library logging (`log`, `slog`)
+
+❌ **Daemon MUST NOT use**:
+- `internal/charts` - Terminal chart rendering (presentation layer)
+- `internal/display` - Terminal formatting (presentation layer)
+- `internal/config` - Old CLI configuration (unused)
+- Any terminal display/formatting libraries
+- Any code that renders charts, tables, or formatted output
+
+**Why this matters**:
+- Daemon runs as system service with no terminal
+- All presentation belongs in the Wails GUI (React components)
+- Mixing concerns makes the daemon bloated and defeats the architecture
+- Display code in daemon = architectural violation
 
 **For complete architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
