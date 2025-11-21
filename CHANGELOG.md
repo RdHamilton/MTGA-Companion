@@ -7,22 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-11-21
+
 ### Added
-- Comprehensive documentation wiki with 9 pages covering all features
-  - Installation guide for macOS and Windows
-  - Complete usage guide with examples
-  - CLI commands reference
-  - Configuration guide
-  - Troubleshooting guide
-  - Architecture documentation
-  - Database schema documentation
-  - Development guide
-- Technology stack section in README with links to all dependencies
-- Enhanced README with expanded feature list and documentation links
+
+**Draft Assistant Features**
+- **Type Synergy Detection** - Real-time analysis of card type synergies (Creatures, Instants, Sorceries, etc.) with visual indicators
+- **Card Suggestions** - Context-aware card recommendations based on your picked cards
+- **Missing Cards Detection** - Automatic identification of cards missing from draft packs for collection tracking
+- **Draft Statistics Dashboard** - Real-time mana curve visualization and color distribution as picks are made
+- **Draft Deck Win Rate Predictor** - AI-powered prediction of draft deck performance with letter grades (A/B/C/D/F)
+- **Draft Grade Breakdown** - Detailed modal showing grade calculation and statistics
+
+**Format Meta Analysis**
+- **Format Meta Insights** - Format-wide archetype performance data, best color pairs, and overdrafted colors analysis
+- **Archetype Performance Dashboard** - Interactive archetype selection with top cards per archetype
+- **Archetype Filtering** - Win rate and popularity-based filtering and sorting
+- **Archetype-Specific Card Lists** - View best overall cards, removal, and commons for each archetype
+
+**Historical Draft & Replay**
+- **Historical Draft Replay** - View and replay past draft pick sequences
+- **Draft Replay Engine** - Infrastructure for simulating MTGA log events for testing
+- **GUI Replay Controls** - Play/pause/reset functionality with progress tracking
+- **CLI Replay Command** - `replay` command for development and testing
+
+**Log Management**
+- **Startup Recovery** - Automatic recovery and import of historical data on application startup
+- **Runtime Log Rotation Handling** - Seamless handling of MTGA's UTC_Log rotation at runtime
+- **Manual Log Import UI** - Import historical MTGA logs via GUI with batch processing
+- **Automatic Log Archival** - Opt-in configurable automatic preservation of historical data
+- **Initial Installation Import** - Automatic import of existing logs on first run
+
+**Match Tracking**
+- **Match Details View** - Expandable match details with game-by-game breakdown
+- **Game Win/Loss Tracking** - Per-game statistics within matches
+
+**UI Enhancements**
+- **Card Tier List Visualization** - Visual tier list for draft cards
+- **Enhanced Card Images** - Improved card image display in draft interface
+- **N/A Grades for Missing Data** - Graceful handling of cards without rating data
+- **Performance Monitoring** - Draft overlay performance metrics and monitoring infrastructure
+
+**Data Integration**
+- **17Lands Public Datasets** - Migration to 17Lands public API for more reliable card ratings
+- **Improved Draft Grading** - Fixed bugs in draft grading algorithm
+
+### Fixed
+- **Database Locking** - Fixed database locking issues during rapid draft replay events (#431)
+- **Duplicate Replay Controls** - Fixed duplicate replay controls and toast notification spam (#428, #427)
+- **Tier List Scrolling** - Fixed scrolling behavior in Draft view tier list (#426)
+- **Replay Tool Detection** - Fixed active draft detection in replay testing tool
+- **Win Rate Modal Overlay** - Fixed z-index and overlay issues in win rate prediction modal
+- **Draft Card Images** - Fixed card image display and N/A grade handling
 
 ### Changed
-- Improved README organization with clear sections
-- Added direct links to all wiki pages from README
+- **Documentation Structure** - Reorganized all documentation into `docs/` directory with comprehensive index
+- **Code Cleanup** - Removed 8,488 lines of obsolete Fyne UI and daemon display code
+
+### Technical
+- **Performance**: Draft analysis latency <100ms
+- **Memory Usage**: ~60-80 MB (increased due to draft assistant features)
+- **Backend Tests**: 180+ tests with 85-90% coverage
+- **CI/CD**: All checks passing on Linux, macOS, Windows
+
+## [1.0.0] - 2025-10-01
+
+### Added
+- **Wails Desktop GUI** - Complete cross-platform desktop application with React + TypeScript
+- **Match History Page** - View all matches with filtering and sorting
+- **Win Rate Trend Charts** - Line charts visualizing performance over time
+- **Deck Performance Charts** - Bar charts showing win rates by deck
+- **Rank Progression Tracking** - Real-time rank tracking for Constructed and Limited
+- **Format Distribution Charts** - Pie charts showing play patterns across formats
+- **Result Breakdown Statistics** - Detailed statistics by format and time period
+- **Settings Page** - Database configuration and application settings
+- **Real-Time Updates** - Live statistics while playing MTGA
+- **Toast Notifications** - Non-intrusive update notifications
+- **Persistent Footer** - At-a-glance statistics always visible
+- **Service-Based Architecture** - Daemon mode for 24/7 log monitoring with WebSocket events
+- **Standalone Mode** - Fallback mode with embedded log poller
+- **Responsive Design** - UI adapts from 800x600 to 1920x1080+
+- **Dark Theme** - Material Design-inspired dark theme
+
+### Changed
+- **Architecture**: Complete migration from CLI to desktop GUI
+- **Log Monitoring**: Enhanced with IPC client/server communication
+- **UI Framework**: Migrated from Fyne to Wails v2 + React
+
+### Technical
+- Wails v2 framework (Go + React)
+- React 18, TypeScript 5, Vite 6
+- Recharts for data visualization
+- WebSocket-based IPC (port 9999)
 
 ## [0.1.0] - 2025-01-12
 
