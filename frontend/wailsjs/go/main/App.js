@@ -106,6 +106,10 @@ export function GetEventWinDistribution() {
   return window['go']['main']['App']['GetEventWinDistribution']();
 }
 
+export function GetMatchGames(arg1) {
+  return window['go']['main']['App']['GetMatchGames'](arg1);
+}
+
 export function GetMatches(arg1) {
   return window['go']['main']['App']['GetMatches'](arg1);
 }

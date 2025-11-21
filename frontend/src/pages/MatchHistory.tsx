@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
+import MatchDetailsModal from '../components/MatchDetailsModal';
 import { useAppContext } from '../context/AppContext';
 import './MatchHistory.css';
 
@@ -27,6 +28,9 @@ const MatchHistory = () => {
   // Sorting
   const [sortField, setSortField] = useState<SortField>('Timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Match details modal
+  const [selectedMatch, setSelectedMatch] = useState<models.Match | null>(null);
 
   useEffect(() => {
     loadMatches();
@@ -341,7 +345,12 @@ const MatchHistory = () => {
             </thead>
             <tbody>
               {paginatedMatches.map((match) => (
-                <tr key={match.ID} className={`result-${match.Result.toLowerCase()}`}>
+                <tr
+                  key={match.ID}
+                  className={`result-${match.Result.toLowerCase()} clickable-row`}
+                  onClick={() => setSelectedMatch(match)}
+                  title="Click to view match details"
+                >
                   <td>{formatTimestamp(match.Timestamp)}</td>
                   <td>
                     <span className={`result-badge ${match.Result.toLowerCase()}`}>
@@ -397,6 +406,14 @@ const MatchHistory = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Match Details Modal */}
+      {selectedMatch && (
+        <MatchDetailsModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
       )}
     </div>
   );

@@ -61,6 +61,8 @@ export function GetDraftWinRatePrediction(arg1:string):Promise<prediction.DeckPr
 
 export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribution>>;
 
+export function GetMatchGames(arg1:string):Promise<Array<models.Game>>;
+
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetMissingCards(arg1:string,arg2:number,arg3:number):Promise<models.MissingCardsAnalysis>;

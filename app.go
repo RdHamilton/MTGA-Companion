@@ -175,6 +175,14 @@ func (a *App) GetMatches(filter models.StatsFilter) ([]*models.Match, error) {
 	return a.service.GetMatches(a.ctx, filter)
 }
 
+// GetMatchGames returns all games for a specific match
+func (a *App) GetMatchGames(matchID string) ([]*models.Game, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+	return a.service.GetGamesForMatch(a.ctx, matchID)
+}
+
 // GetStats returns statistics based on filter
 func (a *App) GetStats(filter models.StatsFilter) (*models.Statistics, error) {
 	if a.service == nil {
