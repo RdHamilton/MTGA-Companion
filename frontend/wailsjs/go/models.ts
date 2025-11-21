@@ -418,6 +418,48 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class Game {
+	    ID: number;
+	    MatchID: string;
+	    GameNumber: number;
+	    Result: string;
+	    DurationSeconds?: number;
+	    ResultReason?: string;
+	    CreatedAt: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new Game(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.MatchID = source["MatchID"];
+	        this.GameNumber = source["GameNumber"];
+	        this.Result = source["Result"];
+	        this.DurationSeconds = source["DurationSeconds"];
+	        this.ResultReason = source["ResultReason"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Match {
 	    ID: string;
 	    AccountID: number;

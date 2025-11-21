@@ -95,3 +95,13 @@ th[style*="cursor: pointer"] {
 th[style*="cursor: pointer"]:hover {
   background-color: #3d3d3d;
 }
+
+/* Clickable rows */
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+  background-color: #3d3d3d;
+}
