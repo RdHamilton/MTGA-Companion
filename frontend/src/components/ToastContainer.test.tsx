@@ -11,7 +11,13 @@ const mockReplayState = {
   progress: null,
 };
 
-const mockSubscribers: Array<(state: any) => void> = [];
+interface ReplayState {
+  isActive: boolean;
+  isPaused: boolean;
+  progress: null | unknown;
+}
+
+const mockSubscribers: Array<(state: ReplayState) => void> = [];
 
 vi.mock('../App', () => ({
   getReplayState: vi.fn(() => mockReplayState),
