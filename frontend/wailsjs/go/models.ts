@@ -204,6 +204,42 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class DeckMetrics {
+	    total_cards: number;
+	    total_non_land_cards: number;
+	    creature_count: number;
+	    noncreature_count: number;
+	    cmc_average: number;
+	    distribution_all: number[];
+	    distribution_creatures: number[];
+	    distribution_noncreatures: number[];
+	    type_breakdown: Record<string, number>;
+	    color_distribution: Record<string, number>;
+	    color_counts: Record<string, number>;
+	    multi_color_count: number;
+	    colorless_count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_cards = source["total_cards"];
+	        this.total_non_land_cards = source["total_non_land_cards"];
+	        this.creature_count = source["creature_count"];
+	        this.noncreature_count = source["noncreature_count"];
+	        this.cmc_average = source["cmc_average"];
+	        this.distribution_all = source["distribution_all"];
+	        this.distribution_creatures = source["distribution_creatures"];
+	        this.distribution_noncreatures = source["distribution_noncreatures"];
+	        this.type_breakdown = source["type_breakdown"];
+	        this.color_distribution = source["color_distribution"];
+	        this.color_counts = source["color_counts"];
+	        this.multi_color_count = source["multi_color_count"];
+	        this.colorless_count = source["colorless_count"];
+	    }
+	}
 	export class DraftEvent {
 	    ID: string;
 	    AccountID: number;
