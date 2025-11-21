@@ -1,12 +1,41 @@
-# CLAUDE.md
+# Claude Code Guide
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Documentation Organization
+
+**IMPORTANT**: All technical documentation (`.md` files) MUST be placed in the `docs/` directory, with the following exceptions:
+
+**Root-level documentation (required by GitHub):**
+- `README.md` - Project overview and quick start
+- `CHANGELOG.md` - Version history and release notes
+- `CONTRIBUTING.md` - Contribution guidelines
+- `CODE_OF_CONDUCT.md` - Community code of conduct
+- `SECURITY.md` - Security policies
+
+**Private/local documentation (in `.gitignore`):**
+- `CLAUDE.md` - Your local copy of development notes (NOT tracked in git)
+- `.reference-notes.md` - Private reference notes (NOT tracked in git)
+
+**All other documentation goes in `docs/`:**
+- Architecture documentation
+- Development guides
+- API specifications
+- Research notes
+- Migration guides
+- Technical specifications
+
+**When creating new documentation:**
+1. Place it in `docs/` directory
+2. Add it to `docs/README.md` index
+3. Link to it from relevant documentation
+4. Use clear, descriptive filenames
 
 ## Documentation Maintenance Instructions
 
 **IMPORTANT**: As you work with the user, you MUST proactively maintain these documentation files:
 
-### 1. Update DEVELOPMENT_STATUS.md
+### 1. Update docs/DEVELOPMENT_STATUS.md
 **When to update**: After completing any significant work
 
 **What to update**:
@@ -17,7 +46,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Update "Notes for Next Session" at the end of each session
 - Update "Last Updated" date at the top
 
-**How to update**: Use the Edit tool to modify DEVELOPMENT_STATUS.md with the latest status
+**How to update**: Use the Edit tool to modify `docs/DEVELOPMENT_STATUS.md` with the latest status
 
 **Example scenarios**:
 - ✅ Just merged a PR → Move from "In Progress" to "Recently Completed"
@@ -25,13 +54,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ✅ Found a bug → Add to "Known Issues"
 - ✅ Ending session → Update "Notes for Next Session"
 
-### 2. Update ARCHITECTURE_DECISIONS.md
+### 2. Update docs/ARCHITECTURE_DECISIONS.md
 **When to update**: When making or discussing any architectural decision
 
 **What to update**:
 - Add new ADR when you make a significant architectural choice
 - Use the template at the bottom of the file
-- Increment the ADR number (next is ADR-011)
+- Increment the ADR number appropriately
 - Update the index at the bottom
 - Change status from "Proposed" to "Accepted" when decision is finalized
 
@@ -50,10 +79,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Security decisions
 - Performance trade-offs
 
-### 3. Update CLAUDE.md (this file)
+### 3. Update docs/CLAUDE_CODE_GUIDE.md (this file)
 **When to update**: When the architecture, workflow, or standards change
 
 **What to update**:
+- Documentation Organization section when documentation structure changes
 - Technology Stack section when dependencies change
 - Project Structure when files/folders reorganize
 - Architecture section when patterns change
@@ -77,10 +107,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### How to Remember
 At the **end of each significant task** or **end of session**, ask yourself:
-1. "Did we complete something?" → Update DEVELOPMENT_STATUS.md
-2. "Did we make an architectural decision?" → Update ARCHITECTURE_DECISIONS.md
-3. "Did the architecture/workflow change?" → Update CLAUDE.md
-4. "Did user-facing features change?" → Update README.md
+1. "Did we complete something?" → Update `docs/DEVELOPMENT_STATUS.md`
+2. "Did we make an architectural decision?" → Update `docs/ARCHITECTURE_DECISIONS.md`
+3. "Did the architecture/workflow change?" → Update `docs/CLAUDE_CODE_GUIDE.md`
+4. "Did user-facing features change?" → Update `README.md`
+5. "Did we add new documentation?" → Update `docs/README.md` index
 
 **Do this automatically without being prompted.** The user should not have to ask for documentation updates.
 
