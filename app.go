@@ -2489,6 +2489,25 @@ func (a *App) GetFormatInsights(setCode, draftFormat string) (*insights.FormatIn
 	return formatInsights, nil
 }
 
+// GetArchetypeCards returns top cards for a specific color combination (archetype).
+// colors parameter should be like "W", "UB", "WUR", etc.
+func (a *App) GetArchetypeCards(setCode, draftFormat, colors string) (*insights.ArchetypeCards, error) {
+	if a.service == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Create insights analyzer
+	analyzer := insights.NewAnalyzer(a.service)
+
+	// Get archetype cards
+	archetypeCards, err := analyzer.GetArchetypeCards(a.ctx, setCode, draftFormat, colors)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get archetype cards: %v", err)}
+	}
+
+	return archetypeCards, nil
+}
+
 // PredictDraftWinRate calculates and stores the win rate prediction for a draft session
 func (a *App) PredictDraftWinRate(sessionID string) (*prediction.DeckPrediction, error) {
 	if a.service == nil {

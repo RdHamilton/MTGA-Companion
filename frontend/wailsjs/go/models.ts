@@ -33,6 +33,64 @@ export namespace grading {
 
 export namespace insights {
 	
+	export class TopCard {
+	    name: string;
+	    color: string;
+	    rarity: string;
+	    gihwr: number;
+	    cmc?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TopCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.rarity = source["rarity"];
+	        this.gihwr = source["gihwr"];
+	        this.cmc = source["cmc"];
+	    }
+	}
+	export class ArchetypeCards {
+	    colors: string;
+	    top_cards: TopCard[];
+	    top_creatures: TopCard[];
+	    top_removal: TopCard[];
+	    top_commons: TopCard[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchetypeCards(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colors = source["colors"];
+	        this.top_cards = this.convertValues(source["top_cards"], TopCard);
+	        this.top_creatures = this.convertValues(source["top_creatures"], TopCard);
+	        this.top_removal = this.convertValues(source["top_removal"], TopCard);
+	        this.top_commons = this.convertValues(source["top_commons"], TopCard);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class OverdraftedColor {
 	    color: string;
 	    win_rate: number;
@@ -121,26 +179,6 @@ export namespace insights {
 	        this.speed = source["speed"];
 	        this.avg_game_turn = source["avg_game_turn"];
 	        this.description = source["description"];
-	    }
-	}
-	export class TopCard {
-	    name: string;
-	    color: string;
-	    rarity: string;
-	    gihwr: number;
-	    cmc?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new TopCard(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.color = source["color"];
-	        this.rarity = source["rarity"];
-	        this.gihwr = source["gihwr"];
-	        this.cmc = source["cmc"];
 	    }
 	}
 	export class FormatInsights {

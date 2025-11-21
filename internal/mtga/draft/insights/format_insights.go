@@ -425,3 +425,169 @@ func lower(c byte) byte {
 	}
 	return c
 }
+
+// ArchetypeCards contains top cards for a specific color combination (archetype).
+type ArchetypeCards struct {
+	Colors       string    `json:"colors"`        // e.g., "UB", "WUR"
+	TopCards     []TopCard `json:"top_cards"`     // Best cards overall for this archetype
+	TopCreatures []TopCard `json:"top_creatures"` // Best creatures
+	TopRemoval   []TopCard `json:"top_removal"`   // Best removal spells
+	TopCommons   []TopCard `json:"top_commons"`   // Best commons
+}
+
+// GetArchetypeCards returns top cards for a specific color combination.
+// colors parameter should be a color combination like "W", "UB", "WUR", etc.
+func (a *Analyzer) GetArchetypeCards(ctx context.Context, setCode, draftFormat, colors string) (*ArchetypeCards, error) {
+	// Get card ratings from database
+	cardRatings, _, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get card ratings: %w", err)
+	}
+
+	if len(cardRatings) == 0 {
+		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, draftFormat)
+	}
+
+	// Filter cards by color combination
+	filteredCards := filterCardsByColor(cardRatings, colors)
+
+	archetype := &ArchetypeCards{
+		Colors:       colors,
+		TopCards:     findTopCardsForArchetype(filteredCards, 20),
+		TopCreatures: findTopCardsForArchetype(filteredCards, 15),
+		TopRemoval:   findTopRemovalForArchetype(filteredCards, 10),
+		TopCommons:   findTopCommonsForArchetype(filteredCards, 15),
+	}
+
+	return archetype, nil
+}
+
+// filterCardsByColor filters cards to those that match the specified color combination.
+// For example, "UB" will include cards with color "U", "B", or "UB".
+func filterCardsByColor(cards []seventeenlands.CardRating, colors string) []seventeenlands.CardRating {
+	if colors == "" {
+		return cards
+	}
+
+	filtered := []seventeenlands.CardRating{}
+	for _, card := range cards {
+		// Check if card's color is a subset of the requested colors
+		if isColorMatch(card.Color, colors) {
+			filtered = append(filtered, card)
+		}
+	}
+
+	return filtered
+}
+
+// isColorMatch checks if a card's color fits within the specified color combination.
+// A card matches if all its colors are present in the requested colors.
+// For example: card color "U" matches "UB", card color "UB" matches "UBR", but "UB" doesn't match "U".
+func isColorMatch(cardColor, requestedColors string) bool {
+	if cardColor == "" || cardColor == "C" {
+		// Colorless cards match any color combination
+		return true
+	}
+
+	// Check if all card colors are in the requested colors
+	for i := 0; i < len(cardColor); i++ {
+		found := false
+		for j := 0; j < len(requestedColors); j++ {
+			if cardColor[i] == requestedColors[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// findTopCardsForArchetype finds the best cards overall for an archetype.
+func findTopCardsForArchetype(cardRatings []seventeenlands.CardRating, limit int) []TopCard {
+	cards := []TopCard{}
+	for _, card := range cardRatings {
+		cards = append(cards, TopCard{
+			Name:   card.Name,
+			Color:  card.Color,
+			Rarity: card.Rarity,
+			GIHWR:  card.GIHWR * 100,
+		})
+	}
+
+	// Sort by GIHWR
+	sort.Slice(cards, func(i, j int) bool {
+		return cards[i].GIHWR > cards[j].GIHWR
+	})
+
+	if len(cards) > limit {
+		cards = cards[:limit]
+	}
+
+	return cards
+}
+
+// findTopRemovalForArchetype finds the best removal spells for an archetype.
+func findTopRemovalForArchetype(cardRatings []seventeenlands.CardRating, limit int) []TopCard {
+	removalKeywords := []string{"Destroy", "Exile", "Murder", "Kill", "Deal", "Damage", "Remove", "Bounce"}
+
+	removal := []TopCard{}
+	for _, card := range cardRatings {
+		isRemoval := false
+		for _, keyword := range removalKeywords {
+			if contains(card.Name, keyword) {
+				isRemoval = true
+				break
+			}
+		}
+
+		if isRemoval {
+			removal = append(removal, TopCard{
+				Name:   card.Name,
+				Color:  card.Color,
+				Rarity: card.Rarity,
+				GIHWR:  card.GIHWR * 100,
+			})
+		}
+	}
+
+	// Sort by GIHWR
+	sort.Slice(removal, func(i, j int) bool {
+		return removal[i].GIHWR > removal[j].GIHWR
+	})
+
+	if len(removal) > limit {
+		removal = removal[:limit]
+	}
+
+	return removal
+}
+
+// findTopCommonsForArchetype finds the best common cards for an archetype.
+func findTopCommonsForArchetype(cardRatings []seventeenlands.CardRating, limit int) []TopCard {
+	commons := []TopCard{}
+	for _, card := range cardRatings {
+		if card.Rarity == "common" {
+			commons = append(commons, TopCard{
+				Name:   card.Name,
+				Color:  card.Color,
+				Rarity: card.Rarity,
+				GIHWR:  card.GIHWR * 100,
+			})
+		}
+	}
+
+	// Sort by GIHWR
+	sort.Slice(commons, func(i, j int) bool {
+		return commons[i].GIHWR > commons[j].GIHWR
+	})
+
+	if len(commons) > limit {
+		commons = commons[:limit]
+	}
+
+	return commons
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetFormatInsights } from '../../wailsjs/go/main/App';
+import { GetFormatInsights, GetArchetypeCards } from '../../wailsjs/go/main/App';
 import { insights } from '../../wailsjs/go/models';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './FormatInsights.css';
@@ -11,6 +11,9 @@ interface FormatInsightsProps {
     refreshInterval?: number;
 }
 
+type SortBy = 'winRate' | 'popularity' | 'games';
+type FilterBy = 'all' | 'mono' | '2color' | '3color';
+
 const FormatInsights: React.FC<FormatInsightsProps> = ({
     setCode,
     draftFormat,
@@ -18,9 +21,14 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
     refreshInterval = 60000, // Default: 1 minute
 }) => {
     const [data, setData] = useState<insights.FormatInsights | null>(null);
+    const [selectedArchetype, setSelectedArchetype] = useState<string | null>(null);
+    const [archetypeCards, setArchetypeCards] = useState<insights.ArchetypeCards | null>(null);
+    const [loadingArchetype, setLoadingArchetype] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [sortBy, setSortBy] = useState<SortBy>('winRate');
+    const [filterBy, setFilterBy] = useState<FilterBy>('all');
 
     useEffect(() => {
         if (!isCollapsed && setCode && draftFormat) {
@@ -54,6 +62,63 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
         }
     };
 
+    const loadArchetypeCards = async (colors: string) => {
+        if (!setCode || !draftFormat || !colors) {
+            return;
+        }
+
+        try {
+            setLoadingArchetype(true);
+            const cards = await GetArchetypeCards(setCode, draftFormat, colors);
+            setArchetypeCards(cards);
+            setSelectedArchetype(colors);
+        } catch (err) {
+            console.error('Error loading archetype cards:', err);
+            setArchetypeCards(null);
+        } finally {
+            setLoadingArchetype(false);
+        }
+    };
+
+    const handleArchetypeClick = (colors: string) => {
+        if (selectedArchetype === colors) {
+            // Deselect
+            setSelectedArchetype(null);
+            setArchetypeCards(null);
+        } else {
+            // Select and load cards
+            loadArchetypeCards(colors);
+        }
+    };
+
+    const getFilteredAndSortedRankings = (): insights.ColorPowerRank[] => {
+        if (!data || !data.color_rankings) {
+            return [];
+        }
+
+        // Filter
+        let filtered = data.color_rankings;
+        if (filterBy === 'mono') {
+            filtered = filtered.filter(r => r.color.length === 1);
+        } else if (filterBy === '2color') {
+            filtered = filtered.filter(r => r.color.length === 2);
+        } else if (filterBy === '3color') {
+            filtered = filtered.filter(r => r.color.length >= 3);
+        }
+
+        // Sort
+        const sorted = [...filtered];
+        if (sortBy === 'winRate') {
+            sorted.sort((a, b) => b.win_rate - a.win_rate);
+        } else if (sortBy === 'popularity') {
+            sorted.sort((a, b) => b.popularity - a.popularity);
+        } else if (sortBy === 'games') {
+            sorted.sort((a, b) => b.games_played - a.games_played);
+        }
+
+        return sorted;
+    };
+
     const getRatingColor = (rating: string): string => {
         switch (rating) {
             case 'S': return '#ffd700'; // Gold
@@ -69,11 +134,13 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
         return `${rate.toFixed(1)}%`;
     };
 
+    const colorRankings = getFilteredAndSortedRankings();
+
     return (
         <div className="format-insights">
             <div className="insights-header" onClick={() => setIsCollapsed(!isCollapsed)}>
                 <span className="insights-title">
-                    {isCollapsed ? '▶' : '▼'} Format Meta Insights
+                    {isCollapsed ? '▶' : '▼'} Archetype Performance Dashboard
                     {setCode && draftFormat && ` - ${setCode} ${draftFormat}`}
                 </span>
                 {!isCollapsed && !loading && (
@@ -101,13 +168,43 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
 
                     {data && (
                         <>
-                            {/* Color Power Rankings */}
-                            {data.color_rankings && data.color_rankings.length > 0 && (
+                            {/* Color Power Rankings with Controls */}
+                            {colorRankings.length > 0 && (
                                 <div className="insights-section">
-                                    <h4>Color Power Rankings</h4>
+                                    <div className="section-header-with-controls">
+                                        <h4>Archetype Rankings</h4>
+                                        <div className="insights-controls">
+                                            <div className="control-group">
+                                                <label>Sort by:</label>
+                                                <select
+                                                    value={sortBy}
+                                                    onChange={(e) => setSortBy(e.target.value as SortBy)}
+                                                    className="control-select"
+                                                >
+                                                    <option value="winRate">Win Rate</option>
+                                                    <option value="popularity">Popularity</option>
+                                                    <option value="games">Games Played</option>
+                                                </select>
+                                            </div>
+                                            <div className="control-group">
+                                                <label>Filter:</label>
+                                                <select
+                                                    value={filterBy}
+                                                    onChange={(e) => setFilterBy(e.target.value as FilterBy)}
+                                                    className="control-select"
+                                                >
+                                                    <option value="all">All Colors</option>
+                                                    <option value="mono">Mono Color</option>
+                                                    <option value="2color">2-Color</option>
+                                                    <option value="3color">3+ Color</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="color-rankings">
                                         <ResponsiveContainer width="100%" height={300}>
-                                            <BarChart data={data.color_rankings}>
+                                            <BarChart data={colorRankings}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#3d3d3d" />
                                                 <XAxis
                                                     dataKey="color"
@@ -126,15 +223,20 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                                                     formatter={(value: number) => [`${value.toFixed(1)}%`, 'Win Rate']}
                                                 />
                                                 <Bar dataKey="win_rate" radius={[8, 8, 0, 0]}>
-                                                    {data.color_rankings.map((entry, index) => (
+                                                    {colorRankings.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={getRatingColor(entry.rating)} />
                                                     ))}
                                                 </Bar>
                                             </BarChart>
                                         </ResponsiveContainer>
+
                                         <div className="color-rankings-grid">
-                                            {data.color_rankings.map((rank, idx) => (
-                                                <div key={idx} className="color-rank-item">
+                                            {colorRankings.map((rank, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className={`color-rank-item ${selectedArchetype === rank.color ? 'selected' : ''}`}
+                                                    onClick={() => handleArchetypeClick(rank.color)}
+                                                >
                                                     <div className="rank-header">
                                                         <span className="rank-color">{rank.color}</span>
                                                         <span
@@ -158,11 +260,59 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                                                             <span className="stat-value">{rank.games_played.toLocaleString()}</span>
                                                         </div>
                                                     </div>
+                                                    {selectedArchetype !== rank.color && (
+                                                        <div className="click-hint">Click for top cards</div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Archetype-Specific Cards */}
+                            {selectedArchetype && archetypeCards && (
+                                <div className="insights-section archetype-details">
+                                    <div className="archetype-details-header">
+                                        <h4>{selectedArchetype} Top Cards</h4>
+                                        <button
+                                            className="btn-close-archetype"
+                                            onClick={() => {
+                                                setSelectedArchetype(null);
+                                                setArchetypeCards(null);
+                                            }}
+                                        >
+                                            ✕ Close
+                                        </button>
+                                    </div>
+
+                                    <div className="archetype-cards-grid">
+                                        {archetypeCards.top_cards && archetypeCards.top_cards.length > 0 && (
+                                            <div className="archetype-card-section">
+                                                <h5>Best Overall ({archetypeCards.top_cards.length})</h5>
+                                                <TopCardsList cards={archetypeCards.top_cards} />
+                                            </div>
+                                        )}
+
+                                        {archetypeCards.top_removal && archetypeCards.top_removal.length > 0 && (
+                                            <div className="archetype-card-section">
+                                                <h5>Best Removal ({archetypeCards.top_removal.length})</h5>
+                                                <TopCardsList cards={archetypeCards.top_removal} />
+                                            </div>
+                                        )}
+
+                                        {archetypeCards.top_commons && archetypeCards.top_commons.length > 0 && (
+                                            <div className="archetype-card-section">
+                                                <h5>Best Commons ({archetypeCards.top_commons.length})</h5>
+                                                <TopCardsList cards={archetypeCards.top_commons} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {loadingArchetype && (
+                                <div className="insights-loading">Loading archetype cards...</div>
                             )}
 
                             {/* Format Speed */}
@@ -214,7 +364,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                                 </div>
                             )}
 
-                            {/* Top Cards Sections */}
+                            {/* Top Cards Sections (Format-wide) */}
                             <div className="top-cards-container">
                                 {/* Top Bombs */}
                                 {data.top_bombs && data.top_bombs.length > 0 && (
@@ -232,7 +382,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                                     </div>
                                 )}
 
-                                {/* Top Creatures */}
+                                {/* Top Performers */}
                                 {data.top_creatures && data.top_creatures.length > 0 && (
                                     <div className="insights-section top-cards-section">
                                         <h4>Top Performers</h4>
@@ -240,7 +390,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                                     </div>
                                 )}
 
-                                {/* Top Commons */}
+                                {/* Best Commons */}
                                 {data.top_commons && data.top_commons.length > 0 && (
                                     <div className="insights-section top-cards-section">
                                         <h4>Best Commons</h4>
