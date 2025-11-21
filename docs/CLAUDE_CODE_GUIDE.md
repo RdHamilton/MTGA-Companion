@@ -699,6 +699,196 @@ runtime.EventsEmit(a.ctx, "stats:updated", data)
 EventsOn('stats:updated', (data) => { /* handle update */ });
 ```
 
+## Design Patterns (v1.2 Refactoring)
+
+**IMPORTANT**: The codebase follows several design patterns implemented during the v1.2 refactoring (2024-11). When adding new features or modifying existing code, leverage these patterns to maintain consistency and code quality.
+
+### 1. Facade Pattern
+
+**Location**: `internal/gui/*_facade.go`
+
+**Purpose**: Simplify complex subsystem interactions and provide a clean interface between the Wails frontend and backend services.
+
+**When to use**:
+- Creating new major feature areas (e.g., if adding a tournament feature, create `TournamentFacade`)
+- Exposing backend services to the frontend
+- Grouping related operations into a cohesive interface
+
+**Existing Facades**:
+- `MatchFacade` - Match history and statistics
+- `DraftFacade` - Draft sessions and insights
+- `CardFacade` - Card data and metadata
+- `ExportFacade` - Import/export operations
+- `SystemFacade` - System initialization and daemon communication
+
+### 2. Strategy Pattern
+
+**Location**: `internal/mtga/draft/insights/*_strategy.go`
+
+**Purpose**: Define a family of algorithms and make them interchangeable based on context (e.g., different analysis for Premier Draft vs Quick Draft).
+
+**When to use**:
+- Algorithms vary based on format/type/mode
+- Need different behavior for similar operations
+- Want to avoid complex if/else chains for type checking
+
+**Existing Strategies**:
+- `PremierDraftStrategy` - Analysis for human opponent drafts (10 bombs, 8 removal, 15 creatures, 20 commons)
+- `QuickDraftStrategy` - Analysis for bot opponent drafts (12 bombs, 10 removal, 18 creatures, 25 commons)
+
+**Example Usage**:
+```go
+// Use strategy factory to get the right analyzer
+analyzer := insights.NewAnalyzerForFormat(storage, draftFormat)
+results, err := analyzer.AnalyzeFormat(ctx, setCode, draftFormat)
+```
+
+### 3. Builder Pattern
+
+**Location**: `internal/export/builder.go`
+
+**Purpose**: Construct complex objects step-by-step with a fluent API, making configuration clear and readable.
+
+**When to use**:
+- Object has many configuration options
+- Want to make construction intent clear
+- Need to validate configuration before creating object
+
+**Example Usage**:
+```go
+// Fluent API for export configuration
+err := export.NewExportBuilder().
+    WithFormat(export.FormatJSON).
+    WithFilePath(filePath).
+    WithPrettyJSON(true).
+    WithOverwrite(true).
+    Export(data)
+```
+
+### 4. Observer Pattern
+
+**Location**: `internal/events/`
+
+**Purpose**: Define one-to-many dependency between objects so when one object changes state, all dependents are notified automatically.
+
+**When to use**:
+- Multiple components need to react to the same event
+- Want to decouple event producers from consumers
+- Broadcasting events to multiple destinations (frontend, IPC, logging, analytics)
+
+**Existing Observers**:
+- `WailsObserver` - Forwards events to Wails frontend
+- `IPCObserver` - Forwards events to IPC daemon
+- `LoggingObserver` - Logs events for debugging
+
+**Example Usage**:
+```go
+// Get the event dispatcher from SystemFacade
+dispatcher := systemFacade.GetEventDispatcher()
+
+// Dispatch events
+dispatcher.Dispatch(events.Event{
+    Type: "match:completed",
+    Data: map[string]interface{}{
+        "matchId": matchID,
+        "result":  "victory",
+    },
+    Context: ctx,
+})
+```
+
+**IMPORTANT**: Never use `wailsruntime.EventsEmit` directly. Always use the EventDispatcher.
+
+### 5. Command Pattern
+
+**Location**: `internal/commands/`
+
+**Purpose**: Encapsulate operations as objects, enabling parameterization, queuing, logging, and undo support.
+
+**When to use**:
+- Operations need to be queued or scheduled
+- Want to support undo/redo
+- Need operation history for auditing
+- Want retry logic for critical operations
+
+**Existing Commands**:
+- `ReplayCommand`, `PauseReplayCommand`, `ResumeReplayCommand`, `StopReplayCommand` - Log replay operations
+- `StartupRecoveryCommand` - Initialize daemon with retry logic
+- `ShutdownCommand` - Graceful shutdown
+
+**Example Usage**:
+```go
+executor := commands.NewCommandExecutor(10)
+cmd := commands.NewReplayCommand(ipcClient, filePaths, speed, filterType, pauseOnDraft, clearData)
+err := executor.Execute(ctx, cmd)
+```
+
+### Pattern Implementation Guidelines
+
+**For Event Emission** - Use EventDispatcher, not EventsEmit:
+```go
+// ❌ Don't do this
+wailsruntime.EventsEmit(ctx, "stats:updated", data)
+
+// ✅ Do this
+facade.eventDispatcher.Dispatch(events.Event{
+    Type:    "stats:updated",
+    Data:    data,
+    Context: ctx,
+})
+```
+
+**For Export Operations** - Use Builder pattern:
+```go
+// ❌ Don't do this
+exporter := export.NewExporter(export.Options{...})
+err := exporter.Export(data)
+
+// ✅ Do this
+err := export.NewExportBuilder().
+    WithFormat(export.FormatJSON).
+    WithFilePath(filePath).
+    Export(data)
+```
+
+**For Format-Specific Analysis** - Use Strategy pattern:
+```go
+// ❌ Don't do this
+if draftFormat == "PremierDraft" {
+    // Premier logic
+} else if draftFormat == "QuickDraft" {
+    // Quick logic
+}
+
+// ✅ Do this
+analyzer := insights.NewAnalyzerForFormat(storage, draftFormat)
+results, err := analyzer.AnalyzeFormat(ctx, setCode, draftFormat)
+```
+
+**For Daemon Operations** - Use Command pattern:
+```go
+// ❌ Don't do this
+ipcClient.Send(map[string]interface{}{"type": "replay_logs", ...})
+
+// ✅ Do this
+cmd := commands.NewReplayCommand(ipcClient, filePaths, speed, filterType, pauseOnDraft, clearData)
+err := executor.Execute(ctx, cmd)
+```
+
+### Adding New Features Checklist
+
+When implementing new features, ask:
+
+1. **Does it need a facade?** - Is this a major feature area that needs its own interface?
+2. **Does behavior vary by type?** - Consider Strategy pattern
+3. **Complex configuration?** - Consider Builder pattern
+4. **Need event notifications?** - Use EventDispatcher (Observer pattern)
+5. **Encapsulated operation?** - Consider Command pattern
+
+For complete architectural details and rationale, see **ADR-011** in `docs/ARCHITECTURE_DECISIONS.md`.
+
+---
+
 ## Coding Principles
 
 ### KISS (Keep It Simple, Stupid)
