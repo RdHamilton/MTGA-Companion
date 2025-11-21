@@ -1,0 +1,301 @@
+package gui
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+)
+
+// CardFacade handles all card data operations including set cards and ratings.
+type CardFacade struct {
+	services *Services
+}
+
+// NewCardFacade creates a new CardFacade with the given services.
+func NewCardFacade(services *Services) *CardFacade {
+	return &CardFacade{
+		services: services,
+	}
+}
+
+// CardRatingWithTier extends CardRating with tier and colors information.
+type CardRatingWithTier struct {
+	seventeenlands.CardRating
+	Tier   string   `json:"tier"`   // S, A, B, C, D, or F
+	Colors []string `json:"colors"` // All colors in mana cost (e.g., ["W", "U"])
+}
+
+// GetSetCards returns all cards for a set, fetching from Scryfall if not cached.
+func (c *CardFacade) GetSetCards(ctx context.Context, setCode string) ([]*models.SetCard, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Check if set is already cached (with retry)
+	var isCached bool
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		isCached, err = c.services.Storage.SetCardRepo().IsSetCached(ctx, setCode)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to check set cache: %v", err)}
+	}
+
+	// If not cached, fetch from Scryfall
+	if !isCached {
+		log.Printf("Set %s not cached, fetching from Scryfall...", setCode)
+		count, err := c.services.SetFetcher.FetchAndCacheSet(ctx, setCode)
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Failed to fetch set cards from Scryfall: %v", err)}
+		}
+		log.Printf("Fetched and cached %d cards for set %s", count, setCode)
+	}
+
+	var cards []*models.SetCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		cards, err = c.services.Storage.SetCardRepo().GetCardsBySet(ctx, setCode)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get set cards: %v", err)}
+	}
+
+	return cards, nil
+}
+
+// FetchSetCards manually fetches and caches set cards from Scryfall.
+// Returns the number of cards fetched and cached.
+func (c *CardFacade) FetchSetCards(ctx context.Context, setCode string) (int, error) {
+	if c.services.Storage == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Manually fetching set %s from Scryfall...", setCode)
+	count, err := c.services.SetFetcher.FetchAndCacheSet(ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to fetch set cards: %v", err)}
+	}
+
+	log.Printf("Successfully fetched and cached %d cards for set %s", count, setCode)
+	return count, nil
+}
+
+// RefreshSetCards deletes and re-fetches all cards for a set.
+func (c *CardFacade) RefreshSetCards(ctx context.Context, setCode string) (int, error) {
+	if c.services.Storage == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("Refreshing set %s from Scryfall...", setCode)
+	count, err := c.services.SetFetcher.RefreshSet(ctx, setCode)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to refresh set cards: %v", err)}
+	}
+
+	log.Printf("Successfully refreshed %d cards for set %s", count, setCode)
+	return count, nil
+}
+
+// FetchSetRatings fetches and caches 17Lands card ratings for a set and draft format.
+func (c *CardFacade) FetchSetRatings(ctx context.Context, setCode string, draftFormat string) error {
+	if c.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	if c.services.RatingsFetcher == nil {
+		return &AppError{Message: "Ratings fetcher not initialized"}
+	}
+
+	log.Printf("Fetching 17Lands ratings for set %s, format %s...", setCode, draftFormat)
+	err := c.services.RatingsFetcher.FetchAndCacheRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to fetch ratings: %v", err)}
+	}
+
+	log.Printf("Successfully fetched and cached ratings for set %s, format %s", setCode, draftFormat)
+	return nil
+}
+
+// RefreshSetRatings deletes and re-fetches 17Lands ratings for a set and draft format.
+func (c *CardFacade) RefreshSetRatings(ctx context.Context, setCode string, draftFormat string) error {
+	if c.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	if c.services.RatingsFetcher == nil {
+		return &AppError{Message: "Ratings fetcher not initialized"}
+	}
+
+	log.Printf("Refreshing 17Lands ratings for set %s, format %s...", setCode, draftFormat)
+	err := c.services.RatingsFetcher.RefreshRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to refresh ratings: %v", err)}
+	}
+
+	log.Printf("Successfully refreshed ratings for set %s, format %s", setCode, draftFormat)
+	return nil
+}
+
+// ClearDatasetCache clears all cached 17Lands datasets to free up disk space.
+// This removes the locally cached CSV files but keeps the ratings in the database.
+func (c *CardFacade) ClearDatasetCache(ctx context.Context) error {
+	if c.services.DatasetService == nil {
+		// No dataset service means legacy API mode - nothing to clear
+		log.Println("No dataset cache to clear (using legacy API mode)")
+		return nil
+	}
+
+	log.Println("Clearing 17Lands dataset cache...")
+	err := c.services.DatasetService.ClearCache()
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to clear dataset cache: %v", err)}
+	}
+
+	log.Println("Successfully cleared dataset cache")
+	return nil
+}
+
+// GetDatasetSource returns the data source for a given set and format ("s3" or "web_api").
+// Returns "unknown" if dataset service is not available.
+func (c *CardFacade) GetDatasetSource(ctx context.Context, setCode string, draftFormat string) string {
+	if c.services.DatasetService == nil {
+		return "legacy_api"
+	}
+
+	source := c.services.DatasetService.GetDataSource(ctx, setCode, draftFormat)
+	return source
+}
+
+// GetCardByArenaID returns a card by its Arena ID.
+func (c *CardFacade) GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	log.Printf("[GetCardByArenaID] Looking up card with ArenaID: %s", arenaID)
+
+	card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+	if err != nil {
+		log.Printf("[GetCardByArenaID] Error looking up card %s: %v", arenaID, err)
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card: %v", err)}
+	}
+
+	if card == nil {
+		log.Printf("[GetCardByArenaID] Card %s not found in database", arenaID)
+		return nil, nil
+	}
+
+	log.Printf("[GetCardByArenaID] Found card %s: Name=%s", arenaID, card.Name)
+	return card, nil
+}
+
+// GetCardRatings returns all card ratings for a set and draft format with tier information.
+func (c *CardFacade) GetCardRatings(ctx context.Context, setCode string, draftFormat string) ([]CardRatingWithTier, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get ratings from repository
+	ratings, _, err := c.services.Storage.DraftRatingsRepo().GetCardRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card ratings: %v", err)}
+	}
+
+	// Build a map of arena ID to colors by fetching set cards
+	arenaIDToColors := make(map[string][]string)
+	for _, rating := range ratings {
+		if rating.MTGAID != 0 {
+			arenaID := fmt.Sprintf("%d", rating.MTGAID)
+			card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+			if err == nil && card != nil && len(card.Colors) > 0 {
+				arenaIDToColors[arenaID] = card.Colors
+			}
+		}
+	}
+
+	// Add tier and colors to each rating
+	result := make([]CardRatingWithTier, len(ratings))
+	for i, rating := range ratings {
+		arenaID := fmt.Sprintf("%d", rating.MTGAID)
+		colors := arenaIDToColors[arenaID]
+		// If no colors found in set_cards, fall back to single color from rating
+		if len(colors) == 0 && rating.Color != "" && rating.Color != "C" {
+			colors = []string{rating.Color}
+		}
+		result[i] = CardRatingWithTier{
+			CardRating: rating,
+			Tier:       calculateTier(rating.GIHWR),
+			Colors:     colors,
+		}
+	}
+
+	return result, nil
+}
+
+// GetCardRatingByArenaID returns the 17Lands rating for a specific card.
+func (c *CardFacade) GetCardRatingByArenaID(ctx context.Context, setCode string, draftFormat string, arenaID string) (*CardRatingWithTier, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	rating, err := c.services.Storage.DraftRatingsRepo().GetCardRatingByArenaID(ctx, setCode, draftFormat, arenaID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card rating: %v", err)}
+	}
+
+	if rating == nil {
+		return nil, nil
+	}
+
+	return &CardRatingWithTier{
+		CardRating: *rating,
+		Tier:       calculateTier(rating.GIHWR),
+	}, nil
+}
+
+// GetColorRatings returns 17Lands color combination ratings for a set and draft format.
+func (c *CardFacade) GetColorRatings(ctx context.Context, setCode string, draftFormat string) ([]seventeenlands.ColorRating, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	ratings, _, err := c.services.Storage.DraftRatingsRepo().GetColorRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get color ratings: %v", err)}
+	}
+
+	return ratings, nil
+}
+
+// calculateTier determines the tier (S, A, B, C, D, F) based on GIHWR percentage.
+// Tier thresholds:
+// - S Tier (Bombs): GIHWR ≥ 60% - Format-defining cards
+// - A Tier: 57-59% - Excellent cards, high picks
+// - B Tier: 54-56% - Good playables
+// - C Tier: 51-53% - Filler/role players
+// - D Tier: 48-50% - Below average
+// - F Tier: < 48% - Avoid/sideboard
+func calculateTier(gihwr float64) string {
+	if gihwr >= 60 {
+		return "S"
+	}
+	if gihwr >= 57 {
+		return "A"
+	}
+	if gihwr >= 54 {
+		return "B"
+	}
+	if gihwr >= 51 {
+		return "C"
+	}
+	if gihwr >= 48 {
+		return "D"
+	}
+	return "F"
+}
