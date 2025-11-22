@@ -38,10 +38,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install Fyne dependencies (Linux)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+    - name: Cache apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
+      with:
+        packages: libgl1-mesa-dev xorg-dev
+        version: 1.0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -72,15 +73,60 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
-    - name: Run tests with coverage
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+    - name: Run tests with coverage (no race detection)
+      run: go test -v -coverprofile=coverage.out -covermode=atomic ./...
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.out
+        files: ./coverage.out
         flags: unittests
         fail_ci_if_error: false
+
+  test-race:
+    name: Test with Race Detection (Linux)
+    runs-on: ubuntu-latest
+    # Only run race detection on main branch to save CI time
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Cache apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
+      with:
+        packages: libgl1-mesa-dev xorg-dev
+        version: 1.0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: go.sum
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests with race detection
+      run: go test -v -race -timeout=15m ./...
 
   test-cross-platform:
     name: Test (Cross-Platform)
@@ -266,10 +312,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install Fyne dependencies (Linux)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+    - name: Cache apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
+      with:
+        packages: libgl1-mesa-dev xorg-dev
+        version: 1.0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -335,10 +382,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install Fyne dependencies (Linux)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+    - name: Cache apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
+      with:
+        packages: libgl1-mesa-dev xorg-dev
+        version: 1.0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -360,10 +408,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install Fyne dependencies (Linux)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+    - name: Cache apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
+      with:
+        packages: libgl1-mesa-dev xorg-dev
+        version: 1.0
 
     - name: Set up Go
       uses: actions/setup-go@v5
