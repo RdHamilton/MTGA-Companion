@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-11-21
+
+### Added
+
+**Testing Infrastructure (Phase 5)**
+- **Component Testing Framework** - Vitest + React Testing Library for frontend component tests
+- **122 Component Tests** - Comprehensive test coverage for all UI components (Layout, Footer, ToastContainer, Draft pages, Charts)
+- **End-to-End Testing** - Playwright E2E testing framework with smoke tests, draft workflow tests, and match tracking tests
+- **CI/CD Integration** - Automated frontend testing in GitHub Actions with coverage reporting
+- **Coverage Reporting** - Codecov integration with PR comments showing coverage metrics
+- **Required Status Checks** - Frontend tests and security scans required for PR merges
+- **Test Mocking System** - Comprehensive mocks for Wails runtime (EventsOn, EventsEmit) and app bindings
+- **Testing Documentation** - Complete testing guide (docs/TESTING.md) with examples and best practices
+
+### Changed
+
+**Architecture Refactoring**
+- **Phase 1: Facade Pattern** - Refactored app.go from 2,814 lines to ~300 lines with domain-specific facades (MatchFacade, DraftFacade, DeckFacade, CardFacade, ExportFacade, SystemFacade)
+- **Phase 2: Strategy Pattern** - Pluggable draft format analysis strategies for Premier Draft vs Quick Draft
+- **Phase 3: Builder Pattern** - Fluent API for export operations with simplified code
+- **Phase 4: Observer Pattern** - EventDispatcher for decoupled event management across frontend, IPC, and logging
+- **Phase 4: Command Pattern** - Encapsulated daemon operations as reusable, testable command objects
+
+### Technical
+
+**Code Quality**
+- **Frontend Test Coverage**: 62% (up from 0%)
+- **Backend Test Coverage**: 85-90% (maintained)
+- **Pattern Implementation**: 2,745 lines added (Facades, Strategies, Builders, Observers, Commands)
+- **Code Reduction**: app.go reduced from 2,814 lines to ~300 lines
+- **All Phases**: Passed linting without issues
+- **CI/CD**: Frontend tests, security scans, and coverage reporting integrated
+
+**Performance**
+- Same performance metrics as v1.1 (refactoring didn't impact performance)
+- Draft analysis: <100ms
+- Memory: ~60-80 MB
+- Startup: ~500ms-1s
+
+### Documentation
+
+- **TESTING.md** - 478 lines of comprehensive testing guide
+- **ARCHITECTURE_DECISIONS.md** - ADR-011 documenting design pattern refactoring
+- **CI_README.md** - E2E testing documentation for CI environments
+- **Pattern Documentation** - Detailed usage guides for all implemented patterns
+
 ## [1.1.0] - 2025-11-21
 
 ### Added

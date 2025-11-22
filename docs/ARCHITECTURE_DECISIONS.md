@@ -378,12 +378,13 @@ func (a *App) startup(ctx context.Context) {
 - Format-specific logic mixed with general logic
 - Need better separation of concerns and maintainability
 
-**Decision**: Implement four design patterns in a phased refactoring:
+**Decision**: Implement five design patterns and comprehensive testing in a phased refactoring:
 1. **Facade Pattern** - Simplify frontend/backend interface
 2. **Strategy Pattern** - Format-specific analysis algorithms
 3. **Builder Pattern** - Complex object construction with fluent API
 4. **Observer Pattern** - Decouple event emission from handlers
 5. **Command Pattern** - Encapsulate operations as objects
+6. **Testing Infrastructure** - Component and E2E testing with CI/CD integration
 
 **Rationale**:
 
@@ -417,6 +418,14 @@ func (a *App) startup(ctx context.Context) {
 - Want undo capability for certain operations
 - Commands are reusable and composable
 
+**Phase 5 - Testing Infrastructure**:
+- Frontend had 0% test coverage (risky for refactoring)
+- No automated testing for UI components
+- Manual testing doesn't scale
+- Need confidence in refactored code
+- CI/CD should catch regressions early
+- Component tests verify behavior, E2E tests verify workflows
+
 **Implementation Details**:
 ```
 internal/
@@ -436,6 +445,26 @@ internal/
     ├── strategy.go            # Strategy interface (Phase 2)
     ├── premier_strategy.go    # Premier Draft strategy
     └── quick_strategy.go      # Quick Draft strategy
+
+frontend/               # Testing infrastructure (Phase 5)
+├── src/
+│   ├── test/
+│   │   ├── setup.ts           # Vitest configuration
+│   │   ├── utils/
+│   │   │   └── testUtils.tsx  # Custom render with router
+│   │   └── mocks/
+│   │       ├── wailsApp.ts    # Mock Go backend functions
+│   │       └── wailsRuntime.ts # Mock Wails runtime
+│   └── components/
+│       ├── *.test.tsx         # 122 component tests
+│       └── ...
+├── tests/
+│   └── e2e/
+│       ├── smoke.spec.ts      # Basic E2E smoke tests
+│       ├── draft-workflow.spec.ts  # Draft workflow tests
+│       └── match-tracking.spec.ts  # Match history tests
+├── vite.config.ts             # Vitest config with coverage
+└── playwright.config.ts       # Playwright E2E config
 ```
 
 **Alternatives Considered**:
@@ -454,34 +483,47 @@ internal/
 - Fluent export API improves code readability
 - Centralized event handling via Observer pattern
 - Testable, reusable operations via Command pattern
-- 1,300+ lines of new pattern implementations
+- **Frontend test coverage**: 0% → 62% (122 component tests)
+- **CI/CD integration**: Automated testing on every PR
+- **Comprehensive test infrastructure**: Vitest + Playwright + mocks
+- 2,745+ lines of new pattern implementations
+- 1,200+ lines of test code
 - Better maintainability and extensibility
 
 ⚠️ **Trade-offs**:
 - More files to navigate (organized by pattern/domain)
-- Slight learning curve for contributors (documented in `docs/CLAUDE.md`)
+- Slight learning curve for contributors (documented in `docs/CLAUDE.md` and `docs/TESTING.md`)
 - Pattern overhead for simple operations (but worth it for consistency)
+- Test maintenance overhead (but prevents regressions)
 
 ✅ **Code Quality**:
 - All phases passed linting without issues
 - Consistent code formatting with `gofumpt`
-- Comprehensive documentation of patterns
+- Comprehensive documentation of patterns and testing
 - No breaking changes to external API
+- Required status checks enforce quality
 
 **Metrics**:
 - Phase 1: 690 lines added, 314 removed
 - Phase 2: 738 lines added, 308 removed
 - Phase 3: 298 lines added, 17 removed
 - Phase 4: 1,019 lines added, 67 removed
-- **Total**: 2,745 lines added, 706 removed (net +2,039)
+- Phase 5: 1,200+ lines of test code added
+- **Total**: 3,945+ lines added, 706 removed (net +3,239)
 
 **Related**:
 - PR #480 (Phase 1: Facade Pattern)
 - PR #481 (Phase 2: Strategy Pattern)
 - PR #482 (Phase 3: Builder Pattern)
 - PR #483 (Phase 4: Observer & Command Patterns)
-- Issues #446-#467 (all refactoring tasks)
+- PR #485 (Phase 5: UI Testing Infrastructure - Foundation)
+- PR #486 (Phase 5: Draft Component Tests)
+- PR #487 (Phase 5: UI Component Testing)
+- PR #488 (Phase 5: Complete Testing Infrastructure)
+- PR #484 (Documentation)
+- Issues #446-#478 (all refactoring and testing tasks)
 - Documentation: `docs/CLAUDE.md` (pattern usage guide)
+- Documentation: `docs/TESTING.md` (478-line testing guide)
 
 **Future Enhancements**:
 - Add more strategies for Traditional Draft, Sealed formats
