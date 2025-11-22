@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -1195,6 +1196,464 @@ func (d *DeckFacade) convertToDeckListItems(ctx context.Context, decks []*models
 	}
 
 	return items, nil
+}
+
+// DeckStatistics represents comprehensive deck statistics and analysis.
+type DeckStatistics struct {
+	// Basic counts
+	TotalCards     int     `json:"totalCards"`
+	TotalMainboard int     `json:"totalMainboard"`
+	TotalSideboard int     `json:"totalSideboard"`
+	AverageCMC     float64 `json:"averageCMC"`
+
+	// Mana curve (CMC -> count)
+	ManaCurve map[int]int `json:"manaCurve"`
+	MaxCMC    int         `json:"maxCMC"`
+
+	// Color distribution
+	Colors ColorStats `json:"colors"`
+
+	// Type breakdown
+	Types TypeStats `json:"types"`
+
+	// Land analysis
+	Lands LandStats `json:"lands"`
+
+	// Creature statistics
+	Creatures CreatureStats `json:"creatures"`
+
+	// Format legality
+	Legality FormatLegality `json:"legality"`
+}
+
+// ColorStats represents color distribution in the deck.
+type ColorStats struct {
+	White      int `json:"white"`
+	Blue       int `json:"blue"`
+	Black      int `json:"black"`
+	Red        int `json:"red"`
+	Green      int `json:"green"`
+	Colorless  int `json:"colorless"`
+	Multicolor int `json:"multicolor"`
+}
+
+// TypeStats represents card type breakdown.
+type TypeStats struct {
+	Creatures     int `json:"creatures"`
+	Instants      int `json:"instants"`
+	Sorceries     int `json:"sorceries"`
+	Enchantments  int `json:"enchantments"`
+	Artifacts     int `json:"artifacts"`
+	Planeswalkers int `json:"planeswalkers"`
+	Lands         int `json:"lands"`
+	Other         int `json:"other"`
+}
+
+// LandStats represents land analysis and recommendations.
+type LandStats struct {
+	Total         int     `json:"total"`
+	Basic         int     `json:"basic"`
+	NonBasic      int     `json:"nonBasic"`
+	Ratio         float64 `json:"ratio"`         // Percentage of deck
+	Recommended   int     `json:"recommended"`   // Recommended land count
+	Status        string  `json:"status"`        // "optimal", "too_few", "too_many"
+	StatusMessage string  `json:"statusMessage"` // Human-readable message
+}
+
+// CreatureStats represents creature-specific statistics.
+type CreatureStats struct {
+	Total            int     `json:"total"`
+	AveragePower     float64 `json:"averagePower"`
+	AverageToughness float64 `json:"averageToughness"`
+	TotalPower       int     `json:"totalPower"`
+	TotalToughness   int     `json:"totalToughness"`
+}
+
+// FormatLegality represents deck legality in various formats.
+type FormatLegality struct {
+	Standard  LegalityStatus `json:"standard"`
+	Historic  LegalityStatus `json:"historic"`
+	Explorer  LegalityStatus `json:"explorer"`
+	Alchemy   LegalityStatus `json:"alchemy"`
+	Brawl     LegalityStatus `json:"brawl"`
+	Commander LegalityStatus `json:"commander"`
+}
+
+// LegalityStatus represents legality status for a format.
+type LegalityStatus struct {
+	Legal   bool     `json:"legal"`
+	Reasons []string `json:"reasons,omitempty"` // Why it's not legal
+}
+
+// GetDeckStatistics calculates comprehensive deck statistics.
+func (d *DeckFacade) GetDeckStatistics(ctx context.Context, deckID string) (*DeckStatistics, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get deck and cards
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, deckID)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck: %v", err)}
+	}
+	if deck == nil {
+		return nil, &AppError{Message: "Deck not found"}
+	}
+
+	var deckCards []*models.DeckCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		deckCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deckID)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck cards: %v", err)}
+	}
+
+	stats := &DeckStatistics{
+		ManaCurve: make(map[int]int),
+	}
+
+	// Separate mainboard and sideboard
+	var mainboard, sideboard []*models.DeckCard
+	for _, card := range deckCards {
+		if card.Board == "main" {
+			mainboard = append(mainboard, card)
+		} else if card.Board == "sideboard" {
+			sideboard = append(sideboard, card)
+		}
+	}
+
+	// Calculate statistics from mainboard
+	stats = d.calculateDeckStats(ctx, mainboard, stats)
+
+	// Set totals
+	stats.TotalMainboard = stats.TotalCards
+	for _, card := range sideboard {
+		stats.TotalSideboard += card.Quantity
+	}
+	stats.TotalCards = stats.TotalMainboard + stats.TotalSideboard
+
+	// Calculate land recommendations
+	d.calculateLandRecommendations(stats, deck.Format)
+
+	// Check format legality
+	stats.Legality = d.checkFormatLegality(ctx, mainboard, deck.Format)
+
+	return stats, nil
+}
+
+// calculateDeckStats performs the core statistical calculations.
+func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.DeckCard, stats *DeckStatistics) *DeckStatistics {
+	totalCMC := 0.0
+	nonLandCount := 0
+	totalCreaturePower := 0
+	totalCreatureToughness := 0
+	creatureCountForAvg := 0
+
+	basicLands := map[string]bool{
+		"Plains": true, "Island": true, "Swamp": true, "Mountain": true, "Forest": true, "Wastes": true,
+	}
+
+	for _, deckCard := range cards {
+		// Get card metadata
+		card, err := d.services.CardService.GetCard(deckCard.CardID)
+		if err != nil || card == nil {
+			continue
+		}
+
+		quantity := deckCard.Quantity
+		stats.TotalCards += quantity
+
+		// Mana curve
+		cmc := int(card.CMC)
+		stats.ManaCurve[cmc] += quantity
+		if cmc > stats.MaxCMC {
+			stats.MaxCMC = cmc
+		}
+
+		// Color distribution
+		d.analyzeCardColors(card, quantity, &stats.Colors)
+
+		// Type breakdown
+		isLand := d.analyzeCardTypes(card, quantity, &stats.Types)
+
+		// Land analysis
+		if isLand {
+			stats.Lands.Total += quantity
+			if basicLands[card.Name] {
+				stats.Lands.Basic += quantity
+			} else {
+				stats.Lands.NonBasic += quantity
+			}
+		} else {
+			// Calculate average CMC for non-lands
+			totalCMC += card.CMC * float64(quantity)
+			nonLandCount += quantity
+		}
+
+		// Creature statistics
+		if strings.Contains(strings.ToLower(card.TypeLine), "creature") {
+			// Parse power and toughness
+			if card.Power != nil && card.Toughness != nil {
+				power := d.parsePowerToughness(*card.Power)
+				toughness := d.parsePowerToughness(*card.Toughness)
+
+				totalCreaturePower += power * quantity
+				totalCreatureToughness += toughness * quantity
+				creatureCountForAvg += quantity
+			}
+		}
+	}
+
+	// Calculate averages
+	if nonLandCount > 0 {
+		stats.AverageCMC = totalCMC / float64(nonLandCount)
+	}
+
+	if stats.TotalCards > 0 {
+		stats.Lands.Ratio = float64(stats.Lands.Total) / float64(stats.TotalCards) * 100
+	}
+
+	// Creature stats
+	stats.Creatures.Total = stats.Types.Creatures
+	stats.Creatures.TotalPower = totalCreaturePower
+	stats.Creatures.TotalToughness = totalCreatureToughness
+	if creatureCountForAvg > 0 {
+		stats.Creatures.AveragePower = float64(totalCreaturePower) / float64(creatureCountForAvg)
+		stats.Creatures.AverageToughness = float64(totalCreatureToughness) / float64(creatureCountForAvg)
+	}
+
+	return stats
+}
+
+// analyzeCardColors updates color statistics.
+func (d *DeckFacade) analyzeCardColors(card *cards.Card, quantity int, colors *ColorStats) {
+	if len(card.Colors) == 0 {
+		colors.Colorless += quantity
+		return
+	}
+
+	if len(card.Colors) > 1 {
+		colors.Multicolor += quantity
+		return
+	}
+
+	// Single color
+	switch card.Colors[0] {
+	case "W":
+		colors.White += quantity
+	case "U":
+		colors.Blue += quantity
+	case "B":
+		colors.Black += quantity
+	case "R":
+		colors.Red += quantity
+	case "G":
+		colors.Green += quantity
+	}
+}
+
+// analyzeCardTypes updates type statistics and returns true if it's a land.
+func (d *DeckFacade) analyzeCardTypes(card *cards.Card, quantity int, types *TypeStats) bool {
+	typeLine := strings.ToLower(card.TypeLine)
+
+	if strings.Contains(typeLine, "land") {
+		types.Lands += quantity
+		return true
+	} else if strings.Contains(typeLine, "creature") {
+		types.Creatures += quantity
+	} else if strings.Contains(typeLine, "planeswalker") {
+		types.Planeswalkers += quantity
+	} else if strings.Contains(typeLine, "instant") {
+		types.Instants += quantity
+	} else if strings.Contains(typeLine, "sorcery") {
+		types.Sorceries += quantity
+	} else if strings.Contains(typeLine, "enchantment") {
+		types.Enchantments += quantity
+	} else if strings.Contains(typeLine, "artifact") {
+		types.Artifacts += quantity
+	} else {
+		types.Other += quantity
+	}
+
+	return false
+}
+
+// parsePowerToughness parses power/toughness strings (* becomes 0).
+func (d *DeckFacade) parsePowerToughness(value string) int {
+	if value == "*" || value == "" {
+		return 0
+	}
+
+	var result int
+	_, _ = fmt.Sscanf(value, "%d", &result)
+	return result
+}
+
+// calculateLandRecommendations provides land count recommendations.
+func (d *DeckFacade) calculateLandRecommendations(stats *DeckStatistics, format string) {
+	deckSize := stats.TotalMainboard
+	avgCMC := stats.AverageCMC
+
+	// Standard deck sizes and recommendations
+	var recommendedLands int
+
+	if deckSize >= 99 {
+		// Commander/Brawl (100 cards)
+		recommendedLands = 37 + int((avgCMC-2.5)*2)
+	} else if deckSize >= 60 {
+		// Standard 60-card deck
+		// Base: 24 lands for avg CMC ~2.5
+		// Adjust based on curve
+		recommendedLands = 24 + int((avgCMC-2.5)*2)
+	} else {
+		// Limited (40 cards)
+		recommendedLands = 17 + int((avgCMC-2.5)*1.5)
+	}
+
+	// Clamp to reasonable ranges
+	if deckSize >= 99 {
+		if recommendedLands < 33 {
+			recommendedLands = 33
+		} else if recommendedLands > 42 {
+			recommendedLands = 42
+		}
+	} else if deckSize >= 60 {
+		if recommendedLands < 20 {
+			recommendedLands = 20
+		} else if recommendedLands > 28 {
+			recommendedLands = 28
+		}
+	} else {
+		if recommendedLands < 15 {
+			recommendedLands = 15
+		} else if recommendedLands > 19 {
+			recommendedLands = 19
+		}
+	}
+
+	stats.Lands.Recommended = recommendedLands
+
+	difference := stats.Lands.Total - recommendedLands
+
+	if difference >= -1 && difference <= 1 {
+		stats.Lands.Status = "optimal"
+		stats.Lands.StatusMessage = "Land count is optimal for your deck"
+	} else if difference < -1 {
+		stats.Lands.Status = "too_few"
+		missing := -difference
+		stats.Lands.StatusMessage = fmt.Sprintf("Consider adding %d more land%s (currently %d, recommended %d)",
+			missing, pluralize(missing), stats.Lands.Total, recommendedLands)
+	} else {
+		stats.Lands.Status = "too_many"
+		extra := difference
+		stats.Lands.StatusMessage = fmt.Sprintf("Consider removing %d land%s (currently %d, recommended %d)",
+			extra, pluralize(extra), stats.Lands.Total, recommendedLands)
+	}
+}
+
+// pluralize returns "s" if count != 1.
+func pluralize(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// checkFormatLegality checks deck legality in various formats.
+func (d *DeckFacade) checkFormatLegality(ctx context.Context, cards []*models.DeckCard, deckFormat string) FormatLegality {
+	legality := FormatLegality{
+		Standard:  LegalityStatus{Legal: true},
+		Historic:  LegalityStatus{Legal: true},
+		Explorer:  LegalityStatus{Legal: true},
+		Alchemy:   LegalityStatus{Legal: true},
+		Brawl:     LegalityStatus{Legal: true},
+		Commander: LegalityStatus{Legal: true},
+	}
+
+	// Count total mainboard cards
+	totalCards := 0
+	cardCounts := make(map[int]int)
+
+	for _, deckCard := range cards {
+		totalCards += deckCard.Quantity
+		cardCounts[deckCard.CardID] += deckCard.Quantity
+	}
+
+	// Check minimum deck size
+	if totalCards < 60 && deckFormat != "Brawl" && deckFormat != "Limited" {
+		reason := fmt.Sprintf("Deck has only %d cards (minimum 60 for constructed)", totalCards)
+		legality.Standard.Legal = false
+		legality.Standard.Reasons = append(legality.Standard.Reasons, reason)
+		legality.Historic.Legal = false
+		legality.Historic.Reasons = append(legality.Historic.Reasons, reason)
+		legality.Explorer.Legal = false
+		legality.Explorer.Reasons = append(legality.Explorer.Reasons, reason)
+		legality.Alchemy.Legal = false
+		legality.Alchemy.Reasons = append(legality.Alchemy.Reasons, reason)
+	}
+
+	// Check for duplicates (max 4 copies, except basic lands)
+	basicLands := map[string]bool{
+		"Plains": true, "Island": true, "Swamp": true, "Mountain": true, "Forest": true, "Wastes": true,
+	}
+
+	for cardID, count := range cardCounts {
+		if count > 4 {
+			card, err := d.services.CardService.GetCard(cardID)
+			if err == nil && card != nil && !basicLands[card.Name] {
+				reason := fmt.Sprintf("Card '%s' has %d copies (maximum 4)", card.Name, count)
+				legality.Standard.Legal = false
+				legality.Standard.Reasons = append(legality.Standard.Reasons, reason)
+				legality.Historic.Legal = false
+				legality.Historic.Reasons = append(legality.Historic.Reasons, reason)
+				legality.Explorer.Legal = false
+				legality.Explorer.Reasons = append(legality.Explorer.Reasons, reason)
+				legality.Alchemy.Legal = false
+				legality.Alchemy.Reasons = append(legality.Alchemy.Reasons, reason)
+			}
+		}
+	}
+
+	// Commander/Brawl specific checks
+	if deckFormat == "Brawl" || deckFormat == "Commander" {
+		if deckFormat == "Brawl" && totalCards != 60 {
+			legality.Brawl.Legal = false
+			legality.Brawl.Reasons = append(legality.Brawl.Reasons,
+				fmt.Sprintf("Brawl decks must have exactly 60 cards (currently %d)", totalCards))
+		}
+		if deckFormat == "Commander" && totalCards != 99 {
+			legality.Commander.Legal = false
+			legality.Commander.Reasons = append(legality.Commander.Reasons,
+				fmt.Sprintf("Commander decks must have exactly 99 cards plus commander (currently %d)", totalCards))
+		}
+
+		// Check singleton (max 1 copy except basic lands)
+		for cardID, count := range cardCounts {
+			if count > 1 {
+				card, err := d.services.CardService.GetCard(cardID)
+				if err == nil && card != nil && !basicLands[card.Name] {
+					reason := fmt.Sprintf("Card '%s' has %d copies (singleton format allows only 1)", card.Name, count)
+					if deckFormat == "Brawl" {
+						legality.Brawl.Legal = false
+						legality.Brawl.Reasons = append(legality.Brawl.Reasons, reason)
+					}
+					if deckFormat == "Commander" {
+						legality.Commander.Legal = false
+						legality.Commander.Reasons = append(legality.Commander.Reasons, reason)
+					}
+				}
+			}
+		}
+	}
+
+	return legality
 }
 
 // ExportDeck exports a deck to the requested format.
