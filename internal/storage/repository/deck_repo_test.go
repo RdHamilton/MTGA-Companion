@@ -1213,3 +1213,366 @@ func TestDeckRepository_Tags(t *testing.T) {
 		}
 	}
 }
+
+func TestDeckRepository_Clone(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	description := "Original deck description"
+	colorIdentity := "WU"
+
+	// Create original deck
+	originalDeck := &models.Deck{
+		ID:            "deck-1",
+		AccountID:     1,
+		Name:          "Original Deck",
+		Format:        "Standard",
+		Description:   &description,
+		ColorIdentity: &colorIdentity,
+		Source:        "constructed",
+		MatchesPlayed: 10,
+		MatchesWon:    7,
+		GamesPlayed:   25,
+		GamesWon:      18,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+	}
+
+	err := repo.Create(ctx, originalDeck)
+	if err != nil {
+		t.Fatalf("failed to create original deck: %v", err)
+	}
+
+	// Add some cards to the original deck
+	cards := []*models.DeckCard{
+		{DeckID: "deck-1", CardID: 100, Quantity: 4, Board: "main", FromDraftPick: false},
+		{DeckID: "deck-1", CardID: 101, Quantity: 2, Board: "sideboard", FromDraftPick: false},
+	}
+	for _, card := range cards {
+		if err := repo.AddCard(ctx, card); err != nil {
+			t.Fatalf("failed to add card: %v", err)
+		}
+	}
+
+	// Add tags to original deck
+	tags := []*models.DeckTag{
+		{DeckID: "deck-1", Tag: "aggro", CreatedAt: now},
+		{DeckID: "deck-1", Tag: "control", CreatedAt: now},
+	}
+	for _, tag := range tags {
+		if err := repo.AddTag(ctx, tag); err != nil {
+			t.Fatalf("failed to add tag: %v", err)
+		}
+	}
+
+	// Clone the deck
+	clonedDeck, err := repo.Clone(ctx, "deck-1", "Cloned Deck")
+	if err != nil {
+		t.Fatalf("failed to clone deck: %v", err)
+	}
+
+	// Verify cloned deck properties
+	if clonedDeck.Name != "Cloned Deck" {
+		t.Errorf("expected name 'Cloned Deck', got '%s'", clonedDeck.Name)
+	}
+
+	if clonedDeck.Format != "Standard" {
+		t.Errorf("expected format 'Standard', got '%s'", clonedDeck.Format)
+	}
+
+	if clonedDeck.Source != "constructed" {
+		t.Errorf("expected source 'constructed', got '%s'", clonedDeck.Source)
+	}
+
+	if clonedDeck.MatchesPlayed != 0 {
+		t.Errorf("expected matches_played to be reset to 0, got %d", clonedDeck.MatchesPlayed)
+	}
+
+	if clonedDeck.MatchesWon != 0 {
+		t.Errorf("expected matches_won to be reset to 0, got %d", clonedDeck.MatchesWon)
+	}
+
+	// Verify cards were cloned
+	clonedCards, err := repo.GetCards(ctx, clonedDeck.ID)
+	if err != nil {
+		t.Fatalf("failed to get cloned deck cards: %v", err)
+	}
+
+	if len(clonedCards) != 2 {
+		t.Errorf("expected 2 cards in cloned deck, got %d", len(clonedCards))
+	}
+
+	// Verify tags were cloned
+	clonedTags, err := repo.GetTags(ctx, clonedDeck.ID)
+	if err != nil {
+		t.Fatalf("failed to get cloned deck tags: %v", err)
+	}
+
+	if len(clonedTags) != 2 {
+		t.Errorf("expected 2 tags in cloned deck, got %d", len(clonedTags))
+	}
+}
+
+func TestDeckRepository_GetByTags(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create multiple decks with different tags
+	decks := []*models.Deck{
+		{
+			ID:            "deck-1",
+			AccountID:     1,
+			Name:          "Aggro Deck",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "deck-2",
+			AccountID:     1,
+			Name:          "Control Deck",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "deck-3",
+			AccountID:     1,
+			Name:          "Aggro Control Deck",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+	}
+
+	for _, d := range decks {
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	// Add tags
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-1", Tag: "aggro", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-2", Tag: "control", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-3", Tag: "aggro", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-3", Tag: "control", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+
+	// Test filtering by single tag
+	results, err := repo.GetByTags(ctx, 1, []string{"aggro"})
+	if err != nil {
+		t.Fatalf("failed to get decks by tags: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 decks with 'aggro' tag, got %d", len(results))
+	}
+
+	// Test filtering by multiple tags (must have ALL)
+	results, err = repo.GetByTags(ctx, 1, []string{"aggro", "control"})
+	if err != nil {
+		t.Fatalf("failed to get decks by tags: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 deck with both 'aggro' and 'control' tags, got %d", len(results))
+	}
+
+	if len(results) > 0 && results[0].ID != "deck-3" {
+		t.Errorf("expected deck-3, got %s", results[0].ID)
+	}
+}
+
+func TestDeckRepository_GetByFilters(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create multiple decks with different properties
+	decks := []*models.Deck{
+		{
+			ID:            "deck-1",
+			AccountID:     1,
+			Name:          "Standard Aggro",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 10,
+			MatchesWon:    7,
+			GamesPlayed:   25,
+			GamesWon:      18,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "deck-2",
+			AccountID:     1,
+			Name:          "Historic Control",
+			Format:        "Historic",
+			Source:        "imported",
+			MatchesPlayed: 5,
+			MatchesWon:    3,
+			GamesPlayed:   12,
+			GamesWon:      7,
+			CreatedAt:     now.Add(1 * time.Hour),
+			ModifiedAt:    now.Add(1 * time.Hour),
+		},
+		{
+			ID:            "deck-3",
+			AccountID:     1,
+			Name:          "Standard Control",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 20,
+			MatchesWon:    15,
+			GamesPlayed:   50,
+			GamesWon:      38,
+			CreatedAt:     now.Add(2 * time.Hour),
+			ModifiedAt:    now.Add(2 * time.Hour),
+		},
+	}
+
+	for _, d := range decks {
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	// Add tags
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-1", Tag: "aggro", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-2", Tag: "control", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+	if err := repo.AddTag(ctx, &models.DeckTag{DeckID: "deck-3", Tag: "control", CreatedAt: now}); err != nil {
+		t.Fatalf("failed to add tag: %v", err)
+	}
+
+	// Test filter by format
+	standardFormat := "Standard"
+	filter := &DeckFilter{
+		AccountID: 1,
+		Format:    &standardFormat,
+	}
+
+	results, err := repo.GetByFilters(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get decks by filters: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 Standard decks, got %d", len(results))
+	}
+
+	// Test filter by source
+	constructedSource := "constructed"
+	filter = &DeckFilter{
+		AccountID: 1,
+		Source:    &constructedSource,
+	}
+
+	results, err = repo.GetByFilters(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get decks by filters: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 constructed decks, got %d", len(results))
+	}
+
+	// Test filter by tags
+	filter = &DeckFilter{
+		AccountID: 1,
+		Tags:      []string{"control"},
+	}
+
+	results, err = repo.GetByFilters(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get decks by filters: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 control decks, got %d", len(results))
+	}
+
+	// Test combined filters (format + tags)
+	filter = &DeckFilter{
+		AccountID: 1,
+		Format:    &standardFormat,
+		Tags:      []string{"control"},
+	}
+
+	results, err = repo.GetByFilters(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get decks by filters: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 Standard control deck, got %d", len(results))
+	}
+
+	if len(results) > 0 && results[0].ID != "deck-3" {
+		t.Errorf("expected deck-3, got %s", results[0].ID)
+	}
+
+	// Test sorting by performance
+	filter = &DeckFilter{
+		AccountID: 1,
+		SortBy:    "performance",
+		SortDesc:  true,
+	}
+
+	results, err = repo.GetByFilters(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get decks by filters: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("expected 3 decks, got %d", len(results))
+	}
+
+	// Should be ordered by win rate descending (deck-3: 75%, deck-1: 70%, deck-2: 60%)
+	if len(results) == 3 {
+		if results[0].ID != "deck-3" {
+			t.Errorf("expected deck-3 first (highest win rate), got %s", results[0].ID)
+		}
+		if results[1].ID != "deck-1" {
+			t.Errorf("expected deck-1 second, got %s", results[1].ID)
+		}
+	}
+}

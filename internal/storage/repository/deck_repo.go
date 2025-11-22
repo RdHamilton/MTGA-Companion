@@ -9,6 +9,16 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
+// DeckFilter provides filtering options for deck queries.
+type DeckFilter struct {
+	AccountID int      // Required: filter by account
+	Format    *string  // Optional: filter by format (Standard, Historic, etc.)
+	Source    *string  // Optional: filter by source (draft, constructed, imported)
+	Tags      []string // Optional: filter by tags (must have ALL specified tags)
+	SortBy    string   // Sort field: "modified", "created", "name", "performance"
+	SortDesc  bool     // Sort descending (default: true for dates, false for names)
+}
+
 // DeckRepository handles database operations for decks.
 type DeckRepository interface {
 	// Create inserts a new deck into the database.
@@ -67,6 +77,15 @@ type DeckRepository interface {
 
 	// RemoveTag removes a tag from a deck.
 	RemoveTag(ctx context.Context, deckID string, tag string) error
+
+	// Clone creates a copy of a deck with a new ID and name.
+	Clone(ctx context.Context, deckID, newName string) (*models.Deck, error)
+
+	// GetByTags retrieves all decks that have ALL specified tags.
+	GetByTags(ctx context.Context, accountID int, tags []string) ([]*models.Deck, error)
+
+	// GetByFilters retrieves decks matching multiple filter criteria.
+	GetByFilters(ctx context.Context, filter *DeckFilter) ([]*models.Deck, error)
 }
 
 // deckRepository is the concrete implementation of DeckRepository.
@@ -638,6 +657,203 @@ func (r *deckRepository) RemoveTag(ctx context.Context, deckID string, tag strin
 	}
 
 	return nil
+}
+
+// Clone creates a copy of a deck with a new ID and name.
+func (r *deckRepository) Clone(ctx context.Context, deckID, newName string) (*models.Deck, error) {
+	// Get the original deck
+	originalDeck, err := r.GetByID(ctx, deckID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original deck: %w", err)
+	}
+	if originalDeck == nil {
+		return nil, fmt.Errorf("original deck not found")
+	}
+
+	// Create a new deck with a new ID
+	newDeck := &models.Deck{
+		ID:            fmt.Sprintf("%s-clone-%d", deckID, time.Now().Unix()),
+		AccountID:     originalDeck.AccountID,
+		Name:          newName,
+		Format:        originalDeck.Format,
+		Description:   originalDeck.Description,
+		ColorIdentity: originalDeck.ColorIdentity,
+		Source:        "constructed", // Clones are always constructed, not draft
+		DraftEventID:  nil,           // Don't copy draft event association
+		MatchesPlayed: 0,             // Reset performance stats
+		MatchesWon:    0,
+		GamesPlayed:   0,
+		GamesWon:      0,
+		CreatedAt:     time.Now(),
+		ModifiedAt:    time.Now(),
+	}
+
+	// Create the new deck
+	if err := r.Create(ctx, newDeck); err != nil {
+		return nil, fmt.Errorf("failed to create cloned deck: %w", err)
+	}
+
+	// Copy all cards
+	originalCards, err := r.GetCards(ctx, deckID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original deck cards: %w", err)
+	}
+
+	for _, card := range originalCards {
+		newCard := &models.DeckCard{
+			DeckID:        newDeck.ID,
+			CardID:        card.CardID,
+			Quantity:      card.Quantity,
+			Board:         card.Board,
+			FromDraftPick: false, // Don't copy draft pick flag
+		}
+		if err := r.AddCard(ctx, newCard); err != nil {
+			return nil, fmt.Errorf("failed to copy card to cloned deck: %w", err)
+		}
+	}
+
+	// Copy all tags
+	originalTags, err := r.GetTags(ctx, deckID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original deck tags: %w", err)
+	}
+
+	for _, tag := range originalTags {
+		newTag := &models.DeckTag{
+			DeckID:    newDeck.ID,
+			Tag:       tag.Tag,
+			CreatedAt: time.Now(),
+		}
+		if err := r.AddTag(ctx, newTag); err != nil {
+			return nil, fmt.Errorf("failed to copy tag to cloned deck: %w", err)
+		}
+	}
+
+	return newDeck, nil
+}
+
+// GetByTags retrieves all decks that have ALL specified tags.
+func (r *deckRepository) GetByTags(ctx context.Context, accountID int, tags []string) ([]*models.Deck, error) {
+	if len(tags) == 0 {
+		return r.List(ctx, accountID)
+	}
+
+	// Build query with JOIN for each tag to ensure deck has ALL tags
+	query := `
+		SELECT DISTINCT d.id, d.account_id, d.name, d.format, d.description, d.color_identity, d.source, d.draft_event_id,
+		       d.matches_played, d.matches_won, d.games_played, d.games_won,
+		       d.created_at, d.modified_at, d.last_played
+		FROM decks d
+	`
+
+	// Add a JOIN for each tag
+	for i := range tags {
+		query += fmt.Sprintf(" INNER JOIN deck_tags dt%d ON d.id = dt%d.deck_id", i, i)
+	}
+
+	query += " WHERE d.account_id = ?"
+
+	// Add conditions for each tag
+	for i := range tags {
+		query += fmt.Sprintf(" AND dt%d.tag = ?", i)
+	}
+
+	query += " ORDER BY d.modified_at DESC"
+
+	// Build args: accountID + all tags
+	args := make([]interface{}, 0, len(tags)+1)
+	args = append(args, accountID)
+	for _, tag := range tags {
+		args = append(args, tag)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get decks by tags: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	return r.scanDecks(rows)
+}
+
+// GetByFilters retrieves decks matching multiple filter criteria.
+func (r *deckRepository) GetByFilters(ctx context.Context, filter *DeckFilter) ([]*models.Deck, error) {
+	if filter == nil {
+		return nil, fmt.Errorf("filter cannot be nil")
+	}
+
+	// Start with base query
+	query := `
+		SELECT DISTINCT d.id, d.account_id, d.name, d.format, d.description, d.color_identity, d.source, d.draft_event_id,
+		       d.matches_played, d.matches_won, d.games_played, d.games_won,
+		       d.created_at, d.modified_at, d.last_played
+		FROM decks d
+	`
+
+	// Add JOINs for tag filtering
+	if len(filter.Tags) > 0 {
+		for i := range filter.Tags {
+			query += fmt.Sprintf(" INNER JOIN deck_tags dt%d ON d.id = dt%d.deck_id", i, i)
+		}
+	}
+
+	// WHERE clause
+	query += " WHERE d.account_id = ?"
+	args := []interface{}{filter.AccountID}
+
+	// Add format filter
+	if filter.Format != nil {
+		query += " AND d.format = ?"
+		args = append(args, *filter.Format)
+	}
+
+	// Add source filter
+	if filter.Source != nil {
+		query += " AND d.source = ?"
+		args = append(args, *filter.Source)
+	}
+
+	// Add tag conditions
+	for i, tag := range filter.Tags {
+		query += fmt.Sprintf(" AND dt%d.tag = ?", i)
+		args = append(args, tag)
+	}
+
+	// Add ORDER BY
+	sortField := "d.modified_at"
+	if filter.SortBy != "" {
+		switch filter.SortBy {
+		case "modified":
+			sortField = "d.modified_at"
+		case "created":
+			sortField = "d.created_at"
+		case "name":
+			sortField = "d.name"
+		case "performance":
+			sortField = "(CAST(d.matches_won AS REAL) / NULLIF(d.matches_played, 0))"
+		}
+	}
+
+	sortDir := "DESC"
+	if !filter.SortDesc && filter.SortBy != "name" {
+		sortDir = "ASC"
+	} else if filter.SortBy == "name" && !filter.SortDesc {
+		sortDir = "ASC"
+	}
+
+	query += fmt.Sprintf(" ORDER BY %s %s", sortField, sortDir)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get decks by filters: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	return r.scanDecks(rows)
 }
 
 // scanDecks is a helper function to scan multiple decks from rows.
