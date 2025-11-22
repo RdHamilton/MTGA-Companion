@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -991,5 +992,101 @@ func (d *DeckFacade) ExplainRecommendation(ctx context.Context, req *ExplainReco
 
 	return &ExplainRecommendationResponse{
 		Explanation: explanation,
+	}, nil
+}
+
+// ExportDeckRequest represents a request to export a deck.
+type ExportDeckRequest struct {
+	DeckID         string `json:"deckID"`
+	Format         string `json:"format"`         // "arena", "plaintext", "mtgo", "mtggoldfish"
+	IncludeHeaders bool   `json:"includeHeaders"` // Include section headers
+	IncludeStats   bool   `json:"includeStats"`   // Include deck statistics as comments
+}
+
+// ExportDeckResponse represents the exported deck data.
+type ExportDeckResponse struct {
+	Content  string `json:"content"`         // The exported deck text
+	Filename string `json:"filename"`        // Suggested filename
+	Format   string `json:"format"`          // The format used
+	Error    string `json:"error,omitempty"` // Error message if failed
+}
+
+// ExportDeck exports a deck to the requested format.
+func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*ExportDeckResponse, error) {
+	if req.DeckID == "" {
+		return nil, fmt.Errorf("deck ID is required")
+	}
+	if req.Format == "" {
+		req.Format = "arena" // Default to Arena format
+	}
+
+	// Get deck from database
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, req.DeckID)
+		return err
+	})
+	if err != nil {
+		return &ExportDeckResponse{
+			Error: fmt.Sprintf("Failed to get deck: %v", err),
+		}, nil
+	}
+
+	// Get deck cards
+	var deckCards []*models.DeckCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		deckCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deck.ID)
+		return err
+	})
+	if err != nil {
+		return &ExportDeckResponse{
+			Error: fmt.Sprintf("Failed to get deck cards: %v", err),
+		}, nil
+	}
+
+	// Convert format string to ExportFormat
+	var exportFormat deckexport.ExportFormat
+	switch req.Format {
+	case "arena":
+		exportFormat = deckexport.FormatArena
+	case "plaintext":
+		exportFormat = deckexport.FormatPlainText
+	case "mtgo":
+		exportFormat = deckexport.FormatMTGO
+	case "mtggoldfish":
+		exportFormat = deckexport.FormatMTGGoldfish
+	default:
+		return &ExportDeckResponse{
+			Error: fmt.Sprintf("Unsupported export format: %s", req.Format),
+		}, nil
+	}
+
+	// Export the deck
+	exporter := d.services.DeckExporter
+	if exporter == nil {
+		return &ExportDeckResponse{
+			Error: "Deck exporter not available",
+		}, nil
+	}
+
+	options := &deckexport.ExportOptions{
+		Format:         exportFormat,
+		IncludeHeaders: req.IncludeHeaders,
+		IncludeStats:   req.IncludeStats,
+	}
+
+	result, err := exporter.Export(deck, deckCards, options)
+	if err != nil {
+		return &ExportDeckResponse{
+			Error: fmt.Sprintf("Failed to export deck: %v", err),
+		}, nil
+	}
+
+	return &ExportDeckResponse{
+		Content:  result.Content,
+		Filename: result.Filename,
+		Format:   string(result.Format),
 	}, nil
 }
