@@ -329,9 +329,9 @@ func exportDecksCSVFormat(decks []*models.DeckView, outputPath string) error {
 	return exporter.Export(rows)
 }
 
-// ExportAllDecks exports all decks in the database.
-func ExportAllDecks(ctx context.Context, deckViewer *viewer.DeckViewer, deckFormat DeckFormat, outputPath string) error {
-	decks, err := deckViewer.ListDecks(ctx)
+// ExportAllDecks exports all decks in the database for the specified account.
+func ExportAllDecks(ctx context.Context, deckViewer *viewer.DeckViewer, accountID int, deckFormat DeckFormat, outputPath string) error {
+	decks, err := deckViewer.ListDecks(ctx, accountID)
 	if err != nil {
 		return fmt.Errorf("failed to list decks: %w", err)
 	}
@@ -348,9 +348,9 @@ func ExportAllDecks(ctx context.Context, deckViewer *viewer.DeckViewer, deckForm
 	return ExportDecks(ctx, deckViewer, deckIDs, deckFormat, outputPath)
 }
 
-// ExportDecksByFormat exports all decks of a specific format.
-func ExportDecksByFormat(ctx context.Context, deckViewer *viewer.DeckViewer, format string, deckFormat DeckFormat, outputPath string) error {
-	decks, err := deckViewer.GetDecksByFormat(ctx, format)
+// ExportDecksByFormat exports all decks of a specific format for the specified account.
+func ExportDecksByFormat(ctx context.Context, deckViewer *viewer.DeckViewer, accountID int, format string, deckFormat DeckFormat, outputPath string) error {
+	decks, err := deckViewer.GetDecksByFormat(ctx, accountID, format)
 	if err != nil {
 		return fmt.Errorf("failed to get decks by format: %w", err)
 	}

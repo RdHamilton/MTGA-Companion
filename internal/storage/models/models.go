@@ -74,6 +74,12 @@ type Deck struct {
 	Format        string
 	Description   *string // Nullable
 	ColorIdentity *string // Nullable
+	Source        string  // "draft", "constructed", or "imported"
+	DraftEventID  *string // Nullable, foreign key to draft_events
+	MatchesPlayed int     // Total matches played with this deck
+	MatchesWon    int     // Total matches won with this deck
+	GamesPlayed   int     // Total games played with this deck
+	GamesWon      int     // Total games won with this deck
 	CreatedAt     time.Time
 	ModifiedAt    time.Time
 	LastPlayed    *time.Time // Nullable
@@ -81,11 +87,38 @@ type Deck struct {
 
 // DeckCard represents a card in a deck.
 type DeckCard struct {
-	ID       int
-	DeckID   string
-	CardID   int
-	Quantity int
-	Board    string // "main" or "sideboard"
+	ID            int
+	DeckID        string
+	CardID        int
+	Quantity      int
+	Board         string // "main" or "sideboard"
+	FromDraftPick bool   // True if this card was picked during the associated draft
+}
+
+// DeckTag represents a tag applied to a deck for categorization.
+type DeckTag struct {
+	ID        int
+	DeckID    string
+	Tag       string
+	CreatedAt time.Time
+}
+
+// DeckPerformance provides calculated performance metrics for a deck.
+type DeckPerformance struct {
+	DeckID            string
+	MatchesPlayed     int
+	MatchesWon        int
+	MatchesLost       int
+	GamesPlayed       int
+	GamesWon          int
+	GamesLost         int
+	MatchWinRate      float64 // Calculated: MatchesWon / MatchesPlayed
+	GameWinRate       float64 // Calculated: GamesWon / GamesPlayed
+	LastPlayed        *time.Time
+	AverageDuration   *float64 // Average match duration in seconds
+	CurrentWinStreak  int      // Positive for wins, negative for losses
+	LongestWinStreak  int
+	LongestLossStreak int
 }
 
 // CollectionCard represents a card in the player's collection.
