@@ -38,18 +38,17 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		// Use the completion status from the parser (which detects completion via quest disappearance)
 		// IMPORTANT: Preserve the original assigned_at timestamp for accurate duration calculation
 
-		// Strip monotonic clock from timestamps for SQLite compatibility
-		var completedAt *time.Time
+		// Format timestamps for SQLite (ISO 8601 without timezone suffix)
+		var completedAtStr *string
 		if quest.CompletedAt != nil {
-			rounded := quest.CompletedAt.Round(0)
-			completedAt = &rounded
+			formatted := quest.CompletedAt.UTC().Format("2006-01-02 15:04:05.999999")
+			completedAtStr = &formatted
 		}
 
-		var lastSeenAt *time.Time
+		var lastSeenAtStr *string
 		if quest.LastSeenAt != nil {
-			// Convert to UTC to avoid timezone in string representation
-			utc := quest.LastSeenAt.UTC().Round(0)
-			lastSeenAt = &utc
+			formatted := quest.LastSeenAt.UTC().Format("2006-01-02 15:04:05.999999")
+			lastSeenAtStr = &formatted
 		}
 
 		updateQuery := `
@@ -65,8 +64,8 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		_, err = r.db.Exec(updateQuery,
 			quest.EndingProgress,
 			quest.Completed,
-			completedAt,
-			lastSeenAt,
+			completedAtStr,
+			lastSeenAtStr,
 			quest.CanSwap,
 			existingID,
 		)
@@ -90,26 +89,25 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// Strip monotonic clock from timestamps for SQLite compatibility
-	assignedAt := quest.AssignedAt.Round(0)
-	var completedAt *time.Time
+	// Format timestamps for SQLite (ISO 8601 without timezone suffix)
+	assignedAtStr := quest.AssignedAt.UTC().Format("2006-01-02 15:04:05.999999")
+	var completedAtStr *string
 	if quest.CompletedAt != nil {
-		rounded := quest.CompletedAt.Round(0)
-		completedAt = &rounded
+		formatted := quest.CompletedAt.UTC().Format("2006-01-02 15:04:05.999999")
+		completedAtStr = &formatted
 	}
 
-	var lastSeenAt *time.Time
+	var lastSeenAtStr *string
 	if quest.LastSeenAt != nil {
-		// Convert to UTC to avoid timezone in string representation
-		utc := quest.LastSeenAt.UTC().Round(0)
-		lastSeenAt = &utc
+		formatted := quest.LastSeenAt.UTC().Format("2006-01-02 15:04:05.999999")
+		lastSeenAtStr = &formatted
 	}
 
 	result, err := r.db.Exec(query,
 		quest.QuestID, quest.QuestType, quest.Goal,
 		quest.StartingProgress, quest.EndingProgress,
 		quest.Completed, quest.CanSwap, quest.Rewards,
-		assignedAt, completedAt, lastSeenAt, quest.Rerolled,
+		assignedAtStr, completedAtStr, lastSeenAtStr, quest.Rerolled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save quest: %w", err)
@@ -344,7 +342,11 @@ func (r *QuestRepository) MarkCompleted(questID string, assignedAt time.Time, co
 		WHERE quest_id = ? AND assigned_at = ?
 	`
 
-	_, err := r.db.Exec(query, completedAt, questID, assignedAt)
+	// Format timestamp for SQLite (ISO 8601 without timezone suffix)
+	completedAtStr := completedAt.UTC().Format("2006-01-02 15:04:05.999999")
+	assignedAtStr := assignedAt.UTC().Format("2006-01-02 15:04:05.999999")
+
+	_, err := r.db.Exec(query, completedAtStr, questID, assignedAtStr)
 	if err != nil {
 		return fmt.Errorf("failed to mark quest as completed: %w", err)
 	}
@@ -360,7 +362,10 @@ func (r *QuestRepository) MarkRerolled(questID string, assignedAt time.Time) err
 		WHERE quest_id = ? AND assigned_at = ?
 	`
 
-	_, err := r.db.Exec(query, questID, assignedAt)
+	// Format timestamp for SQLite (ISO 8601 without timezone suffix)
+	assignedAtStr := assignedAt.UTC().Format("2006-01-02 15:04:05.999999")
+
+	_, err := r.db.Exec(query, questID, assignedAtStr)
 	if err != nil {
 		return fmt.Errorf("failed to mark quest as rerolled: %w", err)
 	}
@@ -437,7 +442,10 @@ func (r *QuestRepository) MarkActiveQuestsCompleted(timestamp time.Time) error {
 		  )
 	`
 
-	result, err := r.db.Exec(query, timestamp)
+	// Format timestamp for SQLite (ISO 8601 without timezone suffix)
+	timestampStr := timestamp.UTC().Format("2006-01-02 15:04:05.999999")
+
+	result, err := r.db.Exec(query, timestampStr)
 	if err != nil {
 		return fmt.Errorf("failed to mark active quests as completed: %w", err)
 	}

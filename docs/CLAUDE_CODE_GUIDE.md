@@ -889,6 +889,77 @@ For complete architectural details and rationale, see **ADR-011** in `docs/ARCHI
 
 ---
 
+## Database Best Practices
+
+### SQLite Timestamp Formatting
+
+**CRITICAL**: SQLite's `datetime()` function requires timestamps in ISO 8601 format **without timezone suffixes**.
+
+**Problem**: Go's `time.Time` type includes timezone information when converted to string:
+- `time.Time.String()` produces: `"2025-11-22 00:23:11.743819 +0000 UTC"`
+- SQLite's `datetime()` expects: `"2025-11-22 00:23:11.743819"`
+- Passing the wrong format causes `datetime()` to return `NULL`, breaking queries
+
+**Solution**: Always format timestamps explicitly before saving to SQLite:
+
+```go
+// ✅ Correct - Format timestamp as ISO 8601 without timezone
+timestampStr := timestamp.UTC().Format("2006-01-02 15:04:05.999999")
+_, err := db.Exec(query, timestampStr, ...)
+
+// ❌ Wrong - Passing time.Time directly
+_, err := db.Exec(query, timestamp, ...)
+
+// ❌ Wrong - Using String() or default formatting
+timestampStr := timestamp.String()
+_, err := db.Exec(query, timestampStr, ...)
+```
+
+**When to apply**:
+- ALL `INSERT` statements with timestamp columns
+- ALL `UPDATE` statements with timestamp columns
+- ALL `WHERE` clause comparisons with timestamp columns
+- Both nullable and non-nullable timestamp fields
+
+**Examples**:
+
+```go
+// Non-nullable timestamp
+assignedAtStr := quest.AssignedAt.UTC().Format("2006-01-02 15:04:05.999999")
+_, err := db.Exec(query, assignedAtStr, ...)
+
+// Nullable timestamp
+var completedAtStr *string
+if quest.CompletedAt != nil {
+    formatted := quest.CompletedAt.UTC().Format("2006-01-02 15:04:05.999999")
+    completedAtStr = &formatted
+}
+_, err := db.Exec(query, completedAtStr, ...)
+```
+
+**Why `.UTC()` first**:
+- Ensures consistent timezone (UTC)
+- Removes timezone offset from formatting
+- Makes timestamps comparable across different system timezones
+
+**Why this format**:
+- `"2006-01-02 15:04:05.999999"` is Go's reference time format for ISO 8601 with microseconds
+- SQLite understands this format in `datetime()` and comparison operations
+- Microseconds (`.999999`) preserve precision for sub-second timestamps
+
+**Testing queries**:
+When working with timestamp queries, test them with actual formatted values:
+```sql
+-- This works
+SELECT * FROM quests WHERE datetime(last_seen_at) >= datetime('now', '-24 hours');
+
+-- This fails if last_seen_at contains timezone suffixes like "+0000 UTC"
+-- because datetime(last_seen_at) returns NULL
+```
+
+**Related Issues**:
+- Quest completion tracking bug (2025-11-21) - Quests not appearing due to malformed timestamps
+
 ## Coding Principles
 
 ### KISS (Keep It Simple, Stupid)
