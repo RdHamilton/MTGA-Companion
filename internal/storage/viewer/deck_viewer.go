@@ -101,14 +101,14 @@ func (dv *DeckViewer) GetDeck(ctx context.Context, deckID string) (*models.DeckV
 	return view, nil
 }
 
-// ListDecks retrieves all decks with basic information.
-func (dv *DeckViewer) ListDecks(ctx context.Context) ([]*models.Deck, error) {
-	return dv.deckRepo.List(ctx)
+// ListDecks retrieves all decks with basic information for an account.
+func (dv *DeckViewer) ListDecks(ctx context.Context, accountID int) ([]*models.Deck, error) {
+	return dv.deckRepo.List(ctx, accountID)
 }
 
-// GetDecksByFormat retrieves all decks for a specific format.
-func (dv *DeckViewer) GetDecksByFormat(ctx context.Context, format string) ([]*models.Deck, error) {
-	return dv.deckRepo.GetByFormat(ctx, format)
+// GetDecksByFormat retrieves all decks for a specific format and account.
+func (dv *DeckViewer) GetDecksByFormat(ctx context.Context, accountID int, format string) ([]*models.Deck, error) {
+	return dv.deckRepo.GetByFormat(ctx, accountID, format)
 }
 
 // GetDeckCards retrieves just the cards in a deck with metadata.

@@ -978,9 +978,9 @@ func (s *Service) StoreDeck(ctx context.Context, deck *models.Deck, cards []*mod
 	})
 }
 
-// ListDecks returns all decks.
+// ListDecks returns all decks for the current account.
 func (s *Service) ListDecks(ctx context.Context) ([]*models.Deck, error) {
-	return s.decks.List(ctx)
+	return s.decks.List(ctx, s.currentAccountID)
 }
 
 // InferDeckIDsForMatches attempts to link matches to decks based on timestamp proximity.
@@ -999,8 +999,8 @@ func (s *Service) InferDeckIDsForMatches(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
-	// Get all decks with LastPlayed timestamps
-	allDecks, err := s.decks.List(ctx)
+	// Get all decks with LastPlayed timestamps for the current account
+	allDecks, err := s.decks.List(ctx, s.currentAccountID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list decks: %w", err)
 	}
@@ -1935,6 +1935,11 @@ func (s *Service) SetCardRepo() repository.SetCardRepository {
 // DraftRatingsRepo returns the draft ratings repository.
 func (s *Service) DraftRatingsRepo() repository.DraftRatingsRepository {
 	return s.draftRatings
+}
+
+// DeckRepo returns the deck repository.
+func (s *Service) DeckRepo() repository.DeckRepository {
+	return s.decks
 }
 
 // ClearAllMatches deletes all matches and games for the current account.
