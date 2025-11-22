@@ -12,6 +12,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // DeckFacade handles all deck builder operations.
@@ -1009,6 +1010,191 @@ type ExportDeckResponse struct {
 	Filename string `json:"filename"`        // Suggested filename
 	Format   string `json:"format"`          // The format used
 	Error    string `json:"error,omitempty"` // Error message if failed
+}
+
+// CloneDeck creates a copy of an existing deck.
+func (d *DeckFacade) CloneDeck(ctx context.Context, deckID, newName string) (*models.Deck, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if deckID == "" {
+		return nil, &AppError{Message: "Deck ID is required"}
+	}
+
+	if newName == "" {
+		return nil, &AppError{Message: "New deck name is required"}
+	}
+
+	var clonedDeck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		clonedDeck, err = d.services.Storage.DeckRepo().Clone(ctx, deckID, newName)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to clone deck: %v", err)}
+	}
+
+	log.Printf("Cloned deck %s to %s (%s)", deckID, newName, clonedDeck.ID)
+	return clonedDeck, nil
+}
+
+// GetDecksByFormat retrieves decks filtered by format (Standard, Historic, etc.).
+func (d *DeckFacade) GetDecksByFormat(ctx context.Context, format string) ([]*DeckListItem, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	accountID := d.services.Storage.GetCurrentAccountID()
+	if accountID == 0 {
+		return nil, &AppError{Message: "No active account"}
+	}
+
+	var decks []*models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		decks, err = d.services.Storage.DeckRepo().GetByFormat(ctx, accountID, format)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get decks by format: %v", err)}
+	}
+
+	return d.convertToDeckListItems(ctx, decks)
+}
+
+// GetDecksByTags retrieves decks that have ALL specified tags.
+func (d *DeckFacade) GetDecksByTags(ctx context.Context, tags []string) ([]*DeckListItem, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	accountID := d.services.Storage.GetCurrentAccountID()
+	if accountID == 0 {
+		return nil, &AppError{Message: "No active account"}
+	}
+
+	var decks []*models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		decks, err = d.services.Storage.DeckRepo().GetByTags(ctx, accountID, tags)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get decks by tags: %v", err)}
+	}
+
+	return d.convertToDeckListItems(ctx, decks)
+}
+
+// DeckLibraryFilter represents filter options for the deck library.
+type DeckLibraryFilter struct {
+	Format   *string  `json:"format,omitempty"`   // Filter by format
+	Source   *string  `json:"source,omitempty"`   // Filter by source
+	Tags     []string `json:"tags,omitempty"`     // Filter by tags (must have ALL)
+	SortBy   string   `json:"sortBy,omitempty"`   // Sort field: "modified", "created", "name", "performance"
+	SortDesc bool     `json:"sortDesc,omitempty"` // Sort descending
+}
+
+// GetDeckLibrary retrieves all decks with advanced filtering and sorting.
+func (d *DeckFacade) GetDeckLibrary(ctx context.Context, filter *DeckLibraryFilter) ([]*DeckListItem, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	accountID := d.services.Storage.GetCurrentAccountID()
+	if accountID == 0 {
+		return nil, &AppError{Message: "No active account"}
+	}
+
+	// Convert to repository filter
+	repoFilter := &repository.DeckFilter{
+		AccountID: accountID,
+		SortDesc:  true, // Default to descending
+	}
+
+	if filter != nil {
+		repoFilter.Format = filter.Format
+		repoFilter.Source = filter.Source
+		repoFilter.Tags = filter.Tags
+		repoFilter.SortBy = filter.SortBy
+		repoFilter.SortDesc = filter.SortDesc
+	}
+
+	var decks []*models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		decks, err = d.services.Storage.DeckRepo().GetByFilters(ctx, repoFilter)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck library: %v", err)}
+	}
+
+	return d.convertToDeckListItems(ctx, decks)
+}
+
+// convertToDeckListItems is a helper to convert decks to DeckListItem format.
+func (d *DeckFacade) convertToDeckListItems(ctx context.Context, decks []*models.Deck) ([]*DeckListItem, error) {
+	items := make([]*DeckListItem, 0, len(decks))
+
+	for _, deck := range decks {
+		// Get card count
+		var cards []*models.DeckCard
+		err := storage.RetryOnBusy(func() error {
+			var err error
+			cards, err = d.services.Storage.DeckRepo().GetCards(ctx, deck.ID)
+			return err
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to get cards for deck %s: %v", deck.ID, err)
+		}
+
+		// Count total cards (quantity)
+		cardCount := 0
+		for _, card := range cards {
+			cardCount += card.Quantity
+		}
+
+		// Get tags
+		var tags []*models.DeckTag
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			tags, err = d.services.Storage.DeckRepo().GetTags(ctx, deck.ID)
+			return err
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to get tags for deck %s: %v", deck.ID, err)
+		}
+
+		tagNames := make([]string, len(tags))
+		for i, tag := range tags {
+			tagNames[i] = tag.Tag
+		}
+
+		// Calculate win rate
+		var winRate float64
+		if deck.MatchesPlayed > 0 {
+			winRate = float64(deck.MatchesWon) / float64(deck.MatchesPlayed)
+		}
+
+		items = append(items, &DeckListItem{
+			ID:            deck.ID,
+			Name:          deck.Name,
+			Format:        deck.Format,
+			Source:        deck.Source,
+			ColorIdentity: deck.ColorIdentity,
+			CardCount:     cardCount,
+			MatchesPlayed: deck.MatchesPlayed,
+			MatchWinRate:  winRate,
+			ModifiedAt:    deck.ModifiedAt,
+			LastPlayed:    deck.LastPlayed,
+			Tags:          tagNames,
+		})
+	}
+
+	return items, nil
 }
 
 // ExportDeck exports a deck to the requested format.
