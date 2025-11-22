@@ -10,6 +10,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckimport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
@@ -28,6 +29,9 @@ type Services struct {
 	RatingsFetcher   *setcache.RatingsFetcher
 	DatasetService   *datasets.Service
 	DeckImportParser *deckimport.Parser
+
+	// Recommendation engine
+	RecommendationEngine recommendations.RecommendationEngine
 
 	// Log monitoring
 	Poller *logreader.Poller
