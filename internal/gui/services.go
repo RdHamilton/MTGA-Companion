@@ -8,6 +8,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckimport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
@@ -30,7 +31,8 @@ type Services struct {
 	DatasetService   *datasets.Service
 	DeckImportParser *deckimport.Parser
 
-	// Recommendation engine
+	// Deck operations
+	DeckExporter         *deckexport.Exporter
 	RecommendationEngine recommendations.RecommendationEngine
 
 	// Log monitoring
