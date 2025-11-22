@@ -556,3 +556,170 @@ func (d *DeckFacade) GetDeckByDraftEvent(ctx context.Context, draftEventID strin
 		Tags:  tags,
 	}, nil
 }
+
+// ImportDeckRequest represents a request to import a deck from text.
+type ImportDeckRequest struct {
+	Name         string  `json:"name"`
+	Format       string  `json:"format"`
+	ImportText   string  `json:"importText"`
+	Source       string  `json:"source"`       // "constructed" or "imported"
+	DraftEventID *string `json:"draftEventID"` // Required if source is "draft"
+}
+
+// ImportDeckResponse contains the result of a deck import operation.
+type ImportDeckResponse struct {
+	Success       bool     `json:"success"`
+	DeckID        string   `json:"deckID,omitempty"`
+	Errors        []string `json:"errors,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+	CardsImported int      `json:"cardsImported"`
+	CardsSkipped  int      `json:"cardsSkipped"`
+}
+
+// ImportDeck imports a deck from text (Arena format or plain text).
+func (d *DeckFacade) ImportDeck(ctx context.Context, req *ImportDeckRequest) (*ImportDeckResponse, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Get current account ID
+	accountID := d.services.Storage.GetCurrentAccountID()
+	if accountID == 0 {
+		return nil, &AppError{Message: "No active account"}
+	}
+
+	response := &ImportDeckResponse{
+		Success:       false,
+		Errors:        make([]string, 0),
+		Warnings:      make([]string, 0),
+		CardsImported: 0,
+		CardsSkipped:  0,
+	}
+
+	// Validate request
+	if req.Name == "" {
+		response.Errors = append(response.Errors, "Deck name is required")
+		return response, nil
+	}
+
+	if req.ImportText == "" {
+		response.Errors = append(response.Errors, "Import text is required")
+		return response, nil
+	}
+
+	if req.Source != "constructed" && req.Source != "imported" && req.Source != "draft" {
+		response.Errors = append(response.Errors, fmt.Sprintf("Invalid source: %s (must be 'constructed', 'imported', or 'draft')", req.Source))
+		return response, nil
+	}
+
+	if req.Source == "draft" && req.DraftEventID == nil {
+		response.Errors = append(response.Errors, "Draft event ID is required for draft imports")
+		return response, nil
+	}
+
+	// Parse the import text
+	parser := d.services.DeckImportParser
+	if parser == nil {
+		return nil, &AppError{Message: "Deck import parser not initialized"}
+	}
+
+	parseResult, err := parser.Parse(req.ImportText)
+	if err != nil {
+		response.Errors = append(response.Errors, fmt.Sprintf("Failed to parse import: %v", err))
+		return response, nil
+	}
+
+	// Add parse errors and warnings to response
+	response.Errors = append(response.Errors, parseResult.Deck.Errors...)
+	response.Warnings = append(response.Warnings, parseResult.Deck.Warnings...)
+	response.Warnings = append(response.Warnings, parseResult.Warnings...)
+
+	if !parseResult.Deck.ParsedOK {
+		return response, nil
+	}
+
+	// If this is a draft import, validate against draft pool
+	if req.Source == "draft" && req.DraftEventID != nil {
+		var draftCardIDs []int
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			draftCardIDs, err = d.services.Storage.DeckRepo().GetDraftCards(ctx, *req.DraftEventID)
+			return err
+		})
+		if err != nil {
+			response.Errors = append(response.Errors, fmt.Sprintf("Failed to get draft cards: %v", err))
+			return response, nil
+		}
+
+		draftErrors := parser.ValidateDraftImport(parseResult, draftCardIDs)
+		for _, draftErr := range draftErrors {
+			response.Errors = append(response.Errors, draftErr.Error())
+		}
+
+		if len(draftErrors) > 0 {
+			return response, nil
+		}
+	}
+
+	// Create the deck
+	deck, err := d.CreateDeck(ctx, req.Name, req.Format, req.Source, req.DraftEventID)
+	if err != nil {
+		response.Errors = append(response.Errors, fmt.Sprintf("Failed to create deck: %v", err))
+		return response, nil
+	}
+
+	response.DeckID = deck.ID
+
+	// Add mainboard cards
+	for _, parsedCard := range parseResult.Deck.Mainboard {
+		cardID, ok := parseResult.CardIDs[parsedCard.Name]
+		if !ok {
+			response.CardsSkipped++
+			response.Warnings = append(response.Warnings, fmt.Sprintf("Skipping '%s': card not found in database", parsedCard.Name))
+			continue
+		}
+
+		// Check if this is a draft card
+		fromDraft := req.Source == "draft"
+
+		err = d.AddCard(ctx, deck.ID, cardID, parsedCard.Quantity, "main", fromDraft)
+		if err != nil {
+			response.CardsSkipped++
+			response.Warnings = append(response.Warnings, fmt.Sprintf("Failed to add '%s': %v", parsedCard.Name, err))
+			continue
+		}
+
+		response.CardsImported++
+	}
+
+	// Add sideboard cards
+	for _, parsedCard := range parseResult.Deck.Sideboard {
+		cardID, ok := parseResult.CardIDs[parsedCard.Name]
+		if !ok {
+			response.CardsSkipped++
+			response.Warnings = append(response.Warnings, fmt.Sprintf("Skipping '%s': card not found in database", parsedCard.Name))
+			continue
+		}
+
+		// Check if this is a draft card
+		fromDraft := req.Source == "draft"
+
+		err = d.AddCard(ctx, deck.ID, cardID, parsedCard.Quantity, "sideboard", fromDraft)
+		if err != nil {
+			response.CardsSkipped++
+			response.Warnings = append(response.Warnings, fmt.Sprintf("Failed to add '%s': %v", parsedCard.Name, err))
+			continue
+		}
+
+		response.CardsImported++
+	}
+
+	response.Success = response.CardsImported > 0 && len(response.Errors) == 0
+	log.Printf("Imported deck '%s' (%s): %d cards imported, %d skipped", req.Name, deck.ID, response.CardsImported, response.CardsSkipped)
+
+	return response, nil
+}

@@ -5,8 +5,10 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckimport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
@@ -21,9 +23,11 @@ type Services struct {
 	Storage *storage.Service
 
 	// Card data services
-	SetFetcher     *setcache.Fetcher
-	RatingsFetcher *setcache.RatingsFetcher
-	DatasetService *datasets.Service
+	CardService      *cards.Service
+	SetFetcher       *setcache.Fetcher
+	RatingsFetcher   *setcache.RatingsFetcher
+	DatasetService   *datasets.Service
+	DeckImportParser *deckimport.Parser
 
 	// Log monitoring
 	Poller *logreader.Poller
