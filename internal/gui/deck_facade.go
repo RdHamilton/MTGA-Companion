@@ -253,6 +253,10 @@ func (d *DeckFacade) GetDecksBySource(ctx context.Context, source string) ([]*De
 			cards, err = d.services.Storage.DeckRepo().GetCards(ctx, deck.ID)
 			return err
 		})
+		if err != nil {
+			log.Printf("Warning: Failed to get cards for deck %s: %v", deck.ID, err)
+			// Continue processing other decks
+		}
 
 		cardCount := 0
 		for _, card := range cards {
