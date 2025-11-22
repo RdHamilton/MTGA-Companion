@@ -1322,9 +1322,10 @@ func (d *DeckFacade) GetDeckStatistics(ctx context.Context, deckID string) (*Dec
 	// Separate mainboard and sideboard
 	var mainboard, sideboard []*models.DeckCard
 	for _, card := range deckCards {
-		if card.Board == "main" {
+		switch card.Board {
+		case "main":
 			mainboard = append(mainboard, card)
-		} else if card.Board == "sideboard" {
+		case "sideboard":
 			sideboard = append(sideboard, card)
 		}
 	}
