@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
@@ -722,4 +724,272 @@ func (d *DeckFacade) ImportDeck(ctx context.Context, req *ImportDeckRequest) (*I
 	log.Printf("Imported deck '%s' (%s): %d cards imported, %d skipped", req.Name, deck.ID, response.CardsImported, response.CardsSkipped)
 
 	return response, nil
+}
+
+// GetRecommendationsRequest represents a request for card recommendations.
+type GetRecommendationsRequest struct {
+	DeckID        string   `json:"deckID"`
+	MaxResults    int      `json:"maxResults,omitempty"`    // Default: 10
+	MinScore      float64  `json:"minScore,omitempty"`      // Default: 0.3
+	Colors        []string `json:"colors,omitempty"`        // Filter by colors
+	CardTypes     []string `json:"cardTypes,omitempty"`     // Filter by card types
+	CMCMin        *int     `json:"cmcMin,omitempty"`        // Min CMC
+	CMCMax        *int     `json:"cmcMax,omitempty"`        // Max CMC
+	IncludeLands  bool     `json:"includeLands"`            // Include land recommendations
+	OnlyDraftPool bool     `json:"onlyDraftPool,omitempty"` // Only draft pool cards (for draft decks)
+}
+
+// GetRecommendationsResponse represents the response with card recommendations.
+type GetRecommendationsResponse struct {
+	Recommendations []*CardRecommendation `json:"recommendations"`
+	Error           string                `json:"error,omitempty"`
+}
+
+// CardRecommendation represents a single card recommendation for the frontend.
+type CardRecommendation struct {
+	CardID     int           `json:"cardID"`
+	Name       string        `json:"name"`
+	TypeLine   string        `json:"typeLine"`
+	ManaCost   string        `json:"manaCost,omitempty"`
+	ImageURI   string        `json:"imageURI,omitempty"`
+	Score      float64       `json:"score"`
+	Reasoning  string        `json:"reasoning"`
+	Source     string        `json:"source"`
+	Confidence float64       `json:"confidence"`
+	Factors    *ScoreFactors `json:"factors"`
+}
+
+// ScoreFactors breaks down the recommendation score components.
+type ScoreFactors struct {
+	ColorFit  float64 `json:"colorFit"`
+	ManaCurve float64 `json:"manaCurve"`
+	Synergy   float64 `json:"synergy"`
+	Quality   float64 `json:"quality"`
+	Playable  float64 `json:"playable"`
+}
+
+// GetRecommendations returns card recommendations for a deck.
+func (d *DeckFacade) GetRecommendations(ctx context.Context, req *GetRecommendationsRequest) (*GetRecommendationsResponse, error) {
+	if req.DeckID == "" {
+		return nil, fmt.Errorf("deck ID is required")
+	}
+
+	// Get deck from database
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, req.DeckID)
+		return err
+	})
+	if err != nil {
+		return &GetRecommendationsResponse{
+			Error: fmt.Sprintf("Failed to get deck: %v", err),
+		}, nil
+	}
+
+	// Get deck cards
+	var deckCards []*models.DeckCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		deckCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deck.ID)
+		return err
+	})
+	if err != nil {
+		return &GetRecommendationsResponse{
+			Error: fmt.Sprintf("Failed to get deck cards: %v", err),
+		}, nil
+	}
+
+	// Get card metadata for all cards in deck
+	cardMetadata := make(map[int]*cards.Card)
+	for _, deckCard := range deckCards {
+		if _, exists := cardMetadata[deckCard.CardID]; !exists {
+			card, err := d.services.CardService.GetCard(deckCard.CardID)
+			if err != nil {
+				log.Printf("Warning: Failed to get card %d: %v", deckCard.CardID, err)
+				continue
+			}
+			cardMetadata[deckCard.CardID] = card
+		}
+	}
+
+	// Build deck context for recommendations
+	deckContext := &recommendations.DeckContext{
+		Deck:         deck,
+		Cards:        deckCards,
+		CardMetadata: cardMetadata,
+		Format:       deck.Format,
+	}
+
+	// For draft decks, get the draft pool
+	// TODO: Phase 1B - Integrate with draft session data to get available cards
+	if deck.DraftEventID != nil {
+		// For now, draft pool recommendations will be limited to cards already in the deck
+		log.Printf("Info: Draft pool recommendations not yet fully integrated for deck %s", deck.ID)
+	}
+
+	// Build filters from request
+	filters := &recommendations.Filters{
+		MaxResults:    req.MaxResults,
+		MinScore:      req.MinScore,
+		Colors:        req.Colors,
+		CardTypes:     req.CardTypes,
+		IncludeLands:  req.IncludeLands,
+		OnlyDraftPool: req.OnlyDraftPool,
+	}
+
+	// Set defaults
+	if filters.MaxResults == 0 {
+		filters.MaxResults = 10
+	}
+	if filters.MinScore == 0 {
+		filters.MinScore = 0.3
+	}
+
+	// Set CMC range if provided
+	if req.CMCMin != nil || req.CMCMax != nil {
+		filters.CMCRange = &recommendations.CMCRange{}
+		if req.CMCMin != nil {
+			filters.CMCRange.Min = *req.CMCMin
+		}
+		if req.CMCMax != nil {
+			filters.CMCRange.Max = *req.CMCMax
+		}
+	}
+
+	// Get recommendations from engine
+	engine := d.services.RecommendationEngine
+	if engine == nil {
+		return &GetRecommendationsResponse{
+			Error: "Recommendation engine not available",
+		}, nil
+	}
+
+	recs, err := engine.GetRecommendations(ctx, deckContext, filters)
+	if err != nil {
+		return &GetRecommendationsResponse{
+			Error: fmt.Sprintf("Failed to get recommendations: %v", err),
+		}, nil
+	}
+
+	// Convert to response format
+	responseRecs := make([]*CardRecommendation, 0, len(recs))
+	for _, rec := range recs {
+		manaCost := ""
+		if rec.Card.ManaCost != nil {
+			manaCost = *rec.Card.ManaCost
+		}
+		imageURI := ""
+		if rec.Card.ImageURI != nil {
+			imageURI = *rec.Card.ImageURI
+		}
+
+		responseRecs = append(responseRecs, &CardRecommendation{
+			CardID:     rec.Card.ArenaID,
+			Name:       rec.Card.Name,
+			TypeLine:   rec.Card.TypeLine,
+			ManaCost:   manaCost,
+			ImageURI:   imageURI,
+			Score:      rec.Score,
+			Reasoning:  rec.Reasoning,
+			Source:     rec.Source,
+			Confidence: rec.Confidence,
+			Factors: &ScoreFactors{
+				ColorFit:  rec.Factors.ColorFit,
+				ManaCurve: rec.Factors.ManaCurve,
+				Synergy:   rec.Factors.Synergy,
+				Quality:   rec.Factors.Quality,
+				Playable:  rec.Factors.Playable,
+			},
+		})
+	}
+
+	return &GetRecommendationsResponse{
+		Recommendations: responseRecs,
+	}, nil
+}
+
+// ExplainRecommendationRequest represents a request to explain a recommendation.
+type ExplainRecommendationRequest struct {
+	DeckID string `json:"deckID"`
+	CardID int    `json:"cardID"`
+}
+
+// ExplainRecommendationResponse represents the response with the explanation.
+type ExplainRecommendationResponse struct {
+	Explanation string `json:"explanation"`
+	Error       string `json:"error,omitempty"`
+}
+
+// ExplainRecommendation explains why a card is recommended for a deck.
+func (d *DeckFacade) ExplainRecommendation(ctx context.Context, req *ExplainRecommendationRequest) (*ExplainRecommendationResponse, error) {
+	if req.DeckID == "" || req.CardID == 0 {
+		return nil, fmt.Errorf("deck ID and card ID are required")
+	}
+
+	// Get deck from database
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, req.DeckID)
+		return err
+	})
+	if err != nil {
+		return &ExplainRecommendationResponse{
+			Error: fmt.Sprintf("Failed to get deck: %v", err),
+		}, nil
+	}
+
+	// Get deck cards
+	var deckCards []*models.DeckCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		deckCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deck.ID)
+		return err
+	})
+	if err != nil {
+		return &ExplainRecommendationResponse{
+			Error: fmt.Sprintf("Failed to get deck cards: %v", err),
+		}, nil
+	}
+
+	// Get card metadata for all cards in deck
+	cardMetadata := make(map[int]*cards.Card)
+	for _, deckCard := range deckCards {
+		if _, exists := cardMetadata[deckCard.CardID]; !exists {
+			card, err := d.services.CardService.GetCard(deckCard.CardID)
+			if err != nil {
+				log.Printf("Warning: Failed to get card %d: %v", deckCard.CardID, err)
+				continue
+			}
+			cardMetadata[deckCard.CardID] = card
+		}
+	}
+
+	// Build deck context
+	deckContext := &recommendations.DeckContext{
+		Deck:         deck,
+		Cards:        deckCards,
+		CardMetadata: cardMetadata,
+		Format:       deck.Format,
+	}
+
+	// Get explanation from engine
+	engine := d.services.RecommendationEngine
+	if engine == nil {
+		return &ExplainRecommendationResponse{
+			Error: "Recommendation engine not available",
+		}, nil
+	}
+
+	explanation, err := engine.ExplainRecommendation(ctx, req.CardID, deckContext)
+	if err != nil {
+		return &ExplainRecommendationResponse{
+			Error: fmt.Sprintf("Failed to explain recommendation: %v", err),
+		}, nil
+	}
+
+	return &ExplainRecommendationResponse{
+		Explanation: explanation,
+	}, nil
 }
