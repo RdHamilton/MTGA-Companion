@@ -93,6 +93,543 @@ export namespace gui {
 	        this.colors = source["colors"];
 	    }
 	}
+	export class ScoreFactors {
+	    colorFit: number;
+	    manaCurve: number;
+	    synergy: number;
+	    quality: number;
+	    playable: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScoreFactors(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colorFit = source["colorFit"];
+	        this.manaCurve = source["manaCurve"];
+	        this.synergy = source["synergy"];
+	        this.quality = source["quality"];
+	        this.playable = source["playable"];
+	    }
+	}
+	export class CardRecommendation {
+	    cardID: number;
+	    name: string;
+	    typeLine: string;
+	    manaCost?: string;
+	    imageURI?: string;
+	    score: number;
+	    reasoning: string;
+	    source: string;
+	    confidence: number;
+	    factors?: ScoreFactors;
+	
+	    static createFrom(source: any = {}) {
+	        return new CardRecommendation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardID = source["cardID"];
+	        this.name = source["name"];
+	        this.typeLine = source["typeLine"];
+	        this.manaCost = source["manaCost"];
+	        this.imageURI = source["imageURI"];
+	        this.score = source["score"];
+	        this.reasoning = source["reasoning"];
+	        this.source = source["source"];
+	        this.confidence = source["confidence"];
+	        this.factors = this.convertValues(source["factors"], ScoreFactors);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ColorStats {
+	    white: number;
+	    blue: number;
+	    black: number;
+	    red: number;
+	    green: number;
+	    colorless: number;
+	    multicolor: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.white = source["white"];
+	        this.blue = source["blue"];
+	        this.black = source["black"];
+	        this.red = source["red"];
+	        this.green = source["green"];
+	        this.colorless = source["colorless"];
+	        this.multicolor = source["multicolor"];
+	    }
+	}
+	export class CreatureStats {
+	    total: number;
+	    averagePower: number;
+	    averageToughness: number;
+	    totalPower: number;
+	    totalToughness: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreatureStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.averagePower = source["averagePower"];
+	        this.averageToughness = source["averageToughness"];
+	        this.totalPower = source["totalPower"];
+	        this.totalToughness = source["totalToughness"];
+	    }
+	}
+	export class DeckLibraryFilter {
+	    format?: string;
+	    source?: string;
+	    tags?: string[];
+	    sortBy?: string;
+	    sortDesc?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckLibraryFilter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.source = source["source"];
+	        this.tags = source["tags"];
+	        this.sortBy = source["sortBy"];
+	        this.sortDesc = source["sortDesc"];
+	    }
+	}
+	export class DeckListItem {
+	    id: string;
+	    name: string;
+	    format: string;
+	    source: string;
+	    colorIdentity?: string;
+	    cardCount: number;
+	    matchesPlayed: number;
+	    matchWinRate: number;
+	    modifiedAt: time.Time;
+	    lastPlayed?: time.Time;
+	    tags?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckListItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.format = source["format"];
+	        this.source = source["source"];
+	        this.colorIdentity = source["colorIdentity"];
+	        this.cardCount = source["cardCount"];
+	        this.matchesPlayed = source["matchesPlayed"];
+	        this.matchWinRate = source["matchWinRate"];
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], time.Time);
+	        this.lastPlayed = this.convertValues(source["lastPlayed"], time.Time);
+	        this.tags = source["tags"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LegalityStatus {
+	    legal: boolean;
+	    reasons?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LegalityStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.legal = source["legal"];
+	        this.reasons = source["reasons"];
+	    }
+	}
+	export class FormatLegality {
+	    standard: LegalityStatus;
+	    historic: LegalityStatus;
+	    explorer: LegalityStatus;
+	    alchemy: LegalityStatus;
+	    brawl: LegalityStatus;
+	    commander: LegalityStatus;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormatLegality(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.standard = this.convertValues(source["standard"], LegalityStatus);
+	        this.historic = this.convertValues(source["historic"], LegalityStatus);
+	        this.explorer = this.convertValues(source["explorer"], LegalityStatus);
+	        this.alchemy = this.convertValues(source["alchemy"], LegalityStatus);
+	        this.brawl = this.convertValues(source["brawl"], LegalityStatus);
+	        this.commander = this.convertValues(source["commander"], LegalityStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LandStats {
+	    total: number;
+	    basic: number;
+	    nonBasic: number;
+	    ratio: number;
+	    recommended: number;
+	    status: string;
+	    statusMessage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LandStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.basic = source["basic"];
+	        this.nonBasic = source["nonBasic"];
+	        this.ratio = source["ratio"];
+	        this.recommended = source["recommended"];
+	        this.status = source["status"];
+	        this.statusMessage = source["statusMessage"];
+	    }
+	}
+	export class TypeStats {
+	    creatures: number;
+	    instants: number;
+	    sorceries: number;
+	    enchantments: number;
+	    artifacts: number;
+	    planeswalkers: number;
+	    lands: number;
+	    other: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TypeStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.creatures = source["creatures"];
+	        this.instants = source["instants"];
+	        this.sorceries = source["sorceries"];
+	        this.enchantments = source["enchantments"];
+	        this.artifacts = source["artifacts"];
+	        this.planeswalkers = source["planeswalkers"];
+	        this.lands = source["lands"];
+	        this.other = source["other"];
+	    }
+	}
+	export class DeckStatistics {
+	    totalCards: number;
+	    totalMainboard: number;
+	    totalSideboard: number;
+	    averageCMC: number;
+	    manaCurve: Record<number, number>;
+	    maxCMC: number;
+	    colors: ColorStats;
+	    types: TypeStats;
+	    lands: LandStats;
+	    creatures: CreatureStats;
+	    legality: FormatLegality;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckStatistics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalCards = source["totalCards"];
+	        this.totalMainboard = source["totalMainboard"];
+	        this.totalSideboard = source["totalSideboard"];
+	        this.averageCMC = source["averageCMC"];
+	        this.manaCurve = source["manaCurve"];
+	        this.maxCMC = source["maxCMC"];
+	        this.colors = this.convertValues(source["colors"], ColorStats);
+	        this.types = this.convertValues(source["types"], TypeStats);
+	        this.lands = this.convertValues(source["lands"], LandStats);
+	        this.creatures = this.convertValues(source["creatures"], CreatureStats);
+	        this.legality = this.convertValues(source["legality"], FormatLegality);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DeckWithCards {
+	    deck?: models.Deck;
+	    cards: models.DeckCard[];
+	    tags?: models.DeckTag[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckWithCards(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deck = this.convertValues(source["deck"], models.Deck);
+	        this.cards = this.convertValues(source["cards"], models.DeckCard);
+	        this.tags = this.convertValues(source["tags"], models.DeckTag);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ExplainRecommendationRequest {
+	    deckID: string;
+	    cardID: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExplainRecommendationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckID = source["deckID"];
+	        this.cardID = source["cardID"];
+	    }
+	}
+	export class ExplainRecommendationResponse {
+	    explanation: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExplainRecommendationResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.explanation = source["explanation"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ExportDeckRequest {
+	    deckID: string;
+	    format: string;
+	    includeHeaders: boolean;
+	    includeStats: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportDeckRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckID = source["deckID"];
+	        this.format = source["format"];
+	        this.includeHeaders = source["includeHeaders"];
+	        this.includeStats = source["includeStats"];
+	    }
+	}
+	export class ExportDeckResponse {
+	    content: string;
+	    filename: string;
+	    format: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportDeckResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.filename = source["filename"];
+	        this.format = source["format"];
+	        this.error = source["error"];
+	    }
+	}
+	
+	export class GetRecommendationsRequest {
+	    deckID: string;
+	    maxResults?: number;
+	    minScore?: number;
+	    colors?: string[];
+	    cardTypes?: string[];
+	    cmcMin?: number;
+	    cmcMax?: number;
+	    includeLands: boolean;
+	    onlyDraftPool?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetRecommendationsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckID = source["deckID"];
+	        this.maxResults = source["maxResults"];
+	        this.minScore = source["minScore"];
+	        this.colors = source["colors"];
+	        this.cardTypes = source["cardTypes"];
+	        this.cmcMin = source["cmcMin"];
+	        this.cmcMax = source["cmcMax"];
+	        this.includeLands = source["includeLands"];
+	        this.onlyDraftPool = source["onlyDraftPool"];
+	    }
+	}
+	export class GetRecommendationsResponse {
+	    recommendations: CardRecommendation[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetRecommendationsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendations = this.convertValues(source["recommendations"], CardRecommendation);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ImportDeckRequest {
+	    name: string;
+	    format: string;
+	    importText: string;
+	    source: string;
+	    draftEventID?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportDeckRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.format = source["format"];
+	        this.importText = source["importText"];
+	        this.source = source["source"];
+	        this.draftEventID = source["draftEventID"];
+	    }
+	}
+	export class ImportDeckResponse {
+	    success: boolean;
+	    deckID?: string;
+	    errors?: string[];
+	    warnings?: string[];
+	    cardsImported: number;
+	    cardsSkipped: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportDeckResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.deckID = source["deckID"];
+	        this.errors = source["errors"];
+	        this.warnings = source["warnings"];
+	        this.cardsImported = source["cardsImported"];
+	        this.cardsSkipped = source["cardsSkipped"];
+	    }
+	}
 	export class ImportLogFileResult {
 	    fileName: string;
 	    entriesRead: number;
@@ -121,6 +658,8 @@ export namespace gui {
 	        this.picksStored = source["picksStored"];
 	    }
 	}
+	
+	
 	export class ReplayStatus {
 	    isActive: boolean;
 	    isPaused: boolean;
@@ -147,6 +686,7 @@ export namespace gui {
 	        this.filter = source["filter"];
 	    }
 	}
+	
 
 }
 
@@ -488,6 +1028,86 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class Deck {
+	    ID: string;
+	    AccountID: number;
+	    Name: string;
+	    Format: string;
+	    Description?: string;
+	    ColorIdentity?: string;
+	    Source: string;
+	    DraftEventID?: string;
+	    MatchesPlayed: number;
+	    MatchesWon: number;
+	    GamesPlayed: number;
+	    GamesWon: number;
+	    CreatedAt: time.Time;
+	    ModifiedAt: time.Time;
+	    LastPlayed?: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new Deck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.AccountID = source["AccountID"];
+	        this.Name = source["Name"];
+	        this.Format = source["Format"];
+	        this.Description = source["Description"];
+	        this.ColorIdentity = source["ColorIdentity"];
+	        this.Source = source["Source"];
+	        this.DraftEventID = source["DraftEventID"];
+	        this.MatchesPlayed = source["MatchesPlayed"];
+	        this.MatchesWon = source["MatchesWon"];
+	        this.GamesPlayed = source["GamesPlayed"];
+	        this.GamesWon = source["GamesWon"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
+	        this.ModifiedAt = this.convertValues(source["ModifiedAt"], time.Time);
+	        this.LastPlayed = this.convertValues(source["LastPlayed"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DeckCard {
+	    ID: number;
+	    DeckID: string;
+	    CardID: number;
+	    Quantity: number;
+	    Board: string;
+	    FromDraftPick: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.DeckID = source["DeckID"];
+	        this.CardID = source["CardID"];
+	        this.Quantity = source["Quantity"];
+	        this.Board = source["Board"];
+	        this.FromDraftPick = source["FromDraftPick"];
+	    }
+	}
 	export class DeckMetrics {
 	    total_cards: number;
 	    total_non_land_cards: number;
@@ -523,6 +1143,98 @@ export namespace models {
 	        this.multi_color_count = source["multi_color_count"];
 	        this.colorless_count = source["colorless_count"];
 	    }
+	}
+	export class DeckPerformance {
+	    DeckID: string;
+	    MatchesPlayed: number;
+	    MatchesWon: number;
+	    MatchesLost: number;
+	    GamesPlayed: number;
+	    GamesWon: number;
+	    GamesLost: number;
+	    MatchWinRate: number;
+	    GameWinRate: number;
+	    LastPlayed?: time.Time;
+	    AverageDuration?: number;
+	    CurrentWinStreak: number;
+	    LongestWinStreak: number;
+	    LongestLossStreak: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckPerformance(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.DeckID = source["DeckID"];
+	        this.MatchesPlayed = source["MatchesPlayed"];
+	        this.MatchesWon = source["MatchesWon"];
+	        this.MatchesLost = source["MatchesLost"];
+	        this.GamesPlayed = source["GamesPlayed"];
+	        this.GamesWon = source["GamesWon"];
+	        this.GamesLost = source["GamesLost"];
+	        this.MatchWinRate = source["MatchWinRate"];
+	        this.GameWinRate = source["GameWinRate"];
+	        this.LastPlayed = this.convertValues(source["LastPlayed"], time.Time);
+	        this.AverageDuration = source["AverageDuration"];
+	        this.CurrentWinStreak = source["CurrentWinStreak"];
+	        this.LongestWinStreak = source["LongestWinStreak"];
+	        this.LongestLossStreak = source["LongestLossStreak"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DeckTag {
+	    ID: number;
+	    DeckID: string;
+	    Tag: string;
+	    CreatedAt: time.Time;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckTag(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.DeckID = source["DeckID"];
+	        this.Tag = source["Tag"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class DraftEvent {
 	    ID: string;

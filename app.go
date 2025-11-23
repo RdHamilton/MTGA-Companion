@@ -29,6 +29,7 @@ type App struct {
 	matchFacade  *gui.MatchFacade
 	draftFacade  *gui.DraftFacade
 	cardFacade   *gui.CardFacade
+	deckFacade   *gui.DeckFacade
 	exportFacade *gui.ExportFacade
 	systemFacade *gui.SystemFacade
 
@@ -53,6 +54,7 @@ func NewApp() *App {
 		matchFacade:  gui.NewMatchFacade(services),
 		draftFacade:  gui.NewDraftFacade(services),
 		cardFacade:   gui.NewCardFacade(services),
+		deckFacade:   gui.NewDeckFacade(services),
 		exportFacade: gui.NewExportFacade(services, systemFacade.GetEventDispatcher()),
 		systemFacade: systemFacade,
 	}
@@ -451,4 +453,118 @@ func (a *App) ClearAllData() error {
 // ImportLogFile imports a log file (Player.log or Player-prev.log)
 func (a *App) ImportLogFile() (*gui.ImportLogFileResult, error) {
 	return a.exportFacade.ImportLogFile(a.ctx)
+}
+
+// ========================================
+// Deck Builder Methods (DeckFacade)
+// ========================================
+
+// CreateDeck creates a new deck
+func (a *App) CreateDeck(name, format, source string, draftEventID *string) (*models.Deck, error) {
+	return a.deckFacade.CreateDeck(a.ctx, name, format, source, draftEventID)
+}
+
+// GetDeck retrieves a deck by ID with its cards and tags
+func (a *App) GetDeck(deckID string) (*gui.DeckWithCards, error) {
+	return a.deckFacade.GetDeck(a.ctx, deckID)
+}
+
+// ListDecks retrieves all decks for the current account
+func (a *App) ListDecks() ([]*gui.DeckListItem, error) {
+	return a.deckFacade.ListDecks(a.ctx)
+}
+
+// UpdateDeck updates an existing deck's metadata
+func (a *App) UpdateDeck(deck *models.Deck) error {
+	return a.deckFacade.UpdateDeck(a.ctx, deck)
+}
+
+// DeleteDeck deletes a deck and all its cards
+func (a *App) DeleteDeck(deckID string) error {
+	return a.deckFacade.DeleteDeck(a.ctx, deckID)
+}
+
+// CloneDeck creates a copy of an existing deck
+func (a *App) CloneDeck(deckID, newName string) (*models.Deck, error) {
+	return a.deckFacade.CloneDeck(a.ctx, deckID, newName)
+}
+
+// AddCard adds a card to a deck
+func (a *App) AddCard(deckID string, cardID, quantity int, board string, fromDraft bool) error {
+	return a.deckFacade.AddCard(a.ctx, deckID, cardID, quantity, board, fromDraft)
+}
+
+// RemoveCard removes a card from a deck
+func (a *App) RemoveCard(deckID string, cardID int, board string) error {
+	return a.deckFacade.RemoveCard(a.ctx, deckID, cardID, board)
+}
+
+// GetDeckLibrary retrieves all decks with advanced filtering and sorting
+func (a *App) GetDeckLibrary(filter *gui.DeckLibraryFilter) ([]*gui.DeckListItem, error) {
+	return a.deckFacade.GetDeckLibrary(a.ctx, filter)
+}
+
+// GetDecksBySource retrieves decks filtered by source (draft/constructed/imported)
+func (a *App) GetDecksBySource(source string) ([]*gui.DeckListItem, error) {
+	return a.deckFacade.GetDecksBySource(a.ctx, source)
+}
+
+// GetDecksByFormat retrieves decks filtered by format (Standard, Historic, etc.)
+func (a *App) GetDecksByFormat(format string) ([]*gui.DeckListItem, error) {
+	return a.deckFacade.GetDecksByFormat(a.ctx, format)
+}
+
+// GetDecksByTags retrieves decks that have ALL specified tags
+func (a *App) GetDecksByTags(tags []string) ([]*gui.DeckListItem, error) {
+	return a.deckFacade.GetDecksByTags(a.ctx, tags)
+}
+
+// AddTag adds a tag to a deck for categorization
+func (a *App) AddTag(deckID, tag string) error {
+	return a.deckFacade.AddTag(a.ctx, deckID, tag)
+}
+
+// RemoveTag removes a tag from a deck
+func (a *App) RemoveTag(deckID, tag string) error {
+	return a.deckFacade.RemoveTag(a.ctx, deckID, tag)
+}
+
+// GetDeckByDraftEvent retrieves the deck associated with a draft event
+func (a *App) GetDeckByDraftEvent(draftEventID string) (*gui.DeckWithCards, error) {
+	return a.deckFacade.GetDeckByDraftEvent(a.ctx, draftEventID)
+}
+
+// ImportDeck imports a deck from text (Arena format or plain text)
+func (a *App) ImportDeck(req *gui.ImportDeckRequest) (*gui.ImportDeckResponse, error) {
+	return a.deckFacade.ImportDeck(a.ctx, req)
+}
+
+// ExportDeck exports a deck to the requested format
+func (a *App) ExportDeck(req *gui.ExportDeckRequest) (*gui.ExportDeckResponse, error) {
+	return a.deckFacade.ExportDeck(a.ctx, req)
+}
+
+// GetRecommendations returns card recommendations for a deck
+func (a *App) GetRecommendations(req *gui.GetRecommendationsRequest) (*gui.GetRecommendationsResponse, error) {
+	return a.deckFacade.GetRecommendations(a.ctx, req)
+}
+
+// ExplainRecommendation explains why a card is recommended for a deck
+func (a *App) ExplainRecommendation(req *gui.ExplainRecommendationRequest) (*gui.ExplainRecommendationResponse, error) {
+	return a.deckFacade.ExplainRecommendation(a.ctx, req)
+}
+
+// GetDeckStatistics calculates comprehensive deck statistics
+func (a *App) GetDeckStatistics(deckID string) (*gui.DeckStatistics, error) {
+	return a.deckFacade.GetDeckStatistics(a.ctx, deckID)
+}
+
+// GetDeckPerformance retrieves performance metrics for a deck
+func (a *App) GetDeckPerformance(deckID string) (*models.DeckPerformance, error) {
+	return a.deckFacade.GetDeckPerformance(a.ctx, deckID)
+}
+
+// ValidateDraftDeck validates that all cards in a draft deck are from the associated draft
+func (a *App) ValidateDraftDeck(deckID string) (bool, error) {
+	return a.deckFacade.ValidateDraftDeck(a.ctx, deckID)
 }
