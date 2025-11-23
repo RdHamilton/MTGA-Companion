@@ -819,6 +819,39 @@
     animation: spin 0.8s linear infinite;
 }
 
+/* Build Deck Button */
+.btn-build-deck {
+    background-color: #00c853;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-build-deck:hover {
+    background-color: #00e676;
+    box-shadow: 0 2px 8px rgba(0, 200, 83, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-build-deck:active {
+    transform: translateY(0);
+}
+
+.btn-build-deck:disabled {
+    background-color: #2d2d2d;
+    color: #888888;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Replay Controls - Bottom Left */
 .replay-controls {
     position: fixed;

@@ -749,20 +749,30 @@ const Draft: React.FC = () => {
                             <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
                         </div>
                     </div>
-                    <button
-                        className="btn-analyze-draft"
-                        onClick={handleAnalyzeDraft}
-                        disabled={isAnalyzing || state.picks.length === 0}
-                    >
-                        {isAnalyzing ? (
-                            <>
-                                <div className="spinner"></div>
-                                Analyzing...
-                            </>
-                        ) : (
-                            '🎯 Analyze Pick Quality'
-                        )}
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            className="btn-build-deck"
+                            onClick={() => navigate(`/deck-builder/draft/${state.session.ID}`)}
+                            disabled={state.picks.length === 0}
+                            title="Build and edit your deck from draft picks"
+                        >
+                            🃏 Build Deck
+                        </button>
+                        <button
+                            className="btn-analyze-draft"
+                            onClick={handleAnalyzeDraft}
+                            disabled={isAnalyzing || state.picks.length === 0}
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <div className="spinner"></div>
+                                    Analyzing...
+                                </>
+                            ) : (
+                                '🎯 Analyze Pick Quality'
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
 
