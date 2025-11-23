@@ -76,14 +76,16 @@ export default function Decks() {
 
   return (
     <div className="decks-page">
+      {/* Temporary debug indicator */}
+      <div style={{ position: 'fixed', top: '10px', right: '10px', background: 'yellow', color: 'black', padding: '5px', zIndex: 9999 }}>
+        Modal State: {showCreateDialog ? 'OPEN' : 'CLOSED'}
+      </div>
+
       {/* Header - Only show button when there are decks */}
       <div className="decks-header">
         <h1>My Decks</h1>
         {decks.length > 0 && (
-          <button className="create-deck-button" onClick={() => {
-            console.log('Create button clicked, setting showCreateDialog to true');
-            setShowCreateDialog(true);
-          }}>
+          <button className="create-deck-button" onClick={() => setShowCreateDialog(true)}>
             + Create New Deck
           </button>
         )}
@@ -95,10 +97,7 @@ export default function Decks() {
           <div className="empty-icon">📦</div>
           <h2>No Decks Yet</h2>
           <p>Create your first deck to get started!</p>
-          <button className="create-deck-button-large" onClick={() => {
-            console.log('Empty state button clicked, setting showCreateDialog to true');
-            setShowCreateDialog(true);
-          }}>
+          <button className="create-deck-button-large" onClick={() => setShowCreateDialog(true)}>
             + Create New Deck
           </button>
         </div>
@@ -144,10 +143,6 @@ export default function Decks() {
       )}
 
       {/* Create Deck Dialog */}
-      {(() => {
-        console.log('Render: showCreateDialog =', showCreateDialog);
-        return null;
-      })()}
       {showCreateDialog && (
         <div className="modal-overlay" onClick={() => setShowCreateDialog(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
