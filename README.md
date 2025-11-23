@@ -24,7 +24,7 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Database Storage**: Local SQLite database with migration support
 - **Export System**: Export statistics in CSV or JSON formats
 
-### Draft Assistant (NEW in v1.1)
+### Draft Assistant (v1.1)
 - **Real-Time Draft Assistant**: Live card recommendations and analysis during drafts
 - **Type Synergy Detection**: Automatic detection of card type synergies with visual indicators
 - **Card Suggestions**: Context-aware recommendations based on your picked cards
@@ -35,6 +35,18 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Missing Cards Detection**: Track cards you don't own from draft packs
 - **Historical Draft Replay**: View and replay past draft pick sequences
 - **Card Data Integration**: 17Lands public datasets and Scryfall metadata
+
+### Deck Builder (NEW in v1.3)
+- **Deck Creation & Management**: Build constructed and draft-based decks with full CRUD operations
+- **AI-Powered Recommendations**: Intelligent card suggestions based on color fit, mana curve, synergy, and card quality
+- **Multiple Import Formats**: Import from Arena, plain text, and other common formats
+- **Multiple Export Formats**: Export to Arena, MTGO, MTGGoldfish, and plain text formats
+- **Comprehensive Statistics**: Mana curve, color distribution, type breakdown, and land recommendations
+- **Draft Pool Validation**: Draft decks restricted to cards from the associated draft
+- **Format Legality Checking**: Validate decks for Standard, Historic, Explorer, Alchemy, Brawl, and Commander
+- **Performance Tracking**: Automatic win rate tracking and performance metrics
+- **Tagging & Organization**: Categorize and filter decks with custom tags
+- **Deck Library**: Advanced filtering by format, source, tags, and performance
 
 ## Documentation
 
@@ -49,6 +61,7 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 ### Technical Documentation
 
 - **[Architecture](docs/ARCHITECTURE.md)** - Service-based system design and architecture
+- **[Deck Builder Guide](docs/DECK_BUILDER.md)** - Comprehensive deck builder documentation with API reference
 - **[Daemon API](docs/DAEMON_API.md)** - WebSocket API reference for daemon integration
 - **[Development Guide](docs/DEVELOPMENT.md)** - Development setup and contributing guidelines
 - **[Migration Guide](docs/MIGRATION_TO_SERVICE_ARCHITECTURE.md)** - Upgrading to service-based architecture
