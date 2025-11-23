@@ -93,7 +93,11 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	)
 
 	// Initialize CardService for card metadata with caching
-	cardService, err := cards.NewService(s.services.Storage.GetDB(), cards.DefaultServiceConfig())
+	// NOTE: We disable DB functionality since we use SetFetcher (which uses the migrated schema)
+	// CardService is only used for in-memory caching and API fallback
+	cardServiceConfig := cards.DefaultServiceConfig()
+	cardServiceConfig.EnableDB = false // Disable DB to avoid schema conflicts with migrations
+	cardService, err := cards.NewService(s.services.Storage.GetDB(), cardServiceConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize card service: %w", err)
 	}
