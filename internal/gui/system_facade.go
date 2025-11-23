@@ -14,10 +14,14 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckimport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
@@ -87,6 +91,22 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 		datasetService,
 		s.services.Storage.DraftRatingsRepo(),
 	)
+
+	// Initialize CardService for card metadata with caching
+	cardService, err := cards.NewService(s.services.Storage.GetDB(), cards.DefaultServiceConfig())
+	if err != nil {
+		return fmt.Errorf("failed to initialize card service: %w", err)
+	}
+	s.services.CardService = cardService
+
+	// Initialize DeckImportParser (depends on CardService)
+	s.services.DeckImportParser = deckimport.NewParser(cardService)
+
+	// Initialize DeckExporter (uses CardService as CardProvider)
+	s.services.DeckExporter = deckexport.NewExporter(cardService)
+
+	// Initialize RecommendationEngine (depends on CardService)
+	s.services.RecommendationEngine = recommendations.NewRuleBasedEngine(cardService)
 
 	log.Println("Card services initialized successfully")
 	return nil
