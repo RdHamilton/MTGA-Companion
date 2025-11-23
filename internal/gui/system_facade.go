@@ -14,6 +14,9 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
@@ -62,6 +65,30 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	}
 	s.services.Storage = storage.NewService(db)
 
+	// Initialize card services
+	scryfallClient := scryfall.NewClient()
+
+	// Initialize dataset service for 17Lands ratings
+	datasetService, err := datasets.NewService(datasets.DefaultServiceOptions())
+	if err != nil {
+		return fmt.Errorf("failed to initialize dataset service: %w", err)
+	}
+	s.services.DatasetService = datasetService
+
+	// Initialize SetFetcher for card metadata
+	s.services.SetFetcher = setcache.NewFetcher(
+		scryfallClient,
+		s.services.Storage.SetCardRepo(),
+		s.services.Storage.DraftRatingsRepo(),
+	)
+
+	// Initialize RatingsFetcher for draft ratings
+	s.services.RatingsFetcher = setcache.NewRatingsFetcherWithDatasets(
+		datasetService,
+		s.services.Storage.DraftRatingsRepo(),
+	)
+
+	log.Println("Card services initialized successfully")
 	return nil
 }
 
