@@ -11,6 +11,7 @@ import ResultBreakdown from './pages/ResultBreakdown';
 import Quests from './pages/Quests';
 import Events from './pages/Events';
 import Draft from './pages/Draft';
+import Decks from './pages/Decks';
 import DeckBuilder from './pages/DeckBuilder';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
@@ -154,6 +155,7 @@ function App() {
           <Route path="/quests" element={<Quests />} />
           <Route path="/events" element={<Events />} />
           <Route path="/draft" element={<Draft />} />
+          <Route path="/decks" element={<Decks />} />
           <Route path="/deck-builder/:deckID" element={<DeckBuilder />} />
           <Route path="/deck-builder/draft/:draftEventID" element={<DeckBuilder />} />
           <Route path="/charts/win-rate-trend" element={<WinRateTrend />} />

@@ -62,6 +62,7 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 
 	config := storage.DefaultConfig(dbPath)
 	config.BusyTimeout = 10 * time.Second // Increase timeout to handle concurrent poller operations
+	config.AutoMigrate = true             // Enable automatic database migrations
 
 	db, err := storage.Open(config)
 	if err != nil {
@@ -93,7 +94,10 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	)
 
 	// Initialize CardService for card metadata with caching
-	cardService, err := cards.NewService(s.services.Storage.GetDB(), cards.DefaultServiceConfig())
+	// Disable DB to avoid schema conflicts - we use storage.SetCardRepo instead
+	cardServiceConfig := cards.DefaultServiceConfig()
+	cardServiceConfig.EnableDB = false
+	cardService, err := cards.NewService(s.services.Storage.GetDB(), cardServiceConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize card service: %w", err)
 	}

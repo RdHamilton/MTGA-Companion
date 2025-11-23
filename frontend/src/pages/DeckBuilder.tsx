@@ -6,6 +6,9 @@ import {
   RemoveCard,
   GetDeckStatistics,
   GetDeckByDraftEvent,
+  CreateDeck,
+  GetActiveDraftSessions,
+  GetCompletedDraftSessions,
 } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import DeckList from '../components/DeckList';
@@ -39,12 +42,38 @@ export default function DeckBuilder() {
           // Load by deck ID
           deckData = await GetDeck(deckID);
         } else if (draftEventID) {
-          // Load by draft event ID
+          // Load by draft event ID, create if doesn't exist
           deckData = await GetDeckByDraftEvent(draftEventID);
+
           if (!deckData || !deckData.deck) {
-            setError('No deck found for this draft event. Create one first.');
-            setLoading(false);
-            return;
+            // No deck exists yet - create one from draft picks
+            try {
+              // Get draft session to get the event name for the deck
+              const [activeSessions, completedSessions] = await Promise.all([
+                GetActiveDraftSessions(),
+                GetCompletedDraftSessions(100), // Get last 100 completed drafts
+              ]);
+              const allSessions = [...activeSessions, ...completedSessions];
+              const session = allSessions.find((s: any) => s.ID === draftEventID);
+
+              if (!session) {
+                setError('Draft session not found');
+                setLoading(false);
+                return;
+              }
+
+              const deckName = `${session.EventName} Draft`;
+
+              // Create deck linked to this draft event
+              const newDeck = await CreateDeck(deckName, 'limited', 'draft', draftEventID);
+
+              // Load the newly created deck
+              deckData = await GetDeck(newDeck.ID);
+            } catch (createErr) {
+              setError(createErr instanceof Error ? createErr.message : 'Failed to create deck from draft');
+              setLoading(false);
+              return;
+            }
           }
         } else {
           setError('No deck ID or draft event ID provided');

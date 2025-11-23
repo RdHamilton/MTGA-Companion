@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { models, pickquality, grading, gui } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
@@ -41,6 +42,8 @@ interface HistoricalDraftDetailState {
 }
 
 const Draft: React.FC = () => {
+    const navigate = useNavigate();
+
     const [state, setState] = useState<DraftState>({
         session: null,
         picks: [],
@@ -397,14 +400,27 @@ const Draft: React.FC = () => {
         return (
             <div className="draft-container">
                 <div className="draft-header">
-                    <button className="btn-back" onClick={handleBackToGrid}>
-                        ← Back to Draft History
-                    </button>
-                    <h1>Draft Replay</h1>
-                    <div className="draft-info">
-                        <span className="draft-event">{historicalDetailState.session.EventName}</span>
-                        <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
-                        <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div>
+                            <button className="btn-back" onClick={handleBackToGrid}>
+                                ← Back to Draft History
+                            </button>
+                            <h1>Draft Replay</h1>
+                            <div className="draft-info">
+                                <span className="draft-event">{historicalDetailState.session.EventName}</span>
+                                <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
+                                <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
+                            </div>
+                        </div>
+                        {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
+                            <button
+                                className="btn-build-deck"
+                                onClick={() => navigate(`/deck-builder/draft/${historicalDetailState.session!.ID}`)}
+                                title="Build and edit your deck from draft picks"
+                            >
+                                🃏 Build Deck
+                            </button>
+                        )}
                     </div>
                     {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
                         <>
@@ -675,6 +691,13 @@ const Draft: React.FC = () => {
                                             >
                                                 View Replay
                                             </button>
+                                            <button
+                                                className="btn-build-deck"
+                                                onClick={() => navigate(`/deck-builder/draft/${session.ID}`)}
+                                                title="Build and edit your deck from draft picks"
+                                            >
+                                                🃏 Build Deck
+                                            </button>
                                         </div>
                                     </div>
                                 );
@@ -749,20 +772,30 @@ const Draft: React.FC = () => {
                             <span className="draft-picks">Picks: {state.picks.length}/{state.session.TotalPicks || 45}</span>
                         </div>
                     </div>
-                    <button
-                        className="btn-analyze-draft"
-                        onClick={handleAnalyzeDraft}
-                        disabled={isAnalyzing || state.picks.length === 0}
-                    >
-                        {isAnalyzing ? (
-                            <>
-                                <div className="spinner"></div>
-                                Analyzing...
-                            </>
-                        ) : (
-                            '🎯 Analyze Pick Quality'
-                        )}
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            className="btn-build-deck"
+                            onClick={() => state.session && navigate(`/deck-builder/draft/${state.session.ID}`)}
+                            disabled={state.picks.length === 0 || !state.session}
+                            title="Build and edit your deck from draft picks"
+                        >
+                            🃏 Build Deck
+                        </button>
+                        <button
+                            className="btn-analyze-draft"
+                            onClick={handleAnalyzeDraft}
+                            disabled={isAnalyzing || state.picks.length === 0}
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <div className="spinner"></div>
+                                    Analyzing...
+                                </>
+                            ) : (
+                                '🎯 Analyze Pick Quality'
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
 
