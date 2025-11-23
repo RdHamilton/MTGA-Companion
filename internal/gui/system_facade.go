@@ -62,6 +62,7 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 
 	config := storage.DefaultConfig(dbPath)
 	config.BusyTimeout = 10 * time.Second // Increase timeout to handle concurrent poller operations
+	config.AutoMigrate = true              // Enable automatic database migrations
 
 	db, err := storage.Open(config)
 	if err != nil {
