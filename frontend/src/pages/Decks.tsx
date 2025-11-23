@@ -1,22 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ListDecks, CreateDeck } from '../../wailsjs/go/main/App';
+import { gui } from '../../wailsjs/go/models';
 import './Decks.css';
-
-interface DeckListItem {
-  ID: string;
-  Name: string;
-  Format: string;
-  Source: string;
-  CreatedAt: string;
-  LastModified?: string;
-  CardCount: number;
-  DraftEventID?: string;
-}
 
 export default function Decks() {
   const navigate = useNavigate();
-  const [decks, setDecks] = useState<DeckListItem[]>([]);
+  const [decks, setDecks] = useState<gui.DeckListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -57,9 +47,9 @@ export default function Decks() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString();
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString();
   };
 
   if (loading) {
@@ -108,25 +98,24 @@ export default function Decks() {
         <div className="decks-grid">
           {decks.map((deck) => (
             <div
-              key={deck.ID}
+              key={deck.id}
               className="deck-card"
-              onClick={() => navigate(`/deck-builder/${deck.ID}`)}
+              onClick={() => navigate(`/deck-builder/${deck.id}`)}
             >
               <div className="deck-card-header">
-                <h3>{deck.Name}</h3>
-                {deck.Source === 'draft' && (
+                <h3>{deck.name}</h3>
+                {deck.source === 'draft' && (
                   <span className="source-badge draft">Draft</span>
                 )}
-                {deck.Source === 'import' && (
+                {deck.source === 'import' && (
                   <span className="source-badge import">Import</span>
                 )}
               </div>
               <div className="deck-card-body">
                 <div className="deck-info">
-                  <span className="deck-format">{deck.Format}</span>
-                  <span className="deck-date">Created: {formatDate(deck.CreatedAt)}</span>
-                  {deck.LastModified && (
-                    <span className="deck-date">Updated: {formatDate(deck.LastModified)}</span>
+                  <span className="deck-format">{deck.format}</span>
+                  {deck.modifiedAt && (
+                    <span className="deck-date">Modified: {formatDate(deck.modifiedAt)}</span>
                   )}
                 </div>
               </div>
@@ -135,7 +124,7 @@ export default function Decks() {
                   className="edit-button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/deck-builder/${deck.ID}`);
+                    navigate(`/deck-builder/${deck.id}`);
                   }}
                 >
                   ✏️ Edit

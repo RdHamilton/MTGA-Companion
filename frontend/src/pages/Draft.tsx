@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { models, pickquality, grading, gui } from '../../wailsjs/go/models';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
@@ -41,6 +42,8 @@ interface HistoricalDraftDetailState {
 }
 
 const Draft: React.FC = () => {
+    const navigate = useNavigate();
+
     const [state, setState] = useState<DraftState>({
         session: null,
         picks: [],
@@ -752,8 +755,8 @@ const Draft: React.FC = () => {
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <button
                             className="btn-build-deck"
-                            onClick={() => navigate(`/deck-builder/draft/${state.session.ID}`)}
-                            disabled={state.picks.length === 0}
+                            onClick={() => state.session && navigate(`/deck-builder/draft/${state.session.ID}`)}
+                            disabled={state.picks.length === 0 || !state.session}
                             title="Build and edit your deck from draft picks"
                         >
                             🃏 Build Deck
