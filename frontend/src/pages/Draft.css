@@ -821,6 +821,7 @@
 
 /* Build Deck Button */
 .btn-build-deck {
+    flex: 1;
     background-color: #00c853;
     color: #ffffff;
     border: none;
@@ -832,6 +833,7 @@
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
 }
 

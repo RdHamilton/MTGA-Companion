@@ -400,14 +400,27 @@ const Draft: React.FC = () => {
         return (
             <div className="draft-container">
                 <div className="draft-header">
-                    <button className="btn-back" onClick={handleBackToGrid}>
-                        ← Back to Draft History
-                    </button>
-                    <h1>Draft Replay</h1>
-                    <div className="draft-info">
-                        <span className="draft-event">{historicalDetailState.session.EventName}</span>
-                        <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
-                        <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div>
+                            <button className="btn-back" onClick={handleBackToGrid}>
+                                ← Back to Draft History
+                            </button>
+                            <h1>Draft Replay</h1>
+                            <div className="draft-info">
+                                <span className="draft-event">{historicalDetailState.session.EventName}</span>
+                                <span className="draft-set">Set: {historicalDetailState.session.SetCode}</span>
+                                <span className="draft-picks">Picks: {historicalDetailState.picks.length}/{historicalDetailState.session.TotalPicks || 45}</span>
+                            </div>
+                        </div>
+                        {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
+                            <button
+                                className="btn-build-deck"
+                                onClick={() => navigate(`/deck-builder/draft/${historicalDetailState.session!.ID}`)}
+                                title="Build and edit your deck from draft picks"
+                            >
+                                🃏 Build Deck
+                            </button>
+                        )}
                     </div>
                     {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
                         <>
@@ -677,6 +690,13 @@ const Draft: React.FC = () => {
                                                 onClick={() => loadHistoricalDraftDetail(session)}
                                             >
                                                 View Replay
+                                            </button>
+                                            <button
+                                                className="btn-build-deck"
+                                                onClick={() => navigate(`/deck-builder/draft/${session.ID}`)}
+                                                title="Build and edit your deck from draft picks"
+                                            >
+                                                🃏 Build Deck
                                             </button>
                                         </div>
                                     </div>
