@@ -13,7 +13,7 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'draft' | 'charts'>('match-history');
+  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'draft' | 'decks' | 'charts'>('match-history');
   const [connectionStatus, setConnectionStatus] = useState<any>({
     status: 'standalone',
     connected: false
@@ -33,6 +33,8 @@ const Layout = ({ children }: LayoutProps) => {
       setActiveTab('events');
     } else if (location.pathname === '/draft') {
       setActiveTab('draft');
+    } else if (location.pathname === '/decks' || location.pathname.startsWith('/deck-builder')) {
+      setActiveTab('decks');
     } else if (location.pathname.startsWith('/charts/')) {
       setActiveTab('charts');
     }
@@ -128,6 +130,13 @@ const Layout = ({ children }: LayoutProps) => {
             onClick={() => setActiveTab('draft')}
           >
             Draft
+          </Link>
+          <Link
+            to="/decks"
+            className={`tab ${activeTab === 'decks' ? 'active' : ''}`}
+            onClick={() => setActiveTab('decks')}
+          >
+            Decks
           </Link>
           <Link
             to="/charts/win-rate-trend"
