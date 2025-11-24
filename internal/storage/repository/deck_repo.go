@@ -578,8 +578,21 @@ func (r *deckRepository) ValidateDraftDeck(ctx context.Context, deckID string) (
 		return false, fmt.Errorf("failed to get deck cards: %w", err)
 	}
 
-	// Validate that all deck cards are in the draft
+	// Basic lands that can be added to any deck (standard Arena IDs)
+	basicLands := map[int]bool{
+		81716: true, // Plains
+		81717: true, // Island
+		81718: true, // Swamp
+		81719: true, // Mountain
+		81720: true, // Forest
+	}
+
+	// Validate that all non-basic-land deck cards are in the draft
 	for _, card := range deckCards {
+		// Skip basic lands - they can always be added
+		if basicLands[card.CardID] {
+			continue
+		}
 		if !draftCardSet[card.CardID] {
 			return false, nil // Found a card not in the draft
 		}

@@ -1823,6 +1823,8 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 
 // ExportDeckToFile exports a deck and prompts user to save to file using native dialog.
 func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error {
+	log.Printf("ExportDeckToFile called with deckID: %s", deckID)
+
 	if deckID == "" {
 		return fmt.Errorf("deck ID is required")
 	}
@@ -1835,8 +1837,10 @@ func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error 
 		return err
 	})
 	if err != nil {
+		log.Printf("Failed to get deck: %v", err)
 		return fmt.Errorf("failed to get deck: %v", err)
 	}
+	log.Printf("Got deck: %s", deck.Name)
 
 	// Export deck content
 	req := &ExportDeckRequest{
@@ -1846,17 +1850,23 @@ func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error 
 		IncludeStats:   false,
 	}
 
+	log.Printf("Calling ExportDeck...")
 	response, err := d.ExportDeck(ctx, req)
 	if err != nil {
+		log.Printf("ExportDeck returned error: %v", err)
 		return fmt.Errorf("failed to export deck: %v", err)
 	}
+	log.Printf("ExportDeck succeeded, response.Error: %s", response.Error)
 
 	if response.Error != "" {
+		log.Printf("Response has error: %s", response.Error)
 		return fmt.Errorf("%s", response.Error)
 	}
+	log.Printf("Export content length: %d bytes", len(response.Content))
 
 	// Prompt user to select save location using native Wails dialog
 	defaultFilename := strings.ReplaceAll(deck.Name, " ", "_") + ".txt"
+	log.Printf("Showing SaveFileDialog with filename: %s", defaultFilename)
 	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
 		DefaultFilename: defaultFilename,
 		Title:           "Export Deck",
@@ -1866,12 +1876,15 @@ func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error 
 		},
 	})
 	if err != nil {
+		log.Printf("SaveFileDialog returned error: %v", err)
 		return fmt.Errorf("failed to show save dialog: %v", err)
 	}
 	if filePath == "" {
 		// User cancelled
+		log.Printf("User cancelled save dialog")
 		return nil
 	}
+	log.Printf("User selected file path: %s", filePath)
 
 	// Save the file
 	err = os.WriteFile(filePath, []byte(response.Content), 0o644)
