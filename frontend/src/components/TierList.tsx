@@ -34,28 +34,45 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
     useEffect(() => {
+        const loadRatings = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const [ratingsData, cardsData] = await Promise.all([
+                    GetCardRatings(setCode, draftFormat),
+                    GetSetCards(setCode)
+                ]);
+                setRatings(ratingsData || []);
+                setSetCards(cardsData || []);
+            } catch (err) {
+                console.error('Failed to load card ratings:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load card ratings');
+            } finally {
+                setLoading(false);
+            }
+        };
+
         loadRatings();
     }, [setCode, draftFormat]);
 
-    const loadRatings = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const [ratingsData, cardsData] = await Promise.all([
-                GetCardRatings(setCode, draftFormat),
-                GetSetCards(setCode)
-            ]);
-            setRatings(ratingsData || []);
-            setSetCards(cardsData || []);
-        } catch (err) {
-            console.error('Failed to load card ratings:', err);
-            setError(err instanceof Error ? err.message : 'Failed to load card ratings');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleRefresh = async () => {
+        const loadRatings = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const [ratingsData, cardsData] = await Promise.all([
+                    GetCardRatings(setCode, draftFormat),
+                    GetSetCards(setCode)
+                ]);
+                setRatings(ratingsData || []);
+                setSetCards(cardsData || []);
+            } catch (err) {
+                console.error('Failed to load card ratings:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load card ratings');
+            } finally {
+                setLoading(false);
+            }
+        };
         try {
             setRefreshing(true);
             setError(null);
@@ -169,10 +186,11 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                 case 'alsa':
                     comparison = a.avg_seen - b.avg_seen;
                     break;
-                case 'rarity':
+                case 'rarity': {
                     const rarityOrder: Record<string, number> = { 'mythic': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
                     comparison = (rarityOrder[a.rarity.toLowerCase()] || 0) - (rarityOrder[b.rarity.toLowerCase()] || 0);
                     break;
+                }
             }
             return sortDirection === 'asc' ? comparison : -comparison;
         });

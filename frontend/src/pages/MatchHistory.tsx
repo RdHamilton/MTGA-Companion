@@ -33,24 +33,7 @@ const MatchHistory = () => {
   const [selectedMatch, setSelectedMatch] = useState<models.Match | null>(null);
 
   useEffect(() => {
-    loadMatches();
-  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
-
-  // Listen for real-time updates
-  useEffect(() => {
-    const unsubscribe = EventsOn('stats:updated', () => {
-      console.log('Stats updated event received - reloading match history');
-      loadMatches();
-    });
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
-
-  const loadMatches = async () => {
+    const loadMatches = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -124,7 +107,98 @@ const MatchHistory = () => {
     }
   };
 
-  const formatTimestamp = (timestamp: any) => {
+    loadMatches();
+  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    const loadMatches = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Build filter
+        const filter = new models.StatsFilter();
+
+        // Date range
+        if (dateRange === 'custom') {
+          // Use custom date range if provided
+          if (customStartDate) {
+            const start = new Date(customStartDate + 'T00:00:00');
+            filter.StartDate = start;
+          }
+          if (customEndDate) {
+            // Add 1 day to end date to make it inclusive
+            // (e.g., end date "2024-11-14" becomes "2024-11-15T00:00:00")
+            const end = new Date(customEndDate + 'T00:00:00');
+            end.setDate(end.getDate() + 1);
+            filter.EndDate = end;
+          }
+        } else if (dateRange !== 'all') {
+          const now = new Date();
+          const start = new Date();
+
+          switch (dateRange) {
+            case '7days':
+              start.setDate(now.getDate() - 7);
+              break;
+            case '30days':
+              start.setDate(now.getDate() - 30);
+              break;
+            case '90days':
+              start.setDate(now.getDate() - 90);
+              break;
+          }
+
+          // Set start time to beginning of day
+          start.setHours(0, 0, 0, 0);
+          // Add 1 day to end date to make it inclusive (beginning of next day)
+          const end = new Date(now);
+          end.setDate(end.getDate() + 1);
+          end.setHours(0, 0, 0, 0);
+
+          filter.StartDate = start;
+          filter.EndDate = end;
+        }
+
+        // Card format filter (deck format)
+        if (cardFormat !== 'all') {
+          filter.DeckFormat = cardFormat;
+        }
+
+        // Queue type filter (ladder/play)
+        if (queueType !== 'all') {
+          filter.Format = queueType;
+        }
+
+        // Result filter
+        if (result !== 'all') {
+          filter.Result = result;
+        }
+
+        const matchData = await GetMatches(filter);
+        setMatches(matchData || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load matches');
+        console.error('Error loading matches:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = EventsOn('stats:updated', () => {
+      console.log('Stats updated event received - reloading match history');
+      loadMatches();
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
+
+  const formatTimestamp = (timestamp: unknown) => {
     return new Date(timestamp).toLocaleString();
   };
 
@@ -146,8 +220,8 @@ const MatchHistory = () => {
 
   // Sort and paginate matches
   const sortedMatches = [...matches].sort((a, b) => {
-    let aVal: any = a[sortField];
-    let bVal: any = b[sortField];
+    let aVal: unknown = a[sortField];
+    let bVal: unknown = b[sortField];
 
     // Handle timestamp
     if (sortField === 'Timestamp') {

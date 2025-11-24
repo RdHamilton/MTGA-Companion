@@ -15,24 +15,24 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadGames = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const gamesData = await GetMatchGames(match.ID);
+        setGames(gamesData || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load games');
+        console.error('Error loading games:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadGames();
   }, [match.ID]);
 
-  const loadGames = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const gamesData = await GetMatchGames(match.ID);
-      setGames(gamesData || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load games');
-      console.error('Error loading games:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatTimestamp = (timestamp: any) => {
+  const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
   };
 

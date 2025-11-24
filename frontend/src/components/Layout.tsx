@@ -10,11 +10,15 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+interface ConnectionStatus {
+  status: string;
+  connected: boolean;
+}
+
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'match-history' | 'quests' | 'events' | 'draft' | 'decks' | 'charts'>('match-history');
-  const [connectionStatus, setConnectionStatus] = useState<any>({
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     status: 'standalone',
     connected: false
   });
@@ -23,22 +27,25 @@ const Layout = ({ children }: LayoutProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Sync activeTab with current route (for keyboard shortcuts and direct navigation)
-  useEffect(() => {
+  // Derive activeTab from current route (computed value, not state)
+  const getActiveTab = (): 'match-history' | 'quests' | 'events' | 'draft' | 'decks' | 'charts' => {
     if (location.pathname === '/match-history' || location.pathname === '/') {
-      setActiveTab('match-history');
+      return 'match-history';
     } else if (location.pathname === '/quests') {
-      setActiveTab('quests');
+      return 'quests';
     } else if (location.pathname === '/events') {
-      setActiveTab('events');
+      return 'events';
     } else if (location.pathname === '/draft') {
-      setActiveTab('draft');
+      return 'draft';
     } else if (location.pathname === '/decks' || location.pathname.startsWith('/deck-builder')) {
-      setActiveTab('decks');
+      return 'decks';
     } else if (location.pathname.startsWith('/charts/')) {
-      setActiveTab('charts');
+      return 'charts';
     }
-  }, [location.pathname]);
+    return 'match-history';
+  };
+
+  const activeTab = getActiveTab();
 
   // Subscribe to replay state changes
   useEffect(() => {
@@ -54,31 +61,29 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Load connection status on mount
   useEffect(() => {
+    const loadConnectionStatus = async () => {
+      try {
+        const status = await GetConnectionStatus();
+        setConnectionStatus(status);
+      } catch (error) {
+        console.error('Failed to load connection status:', error);
+      }
+    };
+
     loadConnectionStatus();
 
     // Listen for daemon events
-    EventsOn('daemon:status', () => {
-      loadConnectionStatus();
-    });
+    const handleDaemonStatus = () => loadConnectionStatus();
+    const handleDaemonConnected = () => loadConnectionStatus();
 
-    EventsOn('daemon:connected', () => {
-      loadConnectionStatus();
-    });
+    EventsOn('daemon:status', handleDaemonStatus);
+    EventsOn('daemon:connected', handleDaemonConnected);
 
     return () => {
       EventsOff('daemon:status');
       EventsOff('daemon:connected');
     };
   }, []);
-
-  const loadConnectionStatus = async () => {
-    try {
-      const status = await GetConnectionStatus();
-      setConnectionStatus(status);
-    } catch (error) {
-      console.error('Failed to load connection status:', error);
-    }
-  };
 
   const handleResumeReplay = async () => {
     try {
@@ -106,49 +111,42 @@ const Layout = ({ children }: LayoutProps) => {
           <Link
             to="/match-history"
             className={`tab ${activeTab === 'match-history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('match-history')}
           >
             Match History
           </Link>
           <Link
             to="/quests"
             className={`tab ${activeTab === 'quests' ? 'active' : ''}`}
-            onClick={() => setActiveTab('quests')}
           >
             Quests
           </Link>
           <Link
             to="/events"
             className={`tab ${activeTab === 'events' ? 'active' : ''}`}
-            onClick={() => setActiveTab('events')}
           >
             Events
           </Link>
           <Link
             to="/draft"
             className={`tab ${activeTab === 'draft' ? 'active' : ''}`}
-            onClick={() => setActiveTab('draft')}
           >
             Draft
           </Link>
           <Link
             to="/decks"
             className={`tab ${activeTab === 'decks' ? 'active' : ''}`}
-            onClick={() => setActiveTab('decks')}
           >
             Decks
           </Link>
           <Link
             to="/charts/win-rate-trend"
             className={`tab ${activeTab === 'charts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('charts')}
           >
             Charts
           </Link>
           <Link
             to="/settings"
             className={`tab ${isActive('/settings') ? 'active' : ''}`}
-            onClick={() => setActiveTab('match-history')}
           >
             Settings
           </Link>

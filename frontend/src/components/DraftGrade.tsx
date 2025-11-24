@@ -22,22 +22,22 @@ export const DraftGrade: React.FC<DraftGradeProps> = ({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
+    const loadGrade = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const g = await GetDraftGrade(sessionID);
+        setGrade(g);
+      } catch {
+        // Grade might not exist yet - not necessarily an error
+        setGrade(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadGrade();
   }, [sessionID]);
-
-  const loadGrade = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const g = await GetDraftGrade(sessionID);
-      setGrade(g);
-    } catch (err) {
-      // Grade might not exist yet - not necessarily an error
-      setGrade(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const calculateGrade = async () => {
     try {

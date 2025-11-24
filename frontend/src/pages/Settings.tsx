@@ -15,7 +15,7 @@ const Settings = () => {
   const [showAbout, setShowAbout] = useState(false);
 
   // Daemon settings
-  const [connectionStatus, setConnectionStatus] = useState<any>({
+  const [connectionStatus, setConnectionStatus] = useState<Record<string, unknown>>({
     status: 'standalone',
     connected: false,
     mode: 'standalone',
@@ -29,12 +29,12 @@ const Settings = () => {
   // Replay logs settings
   const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
-  const [replayProgress, setReplayProgress] = useState<any>(null);
+  const [replayProgress, setReplayProgress] = useState<Record<string, unknown> | null>(null);
 
   // Replay tool settings - use global state for active/paused to persist across navigation
   const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
   const [replayToolPaused, setReplayToolPaused] = useState(getReplayState().isPaused);
-  const [replayToolProgress, setReplayToolProgress] = useState<any>(getReplayState().progress);
+  const [replayToolProgress, setReplayToolProgress] = useState<Record<string, unknown> | null>(getReplayState().progress);
   const [replaySpeed, setReplaySpeed] = useState(1.0);
   const [replayFilter, setReplayFilter] = useState('all');
   const [pauseOnDraft, setPauseOnDraft] = useState(false);
@@ -82,18 +82,18 @@ const Settings = () => {
 
   // Listen for replay events
   useEffect(() => {
-    const unsubscribeStarted = EventsOn('replay:started', (data: any) => {
+    const unsubscribeStarted = EventsOn('replay:started', (data: unknown) => {
       console.log('Replay started:', data);
       setIsReplaying(true);
       setReplayProgress(null);
     });
 
-    const unsubscribeProgress = EventsOn('replay:progress', (data: any) => {
+    const unsubscribeProgress = EventsOn('replay:progress', (data: unknown) => {
       console.log('Replay progress:', data);
       setReplayProgress(data);
     });
 
-    const unsubscribeCompleted = EventsOn('replay:completed', (data: any) => {
+    const unsubscribeCompleted = EventsOn('replay:completed', (data: unknown) => {
       console.log('Replay completed:', data);
       setIsReplaying(false);
       setReplayProgress(data);
@@ -103,7 +103,7 @@ const Settings = () => {
       }, 2000);
     });
 
-    const unsubscribeError = EventsOn('replay:error', (data: any) => {
+    const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
       console.error('Replay error:', data);
       setIsReplaying(false);
       // Error will be logged to console

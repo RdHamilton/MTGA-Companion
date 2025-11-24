@@ -17,10 +17,7 @@ const WinRateTrend = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTrendData();
-  }, [dateRange, format]);
-
-  const loadTrendData = async () => {
+    const loadTrendData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -66,6 +63,9 @@ const WinRateTrend = () => {
       setLoading(false);
     }
   };
+
+    loadTrendData();
+  }, [dateRange, format]);
 
   // Transform data for Recharts
   const chartData = analysis?.Periods?.map(period => ({

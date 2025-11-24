@@ -99,6 +99,7 @@ const Draft: React.FC = () => {
                 clearTimeout(debounceTimerRef.current);
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- loadActiveDraft and debouncedLoadActiveDraft are stable
     }, []);
 
     const loadHistoricalDrafts = async () => {
@@ -378,6 +379,7 @@ const Draft: React.FC = () => {
         if (!state.session) return { types: [], colors: { colors: [], count: 0, percentage: 0 }, curve: { avgCMC: 0, archetype: 'midrange' as const, gaps: [] }, pickedCardsCount: 0 };
         const pickedCards = getPickedCards();
         return analyzeSynergies(pickedCards);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- getPickedCards depends on state.picks and state.setCards which are included
     }, [state.session, state.picks, state.setCards]);
 
     // ========================================
@@ -649,7 +651,7 @@ const Draft: React.FC = () => {
                     <div className="historical-drafts">
                         <div className="drafts-grid">
                             {historicalState.sessions.map((session) => {
-                                const startDate = new Date(session.StartTime as any);
+                                const startDate = new Date(session.StartTime as unknown as string);
                                 const formattedDate = startDate.toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',

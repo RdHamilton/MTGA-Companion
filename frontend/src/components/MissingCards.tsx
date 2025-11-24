@@ -16,37 +16,37 @@ const MissingCards = ({ sessionID, packNumber, pickNumber }: MissingCardsProps) 
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    const loadMissingCards = async () => {
+      if (!sessionID || pickNumber <= 1) {
+        // No missing cards for P1P1
+        setAnalysis(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await GetMissingCards(sessionID, packNumber, pickNumber);
+        // Only set analysis if we have actual missing cards
+        if (result && result.TotalMissing > 0) {
+          setAnalysis(result);
+        } else {
+          setAnalysis(null);
+        }
+      } catch (err) {
+        console.error('Failed to load missing cards:', err);
+        // Don't show error to user - just log it and hide component
+        // This is expected when pack data isn't available yet
+        setAnalysis(null);
+        setError(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadMissingCards();
   }, [sessionID, packNumber, pickNumber]);
-
-  const loadMissingCards = async () => {
-    if (!sessionID || pickNumber <= 1) {
-      // No missing cards for P1P1
-      setAnalysis(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await GetMissingCards(sessionID, packNumber, pickNumber);
-      // Only set analysis if we have actual missing cards
-      if (result && result.TotalMissing > 0) {
-        setAnalysis(result);
-      } else {
-        setAnalysis(null);
-      }
-    } catch (err) {
-      console.error('Failed to load missing cards:', err);
-      // Don't show error to user - just log it and hide component
-      // This is expected when pack data isn't available yet
-      setAnalysis(null);
-      setError(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Don't show anything while loading or if there's no data
   if (loading || error || !analysis || analysis.TotalMissing === 0) {

@@ -31,6 +31,25 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
     const [filterBy, setFilterBy] = useState<FilterBy>('all');
 
     useEffect(() => {
+        const loadInsights = async () => {
+            if (!setCode || !draftFormat) {
+                setError('Set code and draft format are required');
+                return;
+            }
+
+            try {
+                setLoading(true);
+                setError(null);
+                const insights = await GetFormatInsights(setCode, draftFormat);
+                setData(insights);
+            } catch (err) {
+                console.error('Error loading format insights:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load insights');
+            } finally {
+                setLoading(false);
+            }
+        };
+
         if (!isCollapsed && setCode && draftFormat) {
             loadInsights();
         }
@@ -43,7 +62,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
         }
     }, [isCollapsed, setCode, draftFormat, autoRefresh, refreshInterval]);
 
-    const loadInsights = async () => {
+    const handleRefreshClick = async () => {
         if (!setCode || !draftFormat) {
             setError('Set code and draft format are required');
             return;
@@ -148,7 +167,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
                         className="btn-refresh-insights"
                         onClick={(e) => {
                             e.stopPropagation();
-                            loadInsights();
+                            handleRefreshClick();
                         }}
                     >
                         Refresh

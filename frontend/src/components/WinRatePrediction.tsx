@@ -22,22 +22,19 @@ export const WinRatePrediction: React.FC<WinRatePredictionProps> = ({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
+    const loadPrediction = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const p = await GetDraftWinRatePrediction(sessionID);
+        setPred(p);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadPrediction();
   }, [sessionID]);
-
-  const loadPrediction = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const p = await GetDraftWinRatePrediction(sessionID);
-      setPred(p);
-    } catch (err) {
-      // Prediction might not exist yet - not an error
-      setPred(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const calculatePrediction = async () => {
     try {
@@ -265,7 +262,7 @@ const PredictionBreakdownModal: React.FC<PredictionBreakdownModalProps> = ({ pre
             <div className="curve-chart">
               {(() => {
                 const curveEntries = Object.entries(prediction.Factors.curve_distribution || {});
-                const maxCount = Math.max(...curveEntries.map(([_, count]) => Number(count)), 1);
+                const maxCount = Math.max(...curveEntries.map(([, count]) => Number(count)), 1);
                 const maxHeight = 160; // Max bar height in pixels
 
                 return curveEntries.map(([cmc, count]) => (

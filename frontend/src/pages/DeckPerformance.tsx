@@ -22,11 +22,149 @@ const DeckPerformance = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadDeckStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const filter = new models.StatsFilter();
+
+        // Date range
+        if (dateRange === 'custom') {
+          if (customStartDate) {
+            const start = new Date(customStartDate + 'T00:00:00');
+            filter.StartDate = start;
+          }
+          if (customEndDate) {
+            const end = new Date(customEndDate + 'T00:00:00');
+            end.setDate(end.getDate() + 1);
+            filter.EndDate = end;
+          }
+        } else if (dateRange !== 'all') {
+          const now = new Date();
+          const start = new Date();
+
+          switch (dateRange) {
+            case '7days':
+              start.setDate(now.getDate() - 7);
+              break;
+            case '30days':
+              start.setDate(now.getDate() - 30);
+              break;
+            case '90days':
+              start.setDate(now.getDate() - 90);
+              break;
+          }
+
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(now);
+          end.setDate(end.getDate() + 1);
+          end.setHours(0, 0, 0, 0);
+
+          filter.StartDate = start;
+          filter.EndDate = end;
+        }
+
+        // Format filter
+        if (format !== 'all') {
+          if (format === 'constructed') {
+            filter.Formats = ['Ladder', 'Play'];
+          } else {
+            filter.Format = format;
+          }
+        }
+
+        const data = await GetStatsByDeck(filter);
+
+        // Convert map to array
+        const statsArray: DeckStats[] = Object.entries(data || {}).map(([deckName, stats]) => ({
+          deckName,
+          stats
+        }));
+
+        setDeckStats(statsArray);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load deck statistics');
+        console.error('Error loading deck stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadDeckStats();
   }, [dateRange, customStartDate, customEndDate, format]);
 
   // Listen for real-time updates
   useEffect(() => {
+    const loadDeckStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const filter = new models.StatsFilter();
+
+        // Date range
+        if (dateRange === 'custom') {
+          if (customStartDate) {
+            const start = new Date(customStartDate + 'T00:00:00');
+            filter.StartDate = start;
+          }
+          if (customEndDate) {
+            const end = new Date(customEndDate + 'T00:00:00');
+            end.setDate(end.getDate() + 1);
+            filter.EndDate = end;
+          }
+        } else if (dateRange !== 'all') {
+          const now = new Date();
+          const start = new Date();
+
+          switch (dateRange) {
+            case '7days':
+              start.setDate(now.getDate() - 7);
+              break;
+            case '30days':
+              start.setDate(now.getDate() - 30);
+              break;
+            case '90days':
+              start.setDate(now.getDate() - 90);
+              break;
+          }
+
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(now);
+          end.setDate(end.getDate() + 1);
+          end.setHours(0, 0, 0, 0);
+
+          filter.StartDate = start;
+          filter.EndDate = end;
+        }
+
+        // Format filter
+        if (format !== 'all') {
+          if (format === 'constructed') {
+            filter.Formats = ['Ladder', 'Play'];
+          } else {
+            filter.Format = format;
+          }
+        }
+
+        const data = await GetStatsByDeck(filter);
+
+        // Convert map to array
+        const statsArray: DeckStats[] = Object.entries(data || {}).map(([deckName, stats]) => ({
+          deckName,
+          stats
+        }));
+
+        setDeckStats(statsArray);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load deck statistics');
+        console.error('Error loading deck stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     const unsubscribe = EventsOn('stats:updated', () => {
       console.log('Stats updated event received - reloading deck performance data');
       loadDeckStats();
@@ -38,75 +176,6 @@ const DeckPerformance = () => {
       }
     };
   }, [dateRange, customStartDate, customEndDate, format]);
-
-  const loadDeckStats = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const filter = new models.StatsFilter();
-
-      // Date range
-      if (dateRange === 'custom') {
-        if (customStartDate) {
-          const start = new Date(customStartDate + 'T00:00:00');
-          filter.StartDate = start;
-        }
-        if (customEndDate) {
-          const end = new Date(customEndDate + 'T00:00:00');
-          end.setDate(end.getDate() + 1);
-          filter.EndDate = end;
-        }
-      } else if (dateRange !== 'all') {
-        const now = new Date();
-        const start = new Date();
-
-        switch (dateRange) {
-          case '7days':
-            start.setDate(now.getDate() - 7);
-            break;
-          case '30days':
-            start.setDate(now.getDate() - 30);
-            break;
-          case '90days':
-            start.setDate(now.getDate() - 90);
-            break;
-        }
-
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now);
-        end.setDate(end.getDate() + 1);
-        end.setHours(0, 0, 0, 0);
-
-        filter.StartDate = start;
-        filter.EndDate = end;
-      }
-
-      // Format filter
-      if (format !== 'all') {
-        if (format === 'constructed') {
-          filter.Formats = ['Ladder', 'Play'];
-        } else {
-          filter.Format = format;
-        }
-      }
-
-      const data = await GetStatsByDeck(filter);
-
-      // Convert map to array
-      const statsArray: DeckStats[] = Object.entries(data || {}).map(([deckName, stats]) => ({
-        deckName,
-        stats
-      }));
-
-      setDeckStats(statsArray);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load deck statistics');
-      console.error('Error loading deck stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatWinRate = (winRate: number) => {
     return `${Math.round(winRate * 100 * 10) / 10}%`;
