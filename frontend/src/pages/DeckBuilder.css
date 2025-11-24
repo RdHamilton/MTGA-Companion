@@ -123,16 +123,27 @@
   grid-template-columns: 1fr;
   gap: 0;
   overflow: hidden;
+  min-height: 0;
 }
 
 .deck-builder-content:has(.card-search-panel) {
   grid-template-columns: 1fr 400px;
 }
 
+.deck-builder-content:has(.recommendations-panel) {
+  grid-template-columns: 1fr 400px;
+}
+
+.deck-builder-content:has(.card-search-panel):has(.recommendations-panel) {
+  grid-template-columns: 1fr 400px 400px;
+}
+
 .deck-list-panel,
-.card-search-panel {
+.card-search-panel,
+.recommendations-panel {
   overflow-y: auto;
   height: 100%;
+  min-height: 0;
 }
 
 .deck-list-panel {
@@ -192,6 +203,12 @@
   border-color: #555;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.action-button.active {
+  background: #4a9eff;
+  border-color: #4a9eff;
+  color: #fff;
 }
 
 /* Scrollbar Styling */
