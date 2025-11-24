@@ -242,20 +242,24 @@ export default function DeckBuilder() {
       console.log('Color counts (mono-colored only):', colorCounts);
       console.log('Color counts after assignment - W:', colorCounts.W, 'U:', colorCounts.U, 'B:', colorCounts.B, 'R:', colorCounts.R, 'G:', colorCounts.G);
 
-      // Calculate target: 40 cards for limited, 60 for constructed
-      const targetDeckSize = deck.Format === 'limited' ? 40 : 60;
-      const currentMainboard = statistics.totalMainboard || 0;
+      // Get backend's land recommendation
       const currentLands = ((statistics as any).lands?.total) || 0;
-      console.log('Deck stats:', { targetDeckSize, currentMainboard, currentLands });
+      const recommendedLands = ((statistics as any).lands?.recommended) || 0;
+      console.log('Deck stats:', { currentLands, recommendedLands });
 
-      // Calculate how many more lands we need
-      const nonLandCards = currentMainboard - currentLands;
-      const landsNeeded = Math.max(0, targetDeckSize - nonLandCards - currentLands);
+      if (recommendedLands === 0) {
+        console.log('No land recommendation available');
+        window.alert('Could not determine land recommendation. Please add more cards to your deck first.');
+        return;
+      }
+
+      // Calculate how many more lands we need based on backend recommendation
+      const landsNeeded = Math.max(0, recommendedLands - currentLands);
       console.log('Lands needed:', landsNeeded);
 
       if (landsNeeded === 0) {
         console.log('Deck already has enough lands');
-        window.alert('Your deck already has enough lands!');
+        window.alert('Your deck already has the recommended number of lands!');
         return;
       }
 
