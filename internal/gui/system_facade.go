@@ -23,6 +23,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // SystemFacade handles system initialization, daemon communication, and replay operations
@@ -106,12 +107,17 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	// Initialize DeckImportParser (depends on CardService)
 	s.services.DeckImportParser = deckimport.NewParser(cardService)
 
-	// Initialize DeckExporter (uses CardService as CardProvider)
-	s.services.DeckExporter = deckexport.NewExporter(cardService)
+	// Initialize DeckExporter with a CardProvider that checks SetCardRepo first
+	// This ensures draft cards are found in the local database before trying Scryfall
+	setCardRepo := s.services.Storage.SetCardRepo()
+	cardProvider := &localFirstCardProvider{
+		setCardRepo: setCardRepo,
+		cardService: cardService,
+	}
+	s.services.DeckExporter = deckexport.NewExporter(cardProvider)
 
 	// Initialize RecommendationEngine (depends on CardService, SetCardRepo, and DraftRatingsRepo)
 	ratingsRepo := s.services.Storage.DraftRatingsRepo()
-	setCardRepo := s.services.Storage.SetCardRepo()
 	log.Printf("Debug: cardService=%v, setCardRepo=%v, ratingsRepo=%v", cardService, setCardRepo, ratingsRepo)
 	s.services.RecommendationEngine = recommendations.NewRuleBasedEngineWithSetRepo(cardService, setCardRepo, ratingsRepo)
 	log.Printf("Debug: RecommendationEngine initialized: %v", s.services.RecommendationEngine)
@@ -776,4 +782,25 @@ func (s *SystemFacade) GetReplayStatus(ctx context.Context) (*ReplayStatus, erro
 	// The UI should subscribe to 'replay:*' WebSocket events for real-time updates.
 	// Session status management is handled by the daemon's log processor, not the frontend.
 	return &ReplayStatus{IsActive: false}, nil
+}
+
+// localFirstCardProvider implements deckexport.CardProvider by checking
+// SetCardRepo first (local database) before falling back to CardService (Scryfall).
+// This ensures draft cards are found locally without expensive API calls.
+type localFirstCardProvider struct {
+	setCardRepo repository.SetCardRepository
+	cardService *cards.Service
+}
+
+// GetCard implements deckexport.CardProvider
+func (p *localFirstCardProvider) GetCard(id int) (*cards.Card, error) {
+	// Try SetCardRepo first (fast, local database)
+	setCard, err := p.setCardRepo.GetCardByArenaID(context.Background(), fmt.Sprintf("%d", id))
+	if err == nil && setCard != nil {
+		// Convert SetCard to cards.Card using the shared function from deck_facade.go
+		return convertSetCardToCard(setCard), nil
+	}
+
+	// Fall back to CardService (Scryfall API)
+	return p.cardService.GetCard(id)
 }

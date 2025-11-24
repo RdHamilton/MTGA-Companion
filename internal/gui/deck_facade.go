@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
@@ -1400,7 +1404,7 @@ func (d *DeckFacade) GetDeckStatistics(ctx context.Context, deckID string) (*Dec
 }
 
 // calculateDeckStats performs the core statistical calculations.
-func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.DeckCard, stats *DeckStatistics) *DeckStatistics {
+func (d *DeckFacade) calculateDeckStats(ctx context.Context, deckCards []*models.DeckCard, stats *DeckStatistics) *DeckStatistics {
 	totalCMC := 0.0
 	nonLandCount := 0
 	totalCreaturePower := 0
@@ -1420,7 +1424,7 @@ func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.Dec
 		81720: "Forest",
 	}
 
-	for _, deckCard := range cards {
+	for _, deckCard := range deckCards {
 		quantity := deckCard.Quantity
 
 		// Check if this is a basic land by ID (handle even without metadata)
@@ -1434,9 +1438,19 @@ func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.Dec
 		}
 
 		// Get card metadata for non-basic-land cards
-		card, err := d.services.CardService.GetCard(deckCard.CardID)
-		if err != nil || card == nil {
-			continue
+		// Try SetCardRepo first (faster, has cards from log parsing and datasets)
+		setCard, setErr := d.services.Storage.SetCardRepo().GetCardByArenaID(ctx, fmt.Sprintf("%d", deckCard.CardID))
+		var card *cards.Card
+		if setErr == nil && setCard != nil {
+			card = convertSetCardToCard(setCard)
+		} else {
+			// Fallback to CardService (Scryfall API)
+			var err error
+			card, err = d.services.CardService.GetCard(deckCard.CardID)
+			if err != nil || card == nil {
+				log.Printf("Warning: Failed to get card metadata for card ID %d: %v", deckCard.CardID, err)
+				continue
+			}
 		}
 
 		stats.TotalCards += quantity
@@ -1638,7 +1652,7 @@ func pluralize(count int) string {
 }
 
 // checkFormatLegality checks deck legality in various formats.
-func (d *DeckFacade) checkFormatLegality(ctx context.Context, cards []*models.DeckCard, deckFormat string) FormatLegality {
+func (d *DeckFacade) checkFormatLegality(ctx context.Context, deckCards []*models.DeckCard, deckFormat string) FormatLegality {
 	legality := FormatLegality{
 		Standard:  LegalityStatus{Legal: true},
 		Historic:  LegalityStatus{Legal: true},
@@ -1652,7 +1666,7 @@ func (d *DeckFacade) checkFormatLegality(ctx context.Context, cards []*models.De
 	totalCards := 0
 	cardCounts := make(map[int]int)
 
-	for _, deckCard := range cards {
+	for _, deckCard := range deckCards {
 		totalCards += deckCard.Quantity
 		cardCounts[deckCard.CardID] += deckCard.Quantity
 	}
@@ -1805,6 +1819,125 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 		Filename: result.Filename,
 		Format:   string(result.Format),
 	}, nil
+}
+
+// ExportDeckToFile exports a deck and prompts user to save to file using native dialog.
+func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error {
+	log.Printf("ExportDeckToFile called with deckID: %s", deckID)
+
+	if deckID == "" {
+		return fmt.Errorf("deck ID is required")
+	}
+
+	// Get deck to use its name for the filename
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, deckID)
+		return err
+	})
+	if err != nil {
+		log.Printf("Failed to get deck: %v", err)
+		return fmt.Errorf("failed to get deck: %v", err)
+	}
+	log.Printf("Got deck: %s", deck.Name)
+
+	// Export deck content
+	req := &ExportDeckRequest{
+		DeckID:         deckID,
+		Format:         "arena",
+		IncludeHeaders: true,
+		IncludeStats:   false,
+	}
+
+	log.Printf("Calling ExportDeck...")
+	response, err := d.ExportDeck(ctx, req)
+	if err != nil {
+		log.Printf("ExportDeck returned error: %v", err)
+		return fmt.Errorf("failed to export deck: %v", err)
+	}
+	log.Printf("ExportDeck succeeded, response.Error: %s", response.Error)
+
+	if response.Error != "" {
+		log.Printf("Response has error: %s", response.Error)
+		return fmt.Errorf("%s", response.Error)
+	}
+	log.Printf("Export content length: %d bytes", len(response.Content))
+
+	// Prompt user to select save location using native Wails dialog
+	defaultFilename := strings.ReplaceAll(deck.Name, " ", "_") + ".txt"
+	log.Printf("Showing SaveFileDialog with filename: %s", defaultFilename)
+	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: defaultFilename,
+		Title:           "Export Deck",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		log.Printf("SaveFileDialog returned error: %v", err)
+		return fmt.Errorf("failed to show save dialog: %v", err)
+	}
+	if filePath == "" {
+		// User cancelled
+		log.Printf("User cancelled save dialog")
+		return nil
+	}
+	log.Printf("User selected file path: %s", filePath)
+
+	// Save the file
+	err = os.WriteFile(filePath, []byte(response.Content), 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to save file: %v", err)
+	}
+
+	log.Printf("Successfully exported deck '%s' to %s", deck.Name, filepath.Base(filePath))
+
+	// Show success message using native Wails dialog
+	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
+		Type:    wailsruntime.InfoDialog,
+		Title:   "Export Successful",
+		Message: fmt.Sprintf("Deck exported successfully!\n\nSaved to: %s\nFormat: %s", filepath.Base(filePath), response.Format),
+	})
+
+	return err
+}
+
+// ValidateDeckWithDialog validates a deck and shows the result in a native dialog.
+func (d *DeckFacade) ValidateDeckWithDialog(ctx context.Context, deckID string) error {
+	if deckID == "" {
+		return fmt.Errorf("deck ID is required")
+	}
+
+	// Validate the deck
+	isValid, err := d.ValidateDraftDeck(ctx, deckID)
+	if err != nil {
+		return fmt.Errorf("failed to validate deck: %v", err)
+	}
+
+	// Show result using native Wails dialog
+	var dialogType wailsruntime.DialogType
+	var title string
+	var message string
+
+	if isValid {
+		dialogType = wailsruntime.InfoDialog
+		title = "Deck Valid"
+		message = "✓ Your deck is valid!\n\nYour deck meets all format requirements and is ready to play."
+	} else {
+		dialogType = wailsruntime.WarningDialog
+		title = "Deck Invalid"
+		message = "✗ Your deck is invalid\n\nYour deck does not meet format requirements. Check the deck statistics for details."
+	}
+
+	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
+		Type:    dialogType,
+		Title:   title,
+		Message: message,
+	})
+
+	return err
 }
 
 // convertSetCardToCard converts a models.SetCard to a cards.Card.

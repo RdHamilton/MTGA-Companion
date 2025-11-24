@@ -5,6 +5,7 @@ export const mockWailsApp = {
   CalculateDraftGrade: vi.fn(() => Promise.resolve({} as any)),
   ClearAllData: vi.fn(() => Promise.resolve()),
   ClearDatasetCache: vi.fn(() => Promise.resolve()),
+  ExportDeck: vi.fn(() => Promise.resolve({} as any)),
   ExportToCSV: vi.fn(() => Promise.resolve()),
   ExportToJSON: vi.fn(() => Promise.resolve()),
   FetchSetCards: vi.fn(() => Promise.resolve(0)),
@@ -44,6 +45,16 @@ export const mockWailsApp = {
   PauseReplay: vi.fn(() => Promise.resolve()),
   ResumeReplay: vi.fn(() => Promise.resolve()),
   StopReplay: vi.fn(() => Promise.resolve()),
+  ValidateDraftDeck: vi.fn(() => Promise.resolve(true)),
+  ValidateDeckWithDialog: vi.fn(() => Promise.resolve()),
+  AddCard: vi.fn(() => Promise.resolve()),
+  RemoveCard: vi.fn(() => Promise.resolve()),
+  GetDeck: vi.fn(() => Promise.resolve({} as any)),
+  GetDeckStatistics: vi.fn(() => Promise.resolve({} as any)),
+  GetDeckByDraftEvent: vi.fn(() => Promise.resolve({} as any)),
+  CreateDeck: vi.fn(() => Promise.resolve({} as any)),
+  GetRecommendations: vi.fn(() => Promise.resolve({} as any)),
+  ExportDeckToFile: vi.fn(() => Promise.resolve()),
 };
 
 export function resetMocks() {

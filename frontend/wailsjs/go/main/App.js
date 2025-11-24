@@ -46,6 +46,10 @@ export function ExportDeck(arg1) {
   return window['go']['main']['App']['ExportDeck'](arg1);
 }
 
+export function ExportDeckToFile(arg1) {
+  return window['go']['main']['App']['ExportDeckToFile'](arg1);
+}
+
 export function ExportToCSV() {
   return window['go']['main']['App']['ExportToCSV']();
 }
@@ -344,6 +348,10 @@ export function TriggerReplayLogs(arg1) {
 
 export function UpdateDeck(arg1) {
   return window['go']['main']['App']['UpdateDeck'](arg1);
+}
+
+export function ValidateDeckWithDialog(arg1) {
+  return window['go']['main']['App']['ValidateDeckWithDialog'](arg1);
 }
 
 export function ValidateDraftDeck(arg1) {
