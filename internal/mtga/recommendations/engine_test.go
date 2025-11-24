@@ -239,7 +239,7 @@ func TestScoreSynergy(t *testing.T) {
 			typeLine:    "Creature — Ally Warrior",
 			keywords:    map[string]int{},
 			creatures:   map[string]int{"Ally": 10}, // 10+ Allies = strong tribal deck
-			expectedMin: 0.75, // 10 Allies gives 0.8 bonus
+			expectedMin: 0.75,                       // 10 Allies gives 0.8 bonus
 			expectedMax: 0.85,
 		},
 		{
