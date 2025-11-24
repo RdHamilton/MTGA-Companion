@@ -1400,7 +1400,7 @@ func (d *DeckFacade) GetDeckStatistics(ctx context.Context, deckID string) (*Dec
 }
 
 // calculateDeckStats performs the core statistical calculations.
-func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.DeckCard, stats *DeckStatistics) *DeckStatistics {
+func (d *DeckFacade) calculateDeckStats(ctx context.Context, deckCards []*models.DeckCard, stats *DeckStatistics) *DeckStatistics {
 	totalCMC := 0.0
 	nonLandCount := 0
 	totalCreaturePower := 0
@@ -1420,7 +1420,7 @@ func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.Dec
 		81720: "Forest",
 	}
 
-	for _, deckCard := range cards {
+	for _, deckCard := range deckCards {
 		quantity := deckCard.Quantity
 
 		// Check if this is a basic land by ID (handle even without metadata)
@@ -1434,9 +1434,19 @@ func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.Dec
 		}
 
 		// Get card metadata for non-basic-land cards
-		card, err := d.services.CardService.GetCard(deckCard.CardID)
-		if err != nil || card == nil {
-			continue
+		// Try SetCardRepo first (faster, has cards from log parsing and datasets)
+		setCard, setErr := d.services.Storage.SetCardRepo().GetCardByArenaID(ctx, fmt.Sprintf("%d", deckCard.CardID))
+		var card *cards.Card
+		if setErr == nil && setCard != nil {
+			card = convertSetCardToCard(setCard)
+		} else {
+			// Fallback to CardService (Scryfall API)
+			var err error
+			card, err = d.services.CardService.GetCard(deckCard.CardID)
+			if err != nil || card == nil {
+				log.Printf("Warning: Failed to get card metadata for card ID %d: %v", deckCard.CardID, err)
+				continue
+			}
 		}
 
 		stats.TotalCards += quantity
@@ -1638,7 +1648,7 @@ func pluralize(count int) string {
 }
 
 // checkFormatLegality checks deck legality in various formats.
-func (d *DeckFacade) checkFormatLegality(ctx context.Context, cards []*models.DeckCard, deckFormat string) FormatLegality {
+func (d *DeckFacade) checkFormatLegality(ctx context.Context, deckCards []*models.DeckCard, deckFormat string) FormatLegality {
 	legality := FormatLegality{
 		Standard:  LegalityStatus{Legal: true},
 		Historic:  LegalityStatus{Legal: true},
@@ -1652,7 +1662,7 @@ func (d *DeckFacade) checkFormatLegality(ctx context.Context, cards []*models.De
 	totalCards := 0
 	cardCounts := make(map[int]int)
 
-	for _, deckCard := range cards {
+	for _, deckCard := range deckCards {
 		totalCards += deckCard.Quantity
 		cardCounts[deckCard.CardID] += deckCard.Quantity
 	}
