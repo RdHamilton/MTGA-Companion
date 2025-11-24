@@ -373,6 +373,16 @@ func (s *SystemFacade) setupEventHandlers(ctx context.Context) {
 		})
 	})
 
+	// Handle draft:updated events from daemon
+	s.services.IPCClient.On("draft:updated", func(data map[string]interface{}) {
+		log.Printf("Received draft:updated event from daemon: %v", data)
+		s.eventDispatcher.Dispatch(events.Event{
+			Type:    "draft:updated",
+			Data:    data,
+			Context: ctx,
+		})
+	})
+
 	// Handle daemon:status events
 	s.services.IPCClient.On("daemon:status", func(data map[string]interface{}) {
 		log.Printf("Daemon status: %v", data)
