@@ -497,12 +497,25 @@ func parseTimestamp(s string) (time.Time, error) {
 		return t, nil
 	}
 
-	// Try SQLite format with microseconds (e.g., "2006-01-02 15:04:05.999999")
-	if t, err := time.Parse("2006-01-02 15:04:05.999999", s); err == nil {
-		return t, nil
+	// Try SQLite format with fractional seconds (variable length 1-9 digits)
+	// Go's time.Parse requires exact digit count, so try common lengths
+	sqliteFormats := []string{
+		"2006-01-02 15:04:05.999999999", // nanoseconds (9 digits)
+		"2006-01-02 15:04:05.999999",    // microseconds (6 digits)
+		"2006-01-02 15:04:05.99999",     // 5 digits
+		"2006-01-02 15:04:05.9999",      // 4 digits
+		"2006-01-02 15:04:05.999",       // milliseconds (3 digits)
+		"2006-01-02 15:04:05.99",        // 2 digits
+		"2006-01-02 15:04:05.9",         // 1 digit
 	}
 
-	// Try SQLite format without microseconds (e.g., "2006-01-02 15:04:05")
+	for _, format := range sqliteFormats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, nil
+		}
+	}
+
+	// Try SQLite format without fractional seconds (e.g., "2006-01-02 15:04:05")
 	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
 		return t, nil
 	}
