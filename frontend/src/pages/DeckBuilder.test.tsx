@@ -4,8 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckBuilder from './DeckBuilder';
 import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockWailsRuntime } from '../test/mocks/wailsRuntime';
-import { models, gui } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 
 // Mock react-router-dom
 const mockNavigate = vi.fn();
