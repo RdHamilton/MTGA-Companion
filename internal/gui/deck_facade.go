@@ -820,9 +820,19 @@ func (d *DeckFacade) GetRecommendations(ctx context.Context, req *GetRecommendat
 	cardMetadata := make(map[int]*cards.Card)
 	for _, deckCard := range deckCards {
 		if _, exists := cardMetadata[deckCard.CardID]; !exists {
+			// Try SetCardRepo first (faster, has cards from log parsing and datasets)
+			setCard, err := d.services.Storage.SetCardRepo().GetCardByArenaID(ctx, fmt.Sprintf("%d", deckCard.CardID))
+			if err == nil && setCard != nil {
+				// Convert models.SetCard to cards.Card
+				card := convertSetCardToCard(setCard)
+				cardMetadata[deckCard.CardID] = card
+				continue
+			}
+
+			// Fallback to CardService (Scryfall API)
 			card, err := d.services.CardService.GetCard(deckCard.CardID)
 			if err != nil {
-				log.Printf("Warning: Failed to get card %d: %v", deckCard.CardID, err)
+				log.Printf("Warning: Failed to get card %d from both SetCardRepo and CardService: %v", deckCard.CardID, err)
 				continue
 			}
 			cardMetadata[deckCard.CardID] = card
@@ -1795,4 +1805,55 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 		Filename: result.Filename,
 		Format:   string(result.Format),
 	}, nil
+}
+
+// convertSetCardToCard converts a models.SetCard to a cards.Card.
+// This allows us to use SetCardRepo data in the recommendation engine.
+func convertSetCardToCard(setCard *models.SetCard) *cards.Card {
+	if setCard == nil {
+		return nil
+	}
+
+	// Parse ArenaID from string to int
+	arenaID := 0
+	_, _ = fmt.Sscanf(setCard.ArenaID, "%d", &arenaID)
+
+	// Build TypeLine from Types array
+	typeLine := ""
+	if len(setCard.Types) > 0 {
+		typeLine = setCard.Types[0]
+		for i := 1; i < len(setCard.Types); i++ {
+			typeLine += " " + setCard.Types[i]
+		}
+	}
+
+	card := &cards.Card{
+		ArenaID:    arenaID,
+		ScryfallID: setCard.ScryfallID,
+		Name:       setCard.Name,
+		TypeLine:   typeLine,
+		SetCode:    setCard.SetCode,
+		CMC:        float64(setCard.CMC),
+		Colors:     setCard.Colors,
+		Rarity:     setCard.Rarity,
+	}
+
+	// Convert string fields to *string where needed
+	if setCard.ManaCost != "" {
+		card.ManaCost = &setCard.ManaCost
+	}
+	if setCard.Power != "" {
+		card.Power = &setCard.Power
+	}
+	if setCard.Toughness != "" {
+		card.Toughness = &setCard.Toughness
+	}
+	if setCard.Text != "" {
+		card.OracleText = &setCard.Text
+	}
+	if setCard.ImageURL != "" {
+		card.ImageURI = &setCard.ImageURL
+	}
+
+	return card
 }

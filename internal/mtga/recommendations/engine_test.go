@@ -968,6 +968,201 @@ func TestRecordAcceptance(t *testing.T) {
 	}
 }
 
+func TestConvertSetCardToCardsCard(t *testing.T) {
+	tests := []struct {
+		name     string
+		setCard  *models.SetCard
+		expected *cards.Card
+	}{
+		{
+			name: "basic card conversion",
+			setCard: &models.SetCard{
+				ArenaID:    "12345",
+				ScryfallID: "scryfall-123",
+				Name:       "Lightning Bolt",
+				SetCode:    "M21",
+				CMC:        1,
+				ManaCost:   "{R}",
+				Colors:     []string{"R"},
+				Types:      []string{"Instant"},
+				Rarity:     "common",
+				Power:      "",
+				Toughness:  "",
+				Text:       "Deal 3 damage to any target.",
+				ImageURL:   "https://example.com/bolt.jpg",
+			},
+			expected: &cards.Card{
+				ArenaID:    12345,
+				ScryfallID: "scryfall-123",
+				Name:       "Lightning Bolt",
+				TypeLine:   "Instant",
+				SetCode:    "M21",
+				CMC:        1.0,
+				Colors:     []string{"R"},
+				Rarity:     "common",
+			},
+		},
+		{
+			name: "creature with power/toughness",
+			setCard: &models.SetCard{
+				ArenaID:    "67890",
+				ScryfallID: "scryfall-456",
+				Name:       "Grizzly Bears",
+				SetCode:    "M21",
+				CMC:        2,
+				ManaCost:   "{1}{G}",
+				Colors:     []string{"G"},
+				Types:      []string{"Creature", "Bear"},
+				Rarity:     "common",
+				Power:      "2",
+				Toughness:  "2",
+				Text:       "",
+				ImageURL:   "https://example.com/bears.jpg",
+			},
+			expected: &cards.Card{
+				ArenaID:    67890,
+				ScryfallID: "scryfall-456",
+				Name:       "Grizzly Bears",
+				TypeLine:   "Creature Bear",
+				SetCode:    "M21",
+				CMC:        2.0,
+				Colors:     []string{"G"},
+				Rarity:     "common",
+			},
+		},
+		{
+			name: "multi-colored card",
+			setCard: &models.SetCard{
+				ArenaID:    "11111",
+				ScryfallID: "scryfall-789",
+				Name:       "Azorius Charm",
+				SetCode:    "RNA",
+				CMC:        2,
+				ManaCost:   "{W}{U}",
+				Colors:     []string{"W", "U"},
+				Types:      []string{"Instant"},
+				Rarity:     "uncommon",
+				Text:       "Choose one — ...",
+				ImageURL:   "https://example.com/charm.jpg",
+			},
+			expected: &cards.Card{
+				ArenaID:    11111,
+				ScryfallID: "scryfall-789",
+				Name:       "Azorius Charm",
+				TypeLine:   "Instant",
+				SetCode:    "RNA",
+				CMC:        2.0,
+				Colors:     []string{"W", "U"},
+				Rarity:     "uncommon",
+			},
+		},
+		{
+			name:     "nil setCard",
+			setCard:  nil,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertSetCardToCardsCard(tt.setCard)
+
+			if tt.expected == nil {
+				if result != nil {
+					t.Errorf("convertSetCardToCardsCard() = %v, want nil", result)
+				}
+				return
+			}
+
+			if result == nil {
+				t.Fatal("convertSetCardToCardsCard() returned nil, want non-nil")
+			}
+
+			// Check basic fields
+			if result.ArenaID != tt.expected.ArenaID {
+				t.Errorf("ArenaID = %d, want %d", result.ArenaID, tt.expected.ArenaID)
+			}
+			if result.Name != tt.expected.Name {
+				t.Errorf("Name = %s, want %s", result.Name, tt.expected.Name)
+			}
+			if result.SetCode != tt.expected.SetCode {
+				t.Errorf("SetCode = %s, want %s", result.SetCode, tt.expected.SetCode)
+			}
+			if result.CMC != tt.expected.CMC {
+				t.Errorf("CMC = %f, want %f", result.CMC, tt.expected.CMC)
+			}
+			if result.Rarity != tt.expected.Rarity {
+				t.Errorf("Rarity = %s, want %s", result.Rarity, tt.expected.Rarity)
+			}
+
+			// Check ManaCost pointer
+			if tt.setCard.ManaCost != "" {
+				if result.ManaCost == nil {
+					t.Error("ManaCost is nil, expected non-nil")
+				} else if *result.ManaCost != tt.setCard.ManaCost {
+					t.Errorf("ManaCost = %s, want %s", *result.ManaCost, tt.setCard.ManaCost)
+				}
+			}
+
+			// Check Power/Toughness pointers
+			if tt.setCard.Power != "" {
+				if result.Power == nil {
+					t.Error("Power is nil, expected non-nil")
+				} else if *result.Power != tt.setCard.Power {
+					t.Errorf("Power = %s, want %s", *result.Power, tt.setCard.Power)
+				}
+			}
+
+			if tt.setCard.Toughness != "" {
+				if result.Toughness == nil {
+					t.Error("Toughness is nil, expected non-nil")
+				} else if *result.Toughness != tt.setCard.Toughness {
+					t.Errorf("Toughness = %s, want %s", *result.Toughness, tt.setCard.Toughness)
+				}
+			}
+
+			// Check OracleText pointer
+			if tt.setCard.Text != "" {
+				if result.OracleText == nil {
+					t.Error("OracleText is nil, expected non-nil")
+				} else if *result.OracleText != tt.setCard.Text {
+					t.Errorf("OracleText = %s, want %s", *result.OracleText, tt.setCard.Text)
+				}
+			}
+
+			// Check ImageURI pointer
+			if tt.setCard.ImageURL != "" {
+				if result.ImageURI == nil {
+					t.Error("ImageURI is nil, expected non-nil")
+				} else if *result.ImageURI != tt.setCard.ImageURL {
+					t.Errorf("ImageURI = %s, want %s", *result.ImageURI, tt.setCard.ImageURL)
+				}
+			}
+
+			// Check Colors slice
+			if len(result.Colors) != len(tt.expected.Colors) {
+				t.Errorf("Colors length = %d, want %d", len(result.Colors), len(tt.expected.Colors))
+			}
+		})
+	}
+}
+
+func TestNewRuleBasedEngineWithSetRepo(t *testing.T) {
+	engine := NewRuleBasedEngineWithSetRepo(nil, nil, nil)
+	if engine == nil {
+		t.Fatal("NewRuleBasedEngineWithSetRepo returned nil")
+	}
+	if engine.cardService != nil {
+		t.Error("Expected cardService to be nil")
+	}
+	if engine.setCardRepo != nil {
+		t.Error("Expected setCardRepo to be nil")
+	}
+	if engine.ratingsRepo != nil {
+		t.Error("Expected ratingsRepo to be nil")
+	}
+}
+
 // Helper functions
 
 func contains(s, substr string) bool {
