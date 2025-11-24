@@ -471,6 +471,15 @@ func (d *DraftFacade) AnalyzeSessionPickQuality(ctx context.Context, sessionID s
 		}
 	}
 
+	// Automatically recalculate draft grade after pick quality analysis
+	// This ensures the grade reflects the actual pick quality data
+	log.Printf("Pick quality analysis complete for session %s, recalculating draft grade...", sessionID)
+	_, err = d.CalculateDraftGrade(ctx, sessionID)
+	if err != nil {
+		log.Printf("Warning: Failed to automatically recalculate draft grade: %v", err)
+		// Don't return error - pick quality analysis still succeeded
+	}
+
 	return nil
 }
 

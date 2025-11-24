@@ -47,66 +47,71 @@ func (s *Service) PredictSessionWinRate(ctx context.Context, sessionID string) (
 	}
 
 	// 3. Build card list with ratings
+	// IMPORTANT: Include ALL picks, not just unique cards!
+	// Draft predictions need to account for card quantities (e.g., 3x removal spell)
 	cards := []Card{}
-	cardsSeen := make(map[string]bool) // Track duplicates
+	cardDataCache := make(map[string]Card) // Cache lookups for duplicate picks
 
 	for _, pick := range picks {
-		// Skip if we've already added this card (handles duplicate picks)
-		cardKey := pick.CardID
-		if cardsSeen[cardKey] {
+		// Check if we already looked up this card's data
+		if cachedCard, exists := cardDataCache[pick.CardID]; exists {
+			// Reuse cached card data for duplicate picks
+			cards = append(cards, cachedCard)
 			continue
 		}
-		cardsSeen[cardKey] = true
 
 		// Try to get card rating from 17Lands data
 		rating, err := s.ratingsRepo.GetCardRatingByArenaID(ctx, session.SetCode, "QuickDraft", pick.CardID)
 
 		// If 17Lands data not available, try Scryfall data as fallback
+		var card Card
 		if err != nil || rating == nil {
 			scryfallCard, scryfallErr := s.setCardRepo.GetCardByArenaID(ctx, pick.CardID)
 
 			if scryfallErr != nil || scryfallCard == nil {
 				// No data available from either source - use complete baseline
 				log.Printf("Warning: No card data found for Arena ID %s, using complete baseline", pick.CardID)
-				cards = append(cards, Card{
+				card = Card{
 					Name:   pick.CardID,
 					CMC:    0,
 					Color:  "C",
 					GIHWR:  0.50,
 					Rarity: "common",
-				})
-				continue
+				}
+			} else {
+				// Use Scryfall data with baseline GIHWR
+				color := parseCardColor(scryfallCard.Colors)
+				log.Printf("Using Scryfall data for %s (no 17Lands rating)", scryfallCard.Name)
+
+				card = Card{
+					Name:   scryfallCard.Name,
+					CMC:    scryfallCard.CMC,
+					Color:  color,
+					GIHWR:  0.50, // Baseline 50% when no 17Lands data
+					Rarity: scryfallCard.Rarity,
+				}
+			}
+		} else {
+			// We have 17Lands data - use it
+			color := "C"
+			if len(rating.Color) > 0 {
+				color = string(rating.Color[0])
 			}
 
-			// Use Scryfall data with baseline GIHWR
-			color := parseCardColor(scryfallCard.Colors)
-			log.Printf("Using Scryfall data for %s (no 17Lands rating)", scryfallCard.Name)
+			cmc := estimateCMC(rating)
 
-			cards = append(cards, Card{
-				Name:   scryfallCard.Name,
-				CMC:    scryfallCard.CMC,
+			card = Card{
+				Name:   rating.Name,
+				CMC:    cmc,
 				Color:  color,
-				GIHWR:  0.50, // Baseline 50% when no 17Lands data
-				Rarity: scryfallCard.Rarity,
-			})
-			continue
+				GIHWR:  rating.GIHWR / 100.0,
+				Rarity: rating.Rarity,
+			}
 		}
 
-		// We have 17Lands data - use it
-		color := "C"
-		if len(rating.Color) > 0 {
-			color = string(rating.Color[0])
-		}
-
-		cmc := estimateCMC(rating)
-
-		cards = append(cards, Card{
-			Name:   rating.Name,
-			CMC:    cmc,
-			Color:  color,
-			GIHWR:  rating.GIHWR / 100.0,
-			Rarity: rating.Rarity,
-		})
+		// Cache the card data for subsequent duplicate picks
+		cardDataCache[pick.CardID] = card
+		cards = append(cards, card)
 	}
 
 	// 4. Calculate prediction
