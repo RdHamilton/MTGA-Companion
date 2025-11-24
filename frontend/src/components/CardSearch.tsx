@@ -70,20 +70,25 @@ export default function CardSearch({
       setLoading(true);
       setError(null);
       try {
-        if (isDraftDeck && draftCardIDs.length > 0) {
+        if (isDraftDeck) {
           // For draft decks: load only draft pool cards
-          const cards: models.SetCard[] = [];
-          for (const cardID of draftCardIDs) {
-            try {
-              const card = await GetCardByArenaID(String(cardID));
-              if (card) {
-                cards.push(card);
+          if (draftCardIDs.length > 0) {
+            const cards: models.SetCard[] = [];
+            for (const cardID of draftCardIDs) {
+              try {
+                const card = await GetCardByArenaID(String(cardID));
+                if (card) {
+                  cards.push(card);
+                }
+              } catch (err) {
+                console.error(`Failed to load card ${cardID}:`, err);
               }
-            } catch (err) {
-              console.error(`Failed to load card ${cardID}:`, err);
             }
+            setAllCards(cards);
+          } else {
+            // Empty draft pool - let the empty state message show
+            setAllCards([]);
           }
-          setAllCards(cards);
         } else {
           // For constructed decks: would need to load all cards
           // For now, we'll show a message that constructed search needs set selection

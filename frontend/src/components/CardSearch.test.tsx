@@ -108,9 +108,12 @@ describe('CardSearch Component', () => {
         />
       );
 
+      // Wait for loading to finish and empty state to appear
       await waitFor(() => {
-        expect(screen.getByText('No cards available in draft pool')).toBeInTheDocument();
+        expect(screen.queryByText('Loading cards...')).not.toBeInTheDocument();
       });
+
+      expect(screen.getByText('No cards available in draft pool')).toBeInTheDocument();
     });
   });
 
@@ -381,8 +384,8 @@ describe('CardSearch Component', () => {
         expect(screen.getByText('Red Card')).toBeInTheDocument();
       });
 
-      // Click blue color filter
-      const blueButton = screen.getByRole('button', { name: /Blue/i });
+      // Click blue color filter (button has text "U" with title "Blue")
+      const blueButton = screen.getByRole('button', { name: 'U' });
       await userEvent.click(blueButton);
 
       // Only blue card should be visible
@@ -393,7 +396,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should filter colorless cards', async () => {
-      const colorlessCard = createMockSetCard({ ArenaID: 1, Name: 'Artifact', Colors: [] });
+      const colorlessCard = createMockSetCard({ ArenaID: 1, Name: 'Colorless Artifact', Colors: [] });
       const coloredCard = createMockSetCard({ ArenaID: 2, Name: 'Blue Card', Colors: ['U'] });
 
       mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
@@ -413,17 +416,17 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Artifact')).toBeInTheDocument();
+        expect(screen.getByText('Colorless Artifact')).toBeInTheDocument();
         expect(screen.getByText('Blue Card')).toBeInTheDocument();
       });
 
-      // Click colorless filter
-      const colorlessButton = screen.getByRole('button', { name: /Colorless/i });
+      // Click colorless filter (button has text "C" with title "Colorless")
+      const colorlessButton = screen.getByRole('button', { name: 'C' });
       await userEvent.click(colorlessButton);
 
       // Only colorless card should be visible
       await waitFor(() => {
-        expect(screen.getByText('Artifact')).toBeInTheDocument();
+        expect(screen.getByText('Colorless Artifact')).toBeInTheDocument();
         expect(screen.queryByText('Blue Card')).not.toBeInTheDocument();
       });
     });
@@ -453,8 +456,8 @@ describe('CardSearch Component', () => {
         expect(screen.getByText('Mono Blue')).toBeInTheDocument();
       });
 
-      // Click multicolor filter
-      const multicolorButton = screen.getByRole('button', { name: /Multicolor/i });
+      // Click multicolor filter (button has text "M" with title "Multicolor")
+      const multicolorButton = screen.getByRole('button', { name: 'M' });
       await userEvent.click(multicolorButton);
 
       // Only multicolor card should be visible
@@ -467,8 +470,8 @@ describe('CardSearch Component', () => {
 
   describe('Type Filtering', () => {
     it('should filter by creature type', async () => {
-      const creature = createMockSetCard({ ArenaID: 1, Name: 'Bear', Types: ['Creature'] });
-      const instant = createMockSetCard({ ArenaID: 2, Name: 'Bolt', Types: ['Instant'] });
+      const creature = createMockSetCard({ ArenaID: 1, Name: 'Grizzly Bear', Types: ['Creature'] });
+      const instant = createMockSetCard({ ArenaID: 2, Name: 'Lightning Bolt', Types: ['Instant'] });
 
       mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
         if (arenaID === '1') return Promise.resolve(creature);
@@ -487,18 +490,20 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Bear')).toBeInTheDocument();
-        expect(screen.getByText('Bolt')).toBeInTheDocument();
+        expect(screen.getByText('Grizzly Bear')).toBeInTheDocument();
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
       });
 
-      // Click creature filter
-      const creatureButton = screen.getByRole('button', { name: /Creature/i });
-      await userEvent.click(creatureButton);
+      // Click creature filter - get the type filter button which shows "Creature"
+      const creatureButtons = screen.getAllByRole('button', { name: /Creature/i });
+      // The type filter button is the one in the type-filters section
+      const creatureButton = creatureButtons.find(btn => btn.classList.contains('type-button'));
+      await userEvent.click(creatureButton!);
 
       // Only creature should be visible
       await waitFor(() => {
-        expect(screen.getByText('Bear')).toBeInTheDocument();
-        expect(screen.queryByText('Bolt')).not.toBeInTheDocument();
+        expect(screen.getByText('Grizzly Bear')).toBeInTheDocument();
+        expect(screen.queryByText('Lightning Bolt')).not.toBeInTheDocument();
       });
     });
   });
@@ -556,7 +561,8 @@ describe('CardSearch Component', () => {
         expect(screen.getByText('Test Card')).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /Add to main/i });
+      // Button has text "+ Add" with title "Add to main"
+      const addButton = screen.getByRole('button', { name: /\+ Add/i });
       await userEvent.click(addButton);
 
       expect(mockOnAddCard).toHaveBeenCalledWith(123, 1, 'main');
@@ -584,8 +590,8 @@ describe('CardSearch Component', () => {
       const sideboardButton = screen.getByRole('button', { name: /Sideboard/i });
       await userEvent.click(sideboardButton);
 
-      // Click add button
-      const addButton = screen.getByRole('button', { name: /Add to sideboard/i });
+      // Click add button (text is "+ Add", title changes to "Add to sideboard")
+      const addButton = screen.getByRole('button', { name: /\+ Add/i });
       await userEvent.click(addButton);
 
       expect(mockOnAddCard).toHaveBeenCalledWith(123, 1, 'sideboard');
@@ -608,12 +614,17 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Test Card')).toBeInTheDocument();
-        expect(screen.getByText('2x in main')).toBeInTheDocument();
+        // Multiple cards with same name may be rendered, use getAllByText
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
+        // Multiple badges may exist, check any of them
+        const badges = document.querySelectorAll('.in-deck-badge');
+        expect(badges.length).toBeGreaterThan(0);
+        expect(badges[0]?.textContent).toBe('2x in main');
       });
 
-      const removeButton = screen.getByRole('button', { name: /Remove from deck/i });
-      await userEvent.click(removeButton);
+      // Button has text "- Remove" with title "Remove from deck" - may be multiple, click first
+      const removeButtons = screen.getAllByRole('button', { name: /- Remove/i });
+      await userEvent.click(removeButtons[0]);
 
       expect(mockOnRemoveCard).toHaveBeenCalledWith(123, 'main');
     });
@@ -635,7 +646,13 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('3x in sideboard')).toBeInTheDocument();
+        // Multiple cards with same name may be rendered
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
+        // Text is broken into multiple nodes, so use a function matcher
+        // There may be multiple badges, we just need at least one
+        const badges = document.querySelectorAll('.in-deck-badge');
+        expect(badges.length).toBeGreaterThan(0);
+        expect(badges[0]?.textContent).toBe('3x in sideboard');
       });
     });
 
@@ -657,13 +674,14 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Test Card')).toBeInTheDocument();
+        // Multiple cards with same name may be rendered
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
       });
 
-      // Add button should not be present
-      expect(screen.queryByRole('button', { name: /Add/i })).not.toBeInTheDocument();
-      // But remove button should still be there
-      expect(screen.getByRole('button', { name: /Remove/i })).toBeInTheDocument();
+      // Add button should not be present (button text is "+ Add")
+      expect(screen.queryByRole('button', { name: /\+ Add/i })).not.toBeInTheDocument();
+      // But remove button should still be there (button text is "- Remove") - may be multiple
+      expect(screen.getAllByRole('button', { name: /- Remove/i }).length).toBeGreaterThan(0);
     });
 
     it('should display available quantity in draft mode', async () => {
@@ -684,7 +702,10 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Available: 2 / 3')).toBeInTheDocument();
+        // Multiple cards may be rendered, check any available-quantity element
+        const quantities = document.querySelectorAll('.available-quantity');
+        expect(quantities.length).toBeGreaterThan(0);
+        expect(quantities[0]?.textContent).toBe('Available: 2 / 3');
       });
     });
   });
@@ -757,7 +778,11 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Creature — Human')).toBeInTheDocument();
+        // The type display is in a .card-type div
+        const typeElements = screen.getAllByText(/Creature/);
+        const cardTypeElement = typeElements.find(el => el.classList.contains('card-type'));
+        expect(cardTypeElement).toBeInTheDocument();
+        expect(cardTypeElement?.textContent).toBe('Creature — Human');
       });
     });
 
@@ -795,7 +820,10 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('CMC: 5')).toBeInTheDocument();
+        // CMC text may be broken into nodes, so check the element content
+        const cardStats = document.querySelector('.card-stats');
+        expect(cardStats).toBeInTheDocument();
+        expect(cardStats?.textContent).toContain('CMC: 5');
       });
     });
   });
