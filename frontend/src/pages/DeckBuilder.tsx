@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   GetDeck,
@@ -20,6 +20,7 @@ export default function DeckBuilder() {
   const { deckID } = useParams<{ deckID?: string }>();
   const { draftEventID } = useParams<{ draftEventID?: string }>();
   const navigate = useNavigate();
+  const creatingDeckRef = useRef(false);
 
   const [deck, setDeck] = useState<models.Deck | null>(null);
   const [cards, setCards] = useState<models.DeckCard[]>([]);
@@ -48,7 +49,15 @@ export default function DeckBuilder() {
 
           if (!deckData || !deckData.deck) {
             // No deck exists yet - create one from draft picks
+            // Guard against duplicate creation (React.StrictMode can cause double-invocation)
+            if (creatingDeckRef.current) {
+              setLoading(false);
+              return;
+            }
+
             try {
+              creatingDeckRef.current = true;
+
               // Get draft session to get the event name for the deck
               const [activeSessions, completedSessions] = await Promise.all([
                 GetActiveDraftSessions(),
@@ -60,6 +69,7 @@ export default function DeckBuilder() {
               if (!session) {
                 setError('Draft session not found');
                 setLoading(false);
+                creatingDeckRef.current = false;
                 return;
               }
 
@@ -73,7 +83,10 @@ export default function DeckBuilder() {
             } catch (createErr) {
               setError(createErr instanceof Error ? createErr.message : 'Failed to create deck from draft');
               setLoading(false);
+              creatingDeckRef.current = false;
               return;
+            } finally {
+              creatingDeckRef.current = false;
             }
           }
         } else {
