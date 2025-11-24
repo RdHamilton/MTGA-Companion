@@ -3,10 +3,12 @@ package recommendations
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // RecommendationEngine provides intelligent card recommendations for deck building.
@@ -28,6 +30,8 @@ type DeckContext struct {
 	CardMetadata map[int]*cards.Card
 	DraftCardIDs []int  // Available cards for draft decks (nil for constructed)
 	Format       string // "Limited", "Standard", "Historic", etc.
+	SetCode      string // Set code for draft ratings (e.g., "BLB")
+	DraftFormat  string // Draft format for ratings (e.g., "PremierDraft")
 }
 
 // Filters control which recommendations are returned.
@@ -37,8 +41,9 @@ type Filters struct {
 	Colors        []string // Filter by colors (nil = any color)
 	CardTypes     []string // Filter by card types (nil = any type)
 	CMCRange      *CMCRange
-	IncludeLands  bool // Include land recommendations
-	OnlyDraftPool bool // Only recommend cards from draft pool
+	IncludeLands  bool  // Include land recommendations
+	OnlyDraftPool bool  // Only recommend cards from draft pool
+	DraftPool     []int // Available cards in draft pool (only used when OnlyDraftPool is true)
 }
 
 // CMCRange filters by converted mana cost.
@@ -69,17 +74,25 @@ type ScoreFactors struct {
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
 	cardService *cards.Service
+	ratingsRepo repository.DraftRatingsRepository
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
-func NewRuleBasedEngine(cardService *cards.Service) *RuleBasedEngine {
+func NewRuleBasedEngine(cardService *cards.Service, ratingsRepo repository.DraftRatingsRepository) *RuleBasedEngine {
 	return &RuleBasedEngine{
 		cardService: cardService,
+		ratingsRepo: ratingsRepo,
 	}
 }
 
 // GetRecommendations returns recommended cards based on deck analysis.
 func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckContext, filters *Filters) ([]*CardRecommendation, error) {
+	if e == nil {
+		return nil, fmt.Errorf("engine is nil")
+	}
+	if e.cardService == nil {
+		return nil, fmt.Errorf("card service is not initialized")
+	}
 	if deck == nil {
 		return nil, fmt.Errorf("deck context is nil")
 	}
@@ -94,20 +107,25 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 	}
 
 	// Analyze deck composition
+	log.Printf("Debug: About to analyze deck with %d cards", len(deck.Cards))
 	analysis := analyzeDeck(deck)
+	log.Printf("Debug: Deck analysis complete, primary colors: %v", analysis.PrimaryColors)
 
 	// Get candidate cards
 	var candidates []*cards.Card
-	if filters.OnlyDraftPool && len(deck.DraftCardIDs) > 0 {
+	if filters.OnlyDraftPool && len(filters.DraftPool) > 0 {
 		// For draft decks, only consider draft pool
-		cardMap, err := e.cardService.GetCards(deck.DraftCardIDs)
+		log.Printf("Debug: Fetching %d cards from draft pool", len(filters.DraftPool))
+		cardMap, err := e.cardService.GetCards(filters.DraftPool)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get draft cards: %w", err)
 		}
+		log.Printf("Debug: Got %d cards from cardService", len(cardMap))
 		candidates = make([]*cards.Card, 0, len(cardMap))
 		for _, card := range cardMap {
 			candidates = append(candidates, card)
 		}
+		log.Printf("Debug: Built %d candidate cards", len(candidates))
 	} else {
 		// For constructed, we'd query all available cards
 		// For now, return empty since we need card database integration
@@ -116,25 +134,33 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 
 	// Score each candidate
 	recommendations := make([]*CardRecommendation, 0)
-	for _, card := range candidates {
+	log.Printf("Debug: Starting to score %d candidates", len(candidates))
+	for i, card := range candidates {
+		log.Printf("Debug: Scoring card %d/%d: %s (arena_id=%d)", i+1, len(candidates), card.Name, card.ArenaID)
+
 		// Skip cards already in deck
 		if isCardInDeck(card.ArenaID, deck.Cards) {
+			log.Printf("Debug: Card %s already in deck, skipping", card.Name)
 			continue
 		}
 
 		// Apply filters
 		if !matchesFilters(card, filters) {
+			log.Printf("Debug: Card %s doesn't match filters, skipping", card.Name)
 			continue
 		}
 
 		// Calculate recommendation score
-		rec := e.scoreCard(card, deck, analysis)
+		log.Printf("Debug: Calling scoreCard for %s", card.Name)
+		rec := e.scoreCard(ctx, card, deck, analysis)
+		log.Printf("Debug: Card %s scored: %.2f", card.Name, rec.Score)
 
 		// Apply score threshold
 		if rec.Score >= filters.MinScore {
 			recommendations = append(recommendations, rec)
 		}
 	}
+	log.Printf("Debug: Scored all candidates, got %d recommendations", len(recommendations))
 
 	// Sort by score (descending)
 	sortRecommendations(recommendations)
@@ -155,7 +181,7 @@ func (e *RuleBasedEngine) ExplainRecommendation(ctx context.Context, cardID int,
 	}
 
 	analysis := analyzeDeck(deck)
-	rec := e.scoreCard(card, deck, analysis)
+	rec := e.scoreCard(ctx, card, deck, analysis)
 
 	return rec.Reasoning, nil
 }
@@ -169,23 +195,34 @@ func (e *RuleBasedEngine) RecordAcceptance(ctx context.Context, deckID string, c
 }
 
 // scoreCard calculates recommendation score for a card.
-func (e *RuleBasedEngine) scoreCard(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) *CardRecommendation {
+func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) *CardRecommendation {
+	log.Printf("Debug: scoreCard starting for %s", card.Name)
 	factors := &ScoreFactors{}
 
 	// Factor 1: Color fit (30% weight)
+	log.Printf("Debug: Calculating color fit")
 	factors.ColorFit = scoreColorFit(card, analysis)
+	log.Printf("Debug: Color fit = %.2f", factors.ColorFit)
 
 	// Factor 2: Mana curve (25% weight)
+	log.Printf("Debug: Calculating mana curve")
 	factors.ManaCurve = scoreManaCurve(card, analysis)
+	log.Printf("Debug: Mana curve = %.2f", factors.ManaCurve)
 
 	// Factor 3: Card quality from ratings (25% weight)
-	factors.Quality = scoreCardQuality(card)
+	log.Printf("Debug: Calculating card quality")
+	factors.Quality = e.scoreCardQuality(ctx, card, deck)
+	log.Printf("Debug: Quality = %.2f", factors.Quality)
 
 	// Factor 4: Synergy (15% weight)
+	log.Printf("Debug: Calculating synergy")
 	factors.Synergy = scoreSynergy(card, deck, analysis)
+	log.Printf("Debug: Synergy = %.2f", factors.Synergy)
 
 	// Factor 5: Playability (5% weight)
+	log.Printf("Debug: Calculating playability")
 	factors.Playable = scorePlayability(card, deck)
+	log.Printf("Debug: Playability = %.2f", factors.Playable)
 
 	// Calculate weighted overall score
 	score := (factors.ColorFit * 0.30) +
@@ -397,11 +434,79 @@ func scoreManaCurve(card *cards.Card, analysis *DeckAnalysis) float64 {
 }
 
 // scoreCardQuality calculates intrinsic card quality based on ratings.
-func scoreCardQuality(card *cards.Card) float64 {
-	// For Phase 1A, use rarity as a proxy for quality
-	// In Phase 1B, this will integrate with 17Lands ratings data
+// scoreCardQuality scores a card based on 17Lands ratings data.
+func (e *RuleBasedEngine) scoreCardQuality(ctx context.Context, card *cards.Card, deck *DeckContext) float64 {
+	log.Printf("Debug: scoreCardQuality called for card=%s, ratingsRepo=%v, setCode=%s, format=%s",
+		card.Name, e.ratingsRepo != nil, deck.SetCode, deck.DraftFormat)
 
-	// Estimate based on rarity
+	// If we don't have set/format info, fall back to rarity-based scoring
+	if e.ratingsRepo == nil || deck.SetCode == "" || deck.DraftFormat == "" {
+		log.Printf("Debug: Using fallback scoring (ratingsRepo nil=%v, setCode empty=%v, format empty=%v)",
+			e.ratingsRepo == nil, deck.SetCode == "", deck.DraftFormat == "")
+		return e.fallbackQualityScore(card)
+	}
+
+	// Fetch 17Lands ratings for this card
+	arenaIDStr := fmt.Sprintf("%d", card.ArenaID)
+	log.Printf("Debug: Fetching ratings for arena_id=%s, set=%s, format=%s", arenaIDStr, deck.SetCode, deck.DraftFormat)
+	rating, err := e.ratingsRepo.GetCardRatingByArenaID(ctx, deck.SetCode, deck.DraftFormat, arenaIDStr)
+	if err != nil {
+		// Error fetching ratings, use fallback
+		log.Printf("Debug: Failed to get ratings: %v, using fallback", err)
+		return e.fallbackQualityScore(card)
+	}
+	if rating == nil {
+		// No ratings available in database, use fallback
+		log.Printf("Debug: No ratings found for %s (arena_id=%s), using fallback", card.Name, arenaIDStr)
+		return e.fallbackQualityScore(card)
+	}
+	log.Printf("Debug: Got ratings for %s: GIHWR=%.3f, OHWR=%.3f", card.Name, rating.GIHWR, rating.OHWR)
+
+	// Calculate quality score from 17Lands metrics
+	// Weight: 50% GIHWR, 30% OHWR, 10% ATA, 10% ALSA
+
+	// Normalize GIHWR and OHWR (they're percentages, typically 45-60% range)
+	// Map 45% → 0.0, 55% → 0.5, 65%+ → 1.0
+	gihScore := (rating.GIHWR - 0.45) / 0.20 // 0.45-0.65 → 0.0-1.0
+	if gihScore < 0 {
+		gihScore = 0
+	} else if gihScore > 1 {
+		gihScore = 1
+	}
+
+	ohScore := (rating.OHWR - 0.45) / 0.20
+	if ohScore < 0 {
+		ohScore = 0
+	} else if ohScore > 1 {
+		ohScore = 1
+	}
+
+	// ATA (Average Taken At): Lower is better. Typical range 1-14
+	// Map 1 → 1.0, 5 → 0.7, 10 → 0.3, 14 → 0.0
+	ataScore := 1.0 - ((rating.ATA - 1.0) / 13.0)
+	if ataScore < 0 {
+		ataScore = 0
+	} else if ataScore > 1 {
+		ataScore = 1
+	}
+
+	// ALSA (Average Last Seen At): Higher means it wheels more (less valuable)
+	// Map 1 → 1.0, 5 → 0.7, 10 → 0.3, 14 → 0.0
+	alsaScore := 1.0 - ((rating.ALSA - 1.0) / 13.0)
+	if alsaScore < 0 {
+		alsaScore = 0
+	} else if alsaScore > 1 {
+		alsaScore = 1
+	}
+
+	// Weighted combination
+	qualityScore := (gihScore * 0.50) + (ohScore * 0.30) + (ataScore * 0.10) + (alsaScore * 0.10)
+
+	return qualityScore
+}
+
+// fallbackQualityScore provides quality score based on rarity when ratings unavailable.
+func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 	rarityScores := map[string]float64{
 		"mythic":   0.85,
 		"rare":     0.75,
@@ -409,7 +514,7 @@ func scoreCardQuality(card *cards.Card) float64 {
 		"common":   0.50,
 	}
 
-	if score, ok := rarityScores[card.Rarity]; ok {
+	if score, ok := rarityScores[strings.ToLower(card.Rarity)]; ok {
 		return score
 	}
 

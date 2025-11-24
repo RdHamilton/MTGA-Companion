@@ -39,6 +39,21 @@ const COLOR_MAP: { [key: string]: string } = {
   multicolor: '#888',
 };
 
+// Basic land names as fallback for when metadata is missing
+const BASIC_LAND_NAMES: { [key: number]: string } = {
+  81716: 'Plains',
+  81717: 'Island',
+  81718: 'Swamp',
+  81719: 'Mountain',
+  81720: 'Forest',
+};
+
+const getCardName = (cardID: number, metadata?: models.SetCard): string => {
+  if (metadata?.Name) return metadata.Name;
+  if (BASIC_LAND_NAMES[cardID]) return BASIC_LAND_NAMES[cardID];
+  return `Unknown Card ${cardID}`;
+};
+
 export default function DeckList({
   deck,
   cards,
@@ -94,6 +109,13 @@ export default function DeckList({
     cardsWithMetadata
       .filter((c) => c.deckCard.Board === 'main')
       .forEach((card) => {
+        // Check if this is a basic land by ID (even without metadata)
+        const basicLandIDs = [81716, 81717, 81718, 81719, 81720];
+        if (basicLandIDs.includes(card.deckCard.CardID)) {
+          groups.lands.push(card);
+          return;
+        }
+
         if (!card.metadata) {
           groups.other.push(card);
           return;
@@ -184,7 +206,7 @@ export default function DeckList({
               title={card.metadata?.Name || `Card ${card.deckCard.CardID}`}
             >
               <span className="card-quantity">{card.deckCard.Quantity}x</span>
-              <span className="card-name">{card.metadata?.Name || `Unknown Card ${card.deckCard.CardID}`}</span>
+              <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
               {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
               {onRemoveCard && (
                 <button
@@ -261,13 +283,13 @@ export default function DeckList({
           {colorData.length > 0 && (
             <div className="stat-chart">
               <h3>Color Distribution</h3>
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
                     data={colorData}
                     cx="50%"
-                    cy="50%"
-                    outerRadius={80}
+                    cy="55%"
+                    outerRadius={75}
                     fill="#8884d8"
                     dataKey="value"
                     label={(entry) => `${entry.name}: ${entry.value}`}
@@ -329,7 +351,7 @@ export default function DeckList({
                   title={card.metadata?.Name || `Card ${card.deckCard.CardID}`}
                 >
                   <span className="card-quantity">{card.deckCard.Quantity}x</span>
-                  <span className="card-name">{card.metadata?.Name || `Unknown Card ${card.deckCard.CardID}`}</span>
+                  <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
                   {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
                   {onRemoveCard && (
                     <button

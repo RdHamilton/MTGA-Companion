@@ -301,6 +301,7 @@
   border-radius: 6px;
   border: 2px solid transparent;
   transition: all 0.2s;
+  position: relative;
 }
 
 .card-result:hover {
@@ -318,6 +319,7 @@
   height: auto;
   border-radius: 6px;
   object-fit: cover;
+  flex-shrink: 0;
 }
 
 .card-info {
@@ -358,11 +360,13 @@
 }
 
 .card-actions {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   align-items: flex-end;
-  justify-content: center;
 }
 
 .in-deck-info {

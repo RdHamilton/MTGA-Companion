@@ -2,6 +2,55 @@
 
 This directory contains end-to-end tests for MTGA Companion using Playwright.
 
+## ⚠️ CI Status
+
+**E2E tests are DISABLED in CI** and must be run locally before submitting PRs.
+
+**Why?**
+- Wails builds native desktop applications (not web apps)
+- Desktop GUI apps are difficult to test in headless CI environments
+- Even with Xvfb, tests are flaky and slow in CI
+- Local testing with a real display is more reliable
+
+**CI Coverage:** Unit tests, component tests, linting, formatting, and security scans all run in CI.
+
+---
+
+## 🚀 Quick Start - Run E2E Tests Locally
+
+**Terminal 1 - Start Wails Dev Server:**
+```bash
+cd /Users/ramonehamilton/Documents/Personal\ Projects/MTGA-Companion
+wails dev
+```
+Wait for: `Using DevServer URL: http://localhost:34115`
+
+**Terminal 2 - Run E2E Tests:**
+```bash
+cd /Users/ramonehamilton/Documents/Personal\ Projects/MTGA-Companion/frontend
+npm run test:e2e
+```
+
+**Run specific test files:**
+```bash
+# Only deck builder tests
+npm run test:e2e -- deck-builder.spec.ts
+
+# Only quest tests
+npm run test:e2e -- quests.spec.ts
+
+# Only smoke tests
+npm run test:e2e -- smoke.spec.ts
+```
+
+**Debug mode (see browser):**
+```bash
+npm run test:e2e -- --headed
+npm run test:e2e -- --debug
+```
+
+---
+
 ## Prerequisites
 
 Before running E2E tests, you need to have the Wails application running:
@@ -33,8 +82,27 @@ npx playwright show-report
 
 ## Test Structure
 
-- `smoke.spec.ts` - Basic smoke tests to verify app loads and navigation works
-- More workflow-specific tests will be added in subsequent tickets
+### Smoke Tests (`smoke.spec.ts`)
+Basic smoke tests to verify app loads and navigation works.
+
+### Deck Builder Tests (`deck-builder.spec.ts`) - 18 tests
+- Navigation and initial state (3 tests)
+- Create deck modal (6 tests)
+- Draft-to-deck workflow (4 tests)
+- Deck builder page (3 tests)
+- Error handling (2 tests)
+
+### Quest Tests (`quests.spec.ts`) - 30+ tests
+- Navigation and initial state (3 tests)
+- Quest list display (4 tests)
+- Quest statistics (3 tests)
+- Quest status and completion (3 tests)
+- Quest filtering and sorting (2 tests)
+- Quest details (3 tests)
+- Empty state (2 tests)
+- Error handling (3 tests)
+- Performance and loading (2 tests)
+- Visual layout (2 tests)
 
 ## Writing Tests
 

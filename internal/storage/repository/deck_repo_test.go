@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func setupDeckTestDB(t *testing.T) *sql.DB {
 			modified_at DATETIME NOT NULL,
 			last_played DATETIME,
 			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-			FOREIGN KEY (draft_event_id) REFERENCES draft_events(id) ON DELETE SET NULL,
+			FOREIGN KEY (draft_event_id) REFERENCES draft_sessions(id) ON DELETE SET NULL,
 			CHECK(source IN ('draft', 'constructed', 'imported'))
 		);
 
@@ -68,34 +69,33 @@ func setupDeckTestDB(t *testing.T) *sql.DB {
 			UNIQUE(deck_id, tag)
 		);
 
-		CREATE TABLE draft_events (
+		CREATE TABLE draft_sessions (
 			id TEXT PRIMARY KEY,
-			account_id INTEGER NOT NULL,
 			event_name TEXT NOT NULL,
 			set_code TEXT NOT NULL,
-			start_time DATETIME NOT NULL,
-			end_time DATETIME,
-			wins INTEGER NOT NULL DEFAULT 0,
-			losses INTEGER NOT NULL DEFAULT 0,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+			draft_type TEXT DEFAULT 'quick_draft',
+			start_time TIMESTAMP NOT NULL,
+			end_time TIMESTAMP,
+			status TEXT DEFAULT 'in_progress',
+			total_picks INTEGER DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 
 		CREATE TABLE draft_picks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			draft_event_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
 			pack_number INTEGER NOT NULL,
 			pick_number INTEGER NOT NULL,
-			selected_card INTEGER NOT NULL,
-			timestamp DATETIME NOT NULL,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (draft_event_id) REFERENCES draft_events(id) ON DELETE CASCADE
+			card_id TEXT NOT NULL,
+			timestamp TIMESTAMP NOT NULL,
+			FOREIGN KEY (session_id) REFERENCES draft_sessions(id) ON DELETE CASCADE,
+			UNIQUE(session_id, pack_number, pick_number)
 		);
 
 		CREATE INDEX idx_deck_cards_deck_id ON deck_cards(deck_id);
 		CREATE INDEX idx_deck_tags_deck_id ON deck_tags(deck_id);
-		CREATE INDEX idx_draft_picks_event_id ON draft_picks(draft_event_id);
+		CREATE INDEX idx_draft_picks_session ON draft_picks(session_id);
 
 		-- Insert a default test account
 		INSERT INTO accounts (id, name, is_default, created_at, updated_at)
@@ -716,14 +716,14 @@ func TestDeckRepository_GetByDraftEvent(t *testing.T) {
 
 	now := time.Now()
 
-	// Create a draft event
+	// Create a draft session (updated schema uses draft_sessions, not draft_events)
 	draftEventID := "draft-event-1"
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO draft_events (id, account_id, event_name, set_code, start_time)
-		VALUES (?, ?, ?, ?, ?)
-	`, draftEventID, 1, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
+		INSERT INTO draft_sessions (id, event_name, set_code, start_time)
+		VALUES (?, ?, ?, ?)
+	`, draftEventID, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
 	if err != nil {
-		t.Fatalf("failed to create draft event: %v", err)
+		t.Fatalf("failed to create draft session: %v", err)
 	}
 
 	// Create a draft deck
@@ -921,23 +921,23 @@ func TestDeckRepository_GetDraftCards(t *testing.T) {
 
 	now := time.Now()
 
-	// Create a draft event
+	// Create a draft session (updated schema uses draft_sessions, not draft_events)
 	draftEventID := "draft-event-1"
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO draft_events (id, account_id, event_name, set_code, start_time)
-		VALUES (?, ?, ?, ?, ?)
-	`, draftEventID, 1, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
+		INSERT INTO draft_sessions (id, event_name, set_code, start_time)
+		VALUES (?, ?, ?, ?)
+	`, draftEventID, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
 	if err != nil {
-		t.Fatalf("failed to create draft event: %v", err)
+		t.Fatalf("failed to create draft session: %v", err)
 	}
 
-	// Add some draft picks
+	// Add some draft picks (updated schema uses session_id and card_id)
 	cardIDs := []int{12345, 67890, 11111, 22222, 33333}
 	for i, cardID := range cardIDs {
 		_, err := db.ExecContext(ctx, `
-			INSERT INTO draft_picks (draft_event_id, pack_number, pick_number, selected_card, timestamp)
+			INSERT INTO draft_picks (session_id, pack_number, pick_number, card_id, timestamp)
 			VALUES (?, ?, ?, ?, ?)
-		`, draftEventID, 1, i+1, cardID, now.Format("2006-01-02 15:04:05"))
+		`, draftEventID, 1, i+1, strconv.Itoa(cardID), now.Format("2006-01-02 15:04:05"))
 		if err != nil {
 			t.Fatalf("failed to add draft pick: %v", err)
 		}
@@ -975,23 +975,23 @@ func TestDeckRepository_ValidateDraftDeck(t *testing.T) {
 
 	now := time.Now()
 
-	// Create a draft event
+	// Create a draft session (updated schema uses draft_sessions, not draft_events)
 	draftEventID := "draft-event-1"
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO draft_events (id, account_id, event_name, set_code, start_time)
-		VALUES (?, ?, ?, ?, ?)
-	`, draftEventID, 1, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
+		INSERT INTO draft_sessions (id, event_name, set_code, start_time)
+		VALUES (?, ?, ?, ?)
+	`, draftEventID, "Quick Draft BRO", "BRO", now.Format("2006-01-02 15:04:05"))
 	if err != nil {
-		t.Fatalf("failed to create draft event: %v", err)
+		t.Fatalf("failed to create draft session: %v", err)
 	}
 
-	// Add draft picks
+	// Add draft picks (updated schema uses session_id and card_id)
 	draftCardIDs := []int{12345, 67890, 11111}
 	for i, cardID := range draftCardIDs {
 		_, err := db.ExecContext(ctx, `
-			INSERT INTO draft_picks (draft_event_id, pack_number, pick_number, selected_card, timestamp)
+			INSERT INTO draft_picks (session_id, pack_number, pick_number, card_id, timestamp)
 			VALUES (?, ?, ?, ?, ?)
-		`, draftEventID, 1, i+1, cardID, now.Format("2006-01-02 15:04:05"))
+		`, draftEventID, 1, i+1, strconv.Itoa(cardID), now.Format("2006-01-02 15:04:05"))
 		if err != nil {
 			t.Fatalf("failed to add draft pick: %v", err)
 		}

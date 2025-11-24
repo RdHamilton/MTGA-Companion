@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -306,14 +307,16 @@ func (r *QuestRepository) GetQuestByID(id int) (*models.Quest, error) {
 	`
 
 	quest := &models.Quest{}
-	var completedAt sql.NullTime
-	var lastSeenAt sql.NullTime
+	var assignedAt string
+	var completedAt sql.NullString
+	var lastSeenAt sql.NullString
+	var createdAt string
 
 	err := r.db.QueryRow(query, id).Scan(
 		&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
 		&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
-		&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
-		&completedAt, &lastSeenAt, &quest.Rerolled, &quest.CreatedAt,
+		&quest.CanSwap, &quest.Rewards, &assignedAt,
+		&completedAt, &lastSeenAt, &quest.Rerolled, &createdAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -323,13 +326,37 @@ func (r *QuestRepository) GetQuestByID(id int) (*models.Quest, error) {
 		return nil, fmt.Errorf("failed to get quest: %w", err)
 	}
 
-	if completedAt.Valid {
-		quest.CompletedAt = &completedAt.Time
+	// Parse assigned_at
+	parsedAssignedAt, err := parseTimestamp(assignedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse assigned_at: %w", err)
+	}
+	quest.AssignedAt = parsedAssignedAt
+
+	// Parse completed_at if present
+	if completedAt.Valid && completedAt.String != "" {
+		parsedCompletedAt, err := parseTimestamp(completedAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse completed_at: %w", err)
+		}
+		quest.CompletedAt = &parsedCompletedAt
 	}
 
-	if lastSeenAt.Valid {
-		quest.LastSeenAt = &lastSeenAt.Time
+	// Parse last_seen_at if present
+	if lastSeenAt.Valid && lastSeenAt.String != "" {
+		parsedLastSeenAt, err := parseTimestamp(lastSeenAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse last_seen_at: %w", err)
+		}
+		quest.LastSeenAt = &parsedLastSeenAt
 	}
+
+	// Parse created_at
+	parsedCreatedAt, err := parseTimestamp(createdAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse created_at: %w", err)
+	}
+	quest.CreatedAt = parsedCreatedAt
 
 	return quest, nil
 }
@@ -459,32 +486,99 @@ func (r *QuestRepository) MarkActiveQuestsCompleted(timestamp time.Time) error {
 	return nil
 }
 
+// parseTimestamp attempts to parse a timestamp string in multiple formats
+func parseTimestamp(s string) (time.Time, error) {
+	// Trim any leading/trailing whitespace
+	s = strings.TrimSpace(s)
+
+	// Try RFC3339 with microseconds (e.g., "2025-11-23T06:01:35.548252Z")
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+
+	// Try RFC3339 without microseconds (e.g., "2025-11-23T06:01:35Z")
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+
+	// Try SQLite format with fractional seconds (variable length 1-9 digits)
+	// Go's time.Parse requires exact digit count, so try common lengths
+	sqliteFormats := []string{
+		"2006-01-02 15:04:05.999999999", // nanoseconds (9 digits)
+		"2006-01-02 15:04:05.999999",    // microseconds (6 digits)
+		"2006-01-02 15:04:05.99999",     // 5 digits
+		"2006-01-02 15:04:05.9999",      // 4 digits
+		"2006-01-02 15:04:05.999",       // milliseconds (3 digits)
+		"2006-01-02 15:04:05.99",        // 2 digits
+		"2006-01-02 15:04:05.9",         // 1 digit
+	}
+
+	for _, format := range sqliteFormats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, nil
+		}
+	}
+
+	// Try SQLite format without fractional seconds (e.g., "2006-01-02 15:04:05")
+	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+		return t, nil
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse timestamp: %s", s)
+}
+
 // scanQuests is a helper to scan multiple quest rows
 func (r *QuestRepository) scanQuests(rows *sql.Rows) ([]*models.Quest, error) {
 	quests := []*models.Quest{}
 
 	for rows.Next() {
 		quest := &models.Quest{}
-		var completedAt sql.NullTime
-		var lastSeenAt sql.NullTime
+		var assignedAt string
+		var completedAt sql.NullString
+		var lastSeenAt sql.NullString
+		var createdAt string
 
 		err := rows.Scan(
 			&quest.ID, &quest.QuestID, &quest.QuestType, &quest.Goal,
 			&quest.StartingProgress, &quest.EndingProgress, &quest.Completed,
-			&quest.CanSwap, &quest.Rewards, &quest.AssignedAt,
-			&completedAt, &lastSeenAt, &quest.Rerolled, &quest.CreatedAt,
+			&quest.CanSwap, &quest.Rewards, &assignedAt,
+			&completedAt, &lastSeenAt, &quest.Rerolled, &createdAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan quest: %w", err)
 		}
 
-		if completedAt.Valid {
-			quest.CompletedAt = &completedAt.Time
+		// Parse assigned_at - try multiple formats
+		parsedAssignedAt, err := parseTimestamp(assignedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse assigned_at: %w", err)
+		}
+		quest.AssignedAt = parsedAssignedAt
+
+		// Parse completed_at if present
+		if completedAt.Valid && completedAt.String != "" {
+			parsedCompletedAt, err := parseTimestamp(completedAt.String)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse completed_at: %w", err)
+			}
+			quest.CompletedAt = &parsedCompletedAt
 		}
 
-		if lastSeenAt.Valid {
-			quest.LastSeenAt = &lastSeenAt.Time
+		// Parse last_seen_at if present
+		if lastSeenAt.Valid && lastSeenAt.String != "" {
+			parsedLastSeenAt, err := parseTimestamp(lastSeenAt.String)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse last_seen_at: %w", err)
+			}
+			quest.LastSeenAt = &parsedLastSeenAt
 		}
+
+		// Parse created_at
+		parsedCreatedAt, err := parseTimestamp(createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse created_at: %w", err)
+		}
+		quest.CreatedAt = parsedCreatedAt
 
 		quests = append(quests, quest)
 	}

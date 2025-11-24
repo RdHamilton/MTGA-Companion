@@ -353,28 +353,41 @@ func (d *DeckFacade) AddCard(ctx context.Context, deckID string, cardID, quantit
 	}
 
 	// If this is a draft deck, validate that the card is from the draft
+	// Exception: Basic lands are always allowed (they have unlimited availability)
 	if deck.Source == "draft" && deck.DraftEventID != nil {
-		var draftCards []int
-		err = storage.RetryOnBusy(func() error {
-			var err error
-			draftCards, err = d.services.Storage.DeckRepo().GetDraftCards(ctx, *deck.DraftEventID)
-			return err
-		})
-		if err != nil {
-			return &AppError{Message: fmt.Sprintf("Failed to get draft cards: %v", err)}
+		// Check if this is a basic land (basic lands are always allowed)
+		basicLandIDs := map[int]bool{
+			81716: true, // Plains
+			81717: true, // Island
+			81718: true, // Swamp
+			81719: true, // Mountain
+			81720: true, // Forest
 		}
 
-		// Check if card is in draft
-		cardInDraft := false
-		for _, draftCardID := range draftCards {
-			if draftCardID == cardID {
-				cardInDraft = true
-				break
+		if !basicLandIDs[cardID] {
+			// Not a basic land, so validate it's in the draft pool
+			var draftCards []int
+			err = storage.RetryOnBusy(func() error {
+				var err error
+				draftCards, err = d.services.Storage.DeckRepo().GetDraftCards(ctx, *deck.DraftEventID)
+				return err
+			})
+			if err != nil {
+				return &AppError{Message: fmt.Sprintf("Failed to get draft cards: %v", err)}
 			}
-		}
 
-		if !cardInDraft {
-			return &AppError{Message: "Card not in draft pool - draft decks can only contain cards from the associated draft"}
+			// Check if card is in draft
+			cardInDraft := false
+			for _, draftCardID := range draftCards {
+				if draftCardID == cardID {
+					cardInDraft = true
+					break
+				}
+			}
+
+			if !cardInDraft {
+				return &AppError{Message: "Card not in draft pool - draft decks can only contain cards from the associated draft"}
+			}
 		}
 	}
 
@@ -824,11 +837,37 @@ func (d *DeckFacade) GetRecommendations(ctx context.Context, req *GetRecommendat
 		Format:       deck.Format,
 	}
 
-	// For draft decks, get the draft pool
-	// TODO: Phase 1B - Integrate with draft session data to get available cards
-	if deck.DraftEventID != nil {
-		// For now, draft pool recommendations will be limited to cards already in the deck
-		log.Printf("Info: Draft pool recommendations not yet fully integrated for deck %s", deck.ID)
+	// For draft decks, get the draft pool and set/format info for ratings
+	var draftPool []int
+	if deck.DraftEventID != nil && req.OnlyDraftPool {
+		// Get the draft session for set code and format
+		session, err := d.services.Storage.DraftRepo().GetSession(ctx, *deck.DraftEventID)
+		if err != nil {
+			log.Printf("Warning: Failed to get draft session for deck %s: %v", deck.ID, err)
+		} else {
+			// Extract set code from EventName (e.g., "QuickDraft_BLB_20250101" -> "BLB")
+			eventParts := strings.Split(session.EventName, "_")
+			if len(eventParts) >= 2 {
+				deckContext.SetCode = eventParts[1]
+				// Determine draft format from event name
+				if strings.HasPrefix(session.EventName, "PremierDraft") {
+					deckContext.DraftFormat = "PremierDraft"
+				} else if strings.HasPrefix(session.EventName, "QuickDraft") {
+					deckContext.DraftFormat = "QuickDraft"
+				} else {
+					deckContext.DraftFormat = "PremierDraft" // Default
+				}
+				log.Printf("Info: Using set=%s, format=%s for ratings", deckContext.SetCode, deckContext.DraftFormat)
+			}
+		}
+
+		// Get all cards from the draft session
+		draftPool, err = d.services.Storage.DeckRepo().GetDraftCards(ctx, *deck.DraftEventID)
+		if err != nil {
+			log.Printf("Warning: Failed to get draft pool for deck %s: %v", deck.ID, err)
+		} else {
+			log.Printf("Info: Loaded draft pool for deck %s: %d cards", deck.ID, len(draftPool))
+		}
 	}
 
 	// Build filters from request
@@ -839,6 +878,7 @@ func (d *DeckFacade) GetRecommendations(ctx context.Context, req *GetRecommendat
 		CardTypes:     req.CardTypes,
 		IncludeLands:  req.IncludeLands,
 		OnlyDraftPool: req.OnlyDraftPool,
+		DraftPool:     draftPool,
 	}
 
 	// Set defaults
@@ -1361,14 +1401,34 @@ func (d *DeckFacade) calculateDeckStats(ctx context.Context, cards []*models.Dec
 		"Plains": true, "Island": true, "Swamp": true, "Mountain": true, "Forest": true, "Wastes": true,
 	}
 
+	// Basic land IDs (for when metadata is unavailable)
+	basicLandIDs := map[int]string{
+		81716: "Plains",
+		81717: "Island",
+		81718: "Swamp",
+		81719: "Mountain",
+		81720: "Forest",
+	}
+
 	for _, deckCard := range cards {
-		// Get card metadata
+		quantity := deckCard.Quantity
+
+		// Check if this is a basic land by ID (handle even without metadata)
+		if _, isBasicLand := basicLandIDs[deckCard.CardID]; isBasicLand {
+			stats.TotalCards += quantity
+			stats.Lands.Total += quantity
+			stats.Lands.Basic += quantity
+			stats.Types.Lands += quantity
+			stats.ManaCurve[0] += quantity // Basic lands have CMC 0
+			continue
+		}
+
+		// Get card metadata for non-basic-land cards
 		card, err := d.services.CardService.GetCard(deckCard.CardID)
 		if err != nil || card == nil {
 			continue
 		}
 
-		quantity := deckCard.Quantity
 		stats.TotalCards += quantity
 
 		// Mana curve
