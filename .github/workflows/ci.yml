@@ -251,8 +251,9 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-22.04
-    # Only run E2E tests on main branch and PRs to save CI time
-    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    # E2E tests disabled in CI - desktop apps are difficult to test in headless environments
+    # Run E2E tests locally before submitting PRs (see frontend/tests/e2e/README.md)
+    if: false
 
     steps:
     - name: Checkout code

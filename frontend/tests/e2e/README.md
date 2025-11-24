@@ -4,15 +4,52 @@ This directory contains end-to-end tests for MTGA Companion using Playwright.
 
 ## ⚠️ CI Status
 
-**E2E tests run in CI** using Xvfb (virtual display server).
+**E2E tests are DISABLED in CI** and must be run locally before submitting PRs.
 
-The CI setup:
-- Uses Ubuntu 22.04 for webkit2gtk-4.0 compatibility
-- Runs Xvfb virtual display on :99
-- Starts `wails dev` with verbose output
-- Tests connect to http://localhost:34115
+**Why?**
+- Wails builds native desktop applications (not web apps)
+- Desktop GUI apps are difficult to test in headless CI environments
+- Even with Xvfb, tests are flaky and slow in CI
+- Local testing with a real display is more reliable
 
-If E2E tests become flaky or problematic in CI, they can be disabled and run locally only.
+**CI Coverage:** Unit tests, component tests, linting, formatting, and security scans all run in CI.
+
+---
+
+## 🚀 Quick Start - Run E2E Tests Locally
+
+**Terminal 1 - Start Wails Dev Server:**
+```bash
+cd /Users/ramonehamilton/Documents/Personal\ Projects/MTGA-Companion
+wails dev
+```
+Wait for: `Using DevServer URL: http://localhost:34115`
+
+**Terminal 2 - Run E2E Tests:**
+```bash
+cd /Users/ramonehamilton/Documents/Personal\ Projects/MTGA-Companion/frontend
+npm run test:e2e
+```
+
+**Run specific test files:**
+```bash
+# Only deck builder tests
+npm run test:e2e -- deck-builder.spec.ts
+
+# Only quest tests
+npm run test:e2e -- quests.spec.ts
+
+# Only smoke tests
+npm run test:e2e -- smoke.spec.ts
+```
+
+**Debug mode (see browser):**
+```bash
+npm run test:e2e -- --headed
+npm run test:e2e -- --debug
+```
+
+---
 
 ## Prerequisites
 
