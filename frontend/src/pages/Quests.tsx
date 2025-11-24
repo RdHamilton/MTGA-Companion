@@ -192,8 +192,8 @@ const Quests = () => {
   const formatCompletionTime = (assignedAt: unknown, completedAt: unknown): string => {
     if (!completedAt) return 'N/A';
 
-    const assigned = new Date(assignedAt).getTime();
-    const completed = new Date(completedAt).getTime();
+    const assigned = new Date(String(assignedAt)).getTime();
+    const completed = new Date(String(completedAt)).getTime();
     const durationMs = completed - assigned;
 
     const hours = Math.floor(durationMs / (1000 * 60 * 60));

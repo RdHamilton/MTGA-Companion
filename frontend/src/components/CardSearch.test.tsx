@@ -59,7 +59,7 @@ describe('CardSearch Component', () => {
       const card1 = createMockSetCard({ ArenaID: '111', Name: 'Card One' });
       const card2 = createMockSetCard({ ArenaID: '222', Name: 'Card Two' });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '111') return Promise.resolve(card1);
         if (arenaID === '222') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -156,7 +156,7 @@ describe('CardSearch Component', () => {
       const card1 = createMockSetCard({ ArenaID: '1', Name: 'Lightning Bolt' });
       const card2 = createMockSetCard({ ArenaID: '2', Name: 'Counterspell' });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -247,7 +247,7 @@ describe('CardSearch Component', () => {
       const card1 = createMockSetCard({ ArenaID: '1', Name: 'Cheap Card', CMC: 1 });
       const card2 = createMockSetCard({ ArenaID: '2', Name: 'Expensive Card', CMC: 5 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -283,7 +283,7 @@ describe('CardSearch Component', () => {
       const card1 = createMockSetCard({ ArenaID: '1', Name: 'Cheap Card', CMC: 1 });
       const card2 = createMockSetCard({ ArenaID: '2', Name: 'Expensive Card', CMC: 5 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -320,7 +320,7 @@ describe('CardSearch Component', () => {
       const card2 = createMockSetCard({ ArenaID: '2', Name: 'CMC 3', CMC: 3 });
       const card3 = createMockSetCard({ ArenaID: '3', Name: 'CMC 7', CMC: 7 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         if (arenaID === '3') return Promise.resolve(card3);
@@ -363,7 +363,7 @@ describe('CardSearch Component', () => {
       const blueCard = createMockSetCard({ ArenaID: '1', Name: 'Blue Card', Colors: ['U'] });
       const redCard = createMockSetCard({ ArenaID: '2', Name: 'Red Card', Colors: ['R'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(blueCard);
         if (arenaID === '2') return Promise.resolve(redCard);
         return Promise.reject(new Error('Not found'));
@@ -399,7 +399,7 @@ describe('CardSearch Component', () => {
       const colorlessCard = createMockSetCard({ ArenaID: '1', Name: 'Colorless Artifact', Colors: [] });
       const coloredCard = createMockSetCard({ ArenaID: '2', Name: 'Blue Card', Colors: ['U'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(colorlessCard);
         if (arenaID === '2') return Promise.resolve(coloredCard);
         return Promise.reject(new Error('Not found'));
@@ -435,7 +435,7 @@ describe('CardSearch Component', () => {
       const multicolorCard = createMockSetCard({ ArenaID: '1', Name: 'Multicolor', Colors: ['W', 'U'] });
       const monoCard = createMockSetCard({ ArenaID: '2', Name: 'Mono Blue', Colors: ['U'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(multicolorCard);
         if (arenaID === '2') return Promise.resolve(monoCard);
         return Promise.reject(new Error('Not found'));
@@ -473,7 +473,7 @@ describe('CardSearch Component', () => {
       const creature = createMockSetCard({ ArenaID: '1', Name: 'Grizzly Bear', Types: ['Creature'] });
       const instant = createMockSetCard({ ArenaID: '2', Name: 'Lightning Bolt', Types: ['Instant'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(creature);
         if (arenaID === '2') return Promise.resolve(instant);
         return Promise.reject(new Error('Not found'));
@@ -718,8 +718,8 @@ describe('CardSearch Component', () => {
         createMockSetCard({ ArenaID: '3', Name: 'Card 3' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
-        const index = parseInt(arenaID) - 1;
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
+        const index = parseInt(arenaID as string) - 1;
         return Promise.resolve(cards[index]);
       });
 

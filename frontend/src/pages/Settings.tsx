@@ -7,6 +7,18 @@ import { showToast } from '../components/ToastContainer';
 import { gui } from '../../wailsjs/go/models';
 import './Settings.css';
 
+// Interface for daemon log replay progress (different from gui.ReplayStatus)
+interface LogReplayProgress {
+  processedFiles?: number;
+  totalFiles?: number;
+  totalEntries?: number;
+  matchesImported?: number;
+  decksImported?: number;
+  questsImported?: number;
+  duration?: number;
+  currentFile?: string;
+}
+
 const Settings = () => {
   const [dbPath, setDbPath] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -30,7 +42,7 @@ const Settings = () => {
   // Replay logs settings
   const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
-  const [replayProgress, setReplayProgress] = useState<gui.ReplayStatus | null>(null);
+  const [replayProgress, setReplayProgress] = useState<LogReplayProgress | null>(null);
 
   // Replay tool settings - use global state for active/paused to persist across navigation
   const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
@@ -91,13 +103,13 @@ const Settings = () => {
 
     const unsubscribeProgress = EventsOn('replay:progress', (data: unknown) => {
       console.log('Replay progress:', data);
-      setReplayProgress(data);
+      setReplayProgress(data as LogReplayProgress);
     });
 
     const unsubscribeCompleted = EventsOn('replay:completed', (data: unknown) => {
       console.log('Replay completed:', data);
       setIsReplaying(false);
-      setReplayProgress(data);
+      setReplayProgress(data as LogReplayProgress);
       // Keep progress visible for a moment, then reload using Wails native method
       setTimeout(() => {
         WindowReloadApp(); // Refresh to show updated data

@@ -241,7 +241,7 @@ const RankProgression = () => {
                     if (name === 'Rank') {
                       return numericToRank(value as number);
                     }
-                    return value;
+                    return String(value);
                   }}
                 />
                 <Legend />
