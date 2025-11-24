@@ -223,26 +223,26 @@ export default function DeckBuilder() {
     setAddingLands(true);
     try {
       // Use statistics colors if available (backend returns colors, not colorDistribution)
-      const colors = (statistics as Record<string, unknown>).colors || {};
+      const colors = statistics.colors;
       console.log('Full statistics object:', statistics);
       console.log('Color distribution from backend:', colors);
 
       // Calculate color distribution from mainboard cards
       // Only count mono-colored cards for land distribution
       const colorCounts = {
-        W: colors.white || 0,
-        U: colors.blue || 0,
-        B: colors.black || 0,
-        R: colors.red || 0,
-        G: colors.green || 0,
+        W: colors?.white || 0,
+        U: colors?.blue || 0,
+        B: colors?.black || 0,
+        R: colors?.red || 0,
+        G: colors?.green || 0,
       };
 
       console.log('Color counts (mono-colored only):', colorCounts);
       console.log('Color counts after assignment - W:', colorCounts.W, 'U:', colorCounts.U, 'B:', colorCounts.B, 'R:', colorCounts.R, 'G:', colorCounts.G);
 
       // Get backend's land recommendation
-      const currentLands = ((statistics as Record<string, unknown>).lands?.total) || 0;
-      const recommendedLands = ((statistics as Record<string, unknown>).lands?.recommended) || 0;
+      const currentLands = statistics.lands?.total || 0;
+      const recommendedLands = statistics.lands?.recommended || 0;
       console.log('Deck stats:', { currentLands, recommendedLands });
 
       if (recommendedLands === 0) {
@@ -427,7 +427,7 @@ export default function DeckBuilder() {
             deck={deck}
             cards={cards}
             tags={tags}
-            statistics={statistics}
+            statistics={statistics ?? undefined}
             onRemoveCard={handleRemoveCard}
           />
         </div>

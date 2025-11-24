@@ -220,20 +220,20 @@ const MatchHistory = () => {
 
   // Sort and paginate matches
   const sortedMatches = [...matches].sort((a, b) => {
-    let aVal: unknown = a[sortField];
-    let bVal: unknown = b[sortField];
+    let aVal: string | number = String(a[sortField] ?? '');
+    let bVal: string | number = String(b[sortField] ?? '');
 
     // Handle timestamp
     if (sortField === 'Timestamp') {
-      aVal = new Date(String(aVal)).getTime();
-      bVal = new Date(String(bVal)).getTime();
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
     }
 
-    // Handle nulls/undefined
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
+    // Handle nulls/undefined (already converted to empty string)
+    if (aVal === '') return 1;
+    if (bVal === '') return -1;
 
-    // String comparison
+    // String comparison (lowercase for case-insensitive sort)
     if (typeof aVal === 'string' && typeof bVal === 'string') {
       aVal = aVal.toLowerCase();
       bVal = bVal.toLowerCase();

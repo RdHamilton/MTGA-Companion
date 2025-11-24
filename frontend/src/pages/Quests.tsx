@@ -180,7 +180,7 @@ const Quests = () => {
   }, [dateRange, customStartDate, customEndDate, historyLimit]);
 
   const formatDate = (timestamp: unknown) => {
-    return new Date(timestamp).toLocaleDateString();
+    return new Date(String(timestamp)).toLocaleDateString();
   };
 
   const calculateProgress = (quest: models.Quest): number => {
