@@ -251,9 +251,8 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-22.04
-    # E2E tests disabled in CI - Wails desktop apps require native display and are difficult to run in headless environments
-    # Run E2E tests locally with: wails dev (in one terminal) && cd frontend && npm run test:e2e (in another)
-    if: false
+    # Only run E2E tests on main branch and PRs to save CI time
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
 
     steps:
     - name: Checkout code
@@ -307,42 +306,68 @@ jobs:
       run: |
         export PATH="$HOME/go/bin:$PATH"
         export DISPLAY=:99
-        Xvfb :99 -screen 0 1920x1080x24 &
+        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 2
-        wails dev > wails-dev.log 2>&1 &
-        echo $! > wails-dev.pid
 
-        # Wait for server to be ready (max 60 seconds)
+        echo "Starting wails dev with verbose output..."
+        # Run wails dev with output to both console and log file
+        wails dev -v 2>&1 | tee wails-dev.log &
+        WAILS_PID=$!
+        echo $WAILS_PID > wails-dev.pid
+        echo "Wails PID: $WAILS_PID"
+
+        # Wait for server to be ready (max 120 seconds for first-time build)
         SERVER_READY=false
-        for i in {1..60}; do
-          if curl -s http://localhost:34115 > /dev/null; then
-            echo "Wails dev server is ready!"
+        for i in {1..120}; do
+          if curl -s http://localhost:34115 > /dev/null 2>&1; then
+            echo "✓ Wails dev server is ready at http://localhost:34115!"
             SERVER_READY=true
             break
           fi
-          echo "Waiting for Wails dev server... ($i/60)"
+
+          # Check if process died
+          if ! ps -p $WAILS_PID > /dev/null 2>&1; then
+            echo "✗ Wails process died unexpectedly"
+            break
+          fi
+
+          if [ $((i % 10)) -eq 0 ]; then
+            echo "Still waiting for Wails dev server... ($i/120)"
+          fi
           sleep 1
         done
 
         # Check if server started successfully
         if [ "$SERVER_READY" = "false" ]; then
-          echo "ERROR: Wails dev server failed to start after 60 seconds"
           echo ""
-          echo "=== Log file info ==="
-          echo "Lines in log: $(wc -l < wails-dev.log)"
-          echo "File size: $(ls -lh wails-dev.log | awk '{print $5}')"
-          echo ""
-          echo "=== Full Wails dev server logs ==="
-          cat wails-dev.log
-          echo ""
-          echo "=== Checking if wails process is still running ==="
-          if ps -p $(cat wails-dev.pid) > /dev/null 2>&1; then
-            echo "Wails process is still running but not responding on port 34115"
-            echo "Process info:"
-            ps aux | grep wails | grep -v grep
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "ERROR: Wails dev server failed to start"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Process status
+          if ps -p $WAILS_PID > /dev/null 2>&1; then
+            echo "⚠ Wails process still running (PID: $WAILS_PID) but not serving HTTP"
+            echo ""
+            echo "Process details:"
+            ps aux | grep -E "(PID|$WAILS_PID)" | grep -v grep
           else
-            echo "Wails process has exited"
+            echo "✗ Wails process exited"
           fi
+
+          # Port check
+          echo ""
+          echo "Port 34115 status:"
+          if command -v netstat > /dev/null; then
+            netstat -tuln | grep 34115 || echo "Not listening"
+          else
+            ss -tuln | grep 34115 || echo "Not listening"
+          fi
+
+          # Show logs (output already shown via tee, but show again for clarity)
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Full build log saved above (shown via tee)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           exit 1
         fi
 

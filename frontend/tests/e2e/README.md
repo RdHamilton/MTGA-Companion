@@ -4,15 +4,15 @@ This directory contains end-to-end tests for MTGA Companion using Playwright.
 
 ## ⚠️ CI Status
 
-**E2E tests are disabled in CI** and must be run locally before submitting PRs.
+**E2E tests run in CI** using Xvfb (virtual display server).
 
-**Why?**
-- Wails builds native desktop applications (not web apps)
-- Desktop apps require native GUI components (GTK, WebKit, native windows)
-- Running desktop apps in headless CI environments with Xvfb is unreliable
-- GitHub Actions runners have difficulty with virtual displays and native graphics
+The CI setup:
+- Uses Ubuntu 22.04 for webkit2gtk-4.0 compatibility
+- Runs Xvfb virtual display on :99
+- Starts `wails dev` with verbose output
+- Tests connect to http://localhost:34115
 
-**CI Coverage:** Unit tests, component tests, linting, and security scans all run in CI.
+If E2E tests become flaky or problematic in CI, they can be disabled and run locally only.
 
 ## Prerequisites
 
