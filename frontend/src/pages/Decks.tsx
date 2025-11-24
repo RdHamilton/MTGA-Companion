@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListDecks, CreateDeck } from '../../wailsjs/go/main/App';
+import { ListDecks, CreateDeck, DeleteDeck } from '../../wailsjs/go/main/App';
 import { gui } from '../../wailsjs/go/models';
 import './Decks.css';
 
@@ -12,6 +12,8 @@ export default function Decks() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckFormat, setNewDeckFormat] = useState('standard');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deckToDelete, setDeckToDelete] = useState<gui.DeckListItem | null>(null);
 
   const loadDecks = async () => {
     setLoading(true);
@@ -68,6 +70,30 @@ export default function Decks() {
     }
   };
 
+  const handleDeleteClick = (deck: gui.DeckListItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeckToDelete(deck);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deckToDelete) return;
+
+    try {
+      await DeleteDeck(deckToDelete.id);
+      setShowDeleteDialog(false);
+      setDeckToDelete(null);
+      await loadDecks();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete deck');
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+    setDeckToDelete(null);
+  };
+
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString();
@@ -97,11 +123,6 @@ export default function Decks() {
 
   return (
     <div className="decks-page">
-      {/* Temporary debug indicator */}
-      <div style={{ position: 'fixed', top: '10px', right: '10px', background: 'yellow', color: 'black', padding: '5px', zIndex: 9999 }}>
-        Modal State: {showCreateDialog ? 'OPEN' : 'CLOSED'}
-      </div>
-
       {/* Header - Only show button when there are decks */}
       <div className="decks-header">
         <h1>My Decks</h1>
@@ -155,7 +176,13 @@ export default function Decks() {
                     navigate(`/deck-builder/${deck.id}`);
                   }}
                 >
-                  ✏️ Edit
+                  Edit
+                </button>
+                <button
+                  className="delete-button"
+                  onClick={(e) => handleDeleteClick(deck, e)}
+                >
+                  Delete
                 </button>
               </div>
             </div>
@@ -213,6 +240,32 @@ export default function Decks() {
               </button>
               <button className="create-button" onClick={handleCreateDeck}>
                 Create Deck
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && deckToDelete && (
+        <div className="modal-overlay" onClick={handleDeleteCancel}>
+          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delete Deck</h2>
+              <button className="close-button" onClick={handleDeleteCancel}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete <strong>{deckToDelete.name}</strong>?</p>
+              <p className="warning-text">This action cannot be undone.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-button" onClick={handleDeleteCancel}>
+                Cancel
+              </button>
+              <button className="delete-button-confirm" onClick={handleDeleteConfirm}>
+                Delete
               </button>
             </div>
           </div>

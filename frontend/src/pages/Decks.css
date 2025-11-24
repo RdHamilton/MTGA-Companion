@@ -228,6 +228,23 @@
   border-color: #4a9eff;
 }
 
+.delete-button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #ff5252;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-button:hover {
+  background: #3d1f1f;
+  border-color: #ff5252;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -360,6 +377,42 @@
 .create-button:hover {
   background: #3a8edf;
   transform: translateY(-2px);
+}
+
+.delete-button-confirm {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  background: #ff5252;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-button-confirm:hover {
+  background: #d32f2f;
+  transform: translateY(-2px);
+}
+
+.delete-modal .modal-body {
+  padding: 2rem 1.5rem;
+}
+
+.delete-modal .modal-body p {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.delete-modal .modal-body p.warning-text {
+  margin-top: 0.75rem;
+  color: #ff5252;
+  font-size: 0.875rem;
+  font-style: italic;
 }
 
 /* Responsive */
