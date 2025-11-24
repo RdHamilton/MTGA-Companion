@@ -1,4 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+/**
+ * Helper function to navigate to a page and wait for it to finish loading
+ */
+async function gotoAndWaitForLoad(page: Page, url: string) {
+  await page.goto(url);
+  await page.waitForLoadState('networkidle');
+  // Wait for any loading spinners to disappear
+  await page.locator('.loading-state').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+}
 
 /**
  * E2E tests for Deck Builder workflow
@@ -33,8 +43,7 @@ test.describe('Deck Builder Workflow', () => {
     });
 
     test('should display empty state when no decks exist', async ({ page }) => {
-      await page.goto('/decks');
-      await page.waitForLoadState('networkidle');
+      await gotoAndWaitForLoad(page, '/decks');
 
       // Should show either empty state or deck list
       const hasEmptyState = await page.locator('.empty-state').count() > 0;
@@ -44,8 +53,7 @@ test.describe('Deck Builder Workflow', () => {
     });
 
     test('should show deck list when decks exist', async ({ page }) => {
-      await page.goto('/decks');
-      await page.waitForLoadState('networkidle');
+      await gotoAndWaitForLoad(page, '/decks');
 
       // Look for either deck cards or empty state
       const deckCards = await page.locator('.deck-card').count();
@@ -58,8 +66,7 @@ test.describe('Deck Builder Workflow', () => {
 
   test.describe('Create Deck Modal', () => {
     test('should show Create Deck button', async ({ page }) => {
-      await page.goto('/decks');
-      await page.waitForLoadState('networkidle');
+      await gotoAndWaitForLoad(page, '/decks');
 
       // Look for Create Deck button (either in header or empty state)
       const createButtons = await page.locator('button:has-text("Create New Deck"), button:has-text("+ Create New Deck")').count();
@@ -68,8 +75,7 @@ test.describe('Deck Builder Workflow', () => {
     });
 
     test('should open Create Deck modal when button clicked', async ({ page }) => {
-      await page.goto('/decks');
-      await page.waitForLoadState('networkidle');
+      await gotoAndWaitForLoad(page, '/decks');
 
       // Click the Create Deck button
       const createButton = page.locator('button:has-text("Create New Deck"), button:has-text("+ Create New Deck")').first();
