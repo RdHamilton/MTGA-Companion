@@ -2,6 +2,18 @@
 
 This directory contains end-to-end tests for MTGA Companion using Playwright.
 
+## ⚠️ CI Status
+
+**E2E tests are disabled in CI** and must be run locally before submitting PRs.
+
+**Why?**
+- Wails builds native desktop applications (not web apps)
+- Desktop apps require native GUI components (GTK, WebKit, native windows)
+- Running desktop apps in headless CI environments with Xvfb is unreliable
+- GitHub Actions runners have difficulty with virtual displays and native graphics
+
+**CI Coverage:** Unit tests, component tests, linting, and security scans all run in CI.
+
 ## Prerequisites
 
 Before running E2E tests, you need to have the Wails application running:
@@ -33,8 +45,27 @@ npx playwright show-report
 
 ## Test Structure
 
-- `smoke.spec.ts` - Basic smoke tests to verify app loads and navigation works
-- More workflow-specific tests will be added in subsequent tickets
+### Smoke Tests (`smoke.spec.ts`)
+Basic smoke tests to verify app loads and navigation works.
+
+### Deck Builder Tests (`deck-builder.spec.ts`) - 18 tests
+- Navigation and initial state (3 tests)
+- Create deck modal (6 tests)
+- Draft-to-deck workflow (4 tests)
+- Deck builder page (3 tests)
+- Error handling (2 tests)
+
+### Quest Tests (`quests.spec.ts`) - 30+ tests
+- Navigation and initial state (3 tests)
+- Quest list display (4 tests)
+- Quest statistics (3 tests)
+- Quest status and completion (3 tests)
+- Quest filtering and sorting (2 tests)
+- Quest details (3 tests)
+- Empty state (2 tests)
+- Error handling (3 tests)
+- Performance and loading (2 tests)
+- Visual layout (2 tests)
 
 ## Writing Tests
 
