@@ -9,6 +9,7 @@ import {
   CreateDeck,
   GetActiveDraftSessions,
   GetCompletedDraftSessions,
+  GetDraftPicks,
 } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 import DeckList from '../components/DeckList';
@@ -97,10 +98,17 @@ export default function DeckBuilder() {
 
         // If this is a draft deck, get the draft card IDs
         if (deckData.deck.Source === 'draft' && deckData.deck.DraftEventID) {
-          // For now, we'd need to get the draft cards from the draft event
-          // This would require adding a method to get draft picks
-          // For demo purposes, we'll use an empty array
-          setDraftCardIDs([]);
+          try {
+            const picks = await GetDraftPicks(deckData.deck.DraftEventID);
+            // Extract unique card IDs from draft picks
+            const uniqueCardIDs = Array.from(
+              new Set(picks.map((pick) => parseInt(pick.CardID, 10)))
+            ).filter((id) => !isNaN(id));
+            setDraftCardIDs(uniqueCardIDs);
+          } catch (pickErr) {
+            console.error('Failed to load draft picks:', pickErr);
+            setDraftCardIDs([]);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load deck');
