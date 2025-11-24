@@ -326,12 +326,19 @@ jobs:
         # Check if server started successfully
         if [ "$SERVER_READY" = "false" ]; then
           echo "ERROR: Wails dev server failed to start after 60 seconds"
-          echo "=== Wails dev server logs (last 200 lines) ==="
-          tail -n 200 wails-dev.log
+          echo ""
+          echo "=== Log file info ==="
+          echo "Lines in log: $(wc -l < wails-dev.log)"
+          echo "File size: $(ls -lh wails-dev.log | awk '{print $5}')"
+          echo ""
+          echo "=== Full Wails dev server logs ==="
+          cat wails-dev.log
           echo ""
           echo "=== Checking if wails process is still running ==="
           if ps -p $(cat wails-dev.pid) > /dev/null 2>&1; then
             echo "Wails process is still running but not responding on port 34115"
+            echo "Process info:"
+            ps aux | grep wails | grep -v grep
           else
             echo "Wails process has exited"
           fi
