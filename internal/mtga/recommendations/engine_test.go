@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewRuleBasedEngine(t *testing.T) {
-	engine := NewRuleBasedEngine(nil)
+	engine := NewRuleBasedEngine(nil, nil)
 	if engine == nil {
 		t.Fatal("NewRuleBasedEngine returned nil")
 	}
@@ -184,16 +184,18 @@ func TestScoreCardQuality(t *testing.T) {
 		},
 	}
 
+	engine := NewRuleBasedEngine(nil, nil)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			card := &cards.Card{
 				Rarity: tt.rarity,
 			}
 
-			score := scoreCardQuality(card)
+			score := engine.fallbackQualityScore(card)
 
 			if score < tt.expectedMin || score > tt.expectedMax {
-				t.Errorf("scoreCardQuality() = %v, want between %v and %v",
+				t.Errorf("fallbackQualityScore() = %v, want between %v and %v",
 					score, tt.expectedMin, tt.expectedMax)
 			}
 		})
@@ -945,7 +947,7 @@ func TestAnalyzeDeck(t *testing.T) {
 }
 
 func TestGetRecommendations_EmptyDeck(t *testing.T) {
-	engine := NewRuleBasedEngine(nil)
+	engine := NewRuleBasedEngine(nil, nil)
 
 	result, err := engine.GetRecommendations(context.Background(), nil, nil)
 	if err == nil {
@@ -957,7 +959,7 @@ func TestGetRecommendations_EmptyDeck(t *testing.T) {
 }
 
 func TestRecordAcceptance(t *testing.T) {
-	engine := NewRuleBasedEngine(nil)
+	engine := NewRuleBasedEngine(nil, nil)
 
 	// Phase 1A: This should be a no-op
 	err := engine.RecordAcceptance(context.Background(), "deck-123", 456, true)

@@ -34,6 +34,7 @@ export default function DeckBuilder() {
   const [recommendations, setRecommendations] = useState<gui.CardRecommendation[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [addingLands, setAddingLands] = useState(false);
 
   // Load deck data
   useEffect(() => {
@@ -214,6 +215,121 @@ export default function DeckBuilder() {
     }
   };
 
+  const handleAddSuggestedLands = async () => {
+    console.log('handleAddSuggestedLands called');
+    if (!deck || !statistics) {
+      console.error('Missing deck or statistics:', { deck, statistics });
+      return;
+    }
+
+    setAddingLands(true);
+    try {
+      // Use statistics colors if available (backend returns colors, not colorDistribution)
+      const colors = (statistics as any).colors || {};
+      console.log('Full statistics object:', statistics);
+      console.log('Color distribution from backend:', colors);
+
+      // Calculate color distribution from mainboard cards
+      // Only count mono-colored cards for land distribution
+      const colorCounts = {
+        W: colors.white || 0,
+        U: colors.blue || 0,
+        B: colors.black || 0,
+        R: colors.red || 0,
+        G: colors.green || 0,
+      };
+
+      console.log('Color counts (mono-colored only):', colorCounts);
+      console.log('Color counts after assignment - W:', colorCounts.W, 'U:', colorCounts.U, 'B:', colorCounts.B, 'R:', colorCounts.R, 'G:', colorCounts.G);
+
+      // Calculate target: 40 cards for limited, 60 for constructed
+      const targetDeckSize = deck.Format === 'limited' ? 40 : 60;
+      const currentMainboard = statistics.totalMainboard || 0;
+      const currentLands = ((statistics as any).lands?.total) || 0;
+      console.log('Deck stats:', { targetDeckSize, currentMainboard, currentLands });
+
+      // Calculate how many more lands we need
+      const nonLandCards = currentMainboard - currentLands;
+      const landsNeeded = Math.max(0, targetDeckSize - nonLandCards - currentLands);
+      console.log('Lands needed:', landsNeeded);
+
+      if (landsNeeded === 0) {
+        console.log('Deck already has enough lands');
+        window.alert('Your deck already has enough lands!');
+        return;
+      }
+
+      // Calculate total color weight
+      const totalColors = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+      console.log('Total colors:', totalColors);
+
+      if (totalColors === 0) {
+        console.log('No colors detected');
+        window.alert('Could not determine deck colors. Please add more colored cards first.');
+        return;
+      }
+
+      // Basic land arena IDs (these are standard across all sets)
+      const basicLands: Record<string, { name: string; arenaID: number }> = {
+        W: { name: 'Plains', arenaID: 81716 },
+        U: { name: 'Island', arenaID: 81717 },
+        B: { name: 'Swamp', arenaID: 81718 },
+        R: { name: 'Mountain', arenaID: 81719 },
+        G: { name: 'Forest', arenaID: 81720 },
+      };
+
+      // Distribute lands proportionally
+      const landDistribution: Record<string, number> = {};
+      let landsAllocated = 0;
+
+      // First pass: allocate proportionally
+      Object.keys(colorCounts).forEach((color) => {
+        const proportion = colorCounts[color as keyof typeof colorCounts] / totalColors;
+        const count = Math.floor(landsNeeded * proportion);
+        landDistribution[color] = count;
+        landsAllocated += count;
+      });
+
+      // Second pass: distribute remaining lands to most prominent colors
+      let remaining = landsNeeded - landsAllocated;
+      const sortedColors = Object.keys(colorCounts).sort(
+        (a, b) => colorCounts[b as keyof typeof colorCounts] - colorCounts[a as keyof typeof colorCounts]
+      );
+
+      for (let i = 0; i < remaining; i++) {
+        const color = sortedColors[i % sortedColors.length];
+        landDistribution[color] = (landDistribution[color] || 0) + 1;
+      }
+
+      // Add lands to deck
+      console.log('Land distribution:', landDistribution);
+      for (const [color, count] of Object.entries(landDistribution)) {
+        if (count > 0 && color in basicLands) {
+          const land = basicLands[color as keyof typeof basicLands];
+          console.log(`Adding ${count}x ${land.name} (arena_id=${land.arenaID})`);
+          await AddCard(deck.ID, land.arenaID, count, 'main', false);
+        }
+      }
+
+      // Reload deck data
+      console.log('Reloading deck data...');
+      const deckData = await GetDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await GetDeckStatistics(deck.ID);
+      setStatistics(stats);
+
+      console.log(`Successfully added ${landsNeeded} lands!`);
+      window.alert(`Added ${landsNeeded} suggested lands to your deck!`);
+    } catch (err) {
+      console.error('Error adding lands:', err);
+      window.alert(err instanceof Error ? err.message : 'Failed to add lands');
+    } finally {
+      setAddingLands(false);
+    }
+  };
+
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(
     cards.map((card) => [
@@ -371,6 +487,14 @@ export default function DeckBuilder() {
             }}
           >
             ✨ Suggestions
+          </button>
+          <button
+            className="action-button"
+            title="Add suggested lands based on deck colors"
+            disabled={addingLands || (statistics?.totalMainboard || 0) < 2}
+            onClick={handleAddSuggestedLands}
+          >
+            {addingLands ? '⏳ Adding...' : '🏔️ Add Lands'}
           </button>
           <button className="action-button" title="Validate deck">
             ✓ Validate
