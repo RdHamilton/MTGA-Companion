@@ -660,6 +660,40 @@ export namespace gui {
 	}
 	
 	
+	export class LogReplayProgress {
+	    totalFiles: number;
+	    processedFiles: number;
+	    currentFile: string;
+	    totalEntries: number;
+	    processedEntries: number;
+	    percentComplete: number;
+	    matchesImported: number;
+	    decksImported: number;
+	    questsImported: number;
+	    draftsImported: number;
+	    duration: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogReplayProgress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalFiles = source["totalFiles"];
+	        this.processedFiles = source["processedFiles"];
+	        this.currentFile = source["currentFile"];
+	        this.totalEntries = source["totalEntries"];
+	        this.processedEntries = source["processedEntries"];
+	        this.percentComplete = source["percentComplete"];
+	        this.matchesImported = source["matchesImported"];
+	        this.decksImported = source["decksImported"];
+	        this.questsImported = source["questsImported"];
+	        this.draftsImported = source["draftsImported"];
+	        this.duration = source["duration"];
+	        this.error = source["error"];
+	    }
+	}
 	export class ReplayStatus {
 	    isActive: boolean;
 	    isPaused: boolean;

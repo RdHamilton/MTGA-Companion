@@ -509,14 +509,16 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	for i, logFile := range logFiles {
 		log.Printf("Reading file %d/%d: %s", i+1, len(logFiles), logFile.Name)
 
-		// Broadcast progress
+		// Broadcast progress (field names match gui.LogReplayProgress)
 		s.wsServer.Broadcast(Event{
 			Type: "replay:progress",
 			Data: map[string]interface{}{
-				"totalFiles":     len(logFiles),
-				"processedFiles": i,
-				"currentFile":    logFile.Name,
-				"totalEntries":   len(allEntries),
+				"totalFiles":       len(logFiles),
+				"processedFiles":   i,
+				"currentFile":      logFile.Name,
+				"totalEntries":     len(allEntries),
+				"processedEntries": 0,
+				"percentComplete":  0.0,
 			},
 		})
 
@@ -569,7 +571,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 
 		chunk := allEntries[start:end]
 
-		// Broadcast progress
+		// Broadcast progress (field names match gui.LogReplayProgress)
 		percentComplete := float64(end) / float64(len(allEntries)) * 100
 		s.wsServer.Broadcast(Event{
 			Type: "replay:progress",
@@ -618,17 +620,20 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	log.Printf("Replay completed in %v: %d entries, %d matches, %d decks, %d quests, %d drafts",
 		elapsed, len(allEntries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
 
-	// Broadcast completion
+	// Broadcast completion (field names match gui.LogReplayProgress)
 	s.wsServer.Broadcast(Event{
 		Type: "replay:completed",
 		Data: map[string]interface{}{
-			"totalFiles":      len(logFiles),
-			"totalEntries":    len(allEntries),
-			"matchesImported": result.MatchesStored,
-			"decksImported":   result.DecksStored,
-			"questsImported":  result.QuestsStored,
-			"draftsImported":  result.DraftsStored,
-			"duration":        elapsed.Seconds(),
+			"totalFiles":       len(logFiles),
+			"processedFiles":   len(logFiles),
+			"totalEntries":     len(allEntries),
+			"processedEntries": len(allEntries),
+			"percentComplete":  100.0,
+			"matchesImported":  result.MatchesStored,
+			"decksImported":    result.DecksStored,
+			"questsImported":   result.QuestsStored,
+			"draftsImported":   result.DraftsStored,
+			"duration":         elapsed.Seconds(),
 		},
 	})
 

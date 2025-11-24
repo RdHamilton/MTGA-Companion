@@ -175,6 +175,13 @@ func (a *App) GetReplayStatus() (*gui.ReplayStatus, error) {
 	return a.systemFacade.GetReplayStatus(a.ctx)
 }
 
+// GetLogReplayProgress returns an empty LogReplayProgress struct.
+// This method exists to expose the type to Wails for TypeScript code generation.
+// Actual progress is delivered via 'replay:progress' events.
+func (a *App) GetLogReplayProgress() (*gui.LogReplayProgress, error) {
+	return a.systemFacade.GetLogReplayProgress(a.ctx)
+}
+
 // ========================================
 // Match & Statistics Methods (MatchFacade)
 // ========================================
