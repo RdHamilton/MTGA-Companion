@@ -10,8 +10,9 @@ import {
   GetActiveDraftSessions,
   GetCompletedDraftSessions,
   GetDraftPicks,
+  GetRecommendations,
 } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import './DeckBuilder.css';
@@ -30,6 +31,9 @@ export default function DeckBuilder() {
   const [error, setError] = useState<string | null>(null);
   const [showCardSearch, setShowCardSearch] = useState(false);
   const [draftCardIDs, setDraftCardIDs] = useState<number[]>([]);
+  const [recommendations, setRecommendations] = useState<gui.CardRecommendation[]>([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   // Load deck data
   useEffect(() => {
@@ -151,6 +155,11 @@ export default function DeckBuilder() {
       // Reload statistics
       const stats = await GetDeckStatistics(deck.ID);
       setStatistics(stats);
+
+      // Reload recommendations after adding a card
+      if (deckData.cards && deckData.cards.length >= 3) {
+        loadRecommendations();
+      }
     } catch (err) {
       throw err; // Re-throw to let CardSearch handle the error
     }
@@ -171,6 +180,37 @@ export default function DeckBuilder() {
       setStatistics(stats);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to remove card');
+    }
+  };
+
+  const loadRecommendations = async () => {
+    if (!deck) return;
+
+    setLoadingRecommendations(true);
+    try {
+      const request: gui.GetRecommendationsRequest = {
+        deckID: deck.ID,
+        maxResults: 10,
+        minScore: 0.3,
+        includeLands: true,
+        onlyDraftPool: deck.Source === 'draft',
+      };
+
+      const response = await GetRecommendations(request);
+      if (response.error) {
+        console.error('Recommendations error:', response.error);
+        setRecommendations([]);
+      } else {
+        setRecommendations(response.recommendations || []);
+        if (response.recommendations && response.recommendations.length > 0) {
+          setShowRecommendations(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load recommendations:', err);
+      setRecommendations([]);
+    } finally {
+      setLoadingRecommendations(false);
     }
   };
 
@@ -260,6 +300,53 @@ export default function DeckBuilder() {
             />
           </div>
         )}
+
+        {/* Recommendations Panel (toggleable) */}
+        {showRecommendations && (
+          <div className="recommendations-panel">
+            <div className="recommendations-header">
+              <h3>Card Recommendations</h3>
+              <button className="close-recommendations" onClick={() => setShowRecommendations(false)}>
+                ✕
+              </button>
+            </div>
+
+            {loadingRecommendations ? (
+              <div className="recommendations-loading">Loading recommendations...</div>
+            ) : recommendations.length === 0 ? (
+              <div className="recommendations-empty">
+                No recommendations available. Add more cards to get suggestions!
+              </div>
+            ) : (
+              <div className="recommendations-list">
+                {recommendations.map((rec) => (
+                  <div key={rec.cardID} className="recommendation-card">
+                    {rec.imageURI && (
+                      <img src={rec.imageURI} alt={rec.name} className="rec-card-image" />
+                    )}
+                    <div className="rec-card-info">
+                      <div className="rec-card-name">{rec.name}</div>
+                      <div className="rec-card-type">{rec.typeLine}</div>
+                      {rec.manaCost && <div className="rec-card-mana">{rec.manaCost}</div>}
+                      <div className="rec-score">
+                        Score: {(rec.score * 100).toFixed(0)}% | Confidence: {(rec.confidence * 100).toFixed(0)}%
+                      </div>
+                      <div className="rec-reasoning">{rec.reasoning}</div>
+                    </div>
+                    <div className="rec-card-actions">
+                      <button
+                        className="add-rec-button"
+                        onClick={() => handleAddCard(rec.cardID, 1, 'main')}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Quick Actions Footer */}
@@ -273,7 +360,16 @@ export default function DeckBuilder() {
           <button className="action-button" title="Export deck">
             ⤓ Export
           </button>
-          <button className="action-button" title="Get recommendations">
+          <button
+            className={`action-button ${showRecommendations ? 'active' : ''}`}
+            title="Get recommendations"
+            onClick={() => {
+              if (!showRecommendations && recommendations.length === 0) {
+                loadRecommendations();
+              }
+              setShowRecommendations(!showRecommendations);
+            }}
+          >
             ✨ Suggestions
           </button>
           <button className="action-button" title="Validate deck">

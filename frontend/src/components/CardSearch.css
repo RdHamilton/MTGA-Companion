@@ -297,6 +297,7 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
+  padding-right: 1.5rem;
   background: #2a2a2a;
   border-radius: 6px;
   border: 2px solid transparent;
@@ -363,6 +364,8 @@
   gap: 0.5rem;
   align-items: flex-end;
   justify-content: center;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
 .in-deck-info {
