@@ -28,6 +28,9 @@ export const WinRatePrediction: React.FC<WinRatePredictionProps> = ({
         setError(null);
         const p = await GetDraftWinRatePrediction(sessionID);
         setPred(p);
+      } catch {
+        // Prediction might not exist yet - not an error
+        setPred(null);
       } finally {
         setLoading(false);
       }
