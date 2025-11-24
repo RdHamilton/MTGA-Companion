@@ -220,7 +220,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 3, Board: 'main' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
         if (arenaID === '1') return Promise.resolve(createMockSetCard({ Name: 'Bear', Types: ['Creature'], ArenaID: '1' }));
         if (arenaID === '2') return Promise.resolve(createMockSetCard({ Name: 'Bolt', Types: ['Instant'], ArenaID: '2' }));
         if (arenaID === '3') return Promise.resolve(createMockSetCard({ Name: 'Island', Types: ['Land'], ArenaID: '3' }));
@@ -356,7 +356,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 2, Board: 'sideboard' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
         if (arenaID === '2') {
           return Promise.resolve(createMockSetCard({ Name: 'Sideboard Card', ArenaID: '2' }));
         }
@@ -519,7 +519,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 3, Board: 'main' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
         if (arenaID === '1') return Promise.resolve(createMockSetCard({ Name: 'Zebra', CMC: 3, Types: ['Creature'], ArenaID: '1' }));
         if (arenaID === '2') return Promise.resolve(createMockSetCard({ Name: 'Bear', CMC: 2, Types: ['Creature'], ArenaID: '2' }));
         if (arenaID === '3') return Promise.resolve(createMockSetCard({ Name: 'Aardvark', CMC: 2, Types: ['Creature'], ArenaID: '3' }));

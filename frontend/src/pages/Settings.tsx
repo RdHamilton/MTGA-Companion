@@ -4,6 +4,7 @@ import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandalo
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
+import { gui } from '../../wailsjs/go/models';
 import './Settings.css';
 
 const Settings = () => {
@@ -29,12 +30,12 @@ const Settings = () => {
   // Replay logs settings
   const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
-  const [replayProgress, setReplayProgress] = useState<Record<string, unknown> | null>(null);
+  const [replayProgress, setReplayProgress] = useState<gui.ReplayStatus | null>(null);
 
   // Replay tool settings - use global state for active/paused to persist across navigation
   const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
   const [replayToolPaused, setReplayToolPaused] = useState(getReplayState().isPaused);
-  const [replayToolProgress, setReplayToolProgress] = useState<Record<string, unknown> | null>(getReplayState().progress);
+  const [replayToolProgress, setReplayToolProgress] = useState<gui.ReplayStatus | null>(getReplayState().progress);
   const [replaySpeed, setReplaySpeed] = useState(1.0);
   const [replayFilter, setReplayFilter] = useState('all');
   const [pauseOnDraft, setPauseOnDraft] = useState(false);
