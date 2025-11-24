@@ -11,11 +11,11 @@ func TestConvertSetCardToCard(t *testing.T) {
 		name     string
 		setCard  *models.SetCard
 		expected struct {
-			arenaID    int
-			name       string
-			setCode    string
-			cmc        float64
-			rarity     string
+			arenaID     int
+			name        string
+			setCode     string
+			cmc         float64
+			rarity      string
 			hasManaCost bool
 			manaCost    string
 		}
