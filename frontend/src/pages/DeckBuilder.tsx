@@ -11,11 +11,10 @@ import {
   GetCompletedDraftSessions,
   GetDraftPicks,
   GetRecommendations,
-  ExportDeck,
-  ValidateDraftDeck,
+  ExportDeckToFile,
+  ValidateDeckWithDialog,
 } from '../../wailsjs/go/main/App';
 import { models, gui } from '../../wailsjs/go/models';
-import { ClipboardSetText } from '../../wailsjs/runtime/runtime';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import './DeckBuilder.css';
@@ -339,48 +338,27 @@ export default function DeckBuilder() {
 
   const handleExportDeck = async () => {
     if (!deck) {
-      window.alert('No deck to export');
       return;
     }
 
     try {
-      const response = await ExportDeck({
-        deckID: deck.ID,
-        format: 'arena',
-        includeHeaders: true,
-        includeStats: false,
-      } as gui.ExportDeckRequest);
-
-      if (response.error) {
-        window.alert(`Export failed: ${response.error}`);
-        return;
-      }
-
-      await ClipboardSetText(response.content);
-      window.alert(`Deck exported to clipboard!\n\nFormat: ${response.format}\n\nYou can now paste it into MTG Arena or save it to a file.`);
+      // Call backend which will show native SaveFileDialog
+      await ExportDeckToFile(deck.ID);
     } catch (err) {
       console.error('Error exporting deck:', err);
-      window.alert(err instanceof Error ? err.message : 'Failed to export deck');
     }
   };
 
   const handleValidateDeck = async () => {
     if (!deck) {
-      window.alert('No deck to validate');
       return;
     }
 
     try {
-      const isValid = await ValidateDraftDeck(deck.ID);
-
-      if (isValid) {
-        window.alert('✓ Deck is valid!\n\nYour deck meets all format requirements and is ready to play.');
-      } else {
-        window.alert('✗ Deck is invalid\n\nYour deck does not meet format requirements. Check the deck statistics for details.');
-      }
+      // Call backend which will show native MessageDialog with result
+      await ValidateDeckWithDialog(deck.ID);
     } catch (err) {
       console.error('Error validating deck:', err);
-      window.alert(err instanceof Error ? err.message : 'Failed to validate deck');
     }
   };
 

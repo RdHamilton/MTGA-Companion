@@ -568,3 +568,13 @@ func (a *App) GetDeckPerformance(deckID string) (*models.DeckPerformance, error)
 func (a *App) ValidateDraftDeck(deckID string) (bool, error) {
 	return a.deckFacade.ValidateDraftDeck(a.ctx, deckID)
 }
+
+// ExportDeckToFile exports a deck and shows a native save dialog
+func (a *App) ExportDeckToFile(deckID string) error {
+	return a.deckFacade.ExportDeckToFile(a.ctx, deckID)
+}
+
+// ValidateDeckWithDialog validates a deck and shows result in a native dialog
+func (a *App) ValidateDeckWithDialog(deckID string) error {
+	return a.deckFacade.ValidateDeckWithDialog(a.ctx, deckID)
+}

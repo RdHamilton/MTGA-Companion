@@ -33,6 +33,8 @@ export function ExplainRecommendation(arg1:gui.ExplainRecommendationRequest):Pro
 
 export function ExportDeck(arg1:gui.ExportDeckRequest):Promise<gui.ExportDeckResponse>;
 
+export function ExportDeckToFile(arg1:string):Promise<void>;
+
 export function ExportToCSV():Promise<void>;
 
 export function ExportToJSON():Promise<void>;
@@ -182,5 +184,7 @@ export function SwitchToStandaloneMode():Promise<void>;
 export function TriggerReplayLogs(arg1:boolean):Promise<void>;
 
 export function UpdateDeck(arg1:models.Deck):Promise<void>;
+
+export function ValidateDeckWithDialog(arg1:string):Promise<void>;
 
 export function ValidateDraftDeck(arg1:string):Promise<boolean>;
