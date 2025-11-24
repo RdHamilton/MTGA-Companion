@@ -313,14 +313,24 @@ jobs:
         echo $! > wails-dev.pid
 
         # Wait for server to be ready (max 60 seconds)
+        SERVER_READY=false
         for i in {1..60}; do
           if curl -s http://localhost:34115 > /dev/null; then
             echo "Wails dev server is ready!"
+            SERVER_READY=true
             break
           fi
           echo "Waiting for Wails dev server... ($i/60)"
           sleep 1
         done
+
+        # Check if server started successfully
+        if [ "$SERVER_READY" = "false" ]; then
+          echo "ERROR: Wails dev server failed to start after 60 seconds"
+          echo "=== Wails dev server logs ==="
+          cat wails-dev.log
+          exit 1
+        fi
 
     - name: Run E2E tests
       run: |
