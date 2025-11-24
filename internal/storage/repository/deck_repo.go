@@ -514,10 +514,10 @@ func (r *deckRepository) GetPerformance(ctx context.Context, deckID string) (*mo
 // GetDraftCards retrieves all cards picked during a draft event.
 func (r *deckRepository) GetDraftCards(ctx context.Context, draftEventID string) ([]int, error) {
 	query := `
-		SELECT DISTINCT selected_card
+		SELECT DISTINCT CAST(card_id AS INTEGER) as card_id_int
 		FROM draft_picks
-		WHERE draft_event_id = ?
-		ORDER BY selected_card
+		WHERE session_id = ?
+		ORDER BY card_id_int
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, draftEventID)
