@@ -133,8 +133,8 @@ describe('ErrorState', () => {
         />
       );
 
-      const container = document.querySelector('.error-state');
-      const icon = document.querySelector('.error-state-icon');
+      const container = document.querySelector('.error-state') as HTMLElement | null;
+      const icon = document.querySelector('.error-state-icon') as HTMLElement | null;
       const title = screen.getByText('Cannot Load Data');
       const details = screen.getByText('Database connection failed');
       const helpText = screen.getByText('Please try again later.');
@@ -148,8 +148,8 @@ describe('ErrorState', () => {
     it('should maintain correct DOM hierarchy without optional props', () => {
       render(<ErrorState message="Error occurred" />);
 
-      const container = document.querySelector('.error-state');
-      const icon = document.querySelector('.error-state-icon');
+      const container = document.querySelector('.error-state') as HTMLElement | null;
+      const icon = document.querySelector('.error-state-icon') as HTMLElement | null;
       const title = screen.getByText('Error occurred');
 
       expect(container).toContainElement(icon);

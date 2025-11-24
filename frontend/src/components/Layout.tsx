@@ -64,7 +64,7 @@ const Layout = ({ children }: LayoutProps) => {
     const loadConnectionStatus = async () => {
       try {
         const status = await GetConnectionStatus();
-        setConnectionStatus(status);
+        setConnectionStatus(status as ConnectionStatus);
       } catch (error) {
         console.error('Failed to load connection status:', error);
       }

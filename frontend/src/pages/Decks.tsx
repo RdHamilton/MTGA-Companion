@@ -32,7 +32,7 @@ export default function Decks() {
   useEffect(() => {
     // Wait for Wails runtime to be ready before loading decks
     const checkWailsReady = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as Record<string, unknown>).go) {
+      if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).go) {
         clearInterval(checkWailsReady);
         loadDecks();
       }
@@ -41,7 +41,7 @@ export default function Decks() {
     // Fallback timeout after 5 seconds
     const timeout = setTimeout(() => {
       clearInterval(checkWailsReady);
-      if (!(window as Record<string, unknown>).go) {
+      if (!(window as unknown as Record<string, unknown>).go) {
         setError('Wails runtime not initialized');
         setLoading(false);
       }
@@ -95,7 +95,7 @@ export default function Decks() {
 
   const formatDate = (date: unknown) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString();
+    return new Date(String(date)).toLocaleDateString();
   };
 
   if (loading) {

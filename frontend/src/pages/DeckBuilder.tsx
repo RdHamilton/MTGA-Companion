@@ -28,7 +28,7 @@ export default function DeckBuilder() {
   const [deck, setDeck] = useState<models.Deck | null>(null);
   const [cards, setCards] = useState<models.DeckCard[]>([]);
   const [tags, setTags] = useState<models.DeckTag[]>([]);
-  const [statistics, setStatistics] = useState<unknown>(null);
+  const [statistics, setStatistics] = useState<gui.DeckStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCardSearch, setShowCardSearch] = useState(false);
@@ -71,7 +71,7 @@ export default function DeckBuilder() {
                 GetCompletedDraftSessions(100), // Get last 100 completed drafts
               ]);
               const allSessions = [...activeSessions, ...completedSessions];
-              const session = allSessions.find((s: unknown) => s.ID === draftEventID);
+              const session = allSessions.find((s) => s.ID === draftEventID);
 
               if (!session) {
                 setError('Draft session not found');

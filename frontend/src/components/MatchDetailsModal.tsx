@@ -32,8 +32,8 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
     loadGames();
   }, [match.ID]);
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+  const formatTimestamp = (timestamp: string | unknown) => {
+    return new Date(String(timestamp)).toLocaleString();
   };
 
   const formatDuration = (seconds: number | null | undefined) => {

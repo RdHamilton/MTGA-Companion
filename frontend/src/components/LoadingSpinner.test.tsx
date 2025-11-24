@@ -77,8 +77,8 @@ describe('LoadingSpinner', () => {
     it('should maintain correct DOM hierarchy', () => {
       render(<LoadingSpinner message="Loading data..." />);
 
-      const container = document.querySelector('.loading-container');
-      const spinner = document.querySelector('.spinner');
+      const container = document.querySelector('.loading-container') as HTMLElement | null;
+      const spinner = document.querySelector('.spinner') as HTMLElement | null;
       const message = screen.getByText('Loading data...');
 
       expect(container).toContainElement(spinner);

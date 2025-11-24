@@ -199,7 +199,7 @@ const MatchHistory = () => {
   }, [dateRange, customStartDate, customEndDate, cardFormat, queueType, result]);
 
   const formatTimestamp = (timestamp: unknown) => {
-    return new Date(timestamp).toLocaleString();
+    return new Date(String(timestamp)).toLocaleString();
   };
 
   const formatScore = (wins: number, losses: number) => {
@@ -225,8 +225,8 @@ const MatchHistory = () => {
 
     // Handle timestamp
     if (sortField === 'Timestamp') {
-      aVal = new Date(aVal).getTime();
-      bVal = new Date(bVal).getTime();
+      aVal = new Date(String(aVal)).getTime();
+      bVal = new Date(String(bVal)).getTime();
     }
 
     // Handle nulls/undefined
