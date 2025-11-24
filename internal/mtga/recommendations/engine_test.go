@@ -230,8 +230,17 @@ func TestScoreSynergy(t *testing.T) {
 			typeLine:    humanTypeLine,
 			keywords:    map[string]int{},
 			creatures:   map[string]int{"Human": 5, "Warrior": 4},
-			expectedMin: 0.25,
-			expectedMax: 0.35,
+			expectedMin: 0.45, // Improved tribal scoring: 5 Humans=0.6, 4 Warriors=0.4, averaged=0.5
+			expectedMax: 0.55,
+		},
+		{
+			name:        "strong tribal synergy",
+			oracleText:  nil,
+			typeLine:    "Creature — Ally Warrior",
+			keywords:    map[string]int{},
+			creatures:   map[string]int{"Ally": 10}, // 10+ Allies = strong tribal deck
+			expectedMin: 0.75, // 10 Allies gives 0.8 bonus
+			expectedMax: 0.85,
 		},
 		{
 			name:        "no synergy",

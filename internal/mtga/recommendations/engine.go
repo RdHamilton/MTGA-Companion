@@ -574,8 +574,19 @@ func scoreSynergy(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) f
 		cardTypes := extractCreatureTypesFromLine(card.TypeLine)
 		for creatureType := range cardTypes {
 			if count, ok := analysis.CreatureTypes[creatureType]; ok && count >= 3 {
-				// Tribal synergy if we have 3+ of this type
-				synergy += 0.3
+				// Tribal synergy scales with how many of this type we have
+				// 3-4 creatures: 0.4 bonus
+				// 5-7 creatures: 0.6 bonus
+				// 8+ creatures: 0.8 bonus (strong tribal theme)
+				var tribalBonus float64
+				if count >= 8 {
+					tribalBonus = 0.8
+				} else if count >= 5 {
+					tribalBonus = 0.6
+				} else {
+					tribalBonus = 0.4
+				}
+				synergy += tribalBonus
 				synergyCount++
 			}
 		}
@@ -646,8 +657,12 @@ func generateExplanation(card *cards.Card, factors *ScoreFactors, analysis *Deck
 	}
 
 	// Synergy reasoning
-	if factors.Synergy >= 0.7 {
+	if factors.Synergy >= 0.8 {
+		reasons = append(reasons, "has excellent synergy with your deck's strategy")
+	} else if factors.Synergy >= 0.7 {
 		reasons = append(reasons, "has strong synergy with your existing cards")
+	} else if factors.Synergy >= 0.6 {
+		reasons = append(reasons, "synergizes well with your deck")
 	}
 
 	// Construct final explanation
