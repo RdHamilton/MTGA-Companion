@@ -58,6 +58,17 @@ test.describe('Deck Builder Workflow', () => {
         deckList: hasDeckList
       });
 
+      // Debug: Get the full HTML of .decks-page to see what's actually there
+      const decksPageHTML = await page.locator('.decks-page').innerHTML();
+      console.log('Decks page HTML length:', decksPageHTML.length);
+      console.log('Decks page HTML preview:', decksPageHTML.substring(0, 500));
+
+      // Debug: Check all elements with class containing 'deck' or 'empty'
+      const allDeckElements = await page.locator('[class*="deck"]').count();
+      const allEmptyElements = await page.locator('[class*="empty"]').count();
+      console.log('Elements with "deck" in class:', allDeckElements);
+      console.log('Elements with "empty" in class:', allEmptyElements);
+
       // Check if there's an error state
       if (hasErrorState) {
         const errorText = await page.locator('.error-state').textContent();

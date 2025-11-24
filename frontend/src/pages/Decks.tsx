@@ -13,10 +13,6 @@ export default function Decks() {
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckFormat, setNewDeckFormat] = useState('standard');
 
-  useEffect(() => {
-    loadDecks();
-  }, []);
-
   const loadDecks = async () => {
     setLoading(true);
     setError(null);
@@ -30,6 +26,31 @@ export default function Decks() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Wait for Wails runtime to be ready before loading decks
+    const checkWailsReady = setInterval(() => {
+      if (typeof window !== 'undefined' && (window as any).go) {
+        clearInterval(checkWailsReady);
+        loadDecks();
+      }
+    }, 100);
+
+    // Fallback timeout after 5 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(checkWailsReady);
+      if (!(window as any).go) {
+        setError('Wails runtime not initialized');
+        setLoading(false);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(checkWailsReady);
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateDeck = async () => {
     if (!newDeckName.trim()) {
