@@ -98,9 +98,6 @@ test.describe('Match Tracking Workflow', () => {
       const selectCount = await formatSelectors.count();
 
       if (selectCount > 0) {
-        // Get initial match count
-        const initialMatches = await page.locator('[class*="match-card"], [class*="match-item"]').count();
-
         // Try to select a filter option
         const firstSelect = formatSelectors.first();
         await firstSelect.click();
@@ -343,9 +340,6 @@ test.describe('Match Tracking Workflow', () => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
-
-      // Get initial footer content
-      const initialFooter = await page.locator('.app-footer, footer, [class*="footer"]').textContent();
 
       // Navigate to different view
       await page.getByText('Draft').click();

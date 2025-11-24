@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import CardSearch from './CardSearch';
@@ -9,7 +9,7 @@ import { models } from '../../wailsjs/go/models';
 // Helper function to create mock set card
 function createMockSetCard(overrides: Partial<models.SetCard> = {}): models.SetCard {
   return new models.SetCard({
-    ArenaID: 12345,
+    ArenaID: '12345',
     Name: 'Test Card',
     SetCode: 'TST',
     CMC: 3,
@@ -56,10 +56,10 @@ describe('CardSearch Component', () => {
     });
 
     it('should load cards from draft pool', async () => {
-      const card1 = createMockSetCard({ ArenaID: 111, Name: 'Card One' });
-      const card2 = createMockSetCard({ ArenaID: 222, Name: 'Card Two' });
+      const card1 = createMockSetCard({ ArenaID: '111', Name: 'Card One' });
+      const card2 = createMockSetCard({ ArenaID: '222', Name: 'Card Two' });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '111') return Promise.resolve(card1);
         if (arenaID === '222') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -153,10 +153,10 @@ describe('CardSearch Component', () => {
 
   describe('Search Filtering', () => {
     it('should filter cards by search term', async () => {
-      const card1 = createMockSetCard({ ArenaID: 1, Name: 'Lightning Bolt' });
-      const card2 = createMockSetCard({ ArenaID: 2, Name: 'Counterspell' });
+      const card1 = createMockSetCard({ ArenaID: '1', Name: 'Lightning Bolt' });
+      const card2 = createMockSetCard({ ArenaID: '2', Name: 'Counterspell' });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -190,7 +190,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should be case-insensitive', async () => {
-      const card = createMockSetCard({ ArenaID: 1, Name: 'Lightning Bolt' });
+      const card = createMockSetCard({ ArenaID: '1', Name: 'Lightning Bolt' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -216,7 +216,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should show "no results" message when no cards match', async () => {
-      const card = createMockSetCard({ ArenaID: 1, Name: 'Lightning Bolt' });
+      const card = createMockSetCard({ ArenaID: '1', Name: 'Lightning Bolt' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -244,10 +244,10 @@ describe('CardSearch Component', () => {
 
   describe('CMC Filtering', () => {
     it('should filter by minimum CMC', async () => {
-      const card1 = createMockSetCard({ ArenaID: 1, Name: 'Cheap Card', CMC: 1 });
-      const card2 = createMockSetCard({ ArenaID: 2, Name: 'Expensive Card', CMC: 5 });
+      const card1 = createMockSetCard({ ArenaID: '1', Name: 'Cheap Card', CMC: 1 });
+      const card2 = createMockSetCard({ ArenaID: '2', Name: 'Expensive Card', CMC: 5 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -280,10 +280,10 @@ describe('CardSearch Component', () => {
     });
 
     it('should filter by maximum CMC', async () => {
-      const card1 = createMockSetCard({ ArenaID: 1, Name: 'Cheap Card', CMC: 1 });
-      const card2 = createMockSetCard({ ArenaID: 2, Name: 'Expensive Card', CMC: 5 });
+      const card1 = createMockSetCard({ ArenaID: '1', Name: 'Cheap Card', CMC: 1 });
+      const card2 = createMockSetCard({ ArenaID: '2', Name: 'Expensive Card', CMC: 5 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         return Promise.reject(new Error('Not found'));
@@ -316,11 +316,11 @@ describe('CardSearch Component', () => {
     });
 
     it('should filter by CMC range', async () => {
-      const card1 = createMockSetCard({ ArenaID: 1, Name: 'CMC 1', CMC: 1 });
-      const card2 = createMockSetCard({ ArenaID: 2, Name: 'CMC 3', CMC: 3 });
-      const card3 = createMockSetCard({ ArenaID: 3, Name: 'CMC 7', CMC: 7 });
+      const card1 = createMockSetCard({ ArenaID: '1', Name: 'CMC 1', CMC: 1 });
+      const card2 = createMockSetCard({ ArenaID: '2', Name: 'CMC 3', CMC: 3 });
+      const card3 = createMockSetCard({ ArenaID: '3', Name: 'CMC 7', CMC: 7 });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(card1);
         if (arenaID === '2') return Promise.resolve(card2);
         if (arenaID === '3') return Promise.resolve(card3);
@@ -360,10 +360,10 @@ describe('CardSearch Component', () => {
 
   describe('Color Filtering', () => {
     it('should filter by single color', async () => {
-      const blueCard = createMockSetCard({ ArenaID: 1, Name: 'Blue Card', Colors: ['U'] });
-      const redCard = createMockSetCard({ ArenaID: 2, Name: 'Red Card', Colors: ['R'] });
+      const blueCard = createMockSetCard({ ArenaID: '1', Name: 'Blue Card', Colors: ['U'] });
+      const redCard = createMockSetCard({ ArenaID: '2', Name: 'Red Card', Colors: ['R'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(blueCard);
         if (arenaID === '2') return Promise.resolve(redCard);
         return Promise.reject(new Error('Not found'));
@@ -396,10 +396,10 @@ describe('CardSearch Component', () => {
     });
 
     it('should filter colorless cards', async () => {
-      const colorlessCard = createMockSetCard({ ArenaID: 1, Name: 'Colorless Artifact', Colors: [] });
-      const coloredCard = createMockSetCard({ ArenaID: 2, Name: 'Blue Card', Colors: ['U'] });
+      const colorlessCard = createMockSetCard({ ArenaID: '1', Name: 'Colorless Artifact', Colors: [] });
+      const coloredCard = createMockSetCard({ ArenaID: '2', Name: 'Blue Card', Colors: ['U'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(colorlessCard);
         if (arenaID === '2') return Promise.resolve(coloredCard);
         return Promise.reject(new Error('Not found'));
@@ -432,10 +432,10 @@ describe('CardSearch Component', () => {
     });
 
     it('should filter multicolor cards', async () => {
-      const multicolorCard = createMockSetCard({ ArenaID: 1, Name: 'Multicolor', Colors: ['W', 'U'] });
-      const monoCard = createMockSetCard({ ArenaID: 2, Name: 'Mono Blue', Colors: ['U'] });
+      const multicolorCard = createMockSetCard({ ArenaID: '1', Name: 'Multicolor', Colors: ['W', 'U'] });
+      const monoCard = createMockSetCard({ ArenaID: '2', Name: 'Mono Blue', Colors: ['U'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(multicolorCard);
         if (arenaID === '2') return Promise.resolve(monoCard);
         return Promise.reject(new Error('Not found'));
@@ -470,10 +470,10 @@ describe('CardSearch Component', () => {
 
   describe('Type Filtering', () => {
     it('should filter by creature type', async () => {
-      const creature = createMockSetCard({ ArenaID: 1, Name: 'Grizzly Bear', Types: ['Creature'] });
-      const instant = createMockSetCard({ ArenaID: 2, Name: 'Lightning Bolt', Types: ['Instant'] });
+      const creature = createMockSetCard({ ArenaID: '1', Name: 'Grizzly Bear', Types: ['Creature'] });
+      const instant = createMockSetCard({ ArenaID: '2', Name: 'Lightning Bolt', Types: ['Instant'] });
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
         if (arenaID === '1') return Promise.resolve(creature);
         if (arenaID === '2') return Promise.resolve(instant);
         return Promise.reject(new Error('Not found'));
@@ -544,7 +544,7 @@ describe('CardSearch Component', () => {
 
   describe('Card Actions', () => {
     it('should add card to mainboard when add button clicked', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -569,7 +569,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should add card to sideboard when sideboard selected', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -598,7 +598,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should remove card when remove button clicked', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       const existingCards = new Map([[123, { quantity: 2, board: 'main' }]]);
@@ -630,7 +630,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should show card is in deck with badge', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       const existingCards = new Map([[123, { quantity: 3, board: 'sideboard' }]]);
@@ -657,7 +657,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should not show add button when all copies are in deck (draft mode)', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       // 2 copies in pool, 2 in deck
@@ -685,7 +685,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should display available quantity in draft mode', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       // 3 copies in pool, 1 in deck
@@ -713,13 +713,13 @@ describe('CardSearch Component', () => {
   describe('Result Display', () => {
     it('should display result count', async () => {
       const cards = [
-        createMockSetCard({ ArenaID: 1, Name: 'Card 1' }),
-        createMockSetCard({ ArenaID: 2, Name: 'Card 2' }),
-        createMockSetCard({ ArenaID: 3, Name: 'Card 3' }),
+        createMockSetCard({ ArenaID: '1', Name: 'Card 1' }),
+        createMockSetCard({ ArenaID: '2', Name: 'Card 2' }),
+        createMockSetCard({ ArenaID: '3', Name: 'Card 3' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID: string) => {
-        const index = parseInt(arenaID) - 1;
+      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
+        const index = parseInt(arenaID as string) - 1;
         return Promise.resolve(cards[index]);
       });
 
@@ -740,7 +740,7 @@ describe('CardSearch Component', () => {
 
     it('should display card image when available', async () => {
       const card = createMockSetCard({
-        ArenaID: 123,
+        ArenaID: '123',
         Name: 'Test Card',
         ImageURL: 'https://example.com/card.jpg',
       });
@@ -764,7 +764,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should display card type', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card', Types: ['Creature', 'Human'] });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card', Types: ['Creature', 'Human'] });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -787,7 +787,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should display mana cost', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card', ManaCost: '{3}{U}{U}' });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card', ManaCost: '{3}{U}{U}' });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(
@@ -806,7 +806,7 @@ describe('CardSearch Component', () => {
     });
 
     it('should display CMC', async () => {
-      const card = createMockSetCard({ ArenaID: 123, Name: 'Test Card', CMC: 5 });
+      const card = createMockSetCard({ ArenaID: '123', Name: 'Test Card', CMC: 5 });
       mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
 
       render(

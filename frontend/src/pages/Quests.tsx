@@ -26,28 +26,7 @@ const Quests = () => {
   const [pageSize] = useState(10);
 
   useEffect(() => {
-    loadQuestData();
-  }, [dateRange, customStartDate, customEndDate]);
-
-  // Listen for real-time updates
-  useEffect(() => {
-    const unsubscribeStats = EventsOn('stats:updated', () => {
-      console.log('Stats updated event received - reloading quest data');
-      loadQuestData();
-    });
-
-    const unsubscribeQuests = EventsOn('quest:updated', () => {
-      console.log('Quest updated event received - reloading quest data');
-      loadQuestData();
-    });
-
-    return () => {
-      if (unsubscribeStats) unsubscribeStats();
-      if (unsubscribeQuests) unsubscribeQuests();
-    };
-  }, [dateRange, customStartDate, customEndDate]);
-
-  const loadQuestData = async () => {
+    const loadQuestData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -113,8 +92,95 @@ const Quests = () => {
     }
   };
 
-  const formatDate = (timestamp: any) => {
-    return new Date(timestamp).toLocaleDateString();
+    loadQuestData();
+  }, [dateRange, customStartDate, customEndDate, historyLimit]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    const loadQuestData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Build date range for history and stats
+        let startDate = '';
+        let endDate = '';
+
+        if (dateRange === 'custom') {
+          startDate = customStartDate;
+          endDate = customEndDate;
+        } else if (dateRange !== 'all') {
+          const now = new Date();
+          const start = new Date();
+
+          switch (dateRange) {
+            case '7days':
+              start.setDate(now.getDate() - 7);
+              break;
+            case '30days':
+              start.setDate(now.getDate() - 30);
+              break;
+            case '90days':
+              start.setDate(now.getDate() - 90);
+              break;
+          }
+
+          startDate = start.toISOString().split('T')[0];
+          endDate = now.toISOString().split('T')[0];
+        }
+
+        // Load quest data sequentially with better error reporting
+        try {
+          const active = await GetActiveQuests();
+          setActiveQuests(active || []);
+        } catch (activeErr) {
+          console.error('Error loading active quests:', activeErr);
+          throw new Error(`Failed to load active quests: ${activeErr instanceof Error ? activeErr.message : String(activeErr)}`);
+        }
+
+        try {
+          console.log('Loading quest history with dates:', startDate, endDate, historyLimit);
+          const history = await GetQuestHistory(startDate, endDate, historyLimit);
+          console.log('Quest history loaded:', history?.length || 0, 'quests');
+          setQuestHistory(history || []);
+        } catch (historyErr) {
+          console.error('Error loading quest history:', historyErr);
+          throw new Error(`Failed to load quest history: ${historyErr instanceof Error ? historyErr.message : String(historyErr)}`);
+        }
+
+        try {
+          const account = await GetCurrentAccount();
+          setCurrentAccount(account);
+        } catch (accountErr) {
+          console.error('Error loading current account:', accountErr);
+          // Don't throw - account data is optional
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load quest data');
+        console.error('Error loading quest data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribeStats = EventsOn('stats:updated', () => {
+      console.log('Stats updated event received - reloading quest data');
+      loadQuestData();
+    });
+
+    const unsubscribeQuests = EventsOn('quest:updated', () => {
+      console.log('Quest updated event received - reloading quest data');
+      loadQuestData();
+    });
+
+    return () => {
+      if (unsubscribeStats) unsubscribeStats();
+      if (unsubscribeQuests) unsubscribeQuests();
+    };
+  }, [dateRange, customStartDate, customEndDate, historyLimit]);
+
+  const formatDate = (timestamp: unknown) => {
+    return new Date(String(timestamp)).toLocaleDateString();
   };
 
   const calculateProgress = (quest: models.Quest): number => {
@@ -123,11 +189,11 @@ const Quests = () => {
     return Math.min(progress, 100);
   };
 
-  const formatCompletionTime = (assignedAt: any, completedAt: any): string => {
+  const formatCompletionTime = (assignedAt: unknown, completedAt: unknown): string => {
     if (!completedAt) return 'N/A';
 
-    const assigned = new Date(assignedAt).getTime();
-    const completed = new Date(completedAt).getTime();
+    const assigned = new Date(String(assignedAt)).getTime();
+    const completed = new Date(String(completedAt)).getTime();
     const durationMs = completed - assigned;
 
     const hours = Math.floor(durationMs / (1000 * 60 * 60));

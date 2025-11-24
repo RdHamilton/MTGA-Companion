@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { GetCardByArenaID } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 import './DeckList.css';
 
 interface DeckListProps {
   deck: models.Deck;
   cards: models.DeckCard[];
   tags?: models.DeckTag[];
-  statistics?: any; // DeckStatistics from backend
+  statistics?: gui.DeckStatistics;
   onRemoveCard?: (cardID: number, board: string) => void;
   onCardHover?: (card: models.SetCard) => void;
 }
@@ -63,12 +63,23 @@ export default function DeckList({
   onCardHover,
 }: DeckListProps) {
   const [cardsWithMetadata, setCardsWithMetadata] = useState<CardWithMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cards.length > 0);
   const [showSideboard, setShowSideboard] = useState(false);
 
   // Load card metadata for all cards
   useEffect(() => {
+    let isMounted = true;
+
     const loadMetadata = async () => {
+      // Handle empty cards case
+      if (cards.length === 0) {
+        if (isMounted) {
+          setCardsWithMetadata([]);
+          setLoading(false);
+        }
+        return;
+      }
+
       setLoading(true);
       const withMetadata: CardWithMetadata[] = [];
 
@@ -82,15 +93,17 @@ export default function DeckList({
         }
       }
 
-      setCardsWithMetadata(withMetadata);
-      setLoading(false);
+      if (isMounted) {
+        setCardsWithMetadata(withMetadata);
+        setLoading(false);
+      }
     };
 
-    if (cards.length > 0) {
-      loadMetadata();
-    } else {
-      setLoading(false);
-    }
+    loadMetadata();
+
+    return () => {
+      isMounted = false;
+    };
   }, [cards]);
 
   // Group cards by type (mainboard only)

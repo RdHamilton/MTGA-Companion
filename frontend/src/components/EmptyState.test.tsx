@@ -159,8 +159,8 @@ describe('EmptyState', () => {
         />
       );
 
-      const container = document.querySelector('.empty-state');
-      const icon = document.querySelector('.empty-state-icon');
+      const container = document.querySelector('.empty-state') as HTMLElement | null;
+      const icon = document.querySelector('.empty-state-icon') as HTMLElement | null;
       const title = screen.getByText('Not Found');
       const message = screen.getByText('Search returned no results.');
       const helpText = screen.getByText('Try different search terms.');

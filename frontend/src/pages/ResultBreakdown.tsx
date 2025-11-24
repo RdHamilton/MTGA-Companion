@@ -16,10 +16,7 @@ const ResultBreakdown = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMetrics();
-  }, [dateRange, customStartDate, customEndDate, format]);
-
-  const loadMetrics = async () => {
+    const loadMetrics = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -80,6 +77,9 @@ const ResultBreakdown = () => {
       setLoading(false);
     }
   };
+
+    loadMetrics();
+  }, [dateRange, customStartDate, customEndDate, format]);
 
   const formatWinRate = (winRate: number) => {
     return `${Math.round(winRate * 100 * 10) / 10}%`;

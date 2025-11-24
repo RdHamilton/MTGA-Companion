@@ -108,7 +108,7 @@ function analyzeColors(pickedCards: models.SetCard[]): ColorSynergy {
 
     // Find dominant colors (appearing in 30%+ of cards)
     const dominantColors = Array.from(colorCount.entries())
-        .filter(([_, count]) => (count / pickedCards.length) >= 0.3)
+        .filter(([, count]) => (count / pickedCards.length) >= 0.3)
         .sort((a, b) => b[1] - a[1])
         .map(([color]) => color);
 

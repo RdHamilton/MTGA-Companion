@@ -39,7 +39,7 @@ const Footer = () => {
         });
 
         // Format last match time
-        const lastMatchDate = new Date(matches[0].Timestamp as any);
+        const lastMatchDate = new Date(matches[0].Timestamp as string);
         setLastMatch(lastMatchDate.toLocaleString());
       }
     } catch (err) {

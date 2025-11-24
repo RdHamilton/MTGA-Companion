@@ -4,7 +4,20 @@ import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandalo
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
+import { gui } from '../../wailsjs/go/models';
 import './Settings.css';
+
+// Interface for daemon log replay progress (different from gui.ReplayStatus)
+interface LogReplayProgress {
+  processedFiles?: number;
+  totalFiles?: number;
+  totalEntries?: number;
+  matchesImported?: number;
+  decksImported?: number;
+  questsImported?: number;
+  duration?: number;
+  currentFile?: string;
+}
 
 const Settings = () => {
   const [dbPath, setDbPath] = useState('');
@@ -15,7 +28,7 @@ const Settings = () => {
   const [showAbout, setShowAbout] = useState(false);
 
   // Daemon settings
-  const [connectionStatus, setConnectionStatus] = useState<any>({
+  const [connectionStatus, setConnectionStatus] = useState<Record<string, unknown>>({
     status: 'standalone',
     connected: false,
     mode: 'standalone',
@@ -29,12 +42,12 @@ const Settings = () => {
   // Replay logs settings
   const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
   const [isReplaying, setIsReplaying] = useState(false);
-  const [replayProgress, setReplayProgress] = useState<any>(null);
+  const [replayProgress, setReplayProgress] = useState<LogReplayProgress | null>(null);
 
   // Replay tool settings - use global state for active/paused to persist across navigation
   const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
   const [replayToolPaused, setReplayToolPaused] = useState(getReplayState().isPaused);
-  const [replayToolProgress, setReplayToolProgress] = useState<any>(getReplayState().progress);
+  const [replayToolProgress, setReplayToolProgress] = useState<gui.ReplayStatus | null>(getReplayState().progress);
   const [replaySpeed, setReplaySpeed] = useState(1.0);
   const [replayFilter, setReplayFilter] = useState('all');
   const [pauseOnDraft, setPauseOnDraft] = useState(false);
@@ -82,28 +95,28 @@ const Settings = () => {
 
   // Listen for replay events
   useEffect(() => {
-    const unsubscribeStarted = EventsOn('replay:started', (data: any) => {
+    const unsubscribeStarted = EventsOn('replay:started', (data: unknown) => {
       console.log('Replay started:', data);
       setIsReplaying(true);
       setReplayProgress(null);
     });
 
-    const unsubscribeProgress = EventsOn('replay:progress', (data: any) => {
+    const unsubscribeProgress = EventsOn('replay:progress', (data: unknown) => {
       console.log('Replay progress:', data);
-      setReplayProgress(data);
+      setReplayProgress(data as LogReplayProgress);
     });
 
-    const unsubscribeCompleted = EventsOn('replay:completed', (data: any) => {
+    const unsubscribeCompleted = EventsOn('replay:completed', (data: unknown) => {
       console.log('Replay completed:', data);
       setIsReplaying(false);
-      setReplayProgress(data);
+      setReplayProgress(data as LogReplayProgress);
       // Keep progress visible for a moment, then reload using Wails native method
       setTimeout(() => {
         WindowReloadApp(); // Refresh to show updated data
       }, 2000);
     });
 
-    const unsubscribeError = EventsOn('replay:error', (data: any) => {
+    const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
       console.error('Replay error:', data);
       setIsReplaying(false);
       // Error will be logged to console

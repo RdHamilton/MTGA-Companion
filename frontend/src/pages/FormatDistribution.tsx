@@ -24,10 +24,7 @@ const FormatDistribution = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadFormatStats();
-  }, [dateRange, customStartDate, customEndDate]);
-
-  const loadFormatStats = async () => {
+    const loadFormatStats = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -86,6 +83,9 @@ const FormatDistribution = () => {
       setLoading(false);
     }
   };
+
+    loadFormatStats();
+  }, [dateRange, customStartDate, customEndDate]);
 
   const formatWinRate = (winRate: number) => {
     return `${Math.round(winRate * 100 * 10) / 10}%`;

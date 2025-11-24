@@ -118,7 +118,7 @@ describe('Tooltip', () => {
 
   describe('Keyboard Interaction', () => {
     it('should show tooltip on focus after delay', () => {
-      const { container } = render(
+      render(
         <Tooltip content="Focus tooltip">
           <button>Focusable</button>
         </Tooltip>
@@ -475,7 +475,7 @@ describe('Tooltip', () => {
         vi.advanceTimersByTime(300);
       });
 
-      const tooltipContent = container.querySelector('.tooltip-content');
+      const tooltipContent = container.querySelector('.tooltip-content') as HTMLElement | null;
       expect(tooltipContainer).toContainElement(tooltipContent);
     });
   });
@@ -548,7 +548,7 @@ describe('Tooltip', () => {
 
   describe('Edge Cases', () => {
     it('should handle rapid hover events', () => {
-      const { container } = render(
+      render(
         <Tooltip content="Rapid hover">
           <button>Button</button>
         </Tooltip>

@@ -31,22 +31,22 @@ const DraftStatistics: React.FC<DraftStatisticsProps> = ({ sessionID, pickCount 
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        const loadMetrics = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const data = await GetDraftDeckMetrics(sessionID);
+                setMetrics(data);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to load metrics');
+                console.error('Error loading draft metrics:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         loadMetrics();
     }, [sessionID, pickCount]); // Reload when session or pick count changes
-
-    const loadMetrics = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await GetDraftDeckMetrics(sessionID);
-            setMetrics(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load metrics');
-            console.error('Error loading draft metrics:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (loading) {
         return (

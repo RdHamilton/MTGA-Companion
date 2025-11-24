@@ -16,42 +16,14 @@ import DeckBuilder from './pages/DeckBuilder';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import { EventsOn } from '../wailsjs/runtime/runtime';
+import { updateReplayState } from './utils/replayState';
+import { gui } from '../wailsjs/go/models';
 import './App.css';
 
-// Global replay state context
-export interface ReplayState {
-  isActive: boolean;
-  isPaused: boolean;
-  progress: any;
-}
-
-const initialReplayState: ReplayState = {
-  isActive: false,
-  isPaused: false,
-  progress: null,
-};
-
-// Global replay state - accessible across all components
-let globalReplayState: ReplayState = { ...initialReplayState };
-const replayStateListeners: Array<(state: ReplayState) => void> = [];
-
-export const getReplayState = (): ReplayState => globalReplayState;
-
-export const subscribeToReplayState = (listener: (state: ReplayState) => void): (() => void) => {
-  replayStateListeners.push(listener);
-  return () => {
-    const index = replayStateListeners.indexOf(listener);
-    if (index > -1) {
-      replayStateListeners.splice(index, 1);
-    }
-  };
-};
-
-const updateReplayState = (updates: Partial<ReplayState>) => {
-  globalReplayState = { ...globalReplayState, ...updates };
-  console.log('[Global Replay State] Updated:', globalReplayState, 'Listeners:', replayStateListeners.length);
-  replayStateListeners.forEach(listener => listener(globalReplayState));
-};
+// Re-export for backward compatibility - these are used by other components
+// eslint-disable-next-line react-refresh/only-export-components
+export { getReplayState, subscribeToReplayState } from './utils/replayState';
+export type { ReplayState } from './utils/replayState';
 
 // Component that handles global replay events
 function ReplayEventHandler() {
@@ -62,7 +34,7 @@ function ReplayEventHandler() {
     console.log('[ReplayEventHandler] Setting up global replay event listeners');
 
     // Listen for replay events and update global state
-    const unsubscribeStarted = EventsOn('replay:started', (data: any) => {
+    const unsubscribeStarted = EventsOn('replay:started', (data: gui.ReplayStatus) => {
       console.log('[ReplayEventHandler] Replay started:', data);
       updateReplayState({
         isActive: true,
@@ -72,14 +44,14 @@ function ReplayEventHandler() {
       setHasShownDraftNotification(false);
     });
 
-    const unsubscribeProgress = EventsOn('replay:progress', (data: any) => {
+    const unsubscribeProgress = EventsOn('replay:progress', (data: gui.ReplayStatus) => {
       console.log('[ReplayEventHandler] Replay progress:', data);
       updateReplayState({
         progress: data,
       });
     });
 
-    const unsubscribePaused = EventsOn('replay:paused', (data: any) => {
+    const unsubscribePaused = EventsOn('replay:paused', (data: gui.ReplayStatus) => {
       console.log('[ReplayEventHandler] ✅✅✅ Replay paused EVENT RECEIVED:', data);
       console.log('[ReplayEventHandler] About to update state to isPaused=true');
       updateReplayState({
@@ -88,14 +60,14 @@ function ReplayEventHandler() {
       console.log('[ReplayEventHandler] State update called');
     });
 
-    const unsubscribeResumed = EventsOn('replay:resumed', (data: any) => {
+    const unsubscribeResumed = EventsOn('replay:resumed', (data: gui.ReplayStatus) => {
       console.log('[ReplayEventHandler] Replay resumed:', data);
       updateReplayState({
         isPaused: false,
       });
     });
 
-    const unsubscribeCompleted = EventsOn('replay:completed', (data: any) => {
+    const unsubscribeCompleted = EventsOn('replay:completed', (data: gui.ReplayStatus) => {
       console.log('[ReplayEventHandler] Replay completed:', data);
       updateReplayState({
         isActive: false,
@@ -105,7 +77,7 @@ function ReplayEventHandler() {
       setHasShownDraftNotification(false);
     });
 
-    const unsubscribeDraftDetected = EventsOn('replay:draft_detected', (data: any) => {
+    const unsubscribeDraftDetected = EventsOn('replay:draft_detected', (data: unknown) => {
       console.log('[ReplayEventHandler] Draft detected during replay:', data);
 
       // Automatically navigate to Draft tab
@@ -120,7 +92,7 @@ function ReplayEventHandler() {
       }
     });
 
-    const unsubscribeError = EventsOn('replay:error', (data: any) => {
+    const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
       console.error('[ReplayEventHandler] Replay error:', data);
       updateReplayState({
         isActive: false,

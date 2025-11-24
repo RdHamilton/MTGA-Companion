@@ -28,7 +28,7 @@ export default function DeckBuilder() {
   const [deck, setDeck] = useState<models.Deck | null>(null);
   const [cards, setCards] = useState<models.DeckCard[]>([]);
   const [tags, setTags] = useState<models.DeckTag[]>([]);
-  const [statistics, setStatistics] = useState<any>(null);
+  const [statistics, setStatistics] = useState<gui.DeckStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCardSearch, setShowCardSearch] = useState(false);
@@ -71,7 +71,7 @@ export default function DeckBuilder() {
                 GetCompletedDraftSessions(100), // Get last 100 completed drafts
               ]);
               const allSessions = [...activeSessions, ...completedSessions];
-              const session = allSessions.find((s: any) => s.ID === draftEventID);
+              const session = allSessions.find((s) => s.ID === draftEventID);
 
               if (!session) {
                 setError('Draft session not found');
@@ -148,23 +148,19 @@ export default function DeckBuilder() {
   const handleAddCard = async (cardID: number, quantity: number, board: 'main' | 'sideboard') => {
     if (!deck) return;
 
-    try {
-      await AddCard(deck.ID, cardID, quantity, board, deck.Source === 'draft');
+    await AddCard(deck.ID, cardID, quantity, board, deck.Source === 'draft');
 
-      // Reload deck data
-      const deckData = await GetDeck(deck.ID);
-      setCards(deckData.cards || []);
+    // Reload deck data
+    const deckData = await GetDeck(deck.ID);
+    setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await GetDeckStatistics(deck.ID);
-      setStatistics(stats);
+    // Reload statistics
+    const stats = await GetDeckStatistics(deck.ID);
+    setStatistics(stats);
 
-      // Reload recommendations after adding a card
-      if (deckData.cards && deckData.cards.length >= 3) {
-        loadRecommendations();
-      }
-    } catch (err) {
-      throw err; // Re-throw to let CardSearch handle the error
+    // Reload recommendations after adding a card
+    if (deckData.cards && deckData.cards.length >= 3) {
+      loadRecommendations();
     }
   };
 
@@ -227,26 +223,26 @@ export default function DeckBuilder() {
     setAddingLands(true);
     try {
       // Use statistics colors if available (backend returns colors, not colorDistribution)
-      const colors = (statistics as any).colors || {};
+      const colors = statistics.colors;
       console.log('Full statistics object:', statistics);
       console.log('Color distribution from backend:', colors);
 
       // Calculate color distribution from mainboard cards
       // Only count mono-colored cards for land distribution
       const colorCounts = {
-        W: colors.white || 0,
-        U: colors.blue || 0,
-        B: colors.black || 0,
-        R: colors.red || 0,
-        G: colors.green || 0,
+        W: colors?.white || 0,
+        U: colors?.blue || 0,
+        B: colors?.black || 0,
+        R: colors?.red || 0,
+        G: colors?.green || 0,
       };
 
       console.log('Color counts (mono-colored only):', colorCounts);
       console.log('Color counts after assignment - W:', colorCounts.W, 'U:', colorCounts.U, 'B:', colorCounts.B, 'R:', colorCounts.R, 'G:', colorCounts.G);
 
       // Get backend's land recommendation
-      const currentLands = ((statistics as any).lands?.total) || 0;
-      const recommendedLands = ((statistics as any).lands?.recommended) || 0;
+      const currentLands = statistics.lands?.total || 0;
+      const recommendedLands = statistics.lands?.recommended || 0;
       console.log('Deck stats:', { currentLands, recommendedLands });
 
       if (recommendedLands === 0) {
@@ -297,7 +293,7 @@ export default function DeckBuilder() {
       });
 
       // Second pass: distribute remaining lands to most prominent colors
-      let remaining = landsNeeded - landsAllocated;
+      const remaining = landsNeeded - landsAllocated;
       const sortedColors = Object.keys(colorCounts).sort(
         (a, b) => colorCounts[b as keyof typeof colorCounts] - colorCounts[a as keyof typeof colorCounts]
       );
@@ -431,7 +427,7 @@ export default function DeckBuilder() {
             deck={deck}
             cards={cards}
             tags={tags}
-            statistics={statistics}
+            statistics={statistics ?? undefined}
             onRemoveCard={handleRemoveCard}
           />
         </div>

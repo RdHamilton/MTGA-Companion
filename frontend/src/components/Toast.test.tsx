@@ -209,9 +209,9 @@ describe('Toast', () => {
     it('should maintain correct DOM hierarchy', () => {
       const { container } = render(<Toast message="Hierarchy" type="info" />);
 
-      const toast = container.querySelector('.toast');
-      const icon = container.querySelector('.toast-icon');
-      const message = container.querySelector('.toast-message');
+      const toast = container.querySelector('.toast') as HTMLElement | null;
+      const icon = container.querySelector('.toast-icon') as HTMLElement | null;
+      const message = container.querySelector('.toast-message') as HTMLElement | null;
 
       expect(toast).toContainElement(icon);
       expect(toast).toContainElement(message);

@@ -26,10 +26,7 @@ const RankProgression = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTimeline();
-  }, [dateRange]);
-
-  const loadTimeline = async () => {
+    const loadTimeline = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -63,6 +60,9 @@ const RankProgression = () => {
       setLoading(false);
     }
   };
+
+    loadTimeline();
+  }, [dateRange]);
 
   // Convert rank to numeric value for charting
   const rankToNumeric = (rankClass: string | null | undefined, rankLevel: number | null | undefined): number => {
@@ -102,7 +102,7 @@ const RankProgression = () => {
 
   // Transform data for Recharts
   const chartData = timeline.map(point => ({
-    timestamp: new Date(point.timestamp as any).toLocaleDateString(),
+    timestamp: new Date(point.timestamp as unknown as string).toLocaleDateString(),
     rankValue: rankToNumeric(point.rank_class || null, point.rank_level || null),
     rankDisplay: point.rank,
     isChange: point.is_change
@@ -237,11 +237,11 @@ const RankProgression = () => {
                 <Tooltip
                   contentStyle={{ backgroundColor: '#2d2d2d', border: '1px solid #3d3d3d' }}
                   labelStyle={{ color: '#ffffff' }}
-                  formatter={(value: any, name: string) => {
+                  formatter={(value: unknown, name: string) => {
                     if (name === 'Rank') {
                       return numericToRank(value as number);
                     }
-                    return value;
+                    return String(value);
                   }}
                 />
                 <Legend />
@@ -264,7 +264,7 @@ const RankProgression = () => {
               {timeline.slice().reverse().map((point, index) => (
                 <div key={index} className={`timeline-item ${point.is_change ? 'changed' : ''}`}>
                   <div className="timeline-date">
-                    {new Date(point.timestamp as any).toLocaleString()}
+                    {new Date(point.timestamp as unknown as string).toLocaleString()}
                   </div>
                   <div className="timeline-rank">
                     {point.rank}
