@@ -74,6 +74,7 @@ type ScoreFactors struct {
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
 	cardService *cards.Service
+	setCardRepo repository.SetCardRepository // For faster lookups from local DB
 	ratingsRepo repository.DraftRatingsRepository
 }
 
@@ -81,6 +82,15 @@ type RuleBasedEngine struct {
 func NewRuleBasedEngine(cardService *cards.Service, ratingsRepo repository.DraftRatingsRepository) *RuleBasedEngine {
 	return &RuleBasedEngine{
 		cardService: cardService,
+		ratingsRepo: ratingsRepo,
+	}
+}
+
+// NewRuleBasedEngineWithSetRepo creates a new rule-based recommendation engine with SetCardRepo support.
+func NewRuleBasedEngineWithSetRepo(cardService *cards.Service, setCardRepo repository.SetCardRepository, ratingsRepo repository.DraftRatingsRepository) *RuleBasedEngine {
+	return &RuleBasedEngine{
+		cardService: cardService,
+		setCardRepo: setCardRepo,
 		ratingsRepo: ratingsRepo,
 	}
 }
@@ -116,14 +126,34 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 	if filters.OnlyDraftPool && len(filters.DraftPool) > 0 {
 		// For draft decks, only consider draft pool
 		log.Printf("Debug: Fetching %d cards from draft pool", len(filters.DraftPool))
-		cardMap, err := e.cardService.GetCards(filters.DraftPool)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get draft cards: %w", err)
-		}
-		log.Printf("Debug: Got %d cards from cardService", len(cardMap))
-		candidates = make([]*cards.Card, 0, len(cardMap))
-		for _, card := range cardMap {
-			candidates = append(candidates, card)
+
+		// Try SetCardRepo first (faster, has cards from log parsing)
+		if e.setCardRepo != nil {
+			log.Printf("Debug: Using SetCardRepo to fetch draft pool cards")
+			candidates = make([]*cards.Card, 0, len(filters.DraftPool))
+			for _, arenaID := range filters.DraftPool {
+				setCard, err := e.setCardRepo.GetCardByArenaID(ctx, fmt.Sprintf("%d", arenaID))
+				if err == nil && setCard != nil {
+					// Convert setCard to cards.Card
+					card := convertSetCardToCardsCard(setCard)
+					candidates = append(candidates, card)
+				} else {
+					log.Printf("Debug: Card %d not found in SetCardRepo: %v", arenaID, err)
+				}
+			}
+			log.Printf("Debug: Got %d cards from SetCardRepo", len(candidates))
+		} else {
+			// Fallback to CardService (Scryfall API)
+			log.Printf("Debug: SetCardRepo not available, using CardService")
+			cardMap, err := e.cardService.GetCards(filters.DraftPool)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get draft cards: %w", err)
+			}
+			log.Printf("Debug: Got %d cards from cardService", len(cardMap))
+			candidates = make([]*cards.Card, 0, len(cardMap))
+			for _, card := range cardMap {
+				candidates = append(candidates, card)
+			}
 		}
 		log.Printf("Debug: Built %d candidate cards", len(candidates))
 	} else {
@@ -950,4 +980,55 @@ func extractTypesFromTypeLine(typeLine string) []string {
 	}
 
 	return types
+}
+
+// convertSetCardToCardsCard converts a models.SetCard to a cards.Card.
+// This allows us to use SetCardRepo data in the recommendation engine.
+func convertSetCardToCardsCard(setCard *models.SetCard) *cards.Card {
+	if setCard == nil {
+		return nil
+	}
+
+	// Parse ArenaID from string to int
+	arenaID := 0
+	_, _ = fmt.Sscanf(setCard.ArenaID, "%d", &arenaID)
+
+	// Build TypeLine from Types array
+	typeLine := ""
+	if len(setCard.Types) > 0 {
+		typeLine = setCard.Types[0]
+		for i := 1; i < len(setCard.Types); i++ {
+			typeLine += " " + setCard.Types[i]
+		}
+	}
+
+	card := &cards.Card{
+		ArenaID:    arenaID,
+		ScryfallID: setCard.ScryfallID,
+		Name:       setCard.Name,
+		TypeLine:   typeLine,
+		SetCode:    setCard.SetCode,
+		CMC:        float64(setCard.CMC),
+		Colors:     setCard.Colors,
+		Rarity:     setCard.Rarity,
+	}
+
+	// Convert string fields to *string where needed
+	if setCard.ManaCost != "" {
+		card.ManaCost = &setCard.ManaCost
+	}
+	if setCard.Power != "" {
+		card.Power = &setCard.Power
+	}
+	if setCard.Toughness != "" {
+		card.Toughness = &setCard.Toughness
+	}
+	if setCard.Text != "" {
+		card.OracleText = &setCard.Text
+	}
+	if setCard.ImageURL != "" {
+		card.ImageURI = &setCard.ImageURL
+	}
+
+	return card
 }

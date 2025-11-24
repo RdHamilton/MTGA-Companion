@@ -109,10 +109,11 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	// Initialize DeckExporter (uses CardService as CardProvider)
 	s.services.DeckExporter = deckexport.NewExporter(cardService)
 
-	// Initialize RecommendationEngine (depends on CardService and DraftRatingsRepo)
+	// Initialize RecommendationEngine (depends on CardService, SetCardRepo, and DraftRatingsRepo)
 	ratingsRepo := s.services.Storage.DraftRatingsRepo()
-	log.Printf("Debug: cardService=%v, ratingsRepo=%v", cardService, ratingsRepo)
-	s.services.RecommendationEngine = recommendations.NewRuleBasedEngine(cardService, ratingsRepo)
+	setCardRepo := s.services.Storage.SetCardRepo()
+	log.Printf("Debug: cardService=%v, setCardRepo=%v, ratingsRepo=%v", cardService, setCardRepo, ratingsRepo)
+	s.services.RecommendationEngine = recommendations.NewRuleBasedEngineWithSetRepo(cardService, setCardRepo, ratingsRepo)
 	log.Printf("Debug: RecommendationEngine initialized: %v", s.services.RecommendationEngine)
 
 	log.Println("Card services initialized successfully")
