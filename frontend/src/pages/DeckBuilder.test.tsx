@@ -73,16 +73,10 @@ describe('DeckBuilder Component - Export and Validate', () => {
   });
 
   describe('Export Deck Functionality', () => {
-    it('should export deck to clipboard when Export button is clicked', async () => {
+    it('should call ExportDeckToFile when Export button is clicked', async () => {
       const mockDeck = createMockDeck();
       const mockCards = [createMockDeckCard()];
       const mockStats = createMockDeckStatistics();
-      const mockExportResponse = new gui.ExportDeckResponse({
-        content: 'Deck\n1 Test Card (SET) 123',
-        filename: 'test-deck.txt',
-        format: 'arena',
-        error: '',
-      });
 
       mockWailsApp.GetDeck.mockResolvedValue({
         deck: mockDeck,
@@ -90,11 +84,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
         tags: [],
       });
       mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ExportDeck.mockResolvedValue(mockExportResponse);
-      mockWailsRuntime.ClipboardSetText.mockResolvedValue(true);
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      mockWailsApp.ExportDeckToFile.mockResolvedValue();
 
       render(<DeckBuilder />);
 
@@ -107,63 +97,11 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const exportButton = screen.getByRole('button', { name: /Export/i });
       await userEvent.click(exportButton);
 
-      // Verify ExportDeck was called with correct parameters
+      // Verify ExportDeckToFile was called with correct deck ID
+      // Backend handles the native file dialog and saving
       await waitFor(() => {
-        expect(mockWailsApp.ExportDeck).toHaveBeenCalledWith({
-          deckID: 'test-deck-id',
-          format: 'arena',
-          includeHeaders: true,
-          includeStats: false,
-        });
+        expect(mockWailsApp.ExportDeckToFile).toHaveBeenCalledWith('test-deck-id');
       });
-
-      // Verify clipboard was updated
-      expect(mockWailsRuntime.ClipboardSetText).toHaveBeenCalledWith('Deck\n1 Test Card (SET) 123');
-
-      // Verify success alert was shown
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Deck exported to clipboard!')
-      );
-
-      alertSpy.mockRestore();
-    });
-
-    it('should show error alert when export fails', async () => {
-      const mockDeck = createMockDeck();
-      const mockCards = [createMockDeckCard()];
-      const mockStats = createMockDeckStatistics();
-      const mockExportResponse = new gui.ExportDeckResponse({
-        content: '',
-        filename: '',
-        format: '',
-        error: 'Failed to export deck',
-      });
-
-      mockWailsApp.GetDeck.mockResolvedValue({
-        deck: mockDeck,
-        cards: mockCards,
-        tags: [],
-      });
-      mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ExportDeck.mockResolvedValue(mockExportResponse);
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
-      render(<DeckBuilder />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Test Deck')).toBeInTheDocument();
-      });
-
-      const exportButton = screen.getByRole('button', { name: /Export/i });
-      await userEvent.click(exportButton);
-
-      await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Export failed: Failed to export deck');
-      });
-
-      alertSpy.mockRestore();
     });
 
     it('should handle export exception gracefully', async () => {
@@ -177,10 +115,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
         tags: [],
       });
       mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ExportDeck.mockRejectedValue(new Error('Network error'));
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      mockWailsApp.ExportDeckToFile.mockRejectedValue(new Error('Failed to show file dialog'));
 
       render(<DeckBuilder />);
 
@@ -191,11 +126,10 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const exportButton = screen.getByRole('button', { name: /Export/i });
       await userEvent.click(exportButton);
 
+      // Error is logged to console, no alert shown to user (backend handles dialogs)
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Network error');
+        expect(mockWailsApp.ExportDeckToFile).toHaveBeenCalled();
       });
-
-      alertSpy.mockRestore();
     });
 
     it('should not export when no deck is loaded', async () => {
@@ -218,7 +152,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
   });
 
   describe('Validate Deck Functionality', () => {
-    it('should validate deck successfully when Validate button is clicked', async () => {
+    it('should call ValidateDeckWithDialog when Validate button is clicked', async () => {
       const mockDeck = createMockDeck();
       const mockCards = [createMockDeckCard()];
       const mockStats = createMockDeckStatistics();
@@ -229,10 +163,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
         tags: [],
       });
       mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ValidateDraftDeck.mockResolvedValue(true);
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      mockWailsApp.ValidateDeckWithDialog.mockResolvedValue();
 
       render(<DeckBuilder />);
 
@@ -244,51 +175,11 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const validateButton = screen.getByRole('button', { name: /Validate/i });
       await userEvent.click(validateButton);
 
-      // Verify ValidateDraftDeck was called
+      // Verify ValidateDeckWithDialog was called with correct deck ID
+      // Backend handles validation and shows native dialog
       await waitFor(() => {
-        expect(mockWailsApp.ValidateDraftDeck).toHaveBeenCalledWith('test-deck-id');
+        expect(mockWailsApp.ValidateDeckWithDialog).toHaveBeenCalledWith('test-deck-id');
       });
-
-      // Verify success alert was shown
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✓ Deck is valid!')
-      );
-
-      alertSpy.mockRestore();
-    });
-
-    it('should show invalid message when deck validation fails', async () => {
-      const mockDeck = createMockDeck();
-      const mockCards = [createMockDeckCard()];
-      const mockStats = createMockDeckStatistics();
-
-      mockWailsApp.GetDeck.mockResolvedValue({
-        deck: mockDeck,
-        cards: mockCards,
-        tags: [],
-      });
-      mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ValidateDraftDeck.mockResolvedValue(false);
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
-      render(<DeckBuilder />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Test Deck')).toBeInTheDocument();
-      });
-
-      const validateButton = screen.getByRole('button', { name: /Validate/i });
-      await userEvent.click(validateButton);
-
-      await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          expect.stringContaining('✗ Deck is invalid')
-        );
-      });
-
-      alertSpy.mockRestore();
     });
 
     it('should handle validation exception gracefully', async () => {
@@ -302,10 +193,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
         tags: [],
       });
       mockWailsApp.GetDeckStatistics.mockResolvedValue(mockStats);
-      mockWailsApp.ValidateDraftDeck.mockRejectedValue(new Error('Validation service unavailable'));
-
-      // Mock window.alert
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      mockWailsApp.ValidateDeckWithDialog.mockRejectedValue(new Error('Validation service unavailable'));
 
       render(<DeckBuilder />);
 
@@ -316,11 +204,10 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const validateButton = screen.getByRole('button', { name: /Validate/i });
       await userEvent.click(validateButton);
 
+      // Error is logged to console, no alert shown to user (backend handles dialogs)
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Validation service unavailable');
+        expect(mockWailsApp.ValidateDeckWithDialog).toHaveBeenCalled();
       });
-
-      alertSpy.mockRestore();
     });
   });
 

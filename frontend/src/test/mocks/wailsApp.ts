@@ -46,6 +46,7 @@ export const mockWailsApp = {
   ResumeReplay: vi.fn(() => Promise.resolve()),
   StopReplay: vi.fn(() => Promise.resolve()),
   ValidateDraftDeck: vi.fn(() => Promise.resolve(true)),
+  ValidateDeckWithDialog: vi.fn(() => Promise.resolve()),
   AddCard: vi.fn(() => Promise.resolve()),
   RemoveCard: vi.fn(() => Promise.resolve()),
   GetDeck: vi.fn(() => Promise.resolve({} as any)),
@@ -53,6 +54,7 @@ export const mockWailsApp = {
   GetDeckByDraftEvent: vi.fn(() => Promise.resolve({} as any)),
   CreateDeck: vi.fn(() => Promise.resolve({} as any)),
   GetRecommendations: vi.fn(() => Promise.resolve({} as any)),
+  ExportDeckToFile: vi.fn(() => Promise.resolve()),
 };
 
 export function resetMocks() {
