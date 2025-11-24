@@ -103,6 +103,8 @@ export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribu
 
 export function GetFormatInsights(arg1:string,arg2:string):Promise<insights.FormatInsights>;
 
+export function GetLogReplayProgress():Promise<gui.LogReplayProgress>;
+
 export function GetMatchGames(arg1:string):Promise<Array<models.Game>>;
 
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;

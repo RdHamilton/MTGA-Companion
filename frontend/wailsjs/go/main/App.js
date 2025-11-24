@@ -186,6 +186,10 @@ export function GetFormatInsights(arg1, arg2) {
   return window['go']['main']['App']['GetFormatInsights'](arg1, arg2);
 }
 
+export function GetLogReplayProgress() {
+  return window['go']['main']['App']['GetLogReplayProgress']();
+}
+
 export function GetMatchGames(arg1) {
   return window['go']['main']['App']['GetMatchGames'](arg1);
 }

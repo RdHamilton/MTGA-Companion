@@ -596,7 +596,7 @@ func (s *SystemFacade) SwitchToDaemonMode(ctx context.Context) error {
 	return nil
 }
 
-// ReplayStatus represents the current state of the replay engine.
+// ReplayStatus represents the current state of the replay engine (replay tool).
 type ReplayStatus struct {
 	IsActive        bool    `json:"isActive"`
 	IsPaused        bool    `json:"isPaused"`
@@ -606,6 +606,25 @@ type ReplayStatus struct {
 	Elapsed         float64 `json:"elapsed"`
 	Speed           float64 `json:"speed"`
 	Filter          string  `json:"filter"`
+}
+
+// LogReplayProgress represents progress during daemon log replay/recovery.
+// This is used for bulk import of historical log files.
+type LogReplayProgress struct {
+	TotalFiles       int     `json:"totalFiles"`
+	ProcessedFiles   int     `json:"processedFiles"`
+	CurrentFile      string  `json:"currentFile"`
+	TotalEntries     int     `json:"totalEntries"`
+	ProcessedEntries int     `json:"processedEntries"`
+	PercentComplete  float64 `json:"percentComplete"`
+	// Import results (populated on completion)
+	MatchesImported int     `json:"matchesImported"`
+	DecksImported   int     `json:"decksImported"`
+	QuestsImported  int     `json:"questsImported"`
+	DraftsImported  int     `json:"draftsImported"`
+	Duration        float64 `json:"duration"`
+	// Error information
+	Error string `json:"error,omitempty"`
 }
 
 // TriggerReplayLogs sends a command to the daemon to replay historical logs.
@@ -792,6 +811,13 @@ func (s *SystemFacade) GetReplayStatus(ctx context.Context) (*ReplayStatus, erro
 	// The UI should subscribe to 'replay:*' WebSocket events for real-time updates.
 	// Session status management is handled by the daemon's log processor, not the frontend.
 	return &ReplayStatus{IsActive: false}, nil
+}
+
+// GetLogReplayProgress returns an empty LogReplayProgress struct.
+// This method exists to expose the type to Wails for TypeScript code generation.
+// Actual progress is delivered via 'replay:progress' events.
+func (s *SystemFacade) GetLogReplayProgress(ctx context.Context) (*LogReplayProgress, error) {
+	return &LogReplayProgress{}, nil
 }
 
 // localFirstCardProvider implements deckexport.CardProvider by checking
