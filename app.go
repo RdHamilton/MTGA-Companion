@@ -8,6 +8,7 @@ import (
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/daemon/manager"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
@@ -39,10 +40,15 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	// Initialize daemon manager configuration
+	daemonConfig := manager.DefaultConfig()
+
 	// Initialize shared services
 	services := &gui.Services{
-		DaemonPort:   9999, // Default daemon port
-		DraftMetrics: metrics.NewDraftMetrics(),
+		DaemonPort:      daemonConfig.Port, // Use daemon manager's default port
+		DaemonManager:   manager.New(daemonConfig),
+		DaemonAutoStart: false, // Disabled by default until daemon binary is bundled
+		DraftMetrics:    metrics.NewDraftMetrics(),
 	}
 
 	// Create system facade first (it contains the event dispatcher)
@@ -81,6 +87,21 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 
+	// Auto-start daemon subprocess if enabled
+	if a.services.DaemonAutoStart {
+		go func() {
+			if err := a.systemFacade.AutoStartDaemon(ctx); err != nil {
+				log.Printf("Failed to auto-start daemon: %v", err)
+			} else {
+				// Wait for daemon to start, then connect
+				time.Sleep(2 * time.Second)
+				if err := a.systemFacade.ReconnectToDaemon(ctx); err != nil {
+					log.Printf("Failed to connect to auto-started daemon: %v", err)
+				}
+			}
+		}()
+	}
+
 	// Try to reconnect to daemon first, fall back to standalone mode if not available
 	if err := a.systemFacade.ReconnectToDaemon(ctx); err != nil {
 		log.Printf("Daemon not available, falling back to standalone mode: %v", err)
@@ -98,7 +119,14 @@ func (a *App) startup(ctx context.Context) {
 // shutdown is called when the app is closing
 func (a *App) shutdown(ctx context.Context) {
 	log.Println("App shutting down...")
+
+	// Stop poller if running
 	a.systemFacade.StopPoller()
+
+	// Stop daemon subprocess if running (issue #597 - graceful shutdown)
+	if err := a.systemFacade.StopDaemonProcess(ctx); err != nil {
+		log.Printf("Warning: Failed to stop daemon subprocess: %v", err)
+	}
 }
 
 // ========================================
@@ -143,6 +171,40 @@ func (a *App) SwitchToStandaloneMode() error {
 // SwitchToDaemonMode switches to daemon mode (IPC connection)
 func (a *App) SwitchToDaemonMode() error {
 	return a.systemFacade.SwitchToDaemonMode(a.ctx)
+}
+
+// ========================================
+// Daemon Subprocess Management
+// ========================================
+
+// StartDaemonProcess starts the daemon subprocess
+func (a *App) StartDaemonProcess() error {
+	return a.systemFacade.StartDaemonProcess(a.ctx)
+}
+
+// StopDaemonProcess stops the daemon subprocess
+func (a *App) StopDaemonProcess() error {
+	return a.systemFacade.StopDaemonProcess(a.ctx)
+}
+
+// RestartDaemonProcess restarts the daemon subprocess
+func (a *App) RestartDaemonProcess() error {
+	return a.systemFacade.RestartDaemonProcess(a.ctx)
+}
+
+// GetDaemonProcessStatus returns the status of the daemon subprocess
+func (a *App) GetDaemonProcessStatus() *gui.DaemonProcessStatus {
+	return a.systemFacade.GetDaemonProcessStatus()
+}
+
+// SetDaemonAutoStart enables or disables daemon auto-start
+func (a *App) SetDaemonAutoStart(enabled bool) {
+	a.systemFacade.SetDaemonAutoStart(enabled)
+}
+
+// IsDaemonAutoStartEnabled returns whether daemon auto-start is enabled
+func (a *App) IsDaemonAutoStartEnabled() bool {
+	return a.systemFacade.IsDaemonAutoStartEnabled()
 }
 
 // TriggerReplayLogs triggers a replay of the log file
