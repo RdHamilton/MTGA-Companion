@@ -571,3 +571,248 @@
   padding: 20px 24px;
   border-top: 1px solid #3d3d3d;
 }
+
+/* Replay Progress Container */
+.replay-progress-container {
+  background: #2d2d2d;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.replay-progress-title {
+  margin-top: 0;
+  color: #4a9eff;
+}
+
+.replay-progress-title.complete {
+  color: #00ff00;
+}
+
+.replay-progress-title.paused {
+  color: #ff9800;
+}
+
+/* Progress Bar */
+.settings-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.settings-progress-bar.with-margin-bottom {
+  margin-bottom: 16px;
+}
+
+.settings-progress-bar-fill {
+  height: 100%;
+  background: #4a9eff;
+  transition: width 0.3s ease;
+}
+
+.settings-progress-bar-fill.paused {
+  background: #ff9800;
+}
+
+/* Grid Layouts */
+.settings-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-grid-2col-wide {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 0.95em;
+}
+
+/* Info/Warning/Success Boxes */
+.settings-warning-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: #2d2d2d;
+  border-radius: 4px;
+  border: 1px solid #ff6b6b;
+}
+
+.settings-info-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: #2d2d2d;
+  border-radius: 8px;
+}
+
+.settings-info-box-dark {
+  margin-top: 16px;
+  padding: 12px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #aaa;
+}
+
+.settings-success-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: #2d4a2d;
+  border-radius: 8px;
+  border: 1px solid #4a9eff;
+}
+
+.settings-daemon-warning {
+  color: #ff6b6b;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #2d2d2d;
+  border-radius: 8px;
+}
+
+.settings-daemon-hint {
+  color: #ff6b6b;
+  margin-top: 8px;
+}
+
+/* Section Description */
+.settings-section-description {
+  margin-bottom: 16px;
+  color: #aaa;
+}
+
+/* Replay Tool Controls */
+.replay-tool-controls {
+  background: #2d2d2d;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.replay-tool-title {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.replay-tool-title.active {
+  color: #4a9eff;
+}
+
+.replay-tool-title.paused {
+  color: #ff9800;
+}
+
+.replay-tool-subtitle {
+  font-size: 0.9em;
+  font-weight: normal;
+  color: #aaa;
+}
+
+.replay-tool-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Special Buttons */
+.action-button.pause {
+  background: #ff9800;
+}
+
+.action-button.resume {
+  background: #00c853;
+}
+
+.action-button.recalculate {
+  background: #4a9eff;
+  color: white;
+  font-weight: bold;
+}
+
+.action-button.clear-cache {
+  background: #ff6b6b;
+  color: white;
+}
+
+/* Input widths */
+.input-width-200 {
+  width: 200px;
+}
+
+.select-width-200 {
+  width: 200px;
+}
+
+/* Slider display */
+.slider-value {
+  margin-left: 12px;
+  min-width: 60px;
+  display: inline-block;
+}
+
+/* Checkbox container */
+.checkbox-container {
+  margin-bottom: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Current file display */
+.current-file-display {
+  font-size: 0.9em;
+  color: #aaa;
+}
+
+/* Refresh message display */
+.refresh-message {
+  color: #aaa;
+  margin-top: 8px;
+}
+
+/* Recalculate message */
+.recalculate-message {
+  margin-left: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  display: inline-block;
+}
+
+.recalculate-message.success {
+  background: #2d4a2d;
+  color: #7cfc00;
+}
+
+.recalculate-message.error {
+  background: #4a2d2d;
+  color: #ff6b6b;
+}
+
+/* Set codes grid */
+.set-codes-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  font-size: 0.9em;
+}
+
+/* About section margin */
+.about-button-container {
+  margin-top: 16px;
+}
+
+/* Button spacing */
+.button-margin-right {
+  margin-right: 8px;
+}
