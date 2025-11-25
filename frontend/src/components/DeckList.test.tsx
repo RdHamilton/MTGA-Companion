@@ -336,6 +336,9 @@ describe('DeckList Component', () => {
       const stats = createMockStatistics({
         lands: {
           total: 17,
+          basic: 12,
+          nonBasic: 5,
+          ratio: 0.425,
           recommended: 17,
           status: 'good',
           statusMessage: 'Land count looks good',
