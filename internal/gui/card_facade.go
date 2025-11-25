@@ -29,6 +29,17 @@ type CardRatingWithTier struct {
 	Colors []string `json:"colors"` // All colors in mana cost (e.g., ["W", "U"])
 }
 
+// SetInfo contains information about a Magic set including the icon URL.
+// Used by the frontend to display set symbols.
+type SetInfo struct {
+	Code       string `json:"code"`       // Set code (e.g., "DSK", "BLB")
+	Name       string `json:"name"`       // Full set name (e.g., "Duskmourn: House of Horror")
+	IconSVGURI string `json:"iconSvgUri"` // URL to the set symbol SVG
+	SetType    string `json:"setType"`    // Type of set (e.g., "expansion", "core")
+	ReleasedAt string `json:"releasedAt"` // Release date
+	CardCount  int    `json:"cardCount"`  // Number of cards in set
+}
+
 // GetSetCards returns all cards for a set, fetching from Scryfall if not cached.
 func (c *CardFacade) GetSetCards(ctx context.Context, setCode string) ([]*models.SetCard, error) {
 	if c.services.Storage == nil {
@@ -298,4 +309,55 @@ func calculateTier(gihwr float64) string {
 		return "D"
 	}
 	return "F"
+}
+
+// GetSetInfo returns information about a specific set including its icon URL.
+func (c *CardFacade) GetSetInfo(ctx context.Context, setCode string) (*SetInfo, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	set, err := c.services.Storage.GetSet(ctx, setCode)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get set info: %v", err)}
+	}
+
+	if set == nil {
+		return nil, nil
+	}
+
+	return &SetInfo{
+		Code:       set.Code,
+		Name:       set.Name,
+		IconSVGURI: set.IconSVGURI,
+		SetType:    set.SetType,
+		ReleasedAt: set.ReleasedAt,
+		CardCount:  set.CardCount,
+	}, nil
+}
+
+// GetAllSetInfo returns information about all known sets.
+func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	sets, err := c.services.Storage.GetAllSets(ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get all sets: %v", err)}
+	}
+
+	result := make([]*SetInfo, len(sets))
+	for i, set := range sets {
+		result[i] = &SetInfo{
+			Code:       set.Code,
+			Name:       set.Name,
+			IconSVGURI: set.IconSVGURI,
+			SetType:    set.SetType,
+			ReleasedAt: set.ReleasedAt,
+			CardCount:  set.CardCount,
+		}
+	}
+
+	return result, nil
 }

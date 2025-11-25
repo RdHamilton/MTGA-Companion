@@ -246,6 +246,12 @@
   line-height: 1.2; /* Tighter line height for compact display */
 }
 
+.card-set-symbol {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
 .card-mana {
   color: #aaa;
   font-size: 0.875rem;

@@ -86,6 +86,10 @@ export function GetActiveQuests() {
   return window['go']['main']['App']['GetActiveQuests']();
 }
 
+export function GetAllSetInfo() {
+  return window['go']['main']['App']['GetAllSetInfo']();
+}
+
 export function GetArchetypeCards(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetArchetypeCards'](arg1, arg2, arg3);
 }
@@ -268,6 +272,10 @@ export function GetReplayStatus() {
 
 export function GetSetCards(arg1) {
   return window['go']['main']['App']['GetSetCards'](arg1);
+}
+
+export function GetSetInfo(arg1) {
+  return window['go']['main']['App']['GetSetInfo'](arg1);
 }
 
 export function GetStats(arg1) {

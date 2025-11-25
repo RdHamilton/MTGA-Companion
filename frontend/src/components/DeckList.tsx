@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { GetCardByArenaID } from '../../wailsjs/go/main/App';
 import { models, gui } from '../../wailsjs/go/models';
+import SetSymbol from './SetSymbol';
 import './DeckList.css';
 
 interface DeckListProps {
@@ -220,6 +221,15 @@ export default function DeckList({
             >
               <span className="card-quantity">{card.deckCard.Quantity}x</span>
               <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
+              {card.metadata?.SetCode && (
+                <span className="card-set-symbol">
+                  <SetSymbol
+                    setCode={card.metadata.SetCode}
+                    size="small"
+                    rarity={card.metadata.Rarity?.toLowerCase() as 'common' | 'uncommon' | 'rare' | 'mythic' | undefined}
+                  />
+                </span>
+              )}
               {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
               {onRemoveCard && (
                 <button
@@ -365,6 +375,15 @@ export default function DeckList({
                 >
                   <span className="card-quantity">{card.deckCard.Quantity}x</span>
                   <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
+                  {card.metadata?.SetCode && (
+                    <span className="card-set-symbol">
+                      <SetSymbol
+                        setCode={card.metadata.SetCode}
+                        size="small"
+                        rarity={card.metadata.Rarity?.toLowerCase() as 'common' | 'uncommon' | 'rare' | 'mythic' | undefined}
+                      />
+                    </span>
+                  )}
                   {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
                   {onRemoveCard && (
                     <button

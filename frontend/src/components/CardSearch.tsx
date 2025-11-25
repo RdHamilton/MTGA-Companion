@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { GetCardByArenaID } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
+import SetSymbol from './SetSymbol';
 import './CardSearch.css';
 
 interface CardSearchProps {
@@ -340,6 +341,15 @@ export default function CardSearch({
                     {card.ManaCost && <div className="card-mana-cost">{card.ManaCost}</div>}
                     <div className="card-stats">
                       <span>CMC: {card.CMC}</span>
+                      {card.SetCode && (
+                        <span className="card-set">
+                          <SetSymbol
+                            setCode={card.SetCode}
+                            size="small"
+                            rarity={card.Rarity?.toLowerCase() as 'common' | 'uncommon' | 'rare' | 'mythic' | undefined}
+                          />
+                        </span>
+                      )}
                       {isDraftDeck && (
                         <span className="available-quantity">
                           Available: {available - inDeckQuantity} / {available}
