@@ -63,7 +63,7 @@ export function GetColorRatings(arg1:string,arg2:string):Promise<Array<seventeen
 
 export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.DraftSession>>;
 
-export function GetConnectionStatus():Promise<Record<string, any>>;
+export function GetConnectionStatus():Promise<gui.ConnectionStatus>;
 
 export function GetCurrentAccount():Promise<models.Account>;
 

@@ -4,24 +4,25 @@ import Footer from './Footer';
 import { GetConnectionStatus, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 import { getReplayState, subscribeToReplayState } from '../App';
+import { gui } from '../../wailsjs/go/models';
 import './Layout.css';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-interface ConnectionStatus {
-  status: string;
-  connected: boolean;
-}
-
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
-    status: 'standalone',
-    connected: false
-  });
+  const [connectionStatus, setConnectionStatus] = useState<gui.ConnectionStatus>(
+    new gui.ConnectionStatus({
+      status: 'standalone',
+      connected: false,
+      mode: 'standalone',
+      url: '',
+      port: 0,
+    })
+  );
   const [replayActive, setReplayActive] = useState(getReplayState().isActive);
   const [replayPaused, setReplayPaused] = useState(getReplayState().isPaused);
 
@@ -64,7 +65,7 @@ const Layout = ({ children }: LayoutProps) => {
     const loadConnectionStatus = async () => {
       try {
         const status = await GetConnectionStatus();
-        setConnectionStatus(status as ConnectionStatus);
+        setConnectionStatus(gui.ConnectionStatus.createFrom(status));
       } catch (error) {
         console.error('Failed to load connection status:', error);
       }

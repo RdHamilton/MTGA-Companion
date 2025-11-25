@@ -185,6 +185,26 @@ export namespace gui {
 	        this.multicolor = source["multicolor"];
 	    }
 	}
+	export class ConnectionStatus {
+	    status: string;
+	    connected: boolean;
+	    mode: string;
+	    url: string;
+	    port: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectionStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.connected = source["connected"];
+	        this.mode = source["mode"];
+	        this.url = source["url"];
+	        this.port = source["port"];
+	    }
+	}
 	export class CreatureStats {
 	    total: number;
 	    averagePower: number;

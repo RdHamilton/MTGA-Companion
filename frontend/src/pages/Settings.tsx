@@ -16,13 +16,15 @@ const Settings = () => {
   const [showAbout, setShowAbout] = useState(false);
 
   // Daemon settings
-  const [connectionStatus, setConnectionStatus] = useState<Record<string, unknown>>({
-    status: 'standalone',
-    connected: false,
-    mode: 'standalone',
-    url: 'ws://localhost:9999',
-    port: 9999
-  });
+  const [connectionStatus, setConnectionStatus] = useState<gui.ConnectionStatus>(
+    new gui.ConnectionStatus({
+      status: 'standalone',
+      connected: false,
+      mode: 'standalone',
+      url: 'ws://localhost:9999',
+      port: 9999,
+    })
+  );
   const [daemonMode, setDaemonMode] = useState('auto');
   const [daemonPort, setDaemonPortState] = useState(9999);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -124,7 +126,7 @@ const Settings = () => {
   const loadConnectionStatus = async () => {
     try {
       const status = await GetConnectionStatus();
-      setConnectionStatus(status);
+      setConnectionStatus(gui.ConnectionStatus.createFrom(status));
       setDaemonPortState(status.port || 9999);
     } catch (error) {
       console.error('Failed to load connection status:', error);
