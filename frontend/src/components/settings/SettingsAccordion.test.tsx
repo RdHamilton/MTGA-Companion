@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SettingsAccordion, SettingsAccordionItem } from './SettingsAccordion';
+import { SettingsAccordion } from './SettingsAccordion';
+import type { SettingsAccordionItem } from './SettingsAccordion';
 
 describe('SettingsAccordion', () => {
   const STORAGE_KEY = 'mtga-companion-settings-expanded';

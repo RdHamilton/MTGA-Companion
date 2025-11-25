@@ -9,7 +9,8 @@ import {
   SeventeenLandsSection,
   AboutSection,
 } from '../components/settings/sections';
-import { SettingsAccordion, SettingsAccordionItem } from '../components/settings/SettingsAccordion';
+import { SettingsAccordion } from '../components/settings/SettingsAccordion';
+import type { SettingsAccordionItem } from '../components/settings/SettingsAccordion';
 import {
   useDaemonConnection,
   useLogReplay,

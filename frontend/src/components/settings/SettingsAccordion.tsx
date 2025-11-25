@@ -1,5 +1,7 @@
-import { ReactNode, useCallback } from 'react';
-import { useSettingsAccordion, AccordionSection } from '../../hooks/useSettingsAccordion';
+import { useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { useSettingsAccordion } from '../../hooks/useSettingsAccordion';
+import type { AccordionSection } from '../../hooks/useSettingsAccordion';
 import './SettingsAccordion.css';
 
 export interface SettingsAccordionItem {
