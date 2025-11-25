@@ -78,10 +78,6 @@ export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }
 
-export function GetActiveEvents() {
-  return window['go']['main']['App']['GetActiveEvents']();
-}
-
 export function GetActiveQuests() {
   return window['go']['main']['App']['GetActiveQuests']();
 }
@@ -106,6 +102,14 @@ export function GetCardRatings(arg1, arg2) {
   return window['go']['main']['App']['GetCardRatings'](arg1, arg2);
 }
 
+export function GetCollection(arg1) {
+  return window['go']['main']['App']['GetCollection'](arg1);
+}
+
+export function GetCollectionStats() {
+  return window['go']['main']['App']['GetCollectionStats']();
+}
+
 export function GetColorRatings(arg1, arg2) {
   return window['go']['main']['App']['GetColorRatings'](arg1, arg2);
 }
@@ -124,6 +128,10 @@ export function GetCurrentAccount() {
 
 export function GetDaemonErrorEvent() {
   return window['go']['main']['App']['GetDaemonErrorEvent']();
+}
+
+export function GetDaemonProcessStatus() {
+  return window['go']['main']['App']['GetDaemonProcessStatus']();
 }
 
 export function GetDatasetSource(arg1, arg2) {
@@ -198,10 +206,6 @@ export function GetDraftWinRatePrediction(arg1) {
   return window['go']['main']['App']['GetDraftWinRatePrediction'](arg1);
 }
 
-export function GetEventWinDistribution() {
-  return window['go']['main']['App']['GetEventWinDistribution']();
-}
-
 export function GetFormatInsights(arg1, arg2) {
   return window['go']['main']['App']['GetFormatInsights'](arg1, arg2);
 }
@@ -254,6 +258,10 @@ export function GetRankUpdatedEvent() {
   return window['go']['main']['App']['GetRankUpdatedEvent']();
 }
 
+export function GetRecentCollectionChanges(arg1) {
+  return window['go']['main']['App']['GetRecentCollectionChanges'](arg1);
+}
+
 export function GetRecommendations(arg1) {
   return window['go']['main']['App']['GetRecommendations'](arg1);
 }
@@ -272,6 +280,10 @@ export function GetReplayStatus() {
 
 export function GetSetCards(arg1) {
   return window['go']['main']['App']['GetSetCards'](arg1);
+}
+
+export function GetSetCompletion() {
+  return window['go']['main']['App']['GetSetCompletion']();
 }
 
 export function GetSetInfo(arg1) {
@@ -312,6 +324,10 @@ export function ImportLogFile() {
 
 export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
+}
+
+export function IsDaemonAutoStartEnabled() {
+  return window['go']['main']['App']['IsDaemonAutoStartEnabled']();
 }
 
 export function ListDecks() {
@@ -358,12 +374,24 @@ export function ResetDraftPerformanceMetrics() {
   return window['go']['main']['App']['ResetDraftPerformanceMetrics']();
 }
 
+export function RestartDaemonProcess() {
+  return window['go']['main']['App']['RestartDaemonProcess']();
+}
+
 export function ResumeReplay() {
   return window['go']['main']['App']['ResumeReplay']();
 }
 
+export function SetDaemonAutoStart(arg1) {
+  return window['go']['main']['App']['SetDaemonAutoStart'](arg1);
+}
+
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
+}
+
+export function StartDaemonProcess() {
+  return window['go']['main']['App']['StartDaemonProcess']();
 }
 
 export function StartPoller() {
@@ -372,6 +400,10 @@ export function StartPoller() {
 
 export function StartReplayWithFileDialog(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartReplayWithFileDialog'](arg1, arg2, arg3);
+}
+
+export function StopDaemonProcess() {
+  return window['go']['main']['App']['StopDaemonProcess']();
 }
 
 export function StopPoller() {

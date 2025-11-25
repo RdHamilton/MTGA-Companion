@@ -29,7 +29,7 @@ const Layout = ({ children }: LayoutProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   // Derive activeTab from current route (computed value, not state)
-  const getActiveTab = (): 'match-history' | 'quests' | 'draft' | 'decks' | 'charts' => {
+  const getActiveTab = (): 'match-history' | 'quests' | 'draft' | 'decks' | 'collection' | 'charts' => {
     if (location.pathname === '/match-history' || location.pathname === '/') {
       return 'match-history';
     } else if (location.pathname === '/quests') {
@@ -38,6 +38,8 @@ const Layout = ({ children }: LayoutProps) => {
       return 'draft';
     } else if (location.pathname === '/decks' || location.pathname.startsWith('/deck-builder')) {
       return 'decks';
+    } else if (location.pathname === '/collection') {
+      return 'collection';
     } else if (location.pathname.startsWith('/charts/')) {
       return 'charts';
     }
@@ -130,6 +132,12 @@ const Layout = ({ children }: LayoutProps) => {
             className={`tab ${activeTab === 'decks' ? 'active' : ''}`}
           >
             Decks
+          </Link>
+          <Link
+            to="/collection"
+            className={`tab ${activeTab === 'collection' ? 'active' : ''}`}
+          >
+            Collection
           </Link>
           <Link
             to="/charts/win-rate-trend"
