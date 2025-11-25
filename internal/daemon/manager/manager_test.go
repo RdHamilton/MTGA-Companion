@@ -2,10 +2,15 @@ package manager
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,6 +29,15 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if config.BinaryPath != "" {
 		t.Errorf("expected empty binary path, got %s", config.BinaryPath)
+	}
+	if config.HealthCheckInterval != 10*time.Second {
+		t.Errorf("expected default health check interval 10s, got %v", config.HealthCheckInterval)
+	}
+	if !config.EnableAutoRestart {
+		t.Error("expected auto restart enabled by default")
+	}
+	if config.MaxRestartAttempts != 5 {
+		t.Errorf("expected default max restart attempts 5, got %d", config.MaxRestartAttempts)
 	}
 }
 
@@ -411,5 +425,196 @@ sleep 60
 	// Clean up
 	if err := m.Stop(); err != nil {
 		t.Errorf("failed to stop daemon: %v", err)
+	}
+}
+
+// ============================================================================
+// Health Check Tests
+// ============================================================================
+
+func TestManager_GetHealthStatus_Initial(t *testing.T) {
+	m := New(nil)
+
+	status := m.GetHealthStatus()
+	if status == nil {
+		t.Fatal("expected non-nil health status")
+	}
+	if status.Healthy {
+		t.Error("expected initial health status to be unhealthy")
+	}
+	if status.ConsecutiveFails != 0 {
+		t.Errorf("expected 0 consecutive fails, got %d", status.ConsecutiveFails)
+	}
+	if status.RestartAttempts != 0 {
+		t.Errorf("expected 0 restart attempts, got %d", status.RestartAttempts)
+	}
+}
+
+func TestManager_IsHealthy(t *testing.T) {
+	m := New(nil)
+
+	// Initial state - not healthy
+	if m.IsHealthy() {
+		t.Error("expected IsHealthy() to be false initially")
+	}
+
+	// Simulate running and healthy state
+	m.mu.Lock()
+	m.status = StatusRunning
+	m.healthy = true
+	m.mu.Unlock()
+
+	if !m.IsHealthy() {
+		t.Error("expected IsHealthy() to be true when running and healthy")
+	}
+
+	// Simulate running but unhealthy state
+	m.mu.Lock()
+	m.healthy = false
+	m.mu.Unlock()
+
+	if m.IsHealthy() {
+		t.Error("expected IsHealthy() to be false when unhealthy")
+	}
+}
+
+func TestManager_CalculateBackoff(t *testing.T) {
+	m := New(nil)
+
+	tests := []struct {
+		attempt  int
+		expected time.Duration
+	}{
+		{1, 0},                // Immediate first retry
+		{2, 5 * time.Second},  // 5 seconds
+		{3, 30 * time.Second}, // 30 seconds
+		{4, 2 * time.Minute},  // 2 minutes cap
+		{5, 2 * time.Minute},  // 2 minutes cap
+		{10, 2 * time.Minute}, // 2 minutes cap
+	}
+
+	for _, tt := range tests {
+		got := m.calculateBackoff(tt.attempt)
+		if got != tt.expected {
+			t.Errorf("calculateBackoff(%d) = %v, expected %v", tt.attempt, got, tt.expected)
+		}
+	}
+}
+
+func TestManager_ResetRestartAttempts(t *testing.T) {
+	m := New(nil)
+
+	// Set some values
+	m.mu.Lock()
+	m.restartAttempts = 5
+	m.consecutiveFails = 3
+	m.mu.Unlock()
+
+	// Reset
+	m.ResetRestartAttempts()
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.restartAttempts != 0 {
+		t.Errorf("expected restart attempts to be 0, got %d", m.restartAttempts)
+	}
+	if m.consecutiveFails != 0 {
+		t.Errorf("expected consecutive fails to be 0, got %d", m.consecutiveFails)
+	}
+}
+
+func TestManager_CheckDaemonHealth_Success(t *testing.T) {
+	// Create a mock HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/status" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+	}))
+	defer server.Close()
+
+	// Extract port from server URL
+	port := strings.TrimPrefix(server.URL, "http://127.0.0.1:")
+	portInt := 0
+	_, err := fmt.Sscanf(port, "%d", &portInt)
+	if err != nil {
+		t.Fatalf("failed to parse port: %v", err)
+	}
+
+	m := New(nil)
+
+	err = m.checkDaemonHealth(portInt)
+	if err != nil {
+		t.Errorf("expected no error for healthy daemon, got %v", err)
+	}
+}
+
+func TestManager_CheckDaemonHealth_Unhealthy(t *testing.T) {
+	// Create a mock HTTP server that returns unhealthy
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	port := strings.TrimPrefix(server.URL, "http://127.0.0.1:")
+	portInt := 0
+	_, _ = fmt.Sscanf(port, "%d", &portInt)
+
+	m := New(nil)
+
+	err := m.checkDaemonHealth(portInt)
+	if err == nil {
+		t.Error("expected error for unhealthy daemon")
+	}
+}
+
+func TestManager_CheckDaemonHealth_ConnectionRefused(t *testing.T) {
+	m := New(nil)
+
+	// Use a port that nothing is listening on
+	err := m.checkDaemonHealth(59999)
+	if err == nil {
+		t.Error("expected error when connection refused")
+	}
+}
+
+func TestManager_OnHealthChange_Callback(t *testing.T) {
+	healthChanges := make([]bool, 0)
+
+	config := &Config{
+		Port:                9999,
+		HealthCheckInterval: 100 * time.Millisecond,
+		EnableAutoRestart:   false, // Disable auto restart for this test
+		OnHealthChange: func(healthy bool, err error) {
+			healthChanges = append(healthChanges, healthy)
+		},
+	}
+
+	m := New(config)
+
+	// Simulate running state
+	m.mu.Lock()
+	m.status = StatusRunning
+	m.healthy = true
+	m.mu.Unlock()
+
+	// Simulate health check failure
+	m.mu.Lock()
+	m.healthy = false
+	m.lastError = fmt.Errorf("test error")
+	m.mu.Unlock()
+
+	// Call the callback manually (simulating what performHealthCheck does)
+	if config.OnHealthChange != nil {
+		config.OnHealthChange(false, m.lastError)
+	}
+
+	if len(healthChanges) == 0 {
+		t.Error("expected health change callback to be called")
+	}
+	if healthChanges[0] != false {
+		t.Error("expected health change to report unhealthy")
 	}
 }

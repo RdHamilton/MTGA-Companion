@@ -2,9 +2,11 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,16 +48,34 @@ type Config struct {
 
 	// LogOutput is where to send daemon stdout/stderr. If nil, discards output.
 	LogOutput io.Writer
+
+	// HealthCheckInterval is how often to check daemon health.
+	HealthCheckInterval time.Duration
+
+	// EnableAutoRestart enables automatic restart on daemon crash.
+	EnableAutoRestart bool
+
+	// MaxRestartAttempts is the maximum number of restart attempts before giving up.
+	// Set to 0 for unlimited attempts.
+	MaxRestartAttempts int
+
+	// OnHealthChange is called when daemon health status changes.
+	// This allows the caller to handle health events (e.g., emit Wails events).
+	OnHealthChange func(healthy bool, err error)
 }
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
-		Port:            9999,
-		BinaryPath:      "", // Will auto-detect
-		StartupTimeout:  30 * time.Second,
-		ShutdownTimeout: 10 * time.Second,
-		LogOutput:       os.Stdout,
+		Port:                9999,
+		BinaryPath:          "", // Will auto-detect
+		StartupTimeout:      30 * time.Second,
+		ShutdownTimeout:     10 * time.Second,
+		LogOutput:           os.Stdout,
+		HealthCheckInterval: 10 * time.Second,
+		EnableAutoRestart:   true,
+		MaxRestartAttempts:  5,
+		OnHealthChange:      nil,
 	}
 }
 
@@ -76,6 +96,13 @@ type Manager struct {
 
 	// Channels for coordination
 	doneChan chan struct{}
+
+	// Health check state
+	healthCheckCancel context.CancelFunc
+	lastHealthCheck   time.Time
+	consecutiveFails  int
+	restartAttempts   int
+	healthy           bool
 }
 
 // New creates a new DaemonManager with the given configuration.
@@ -139,6 +166,7 @@ func (m *Manager) Start() error {
 
 	m.pid = m.cmd.Process.Pid
 	m.startTime = time.Now()
+	m.healthy = false // Will be set true after successful health check
 
 	log.Printf("Daemon started with PID %d on port %d", m.pid, m.config.Port)
 
@@ -147,6 +175,9 @@ func (m *Manager) Start() error {
 
 	// Wait for daemon to become healthy
 	go m.waitForHealthy()
+
+	// Start health check loop
+	go m.startHealthCheck()
 
 	return nil
 }
@@ -171,6 +202,9 @@ func (m *Manager) Stop() error {
 	m.mu.Unlock()
 
 	log.Printf("Stopping daemon (PID %d)...", pid)
+
+	// Stop health check first
+	m.stopHealthCheck()
 
 	// Cancel context to signal shutdown
 	if m.cancel != nil {
@@ -449,4 +483,246 @@ func (m *Manager) Info() *Info {
 	}
 
 	return info
+}
+
+// ============================================================================
+// Health Check and Auto-Recovery
+// ============================================================================
+
+// HealthStatus represents the result of a health check.
+type HealthStatus struct {
+	Healthy          bool      `json:"healthy"`
+	LastCheck        time.Time `json:"lastCheck"`
+	ConsecutiveFails int       `json:"consecutiveFails"`
+	RestartAttempts  int       `json:"restartAttempts"`
+	Error            string    `json:"error,omitempty"`
+}
+
+// GetHealthStatus returns the current health status.
+func (m *Manager) GetHealthStatus() *HealthStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	status := &HealthStatus{
+		Healthy:          m.healthy,
+		LastCheck:        m.lastHealthCheck,
+		ConsecutiveFails: m.consecutiveFails,
+		RestartAttempts:  m.restartAttempts,
+	}
+
+	if m.lastError != nil {
+		status.Error = m.lastError.Error()
+	}
+
+	return status
+}
+
+// IsHealthy returns true if the daemon is running and healthy.
+func (m *Manager) IsHealthy() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.status == StatusRunning && m.healthy
+}
+
+// startHealthCheck starts the periodic health check goroutine.
+func (m *Manager) startHealthCheck() {
+	if m.config.HealthCheckInterval <= 0 {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.healthCheckCancel = cancel
+
+	go m.healthCheckLoop(ctx)
+}
+
+// stopHealthCheck stops the health check goroutine.
+func (m *Manager) stopHealthCheck() {
+	if m.healthCheckCancel != nil {
+		m.healthCheckCancel()
+		m.healthCheckCancel = nil
+	}
+}
+
+// healthCheckLoop runs periodic health checks.
+func (m *Manager) healthCheckLoop(ctx context.Context) {
+	ticker := time.NewTicker(m.config.HealthCheckInterval)
+	defer ticker.Stop()
+
+	// Initial delay to let daemon fully start
+	time.Sleep(2 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.performHealthCheck()
+		}
+	}
+}
+
+// performHealthCheck checks daemon health and handles failures.
+func (m *Manager) performHealthCheck() {
+	m.mu.RLock()
+	status := m.status
+	port := m.config.Port
+	m.mu.RUnlock()
+
+	// Only check if we think we're running
+	if status != StatusRunning {
+		return
+	}
+
+	err := m.checkDaemonHealth(port)
+
+	m.mu.Lock()
+	m.lastHealthCheck = time.Now()
+
+	wasHealthy := m.healthy
+
+	if err != nil {
+		m.consecutiveFails++
+		m.healthy = false
+		m.lastError = err
+
+		log.Printf("Daemon health check failed (%d consecutive): %v", m.consecutiveFails, err)
+
+		// Notify health change if callback is set
+		if !wasHealthy || m.config.OnHealthChange != nil {
+			m.mu.Unlock()
+			if m.config.OnHealthChange != nil {
+				m.config.OnHealthChange(false, err)
+			}
+			m.mu.Lock()
+		}
+
+		// Check if we should attempt auto-recovery
+		if m.config.EnableAutoRestart {
+			m.mu.Unlock()
+			m.attemptRecovery()
+			return
+		}
+	} else {
+		// Health check passed
+		if !wasHealthy {
+			log.Println("Daemon health check passed, daemon is healthy")
+		}
+		m.healthy = true
+		m.consecutiveFails = 0
+
+		// Notify health change if callback is set and we were unhealthy
+		if !wasHealthy && m.config.OnHealthChange != nil {
+			m.mu.Unlock()
+			m.config.OnHealthChange(true, nil)
+			return
+		}
+	}
+	m.mu.Unlock()
+}
+
+// checkDaemonHealth performs an HTTP health check against the daemon.
+func (m *Manager) checkDaemonHealth(port int) error {
+	url := fmt.Sprintf("http://localhost:%d/status", port)
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("health check request failed: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unhealthy status code: %d", resp.StatusCode)
+	}
+
+	// Optionally parse the response to check detailed health
+	var healthResp struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&healthResp); err != nil {
+		// If we can't parse the response, just check status code
+		return nil
+	}
+
+	if healthResp.Status != "healthy" && healthResp.Status != "ok" && healthResp.Status != "running" {
+		return fmt.Errorf("daemon reported unhealthy status: %s", healthResp.Status)
+	}
+
+	return nil
+}
+
+// attemptRecovery attempts to recover a failed daemon.
+func (m *Manager) attemptRecovery() {
+	m.mu.Lock()
+	m.restartAttempts++
+	attempts := m.restartAttempts
+	maxAttempts := m.config.MaxRestartAttempts
+	m.mu.Unlock()
+
+	// Check if we've exceeded max attempts
+	if maxAttempts > 0 && attempts > maxAttempts {
+		log.Printf("Maximum restart attempts (%d) exceeded, giving up", maxAttempts)
+		m.mu.Lock()
+		m.status = StatusError
+		m.lastError = fmt.Errorf("maximum restart attempts (%d) exceeded", maxAttempts)
+		m.mu.Unlock()
+		return
+	}
+
+	// Calculate backoff delay using exponential backoff
+	delay := m.calculateBackoff(attempts)
+	log.Printf("Attempting daemon recovery (attempt %d) after %v delay...", attempts, delay)
+
+	time.Sleep(delay)
+
+	// Check if we're still supposed to be running
+	m.mu.RLock()
+	status := m.status
+	m.mu.RUnlock()
+
+	if status == StatusStopping || status == StatusStopped {
+		log.Println("Recovery cancelled: daemon is stopping/stopped")
+		return
+	}
+
+	// Attempt restart
+	if err := m.Restart(); err != nil {
+		log.Printf("Recovery restart failed: %v", err)
+		// The health check loop will continue to try
+	} else {
+		log.Println("Daemon recovery successful")
+		m.mu.Lock()
+		m.restartAttempts = 0 // Reset on successful restart
+		m.mu.Unlock()
+	}
+}
+
+// calculateBackoff returns the backoff delay for the given attempt number.
+// Uses exponential backoff: 0s, 5s, 30s, 2m, 2m, 2m...
+func (m *Manager) calculateBackoff(attempt int) time.Duration {
+	switch attempt {
+	case 1:
+		return 0 // Immediate first retry
+	case 2:
+		return 5 * time.Second
+	case 3:
+		return 30 * time.Second
+	default:
+		return 2 * time.Minute // Cap at 2 minutes
+	}
+}
+
+// ResetRestartAttempts resets the restart attempt counter.
+// Call this after successfully connecting to the daemon.
+func (m *Manager) ResetRestartAttempts() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.restartAttempts = 0
+	m.consecutiveFails = 0
 }
