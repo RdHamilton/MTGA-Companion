@@ -30,8 +30,13 @@ type CollectionRepository interface {
 	// GetAll retrieves the entire collection as a map of cardID -> quantity.
 	GetAll(ctx context.Context) (map[int]int, error)
 
-	// RecordChange records a change to the collection in the history table.
+	// RecordChange records a change to the collection in the history table
+	// and updates the collection with the new quantity (current + delta).
 	RecordChange(ctx context.Context, cardID int, delta int, timestamp time.Time, source *string) error
+
+	// RecordHistoryEntry records a history entry without updating the collection.
+	// Use this when the collection has already been updated (e.g., after UpsertMany).
+	RecordHistoryEntry(ctx context.Context, cardID int, delta int, quantityAfter int, timestamp time.Time, source *string) error
 
 	// GetHistory retrieves collection history for a specific card.
 	GetHistory(ctx context.Context, cardID int) ([]*models.CollectionHistory, error)
@@ -149,6 +154,30 @@ func (r *collectionRepository) RecordChange(ctx context.Context, cardID int, del
 	// Update the collection
 	if err := r.UpsertCard(ctx, cardID, quantityAfter); err != nil {
 		return fmt.Errorf("failed to update collection: %w", err)
+	}
+
+	return nil
+}
+
+// RecordHistoryEntry records a history entry without updating the collection.
+// Use this when the collection has already been updated (e.g., after UpsertMany).
+func (r *collectionRepository) RecordHistoryEntry(ctx context.Context, cardID int, delta int, quantityAfter int, timestamp time.Time, source *string) error {
+	query := `
+		INSERT INTO collection_history (
+			card_id, quantity_delta, quantity_after, timestamp, source, created_at
+		) VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		cardID,
+		delta,
+		quantityAfter,
+		timestamp,
+		source,
+		time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record history entry: %w", err)
 	}
 
 	return nil

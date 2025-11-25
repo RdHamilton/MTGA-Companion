@@ -643,3 +643,58 @@ func TestCollectionRepository_GetChangesSince_NoChanges(t *testing.T) {
 		t.Errorf("expected 0 changes, got %d", len(changes))
 	}
 }
+
+func TestCollectionRepository_RecordHistoryEntry(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	// First, add a card to the collection
+	err := repo.UpsertCard(ctx, 12345, 4)
+	if err != nil {
+		t.Fatalf("failed to upsert card: %v", err)
+	}
+
+	// Record a history entry without updating the collection
+	now := time.Now()
+	source := "sync"
+	err = repo.RecordHistoryEntry(ctx, 12345, 2, 4, now, &source)
+	if err != nil {
+		t.Fatalf("failed to record history entry: %v", err)
+	}
+
+	// Verify collection was NOT updated (should still be 4)
+	quantity, err := repo.GetCard(ctx, 12345)
+	if err != nil {
+		t.Fatalf("failed to get card: %v", err)
+	}
+	if quantity != 4 {
+		t.Errorf("expected quantity to remain 4, got %d", quantity)
+	}
+
+	// Verify history was recorded
+	history, err := repo.GetHistory(ctx, 12345)
+	if err != nil {
+		t.Fatalf("failed to get history: %v", err)
+	}
+
+	if len(history) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(history))
+	}
+
+	if history[0].QuantityDelta != 2 {
+		t.Errorf("expected delta 2, got %d", history[0].QuantityDelta)
+	}
+	if history[0].QuantityAfter != 4 {
+		t.Errorf("expected quantity after 4, got %d", history[0].QuantityAfter)
+	}
+	if *history[0].Source != "sync" {
+		t.Errorf("expected source 'sync', got '%s'", *history[0].Source)
+	}
+}
