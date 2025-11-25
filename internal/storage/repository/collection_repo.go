@@ -9,10 +9,20 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
+// CollectionEntry represents a card and its quantity in the collection.
+type CollectionEntry struct {
+	CardID   int
+	Quantity int
+}
+
 // CollectionRepository handles database operations for card collection.
 type CollectionRepository interface {
 	// UpsertCard inserts or updates a card in the collection.
 	UpsertCard(ctx context.Context, cardID int, quantity int) error
+
+	// UpsertMany inserts or updates multiple cards in a single transaction.
+	// This is optimized for bulk sync operations (<1s for full collection).
+	UpsertMany(ctx context.Context, entries []CollectionEntry) error
 
 	// GetCard retrieves the quantity of a specific card.
 	GetCard(ctx context.Context, cardID int) (int, error)
@@ -28,6 +38,9 @@ type CollectionRepository interface {
 
 	// GetRecentChanges retrieves recent collection changes.
 	GetRecentChanges(ctx context.Context, limit int) ([]*models.CollectionHistory, error)
+
+	// GetChangesSince retrieves collection changes since a specific time.
+	GetChangesSince(ctx context.Context, since time.Time) ([]*models.CollectionHistory, error)
 }
 
 // collectionRepository is the concrete implementation of CollectionRepository.
@@ -196,6 +209,96 @@ func (r *collectionRepository) GetRecentChanges(ctx context.Context, limit int) 
 	rows, err := r.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent changes: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
+
+	var history []*models.CollectionHistory
+	for rows.Next() {
+		h := &models.CollectionHistory{}
+		err := rows.Scan(
+			&h.ID,
+			&h.CardID,
+			&h.QuantityDelta,
+			&h.QuantityAfter,
+			&h.Timestamp,
+			&h.Source,
+			&h.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan history: %w", err)
+		}
+		history = append(history, h)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating history: %w", err)
+	}
+
+	return history, nil
+}
+
+// UpsertMany inserts or updates multiple cards in a single transaction.
+// Uses batch operations for performance (<1s for full collection).
+func (r *collectionRepository) UpsertMany(ctx context.Context, entries []CollectionEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on rollback after commit
+		_ = tx.Rollback()
+	}()
+
+	// Prepare the upsert statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO collection (card_id, quantity, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(card_id) DO UPDATE SET
+			quantity = excluded.quantity,
+			updated_at = excluded.updated_at
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup
+		_ = stmt.Close()
+	}()
+
+	now := time.Now()
+	for _, entry := range entries {
+		_, err := stmt.ExecContext(ctx, entry.CardID, entry.Quantity, now)
+		if err != nil {
+			return fmt.Errorf("failed to upsert card %d: %w", entry.CardID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// GetChangesSince retrieves collection changes since a specific time.
+func (r *collectionRepository) GetChangesSince(ctx context.Context, since time.Time) ([]*models.CollectionHistory, error) {
+	query := `
+		SELECT id, card_id, quantity_delta, quantity_after, timestamp, source, created_at
+		FROM collection_history
+		WHERE timestamp > ?
+		ORDER BY timestamp DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, since)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changes since %v: %w", since, err)
 	}
 	defer func() {
 		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation

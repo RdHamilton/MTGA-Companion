@@ -388,3 +388,258 @@ func TestCollectionRepository_NegativeDelta(t *testing.T) {
 		t.Errorf("expected delta -2, got %d", history[0].QuantityDelta)
 	}
 }
+
+func TestCollectionRepository_UpsertMany(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	// Prepare test entries
+	entries := []CollectionEntry{
+		{CardID: 12345, Quantity: 4},
+		{CardID: 67890, Quantity: 2},
+		{CardID: 11111, Quantity: 1},
+		{CardID: 22222, Quantity: 3},
+	}
+
+	// Upsert multiple cards
+	err := repo.UpsertMany(ctx, entries)
+	if err != nil {
+		t.Fatalf("failed to upsert many: %v", err)
+	}
+
+	// Verify all cards were inserted
+	collection, err := repo.GetAll(ctx)
+	if err != nil {
+		t.Fatalf("failed to get all: %v", err)
+	}
+
+	if len(collection) != 4 {
+		t.Errorf("expected 4 cards, got %d", len(collection))
+	}
+
+	for _, entry := range entries {
+		if qty, ok := collection[entry.CardID]; !ok {
+			t.Errorf("card %d not found", entry.CardID)
+		} else if qty != entry.Quantity {
+			t.Errorf("card %d: expected quantity %d, got %d", entry.CardID, entry.Quantity, qty)
+		}
+	}
+}
+
+func TestCollectionRepository_UpsertMany_Update(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	// Insert initial cards
+	initialEntries := []CollectionEntry{
+		{CardID: 12345, Quantity: 2},
+		{CardID: 67890, Quantity: 1},
+	}
+
+	err := repo.UpsertMany(ctx, initialEntries)
+	if err != nil {
+		t.Fatalf("failed to upsert initial entries: %v", err)
+	}
+
+	// Update some, add new
+	updatedEntries := []CollectionEntry{
+		{CardID: 12345, Quantity: 4}, // Update
+		{CardID: 67890, Quantity: 3}, // Update
+		{CardID: 11111, Quantity: 1}, // New
+	}
+
+	err = repo.UpsertMany(ctx, updatedEntries)
+	if err != nil {
+		t.Fatalf("failed to upsert updated entries: %v", err)
+	}
+
+	// Verify updates
+	collection, err := repo.GetAll(ctx)
+	if err != nil {
+		t.Fatalf("failed to get all: %v", err)
+	}
+
+	expected := map[int]int{
+		12345: 4,
+		67890: 3,
+		11111: 1,
+	}
+
+	for cardID, expectedQty := range expected {
+		if qty := collection[cardID]; qty != expectedQty {
+			t.Errorf("card %d: expected quantity %d, got %d", cardID, expectedQty, qty)
+		}
+	}
+}
+
+func TestCollectionRepository_UpsertMany_Empty(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	// Upsert empty slice should not error
+	err := repo.UpsertMany(ctx, []CollectionEntry{})
+	if err != nil {
+		t.Errorf("UpsertMany with empty slice should not error: %v", err)
+	}
+
+	// Upsert nil should not error
+	err = repo.UpsertMany(ctx, nil)
+	if err != nil {
+		t.Errorf("UpsertMany with nil should not error: %v", err)
+	}
+}
+
+func TestCollectionRepository_UpsertMany_LargeCollection(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	// Create a large collection (simulating full collection sync)
+	const numCards = 5000
+	entries := make([]CollectionEntry, numCards)
+	for i := 0; i < numCards; i++ {
+		entries[i] = CollectionEntry{
+			CardID:   i + 1,
+			Quantity: (i % 4) + 1, // 1-4 copies
+		}
+	}
+
+	// Measure time
+	start := time.Now()
+	err := repo.UpsertMany(ctx, entries)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("failed to upsert large collection: %v", err)
+	}
+
+	// Verify count
+	collection, err := repo.GetAll(ctx)
+	if err != nil {
+		t.Fatalf("failed to get all: %v", err)
+	}
+
+	if len(collection) != numCards {
+		t.Errorf("expected %d cards, got %d", numCards, len(collection))
+	}
+
+	// Should complete in reasonable time (< 1 second as per issue requirement)
+	if elapsed > time.Second {
+		t.Errorf("UpsertMany took too long: %v (should be < 1s)", elapsed)
+	}
+
+	t.Logf("UpsertMany of %d cards completed in %v", numCards, elapsed)
+}
+
+func TestCollectionRepository_GetChangesSince(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	source := "pack"
+
+	// Record changes at different times
+	times := []time.Duration{
+		-3 * time.Hour,    // Old change
+		-2 * time.Hour,    // Old change
+		-30 * time.Minute, // Recent change
+		-10 * time.Minute, // Recent change
+	}
+
+	for i, offset := range times {
+		timestamp := now.Add(offset)
+		err := repo.RecordChange(ctx, 10000+i, 1, timestamp, &source)
+		if err != nil {
+			t.Fatalf("failed to record change %d: %v", i, err)
+		}
+	}
+
+	// Get changes since 1 hour ago
+	since := now.Add(-1 * time.Hour)
+	changes, err := repo.GetChangesSince(ctx, since)
+	if err != nil {
+		t.Fatalf("failed to get changes since: %v", err)
+	}
+
+	// Should only return the 2 recent changes
+	if len(changes) != 2 {
+		t.Errorf("expected 2 recent changes, got %d", len(changes))
+	}
+
+	// Verify they are the correct cards (most recent first)
+	if len(changes) >= 2 {
+		if changes[0].CardID != 10003 {
+			t.Errorf("expected first change to be card 10003, got %d", changes[0].CardID)
+		}
+		if changes[1].CardID != 10002 {
+			t.Errorf("expected second change to be card 10002, got %d", changes[1].CardID)
+		}
+	}
+}
+
+func TestCollectionRepository_GetChangesSince_NoChanges(t *testing.T) {
+	db := setupCollectionTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	source := "pack"
+
+	// Record old changes only
+	oldTime := now.Add(-2 * time.Hour)
+	err := repo.RecordChange(ctx, 12345, 1, oldTime, &source)
+	if err != nil {
+		t.Fatalf("failed to record change: %v", err)
+	}
+
+	// Get changes since 1 hour ago (should be empty)
+	since := now.Add(-1 * time.Hour)
+	changes, err := repo.GetChangesSince(ctx, since)
+	if err != nil {
+		t.Fatalf("failed to get changes since: %v", err)
+	}
+
+	if len(changes) != 0 {
+		t.Errorf("expected 0 changes, got %d", len(changes))
+	}
+}
