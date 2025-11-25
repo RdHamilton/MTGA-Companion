@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
+import LoadingButton from '../components/LoadingButton';
 import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, FetchSetCards, RefreshSetCards, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
@@ -503,13 +504,14 @@ const Settings = () => {
               <span className="setting-description">Manually reconnect to the daemon service</span>
             </label>
             <div className="setting-control">
-              <button
-                className="action-button"
+              <LoadingButton
+                loading={isReconnecting}
+                loadingText="Reconnecting..."
                 onClick={handleReconnect}
-                disabled={isReconnecting || daemonMode === 'standalone'}
+                disabled={daemonMode === 'standalone'}
               >
-                {isReconnecting ? 'Reconnecting...' : 'Reconnect to Daemon'}
-              </button>
+                Reconnect to Daemon
+              </LoadingButton>
             </div>
           </div>
         </div>
@@ -631,13 +633,15 @@ const Settings = () => {
                   <span>Clear all data before replay (recommended for first-time setup)</span>
                 </label>
               </div>
-              <button
-                className="action-button primary"
+              <LoadingButton
+                loading={isReplaying}
+                loadingText="Replaying Logs..."
                 onClick={handleReplayLogs}
-                disabled={isReplaying || connectionStatus.status !== 'connected'}
+                disabled={connectionStatus.status !== 'connected'}
+                variant="primary"
               >
-                {isReplaying ? 'Replaying Logs...' : 'Replay Historical Logs'}
-              </button>
+                Replay Historical Logs
+              </LoadingButton>
               {connectionStatus.status !== 'connected' && (
                 <div className="setting-hint settings-daemon-hint">
                   Daemon must be running to replay logs
@@ -919,13 +923,16 @@ const Settings = () => {
               <span className="setting-description">Download and cache 17Lands ratings for the selected set and format</span>
             </label>
             <div className="setting-control">
-              <button
-                className="action-button primary button-margin-right"
+              <LoadingButton
+                loading={isFetchingRatings}
+                loadingText="Fetching..."
                 onClick={handleFetchSetRatings}
-                disabled={isFetchingRatings || !setCode}
+                disabled={!setCode}
+                variant="primary"
+                className="button-margin-right"
               >
-                {isFetchingRatings ? 'Fetching...' : 'Fetch Ratings'}
-              </button>
+                Fetch Ratings
+              </LoadingButton>
               <button
                 className="action-button"
                 onClick={handleRefreshSetRatings}
@@ -942,13 +949,16 @@ const Settings = () => {
               <span className="setting-description">Download and cache card details (names, images, text) from Scryfall for the selected set</span>
             </label>
             <div className="setting-control">
-              <button
-                className="action-button primary button-margin-right"
+              <LoadingButton
+                loading={isFetchingCards}
+                loadingText="Fetching..."
                 onClick={handleFetchSetCards}
-                disabled={isFetchingCards || !setCode}
+                disabled={!setCode}
+                variant="primary"
+                className="button-margin-right"
               >
-                {isFetchingCards ? 'Fetching...' : 'Fetch Card Data'}
-              </button>
+                Fetch Card Data
+              </LoadingButton>
               <button
                 className="action-button"
                 onClick={handleRefreshSetCards}
@@ -965,13 +975,14 @@ const Settings = () => {
               <span className="setting-description">Update all draft grades and predictions with the latest 17Lands card ratings</span>
             </label>
             <div className="setting-control">
-              <button
-                className="action-button recalculate"
+              <LoadingButton
+                loading={isRecalculating}
+                loadingText="Recalculating..."
                 onClick={handleRecalculateGrades}
-                disabled={isRecalculating}
+                variant="recalculate"
               >
-                {isRecalculating ? 'Recalculating...' : 'Recalculate All Drafts'}
-              </button>
+                Recalculate All Drafts
+              </LoadingButton>
               {recalculateMessage && (
                 <div className={`recalculate-message ${recalculateMessage.startsWith('✓') ? 'success' : 'error'}`}>
                   {recalculateMessage}
@@ -986,13 +997,14 @@ const Settings = () => {
               <span className="setting-description">Remove cached 17Lands CSV files to free up disk space (ratings in database are preserved)</span>
             </label>
             <div className="setting-control">
-              <button
-                className="action-button clear-cache"
+              <LoadingButton
+                loading={isClearingCache}
+                loadingText="Clearing..."
                 onClick={handleClearDatasetCache}
-                disabled={isClearingCache}
+                variant="clear-cache"
               >
-                {isClearingCache ? 'Clearing...' : 'Clear Dataset Cache'}
-              </button>
+                Clear Dataset Cache
+              </LoadingButton>
             </div>
           </div>
 
