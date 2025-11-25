@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import {
-  DatabaseSection,
   DaemonConnectionSection,
   AppPreferencesSection,
-  DataManagementSection,
+  ImportExportSection,
+  DataRecoverySection,
   ReplayToolSection,
   SeventeenLandsSection,
-  AppearanceSection,
   AboutSection,
 } from '../components/settings/sections';
 import {
@@ -16,17 +15,25 @@ import {
   useReplayTool,
   useSeventeenLands,
   useDataManagement,
+  useDeveloperMode,
 } from '../hooks';
 import './Settings.css';
 
 const Settings = () => {
   // Local UI state
-  const [dbPath, setDbPath] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
   const [showNotifications, setShowNotifications] = useState(true);
+  const [theme, setTheme] = useState('dark');
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+
+  // Developer mode hook
+  const {
+    isDeveloperMode,
+    handleVersionClick,
+    toggleDeveloperMode,
+  } = useDeveloperMode();
 
   // Custom hooks for state management
   const {
@@ -100,10 +107,10 @@ const Settings = () => {
   };
 
   const handleReset = () => {
-    setDbPath('');
     setAutoRefresh(false);
     setRefreshInterval(30);
     setShowNotifications(true);
+    setTheme('dark');
   };
 
   return (
@@ -114,11 +121,7 @@ const Settings = () => {
       </div>
 
       <div className="settings-content">
-        <DatabaseSection
-          dbPath={dbPath}
-          onDbPathChange={setDbPath}
-        />
-
+        {/* Connection */}
         <DaemonConnectionSection
           connectionStatus={connectionStatus}
           daemonMode={daemonMode}
@@ -129,6 +132,7 @@ const Settings = () => {
           onModeChange={handleModeChange}
         />
 
+        {/* Preferences (consolidated with theme) */}
         <AppPreferencesSection
           autoRefresh={autoRefresh}
           onAutoRefreshChange={setAutoRefresh}
@@ -136,38 +140,29 @@ const Settings = () => {
           onRefreshIntervalChange={setRefreshInterval}
           showNotifications={showNotifications}
           onShowNotificationsChange={setShowNotifications}
+          theme={theme}
+          onThemeChange={setTheme}
         />
 
-        <DataManagementSection
+        {/* Import / Export */}
+        <ImportExportSection
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+        />
+
+        {/* Data Recovery */}
+        <DataRecoverySection
           isConnected={isConnected}
           clearDataBeforeReplay={clearDataBeforeReplay}
           onClearDataBeforeReplayChange={setClearDataBeforeReplay}
           isReplaying={isReplaying}
           replayProgress={replayProgress}
-          onExportData={handleExportData}
-          onImportData={handleImportData}
           onImportLogFile={handleImportLogFile}
           onReplayLogs={() => handleReplayLogs(isConnected)}
           onClearAllData={handleClearAllData}
         />
 
-        <ReplayToolSection
-          isConnected={isConnected}
-          replayToolActive={replayToolActive}
-          replayToolPaused={replayToolPaused}
-          replayToolProgress={replayToolProgress}
-          replaySpeed={replaySpeed}
-          onReplaySpeedChange={setReplaySpeed}
-          replayFilter={replayFilter}
-          onReplayFilterChange={setReplayFilter}
-          pauseOnDraft={pauseOnDraft}
-          onPauseOnDraftChange={setPauseOnDraft}
-          onStartReplayTool={() => handleStartReplayTool(isConnected)}
-          onPauseReplayTool={handlePauseReplayTool}
-          onResumeReplayTool={handleResumeReplayTool}
-          onStopReplayTool={handleStopReplayTool}
-        />
-
+        {/* 17Lands Integration */}
         <SeventeenLandsSection
           setCode={setCode}
           onSetCodeChange={setSetCode}
@@ -187,9 +182,33 @@ const Settings = () => {
           onClearDatasetCache={handleClearDatasetCache}
         />
 
-        <AppearanceSection />
+        {/* Developer Tools - Hidden by default */}
+        {isDeveloperMode && (
+          <ReplayToolSection
+            isConnected={isConnected}
+            replayToolActive={replayToolActive}
+            replayToolPaused={replayToolPaused}
+            replayToolProgress={replayToolProgress}
+            replaySpeed={replaySpeed}
+            onReplaySpeedChange={setReplaySpeed}
+            replayFilter={replayFilter}
+            onReplayFilterChange={setReplayFilter}
+            pauseOnDraft={pauseOnDraft}
+            onPauseOnDraftChange={setPauseOnDraft}
+            onStartReplayTool={() => handleStartReplayTool(isConnected)}
+            onPauseReplayTool={handlePauseReplayTool}
+            onResumeReplayTool={handleResumeReplayTool}
+            onStopReplayTool={handleStopReplayTool}
+          />
+        )}
 
-        <AboutSection onShowAboutDialog={() => setShowAbout(true)} />
+        {/* About */}
+        <AboutSection
+          onShowAboutDialog={() => setShowAbout(true)}
+          isDeveloperMode={isDeveloperMode}
+          onVersionClick={handleVersionClick}
+          onToggleDeveloperMode={toggleDeveloperMode}
+        />
 
         {/* Action Buttons */}
         <div className="settings-actions">

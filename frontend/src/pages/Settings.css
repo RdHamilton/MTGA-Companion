@@ -816,3 +816,48 @@
 .button-margin-right {
   margin-right: 8px;
 }
+
+/* Developer mode styles */
+.about-version-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.about-version-clickable:hover {
+  color: #7d9bff;
+}
+
+.about-version-clickable:active {
+  color: #5d7bdf;
+}
+
+.developer-mode-indicator {
+  background-color: rgba(125, 155, 255, 0.1);
+  border-left: 3px solid #7d9bff;
+  padding-left: 8px;
+  margin-left: -8px;
+}
+
+.developer-mode-enabled {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #7d9bff;
+}
+
+.developer-mode-toggle {
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: transparent;
+  border: 1px solid #7d9bff;
+  border-radius: 4px;
+  color: #7d9bff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.developer-mode-toggle:hover {
+  background-color: #7d9bff;
+  color: #1d1d1d;
+}
