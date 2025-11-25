@@ -14,6 +14,7 @@ interface SetSymbolProps {
 const setInfoCache = new Map<string, gui.SetInfo | null>();
 
 // Export for testing purposes
+// eslint-disable-next-line react-refresh/only-export-components
 export function clearSetInfoCache(): void {
   setInfoCache.clear();
 }
