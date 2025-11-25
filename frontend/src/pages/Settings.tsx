@@ -61,43 +61,34 @@ const Settings = () => {
   useEffect(() => {
     // Get initial state immediately
     const initialState = getReplayState();
-    console.log('[Settings] Initial replay state on mount:', initialState);
-    console.log('[Settings] Setting local state: active=%s, paused=%s', initialState.isActive, initialState.isPaused);
     setReplayToolActive(initialState.isActive);
     setReplayToolPaused(initialState.isPaused);
     setReplayToolProgress(initialState.progress);
 
     // Subscribe to future changes
-    console.log('[Settings] Subscribing to replay state changes');
     const unsubscribe = subscribeToReplayState((state) => {
-      console.log('[Settings] Received state update from subscription:', state);
-      console.log('[Settings] Updating local state: active=%s, paused=%s', state.isActive, state.isPaused);
       setReplayToolActive(state.isActive);
       setReplayToolPaused(state.isPaused);
       setReplayToolProgress(state.progress);
     });
 
     return () => {
-      console.log('[Settings] Unsubscribing from replay state changes');
       unsubscribe();
     };
   }, []);
 
   // Listen for replay events
   useEffect(() => {
-    const unsubscribeStarted = EventsOn('replay:started', (data: unknown) => {
-      console.log('Replay started:', data);
+    const unsubscribeStarted = EventsOn('replay:started', () => {
       setIsReplaying(true);
       setReplayProgress(null);
     });
 
     const unsubscribeProgress = EventsOn('replay:progress', (data: unknown) => {
-      console.log('Replay progress:', data);
       setReplayProgress(gui.LogReplayProgress.createFrom(data));
     });
 
     const unsubscribeCompleted = EventsOn('replay:completed', (data: unknown) => {
-      console.log('Replay completed:', data);
       setIsReplaying(false);
       setReplayProgress(gui.LogReplayProgress.createFrom(data));
       // Keep progress visible for a moment, then reload using Wails native method
@@ -106,11 +97,8 @@ const Settings = () => {
       }, 2000);
     });
 
-    const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
-      const eventData = gui.ReplayErrorEvent.createFrom(data);
-      console.error('Replay error:', eventData);
+    const unsubscribeError = EventsOn('replay:error', () => {
       setIsReplaying(false);
-      // Error will be logged to console
     });
 
     // Note: Replay tool events are now handled globally in App.tsx
@@ -129,8 +117,8 @@ const Settings = () => {
       const status = await GetConnectionStatus();
       setConnectionStatus(gui.ConnectionStatus.createFrom(status));
       setDaemonPortState(status.port || 9999);
-    } catch (error) {
-      console.error('Failed to load connection status:', error);
+    } catch {
+      // Connection status load failed silently - UI will show default state
     }
   };
 
@@ -143,9 +131,7 @@ const Settings = () => {
 
     try {
       await SetDaemonPort(port);
-      console.log('Daemon port updated to', port);
     } catch (error) {
-      console.error('Failed to set daemon port:', error);
       showToast.show(`Failed to set daemon port: ${error}`, 'error');
     }
   };
@@ -157,7 +143,6 @@ const Settings = () => {
       await loadConnectionStatus();
       showToast.show('Successfully reconnected to daemon', 'success');
     } catch (error) {
-      console.error('Failed to reconnect:', error);
       showToast.show(`Failed to reconnect to daemon: ${error}`, 'error');
     } finally {
       setIsReconnecting(false);
@@ -179,7 +164,6 @@ const Settings = () => {
       }
       // 'auto' mode is handled automatically by the app
     } catch (error) {
-      console.error('Failed to switch mode:', error);
       showToast.show(`Failed to switch mode: ${error}`, 'error');
     }
   };
@@ -207,7 +191,6 @@ const Settings = () => {
       }
       showToast.show(`Successfully exported data to ${format.toUpperCase()}!`, 'success');
     } catch (error) {
-      console.error('Export failed:', error);
       showToast.show(`Failed to export data: ${error}`, 'error');
     }
   };
@@ -217,7 +200,6 @@ const Settings = () => {
       await ImportFromFile();
       showToast.show('Successfully imported data! Refresh the page to see updated statistics.', 'success');
     } catch (error) {
-      console.error('Import failed:', error);
       showToast.show(`Failed to import data: ${error}`, 'error');
     }
   };
@@ -245,30 +227,21 @@ const Settings = () => {
         'success'
       );
     } catch (error) {
-      console.error('Log import failed:', error);
       showToast.show(`Failed to import log file: ${error}`, 'error');
     }
   };
 
   const handleReplayLogs = async () => {
-    console.log('=== REPLAY LOGS CLICKED ===');
-    console.log('handleReplayLogs called');
-    console.log('Connection status:', connectionStatus);
-    console.log('Clear data before replay:', clearDataBeforeReplay);
-
     // Check if connected to daemon
     if (connectionStatus.status !== 'connected') {
-      console.error('Daemon not connected, status:', connectionStatus.status);
       return;
     }
 
-    console.log('Calling TriggerReplayLogs...');
     try {
       await TriggerReplayLogs(clearDataBeforeReplay);
-      console.log('TriggerReplayLogs succeeded - replay started on daemon');
       // Progress UI will update automatically from events
     } catch (error) {
-      console.error('Failed to trigger replay:', error);
+      showToast.show(`Failed to trigger replay: ${error}`, 'error');
     }
   };
 
@@ -281,10 +254,8 @@ const Settings = () => {
     }
 
     try {
-      console.log('Starting replay with speed:', replaySpeed, 'filter:', replayFilter, 'pauseOnDraft:', pauseOnDraft);
       await StartReplayWithFileDialog(replaySpeed, replayFilter, pauseOnDraft);
     } catch (error) {
-      console.error('Failed to start replay:', error);
       showToast.show(`Failed to start replay: ${error}`, 'error');
     }
   };
@@ -293,7 +264,6 @@ const Settings = () => {
     try {
       await PauseReplay();
     } catch (error) {
-      console.error('Failed to pause replay:', error);
       showToast.show(`Failed to pause replay: ${error}`, 'error');
     }
   };
@@ -302,7 +272,6 @@ const Settings = () => {
     try {
       await ResumeReplay();
     } catch (error) {
-      console.error('Failed to resume replay:', error);
       showToast.show(`Failed to resume replay: ${error}`, 'error');
     }
   };
@@ -311,7 +280,6 @@ const Settings = () => {
     try {
       await StopReplay();
     } catch (error) {
-      console.error('Failed to stop replay:', error);
       showToast.show(`Failed to stop replay: ${error}`, 'error');
     }
   };
@@ -337,12 +305,10 @@ const Settings = () => {
                           source === 'legacy_api' ? 'legacy API' : source;
 
         showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}! The data is now cached and ready for use in drafts.`, 'success');
-      } catch (err) {
-        console.error('Failed to get data source:', err);
+      } catch {
         showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})! The data is now cached and ready for use in drafts.`, 'success');
       }
     } catch (error) {
-      console.error('Failed to fetch ratings:', error);
       showToast.show(`Failed to fetch 17Lands ratings: ${error}. Make sure: Set code is correct (e.g., TLA, BLB, DSK, FDN), you have internet connection, and 17Lands has data for this set.`, 'error');
     } finally {
       setIsFetchingRatings(false);
@@ -369,12 +335,10 @@ const Settings = () => {
                           source === 'legacy_api' ? 'legacy API' : source;
 
         showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!`, 'success');
-      } catch (err) {
-        console.error('Failed to get data source:', err);
+      } catch {
         showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`, 'success');
       }
     } catch (error) {
-      console.error('Failed to refresh ratings:', error);
       showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
     } finally {
       setIsFetchingRatings(false);
@@ -392,7 +356,6 @@ const Settings = () => {
       const count = await FetchSetCards(setCode.trim().toUpperCase());
       showToast.show(`Successfully fetched ${count} cards for ${setCode.toUpperCase()} from Scryfall! Card data is now cached.`, 'success');
     } catch (error) {
-      console.error('Failed to fetch cards:', error);
       showToast.show(`Failed to fetch cards: ${error}. Make sure the set code is correct and you have internet connection.`, 'error');
     } finally {
       setIsFetchingCards(false);
@@ -410,7 +373,6 @@ const Settings = () => {
       const count = await RefreshSetCards(setCode.trim().toUpperCase());
       showToast.show(`Successfully refreshed ${count} cards for ${setCode.toUpperCase()} from Scryfall!`, 'success');
     } catch (error) {
-      console.error('Failed to refresh cards:', error);
       showToast.show(`Failed to refresh cards: ${error}`, 'error');
     } finally {
       setIsFetchingCards(false);
@@ -418,30 +380,23 @@ const Settings = () => {
   };
 
   const handleRecalculateGrades = async () => {
-    console.log('[RecalculateGrades] Button clicked');
-    console.log('[RecalculateGrades] Starting recalculation...');
-
     setIsRecalculating(true);
     setRecalculateMessage('');
 
     try {
-      console.log('[RecalculateGrades] Calling RecalculateAllDraftGrades()...');
       const count = await RecalculateAllDraftGrades();
-      console.log('[RecalculateGrades] Recalculation complete, count:', count);
 
       setRecalculateMessage(`✓ Successfully recalculated ${count} draft session(s)! Draft grades and predictions have been updated.`);
 
       // Clear message after 5 seconds
       setTimeout(() => setRecalculateMessage(''), 5000);
     } catch (error) {
-      console.error('[RecalculateGrades] Error:', error);
       setRecalculateMessage(`✗ Failed to recalculate draft grades: ${error}`);
 
       // Clear error message after 8 seconds
       setTimeout(() => setRecalculateMessage(''), 8000);
     } finally {
       setIsRecalculating(false);
-      console.log('[RecalculateGrades] Finished');
     }
   };
 
@@ -451,7 +406,6 @@ const Settings = () => {
       await ClearDatasetCache();
       showToast.show('Successfully cleared dataset cache! Cached CSV files have been deleted to free up disk space. Ratings in the database are preserved.', 'success');
     } catch (error) {
-      console.error('Failed to clear cache:', error);
       showToast.show(`Failed to clear dataset cache: ${error}`, 'error');
     } finally {
       setIsClearingCache(false);
@@ -760,7 +714,6 @@ const Settings = () => {
                   showToast.show('All data has been cleared successfully!', 'success');
                   window.location.reload(); // Refresh to show empty state
                 } catch (error) {
-                  console.error('Clear data failed:', error);
                   showToast.show(`Failed to clear data: ${error}`, 'error');
                 }
               }}>
@@ -887,23 +840,6 @@ const Settings = () => {
                 )}
               </h3>
 
-              {/* Debug State Panel */}
-              <div style={{
-                background: '#1e1e1e',
-                padding: '12px',
-                borderRadius: '4px',
-                marginBottom: '16px',
-                fontSize: '0.85em',
-                fontFamily: 'monospace',
-                color: '#4a9eff'
-              }}>
-                <div><strong>STATE DEBUG:</strong></div>
-                <div>replayToolActive: {String(replayToolActive)}</div>
-                <div>replayToolPaused: {String(replayToolPaused)}</div>
-                <div>Global State isPaused: {String(getReplayState().isPaused)}</div>
-                <div>Global State isActive: {String(getReplayState().isActive)}</div>
-              </div>
-
               {replayToolProgress && (
                 <>
                   <div style={{
@@ -943,10 +879,6 @@ const Settings = () => {
               )}
 
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {(() => {
-                  console.log('[Settings Render] Button logic - replayToolPaused:', replayToolPaused);
-                  return null;
-                })()}
                 {!replayToolPaused && (
                   <button
                     className="action-button"
