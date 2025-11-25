@@ -29,13 +29,11 @@ const Layout = ({ children }: LayoutProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   // Derive activeTab from current route (computed value, not state)
-  const getActiveTab = (): 'match-history' | 'quests' | 'events' | 'draft' | 'decks' | 'charts' => {
+  const getActiveTab = (): 'match-history' | 'quests' | 'draft' | 'decks' | 'charts' => {
     if (location.pathname === '/match-history' || location.pathname === '/') {
       return 'match-history';
     } else if (location.pathname === '/quests') {
       return 'quests';
-    } else if (location.pathname === '/events') {
-      return 'events';
     } else if (location.pathname === '/draft') {
       return 'draft';
     } else if (location.pathname === '/decks' || location.pathname.startsWith('/deck-builder')) {
@@ -120,12 +118,6 @@ const Layout = ({ children }: LayoutProps) => {
             className={`tab ${activeTab === 'quests' ? 'active' : ''}`}
           >
             Quests
-          </Link>
-          <Link
-            to="/events"
-            className={`tab ${activeTab === 'events' ? 'active' : ''}`}
-          >
-            Events
           </Link>
           <Link
             to="/draft"

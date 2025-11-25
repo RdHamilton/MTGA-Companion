@@ -11,9 +11,10 @@ const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
  * Shortcuts:
  * - Cmd/Ctrl + 1: Match History
  * - Cmd/Ctrl + 2: Quests
- * - Cmd/Ctrl + 3: Events
- * - Cmd/Ctrl + 4: Charts
- * - Cmd/Ctrl + 5: Settings
+ * - Cmd/Ctrl + 3: Draft
+ * - Cmd/Ctrl + 4: Decks
+ * - Cmd/Ctrl + 5: Charts
+ * - Cmd/Ctrl + 6: Settings
  * - Cmd/Ctrl + R: Refresh current page
  * - Cmd/Ctrl + ,: Settings (macOS standard)
  */
@@ -51,14 +52,18 @@ const KeyboardShortcutsHandler = () => {
             handled = true;
             break;
           case '3':
-            navigate('/events');
+            navigate('/draft');
             handled = true;
             break;
           case '4':
-            navigate('/charts/win-rate-trend');
+            navigate('/decks');
             handled = true;
             break;
           case '5':
+            navigate('/charts/win-rate-trend');
+            handled = true;
+            break;
+          case '6':
             navigate('/settings');
             handled = true;
             break;

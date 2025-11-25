@@ -139,8 +139,28 @@ describe('RankProgression', () => {
         expect(screen.getByText('No rank progression data')).toBeInTheDocument();
       });
       expect(
-        screen.getByText('Play ranked matches to track your rank progression over time.')
+        screen.getByText('Play ranked constructed matches to track your rank progression over time.')
       ).toBeInTheDocument();
+    });
+
+    it('should show empty state with limited message when limited format selected', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({ entries: [] });
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(screen.getByText('No rank progression data')).toBeInTheDocument();
+      });
+
+      // Change to limited format
+      const formatSelect = getSelectByLabel('Format');
+      fireEvent.change(formatSelect, { target: { value: 'limited' } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Play limited (draft/sealed) matches to track your rank progression over time.')
+        ).toBeInTheDocument();
+      });
     });
 
     it('should show empty state when API returns null', async () => {
@@ -312,6 +332,16 @@ describe('RankProgression', () => {
   });
 
   describe('Filters', () => {
+    it('should render format filter', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(getSelectByLabel('Format')).toBeInTheDocument();
+      });
+    });
+
     it('should render date range filter', async () => {
       mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
@@ -319,6 +349,42 @@ describe('RankProgression', () => {
 
       await waitFor(() => {
         expect(getSelectByLabel('Date Range')).toBeInTheDocument();
+      });
+    });
+
+    it('should update format when filter changes', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+      });
+
+      const formatSelect = getSelectByLabel('Format');
+      expect(formatSelect.value).toBe('constructed');
+
+      fireEvent.change(formatSelect, { target: { value: 'limited' } });
+
+      await waitFor(() => {
+        expect(formatSelect.value).toBe('limited');
+      });
+    });
+
+    it('should refetch data when format changes', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(1);
+      });
+
+      const formatSelect = getSelectByLabel('Format');
+      fireEvent.change(formatSelect, { target: { value: 'limited' } });
+
+      await waitFor(() => {
+        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -368,21 +434,40 @@ describe('RankProgression', () => {
       });
     });
 
-    it('should display format note', async () => {
+    it('should display format note for constructed', async () => {
       mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
       await waitFor(() => {
         expect(
-          screen.getByText('Showing rank progression for Constructed (Ranked) ladder only')
+          screen.getByText('Showing rank progression for Constructed (Draft/Sealed) ladder')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should display format note for limited', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+      });
+
+      const formatSelect = getSelectByLabel('Format');
+      fireEvent.change(formatSelect, { target: { value: 'limited' } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Showing rank progression for Limited (Draft/Sealed) ladder')
         ).toBeInTheDocument();
       });
     });
   });
 
   describe('API Calls', () => {
-    it('should call GetRankProgressionTimeline with correct parameters', async () => {
+    it('should call GetRankProgressionTimeline with constructed format by default', async () => {
       mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
@@ -395,6 +480,29 @@ describe('RankProgression', () => {
       const call = mockWailsApp.GetRankProgressionTimeline.mock.calls[0] as any[];
       expect(call[0]).toBe('constructed');
       expect(call[3]).toBe('daily');
+    });
+
+    it('should call GetRankProgressionTimeline with limited format when selected', async () => {
+      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+
+      renderWithProvider(<RankProgression />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+      });
+
+      const formatSelect = getSelectByLabel('Format');
+      fireEvent.change(formatSelect, { target: { value: 'limited' } });
+
+      await waitFor(() => {
+        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(2);
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const calls = mockWailsApp.GetRankProgressionTimeline.mock.calls as any[][];
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toBe('limited');
+      expect(lastCall[3]).toBe('daily');
     });
   });
 

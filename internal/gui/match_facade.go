@@ -200,35 +200,3 @@ func (m *MatchFacade) GetCurrentAccount(ctx context.Context) (*models.Account, e
 	}
 	return account, nil
 }
-
-// GetActiveEvents returns all active draft events.
-func (m *MatchFacade) GetActiveEvents(ctx context.Context) ([]*models.DraftEvent, error) {
-	if m.services.Storage == nil {
-		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
-	}
-
-	events, err := m.services.Storage.GetActiveEvents(ctx)
-	if err != nil {
-		log.Printf("Error fetching active events: %v", err)
-		return nil, err
-	}
-
-	log.Printf("Found %d active events", len(events))
-	return events, nil
-}
-
-// GetEventWinDistribution returns win distribution across events.
-func (m *MatchFacade) GetEventWinDistribution(ctx context.Context) ([]*storage.EventWinDistribution, error) {
-	if m.services.Storage == nil {
-		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
-	}
-
-	distribution, err := m.services.Storage.GetEventWinDistribution(ctx)
-	if err != nil {
-		log.Printf("Error fetching event win distribution: %v", err)
-		return nil, err
-	}
-
-	log.Printf("Event win distribution returned %d entries", len(distribution))
-	return distribution, nil
-}

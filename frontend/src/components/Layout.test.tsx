@@ -58,7 +58,6 @@ describe('Layout Component', () => {
 
       expect(screen.getByText('Match History')).toBeInTheDocument();
       expect(screen.getByText('Quests')).toBeInTheDocument();
-      expect(screen.getByText('Events')).toBeInTheDocument();
       expect(screen.getByText('Draft')).toBeInTheDocument();
       expect(screen.getByText('Charts')).toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
