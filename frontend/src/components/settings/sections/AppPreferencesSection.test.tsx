@@ -10,11 +10,43 @@ describe('AppPreferencesSection', () => {
     onRefreshIntervalChange: vi.fn(),
     showNotifications: true,
     onShowNotificationsChange: vi.fn(),
+    theme: 'dark',
+    onThemeChange: vi.fn(),
   };
 
   it('renders section title', () => {
     render(<AppPreferencesSection {...defaultProps} />);
-    expect(screen.getByText('Application Preferences')).toBeInTheDocument();
+    expect(screen.getByText('Preferences')).toBeInTheDocument();
+  });
+
+  describe('theme selector', () => {
+    it('renders theme selector', () => {
+      render(<AppPreferencesSection {...defaultProps} />);
+      expect(screen.getByText('Theme')).toBeInTheDocument();
+    });
+
+    it('displays current theme value', () => {
+      render(<AppPreferencesSection {...defaultProps} theme="dark" />);
+      const select = screen.getByRole('combobox');
+      expect(select).toHaveValue('dark');
+    });
+
+    it('calls onThemeChange when theme changes', () => {
+      const onThemeChange = vi.fn();
+      render(<AppPreferencesSection {...defaultProps} onThemeChange={onThemeChange} />);
+
+      const select = screen.getByRole('combobox');
+      fireEvent.change(select, { target: { value: 'light' } });
+
+      expect(onThemeChange).toHaveBeenCalledWith('light');
+    });
+
+    it('has all theme options', () => {
+      render(<AppPreferencesSection {...defaultProps} />);
+      expect(screen.getByText('Dark (Default)')).toBeInTheDocument();
+      expect(screen.getByText('Light (Coming Soon)')).toBeInTheDocument();
+      expect(screen.getByText('Auto (System Default)')).toBeInTheDocument();
+    });
   });
 
   describe('auto-refresh toggle', () => {

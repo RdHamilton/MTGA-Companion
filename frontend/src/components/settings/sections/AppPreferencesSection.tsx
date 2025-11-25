@@ -1,4 +1,4 @@
-import { SettingItem, SettingToggle } from '../';
+import { SettingItem, SettingToggle, SettingSelect } from '../';
 
 export interface AppPreferencesSectionProps {
   autoRefresh: boolean;
@@ -7,6 +7,8 @@ export interface AppPreferencesSectionProps {
   onRefreshIntervalChange: (value: number) => void;
   showNotifications: boolean;
   onShowNotificationsChange: (value: boolean) => void;
+  theme: string;
+  onThemeChange: (value: string) => void;
 }
 
 export function AppPreferencesSection({
@@ -16,10 +18,24 @@ export function AppPreferencesSection({
   onRefreshIntervalChange,
   showNotifications,
   onShowNotificationsChange,
+  theme,
+  onThemeChange,
 }: AppPreferencesSectionProps) {
   return (
     <div className="settings-section">
-      <h2 className="section-title">Application Preferences</h2>
+      <h2 className="section-title">Preferences</h2>
+
+      <SettingSelect
+        label="Theme"
+        description="Choose your preferred color scheme"
+        value={theme}
+        onChange={onThemeChange}
+        options={[
+          { value: 'dark', label: 'Dark (Default)' },
+          { value: 'light', label: 'Light (Coming Soon)' },
+          { value: 'auto', label: 'Auto (System Default)' },
+        ]}
+      />
 
       <SettingToggle
         label="Auto-refresh data"

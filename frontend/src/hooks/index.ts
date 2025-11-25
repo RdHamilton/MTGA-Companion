@@ -12,3 +12,5 @@ export type { UseSeventeenLandsReturn } from './useSeventeenLands';
 
 export { useDataManagement } from './useDataManagement';
 export type { UseDataManagementReturn } from './useDataManagement';
+
+export { useDeveloperMode } from './useDeveloperMode';
