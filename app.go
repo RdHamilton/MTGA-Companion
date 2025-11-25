@@ -485,6 +485,16 @@ func (a *App) GetColorRatings(setCode string, draftFormat string) ([]seventeenla
 	return a.cardFacade.GetColorRatings(a.ctx, setCode, draftFormat)
 }
 
+// GetSetInfo returns information about a specific set including its icon URL
+func (a *App) GetSetInfo(setCode string) (*gui.SetInfo, error) {
+	return a.cardFacade.GetSetInfo(a.ctx, setCode)
+}
+
+// GetAllSetInfo returns information about all known sets
+func (a *App) GetAllSetInfo() ([]*gui.SetInfo, error) {
+	return a.cardFacade.GetAllSetInfo(a.ctx)
+}
+
 // ========================================
 // Export Methods (ExportFacade)
 // ========================================

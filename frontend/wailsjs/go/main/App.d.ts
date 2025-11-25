@@ -53,6 +53,8 @@ export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
 
 export function GetActiveQuests():Promise<Array<models.Quest>>;
 
+export function GetAllSetInfo():Promise<Array<gui.SetInfo>>;
+
 export function GetArchetypeCards(arg1:string,arg2:string,arg3:string):Promise<insights.ArchetypeCards>;
 
 export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;
@@ -144,6 +146,8 @@ export function GetReplayErrorEvent():Promise<gui.ReplayErrorEvent>;
 export function GetReplayStatus():Promise<gui.ReplayStatus>;
 
 export function GetSetCards(arg1:string):Promise<Array<models.SetCard>>;
+
+export function GetSetInfo(arg1:string):Promise<gui.SetInfo>;
 
 export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
 

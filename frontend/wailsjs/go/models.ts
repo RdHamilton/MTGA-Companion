@@ -857,6 +857,28 @@ export namespace gui {
 	    }
 	}
 	
+	export class SetInfo {
+	    code: string;
+	    name: string;
+	    iconSvgUri: string;
+	    setType: string;
+	    releasedAt: string;
+	    cardCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.name = source["name"];
+	        this.iconSvgUri = source["iconSvgUri"];
+	        this.setType = source["setType"];
+	        this.releasedAt = source["releasedAt"];
+	        this.cardCount = source["cardCount"];
+	    }
+	}
 	export class StatsUpdatedEvent {
 	    matches: number;
 	    games: number;
