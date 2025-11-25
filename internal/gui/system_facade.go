@@ -637,6 +637,76 @@ type LogReplayProgress struct {
 	Error string `json:"error,omitempty"`
 }
 
+// ============================================================================
+// Event Payload Types
+// These types define the structure of data sent with frontend events.
+// ============================================================================
+
+// StatsUpdatedEvent is the payload for stats:updated events.
+// Sent when match/game statistics are updated.
+type StatsUpdatedEvent struct {
+	Matches int `json:"matches"` // Number of matches updated
+	Games   int `json:"games"`   // Number of games updated
+}
+
+// RankUpdatedEvent is the payload for rank:updated events.
+// Sent when player rank changes.
+type RankUpdatedEvent struct {
+	Format string `json:"format"` // Ranked format (e.g., "Constructed", "Limited")
+	Tier   string `json:"tier"`   // Rank tier (e.g., "Gold", "Platinum")
+	Step   string `json:"step"`   // Step within tier (e.g., "1", "2", "3", "4")
+}
+
+// QuestUpdatedEvent is the payload for quest:updated events.
+// Sent when quest progress changes.
+type QuestUpdatedEvent struct {
+	Completed int `json:"completed"` // Number of quests completed
+	Count     int `json:"count"`     // Total number of quests
+}
+
+// DraftUpdatedEvent is the payload for draft:updated events.
+// Sent when draft session data changes.
+type DraftUpdatedEvent struct {
+	Count int `json:"count"` // Number of draft sessions updated
+	Picks int `json:"picks"` // Number of picks made
+}
+
+// DeckUpdatedEvent is the payload for deck:updated events.
+// Sent when deck data changes.
+type DeckUpdatedEvent struct {
+	Count int `json:"count"` // Number of decks updated
+}
+
+// AchievementUpdatedEvent is the payload for achievement:updated events.
+// Sent when achievement progress changes.
+type AchievementUpdatedEvent struct {
+	Count int `json:"count"` // Number of achievements updated
+}
+
+// DaemonErrorEvent is the payload for daemon:error events.
+// Sent when daemon encounters an error.
+type DaemonErrorEvent struct {
+	Error   string `json:"error"`   // Error message
+	Code    string `json:"code"`    // Error code (optional)
+	Details string `json:"details"` // Additional details (optional)
+}
+
+// ReplayErrorEvent is the payload for replay:error events.
+// Sent when replay encounters an error.
+type ReplayErrorEvent struct {
+	Error   string `json:"error"`   // Error message
+	Code    string `json:"code"`    // Error code (optional)
+	Details string `json:"details"` // Additional details (optional)
+}
+
+// ReplayDraftDetectedEvent is the payload for replay:draft_detected events.
+// Sent when a draft is detected during replay.
+type ReplayDraftDetectedEvent struct {
+	DraftID   string `json:"draftId"`   // ID of the detected draft
+	SetCode   string `json:"setCode"`   // Set code (e.g., "DSK", "BLB")
+	EventType string `json:"eventType"` // Draft event type (e.g., "PremierDraft")
+}
+
 // TriggerReplayLogs sends a command to the daemon to replay historical logs.
 // This is only available when connected to the daemon (not standalone mode).
 func (s *SystemFacade) TriggerReplayLogs(ctx context.Context, clearData bool) error {
@@ -828,6 +898,58 @@ func (s *SystemFacade) GetReplayStatus(ctx context.Context) (*ReplayStatus, erro
 // Actual progress is delivered via 'replay:progress' events.
 func (s *SystemFacade) GetLogReplayProgress(ctx context.Context) (*LogReplayProgress, error) {
 	return &LogReplayProgress{}, nil
+}
+
+// ============================================================================
+// Event Type Exposers
+// These methods exist solely to expose event payload types to Wails for
+// TypeScript code generation. They return empty structs and are not called
+// at runtime. Actual event data is delivered via EventsEmit.
+// ============================================================================
+
+// GetStatsUpdatedEvent exposes StatsUpdatedEvent type to Wails.
+func (s *SystemFacade) GetStatsUpdatedEvent(ctx context.Context) (*StatsUpdatedEvent, error) {
+	return &StatsUpdatedEvent{}, nil
+}
+
+// GetRankUpdatedEvent exposes RankUpdatedEvent type to Wails.
+func (s *SystemFacade) GetRankUpdatedEvent(ctx context.Context) (*RankUpdatedEvent, error) {
+	return &RankUpdatedEvent{}, nil
+}
+
+// GetQuestUpdatedEvent exposes QuestUpdatedEvent type to Wails.
+func (s *SystemFacade) GetQuestUpdatedEvent(ctx context.Context) (*QuestUpdatedEvent, error) {
+	return &QuestUpdatedEvent{}, nil
+}
+
+// GetDraftUpdatedEvent exposes DraftUpdatedEvent type to Wails.
+func (s *SystemFacade) GetDraftUpdatedEvent(ctx context.Context) (*DraftUpdatedEvent, error) {
+	return &DraftUpdatedEvent{}, nil
+}
+
+// GetDeckUpdatedEvent exposes DeckUpdatedEvent type to Wails.
+func (s *SystemFacade) GetDeckUpdatedEvent(ctx context.Context) (*DeckUpdatedEvent, error) {
+	return &DeckUpdatedEvent{}, nil
+}
+
+// GetAchievementUpdatedEvent exposes AchievementUpdatedEvent type to Wails.
+func (s *SystemFacade) GetAchievementUpdatedEvent(ctx context.Context) (*AchievementUpdatedEvent, error) {
+	return &AchievementUpdatedEvent{}, nil
+}
+
+// GetDaemonErrorEvent exposes DaemonErrorEvent type to Wails.
+func (s *SystemFacade) GetDaemonErrorEvent(ctx context.Context) (*DaemonErrorEvent, error) {
+	return &DaemonErrorEvent{}, nil
+}
+
+// GetReplayErrorEvent exposes ReplayErrorEvent type to Wails.
+func (s *SystemFacade) GetReplayErrorEvent(ctx context.Context) (*ReplayErrorEvent, error) {
+	return &ReplayErrorEvent{}, nil
+}
+
+// GetReplayDraftDetectedEvent exposes ReplayDraftDetectedEvent type to Wails.
+func (s *SystemFacade) GetReplayDraftDetectedEvent(ctx context.Context) (*ReplayDraftDetectedEvent, error) {
+	return &ReplayDraftDetectedEvent{}, nil
 }
 
 // localFirstCardProvider implements deckexport.CardProvider by checking

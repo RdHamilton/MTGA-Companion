@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import Toast from './Toast';
 import { getReplayState, subscribeToReplayState } from '../App';
+import { gui } from '../../wailsjs/go/models';
 
 interface ToastData {
   id: number;
@@ -57,9 +58,9 @@ const ToastContainer = () => {
   useEffect(() => {
     // Listen for stats:updated events from backend
     const unsubscribeStats = EventsOn('stats:updated', (data: unknown) => {
-      const eventData = data as { matches?: number; games?: number } | undefined;
-      const matches = eventData?.matches || 0;
-      const games = eventData?.games || 0;
+      const eventData = gui.StatsUpdatedEvent.createFrom(data);
+      const matches = eventData.matches || 0;
+      const games = eventData.games || 0;
 
       if (matches > 0) {
         addToast(
@@ -71,10 +72,10 @@ const ToastContainer = () => {
 
     // Listen for rank:updated events
     const unsubscribeRank = EventsOn('rank:updated', (data: unknown) => {
-      const eventData = data as { format?: string; tier?: string; step?: string } | undefined;
-      const format = eventData?.format || 'Ranked';
-      const tier = eventData?.tier || '';
-      const step = eventData?.step || '';
+      const eventData = gui.RankUpdatedEvent.createFrom(data);
+      const format = eventData.format || 'Ranked';
+      const tier = eventData.tier || '';
+      const step = eventData.step || '';
 
       if (tier && step) {
         addToast(
@@ -86,9 +87,9 @@ const ToastContainer = () => {
 
     // Listen for quest update events
     const unsubscribeQuest = EventsOn('quest:updated', (data: unknown) => {
-      const eventData = data as { completed?: number; count?: number } | undefined;
-      const completed = eventData?.completed || 0;
-      const count = eventData?.count || 0;
+      const eventData = gui.QuestUpdatedEvent.createFrom(data);
+      const completed = eventData.completed || 0;
+      const count = eventData.count || 0;
 
       if (completed > 0) {
         addToast(
@@ -105,9 +106,9 @@ const ToastContainer = () => {
 
     // Listen for draft update events with spam protection during replay
     const unsubscribeDraft = EventsOn('draft:updated', (data: unknown) => {
-      const eventData = data as { count?: number; picks?: number } | undefined;
-      const count = eventData?.count || 0;
-      const picks = eventData?.picks || 0;
+      const eventData = gui.DraftUpdatedEvent.createFrom(data);
+      const count = eventData.count || 0;
+      const picks = eventData.picks || 0;
 
       // During replay, batch draft updates to prevent spam
       if (isReplayActiveRef.current) {

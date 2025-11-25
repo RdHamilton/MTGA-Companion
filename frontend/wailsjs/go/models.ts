@@ -33,6 +33,18 @@ export namespace grading {
 
 export namespace gui {
 	
+	export class AchievementUpdatedEvent {
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AchievementUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.count = source["count"];
+	    }
+	}
 	export class CardRatingWithTier {
 	    name: string;
 	    color: string;
@@ -223,6 +235,22 @@ export namespace gui {
 	        this.averageToughness = source["averageToughness"];
 	        this.totalPower = source["totalPower"];
 	        this.totalToughness = source["totalToughness"];
+	    }
+	}
+	export class DaemonErrorEvent {
+	    error: string;
+	    code: string;
+	    details: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DaemonErrorEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.error = source["error"];
+	        this.code = source["code"];
+	        this.details = source["details"];
 	    }
 	}
 	export class DeckLibraryFilter {
@@ -449,6 +477,18 @@ export namespace gui {
 		    return a;
 		}
 	}
+	export class DeckUpdatedEvent {
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.count = source["count"];
+	    }
+	}
 	export class DeckWithCards {
 	    deck?: models.Deck;
 	    cards: models.DeckCard[];
@@ -482,6 +522,20 @@ export namespace gui {
 		    }
 		    return a;
 		}
+	}
+	export class DraftUpdatedEvent {
+	    count: number;
+	    picks: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DraftUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.count = source["count"];
+	        this.picks = source["picks"];
+	    }
 	}
 	export class ExplainRecommendationRequest {
 	    deckID: string;
@@ -714,6 +768,68 @@ export namespace gui {
 	        this.error = source["error"];
 	    }
 	}
+	export class QuestUpdatedEvent {
+	    completed: number;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new QuestUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.completed = source["completed"];
+	        this.count = source["count"];
+	    }
+	}
+	export class RankUpdatedEvent {
+	    format: string;
+	    tier: string;
+	    step: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RankUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.tier = source["tier"];
+	        this.step = source["step"];
+	    }
+	}
+	export class ReplayDraftDetectedEvent {
+	    draftId: string;
+	    setCode: string;
+	    eventType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReplayDraftDetectedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.draftId = source["draftId"];
+	        this.setCode = source["setCode"];
+	        this.eventType = source["eventType"];
+	    }
+	}
+	export class ReplayErrorEvent {
+	    error: string;
+	    code: string;
+	    details: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReplayErrorEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.error = source["error"];
+	        this.code = source["code"];
+	        this.details = source["details"];
+	    }
+	}
 	export class ReplayStatus {
 	    isActive: boolean;
 	    isPaused: boolean;
@@ -741,6 +857,20 @@ export namespace gui {
 	    }
 	}
 	
+	export class StatsUpdatedEvent {
+	    matches: number;
+	    games: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StatsUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matches = source["matches"];
+	        this.games = source["games"];
+	    }
+	}
 
 }
 

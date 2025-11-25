@@ -107,7 +107,8 @@ const Settings = () => {
     });
 
     const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
-      console.error('Replay error:', data);
+      const eventData = gui.ReplayErrorEvent.createFrom(data);
+      console.error('Replay error:', eventData);
       setIsReplaying(false);
       // Error will be logged to console
     });

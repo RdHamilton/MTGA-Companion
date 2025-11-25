@@ -45,6 +45,8 @@ export function FetchSetRatings(arg1:string,arg2:string):Promise<void>;
 
 export function FixDraftSessionStatuses():Promise<number>;
 
+export function GetAchievementUpdatedEvent():Promise<gui.AchievementUpdatedEvent>;
+
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
 export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
@@ -67,6 +69,8 @@ export function GetConnectionStatus():Promise<gui.ConnectionStatus>;
 
 export function GetCurrentAccount():Promise<models.Account>;
 
+export function GetDaemonErrorEvent():Promise<gui.DaemonErrorEvent>;
+
 export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
 
 export function GetDeck(arg1:string):Promise<gui.DeckWithCards>;
@@ -78,6 +82,8 @@ export function GetDeckLibrary(arg1:gui.DeckLibraryFilter):Promise<Array<gui.Dec
 export function GetDeckPerformance(arg1:string):Promise<models.DeckPerformance>;
 
 export function GetDeckStatistics(arg1:string):Promise<gui.DeckStatistics>;
+
+export function GetDeckUpdatedEvent():Promise<gui.DeckUpdatedEvent>;
 
 export function GetDecksByFormat(arg1:string):Promise<Array<gui.DeckListItem>>;
 
@@ -96,6 +102,8 @@ export function GetDraftPerformanceMetrics():Promise<metrics.DraftStats>;
 export function GetDraftPicks(arg1:string):Promise<Array<models.DraftPickSession>>;
 
 export function GetDraftSession(arg1:string):Promise<models.DraftSession>;
+
+export function GetDraftUpdatedEvent():Promise<gui.DraftUpdatedEvent>;
 
 export function GetDraftWinRatePrediction(arg1:string):Promise<prediction.DeckPrediction>;
 
@@ -119,11 +127,19 @@ export function GetQuestHistory(arg1:string,arg2:string,arg3:number):Promise<Arr
 
 export function GetQuestStats(arg1:string,arg2:string):Promise<models.QuestStats>;
 
+export function GetQuestUpdatedEvent():Promise<gui.QuestUpdatedEvent>;
+
 export function GetRankProgression(arg1:string):Promise<models.RankProgression>;
 
 export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.Time,arg4:storage.TimelinePeriod):Promise<storage.RankTimeline>;
 
+export function GetRankUpdatedEvent():Promise<gui.RankUpdatedEvent>;
+
 export function GetRecommendations(arg1:gui.GetRecommendationsRequest):Promise<gui.GetRecommendationsResponse>;
+
+export function GetReplayDraftDetectedEvent():Promise<gui.ReplayDraftDetectedEvent>;
+
+export function GetReplayErrorEvent():Promise<gui.ReplayErrorEvent>;
 
 export function GetReplayStatus():Promise<gui.ReplayStatus>;
 
@@ -134,6 +150,8 @@ export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
 export function GetStatsByDeck(arg1:models.StatsFilter):Promise<Record<string, models.Statistics>>;
 
 export function GetStatsByFormat(arg1:models.StatsFilter):Promise<Record<string, models.Statistics>>;
+
+export function GetStatsUpdatedEvent():Promise<gui.StatsUpdatedEvent>;
 
 export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:Array<string>):Promise<storage.TrendAnalysis>;
 
