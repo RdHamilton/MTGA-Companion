@@ -619,8 +619,8 @@ const Settings = () => {
               </span>
             </label>
             <div className="setting-control">
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="checkbox-container">
+                <label className="checkbox-label">
                   <input
                     type="checkbox"
                     checked={clearDataBeforeReplay}
@@ -639,7 +639,7 @@ const Settings = () => {
                 {isReplaying ? 'Replaying Logs...' : 'Replay Historical Logs'}
               </button>
               {connectionStatus.status !== 'connected' && (
-                <div className="setting-hint" style={{ color: '#ff6b6b', marginTop: '8px' }}>
+                <div className="setting-hint settings-daemon-hint">
                   Daemon must be running to replay logs
                 </div>
               )}
@@ -648,18 +648,13 @@ const Settings = () => {
 
           {(isReplaying || replayProgress) && (
             <div className="setting-item">
-              <div className="replay-progress" style={{
-                background: '#2d2d2d',
-                padding: '16px',
-                borderRadius: '8px',
-                marginTop: '8px'
-              }}>
-                <h3 style={{ marginTop: 0, color: isReplaying ? '#4a9eff' : '#00ff00' }}>
+              <div className="replay-progress-container">
+                <h3 className={`replay-progress-title ${isReplaying ? '' : 'complete'}`}>
                   {isReplaying ? 'Replaying Historical Logs...' : '✓ Replay Complete'}
                 </h3>
                 {replayProgress && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                    <div className="settings-grid-2col">
                       <div>Files: {replayProgress.processedFiles || 0} / {replayProgress.totalFiles || 0}</div>
                       <div>Entries: {replayProgress.totalEntries || 0}</div>
                       <div>Matches: {replayProgress.matchesImported || 0}</div>
@@ -670,29 +665,20 @@ const Settings = () => {
                       )}
                     </div>
                     {replayProgress.currentFile && isReplaying && (
-                      <div style={{ fontSize: '0.9em', color: '#aaa' }}>
+                      <div className="current-file-display">
                         Current: {replayProgress.currentFile}
                       </div>
                     )}
                     {isReplaying && (
-                      <div style={{
-                        width: '100%',
-                        height: '8px',
-                        background: '#1e1e1e',
-                        borderRadius: '4px',
-                        overflow: 'hidden',
-                        marginTop: '12px'
-                      }}>
-                        <div style={{
-                          width: `${((replayProgress.processedFiles || 0) / (replayProgress.totalFiles || 1)) * 100}%`,
-                          height: '100%',
-                          background: '#4a9eff',
-                          transition: 'width 0.3s ease'
-                        }}></div>
+                      <div className="settings-progress-bar">
+                        <div
+                          className="settings-progress-bar-fill"
+                          style={{ width: `${((replayProgress.processedFiles || 0) / (replayProgress.totalFiles || 1)) * 100}%` }}
+                        ></div>
                       </div>
                     )}
                     {!isReplaying && (
-                      <div style={{ color: '#aaa', marginTop: '8px' }}>
+                      <div className="refresh-message">
                         Page will refresh in 2 seconds to show imported data...
                       </div>
                     )}
@@ -726,17 +712,17 @@ const Settings = () => {
         {/* Replay Testing Tool */}
         <div className="settings-section">
           <h2 className="section-title">Replay Testing Tool (Daemon Only)</h2>
-          <div className="setting-description" style={{ marginBottom: '16px', color: '#aaa' }}>
+          <div className="setting-description settings-section-description">
             Test draft and event features by replaying historical log files at variable speeds.
             While replay is active, navigate to Draft or Events pages to watch them populate in real-time.
-            <div style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '4px', border: '1px solid #ff6b6b' }}>
+            <div className="settings-warning-box">
               ⚠️ <strong>Important:</strong> Clear draft/event data before starting replay to avoid database conflicts.
               Existing draft sessions with the same ID will cause storage failures.
             </div>
           </div>
 
           {connectionStatus.status !== 'connected' && (
-            <div className="setting-hint" style={{ color: '#ff6b6b', marginBottom: '16px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
+            <div className="setting-hint settings-daemon-warning">
               ⚠️ Replay tool requires daemon mode. Please start the daemon service to use this feature.
             </div>
           )}
@@ -756,10 +742,9 @@ const Settings = () => {
                     step="1"
                     value={replaySpeed}
                     onChange={(e) => setReplaySpeed(parseFloat(e.target.value))}
-                    className="slider-input"
-                    style={{ width: '200px' }}
+                    className="slider-input input-width-200"
                   />
-                  <span style={{ marginLeft: '12px', minWidth: '60px', display: 'inline-block' }}>
+                  <span className="slider-value">
                     {replaySpeed}x
                   </span>
                 </div>
@@ -772,10 +757,9 @@ const Settings = () => {
                 </label>
                 <div className="setting-control">
                   <select
-                    className="select-input"
+                    className="select-input select-width-200"
                     value={replayFilter}
                     onChange={(e) => setReplayFilter(e.target.value)}
-                    style={{ width: '200px' }}
                   >
                     <option value="all">All Events</option>
                     <option value="draft">Draft Only</option>
@@ -819,22 +803,11 @@ const Settings = () => {
           )}
 
           {replayToolActive && (
-            <div className="replay-tool-controls" style={{
-              background: '#2d2d2d',
-              padding: '20px',
-              borderRadius: '8px',
-              marginTop: '16px'
-            }}>
-              <h3 style={{
-                marginTop: 0,
-                color: replayToolPaused ? '#ff9800' : '#4a9eff',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
+            <div className="replay-tool-controls">
+              <h3 className={`replay-tool-title ${replayToolPaused ? 'paused' : 'active'}`}>
                 {replayToolPaused ? '⏸️ Replay Paused' : '▶️ Replay Active'}
                 {replayToolProgress && (
-                  <span style={{ fontSize: '0.9em', fontWeight: 'normal', color: '#aaa' }}>
+                  <span className="replay-tool-subtitle">
                     ({replayToolProgress.speed || replaySpeed}x speed, {replayToolProgress.filter || replayFilter})
                   </span>
                 )}
@@ -842,13 +815,7 @@ const Settings = () => {
 
               {replayToolProgress && (
                 <>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '12px',
-                    marginBottom: '16px',
-                    fontSize: '0.95em'
-                  }}>
+                  <div className="settings-grid-2col-wide">
                     <div>
                       <strong>Progress:</strong> {replayToolProgress.currentEntry || 0} / {replayToolProgress.totalEntries || 0} entries
                     </div>
@@ -860,39 +827,28 @@ const Settings = () => {
                     </div>
                   </div>
 
-                  <div style={{
-                    width: '100%',
-                    height: '8px',
-                    background: '#1e1e1e',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                    marginBottom: '16px'
-                  }}>
-                    <div style={{
-                      width: `${replayToolProgress.percentComplete || 0}%`,
-                      height: '100%',
-                      background: replayToolPaused ? '#ff9800' : '#4a9eff',
-                      transition: 'width 0.3s ease'
-                    }}></div>
+                  <div className="settings-progress-bar with-margin-bottom">
+                    <div
+                      className={`settings-progress-bar-fill ${replayToolPaused ? 'paused' : ''}`}
+                      style={{ width: `${replayToolProgress.percentComplete || 0}%` }}
+                    ></div>
                   </div>
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="replay-tool-buttons">
                 {!replayToolPaused && (
                   <button
-                    className="action-button"
+                    className="action-button pause"
                     onClick={handlePauseReplayTool}
-                    style={{ background: '#ff9800' }}
                   >
                     ⏸️ Pause
                   </button>
                 )}
                 {replayToolPaused && (
                   <button
-                    className="action-button"
+                    className="action-button resume"
                     onClick={handleResumeReplayTool}
-                    style={{ background: '#00c853' }}
                   >
                     ▶️ Resume
                   </button>
@@ -905,14 +861,7 @@ const Settings = () => {
                 </button>
               </div>
 
-              <div style={{
-                marginTop: '16px',
-                padding: '12px',
-                background: '#1e1e1e',
-                borderRadius: '4px',
-                fontSize: '0.9em',
-                color: '#aaa'
-              }}>
+              <div className="settings-info-box-dark">
                 💡 <strong>Tip:</strong> Navigate to the Draft or Events page to watch them populate in real-time as the replay progresses!
               </div>
             </div>
@@ -922,7 +871,7 @@ const Settings = () => {
         {/* 17Lands Data Management */}
         <div className="settings-section">
           <h2 className="section-title">17Lands Card Ratings</h2>
-          <div className="setting-description" style={{ marginBottom: '16px', color: '#aaa' }}>
+          <div className="setting-description settings-section-description">
             Download card ratings and tier lists from 17Lands for draft assistance.
             Ratings are used in the Active Draft page to show pick quality and recommendations.
           </div>
@@ -940,8 +889,7 @@ const Settings = () => {
                 value={setCode}
                 onChange={(e) => setSetCode(e.target.value.toUpperCase())}
                 placeholder="e.g., TLA, BLB, DSK, FDN"
-                className="text-input"
-                style={{ width: '200px', textTransform: 'uppercase' }}
+                className="text-input input-width-200"
                 maxLength={5}
               />
             </div>
@@ -954,10 +902,9 @@ const Settings = () => {
             </label>
             <div className="setting-control">
               <select
-                className="select-input"
+                className="select-input select-width-200"
                 value={draftFormat}
                 onChange={(e) => setDraftFormat(e.target.value)}
-                style={{ width: '200px' }}
               >
                 <option value="PremierDraft">Premier Draft (BO1)</option>
                 <option value="QuickDraft">Quick Draft</option>
@@ -973,10 +920,9 @@ const Settings = () => {
             </label>
             <div className="setting-control">
               <button
-                className="action-button primary"
+                className="action-button primary button-margin-right"
                 onClick={handleFetchSetRatings}
                 disabled={isFetchingRatings || !setCode}
-                style={{ marginRight: '8px' }}
               >
                 {isFetchingRatings ? 'Fetching...' : 'Fetch Ratings'}
               </button>
@@ -997,10 +943,9 @@ const Settings = () => {
             </label>
             <div className="setting-control">
               <button
-                className="action-button primary"
+                className="action-button primary button-margin-right"
                 onClick={handleFetchSetCards}
                 disabled={isFetchingCards || !setCode}
-                style={{ marginRight: '8px' }}
               >
                 {isFetchingCards ? 'Fetching...' : 'Fetch Card Data'}
               </button>
@@ -1021,27 +966,14 @@ const Settings = () => {
             </label>
             <div className="setting-control">
               <button
-                className="action-button"
+                className="action-button recalculate"
                 onClick={handleRecalculateGrades}
                 disabled={isRecalculating}
-                style={{
-                  background: '#4a9eff',
-                  color: 'white',
-                  fontWeight: 'bold'
-                }}
               >
                 {isRecalculating ? 'Recalculating...' : 'Recalculate All Drafts'}
               </button>
               {recalculateMessage && (
-                <div style={{
-                  marginLeft: '12px',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  background: recalculateMessage.startsWith('✓') ? '#2d4a2d' : '#4a2d2d',
-                  color: recalculateMessage.startsWith('✓') ? '#7cfc00' : '#ff6b6b',
-                  fontSize: '0.9em',
-                  display: 'inline-block'
-                }}>
+                <div className={`recalculate-message ${recalculateMessage.startsWith('✓') ? 'success' : 'error'}`}>
                   {recalculateMessage}
                 </div>
               )}
@@ -1055,13 +987,9 @@ const Settings = () => {
             </label>
             <div className="setting-control">
               <button
-                className="action-button"
+                className="action-button clear-cache"
                 onClick={handleClearDatasetCache}
                 disabled={isClearingCache}
-                style={{
-                  background: '#ff6b6b',
-                  color: 'white'
-                }}
               >
                 {isClearingCache ? 'Clearing...' : 'Clear Dataset Cache'}
               </button>
@@ -1069,7 +997,7 @@ const Settings = () => {
           </div>
 
           {dataSource && (
-            <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d4a2d', borderRadius: '8px', border: '1px solid #4a9eff' }}>
+            <div className="setting-hint settings-success-box">
               <strong>📊 Current Data Source:</strong> {
                 dataSource === 's3' ? 'S3 Public Datasets (recommended, uses locally cached game data)' :
                 dataSource === 'web_api' ? 'Web API (fallback for new sets like TLA)' :
@@ -1079,9 +1007,9 @@ const Settings = () => {
             </div>
           )}
 
-          <div className="setting-hint" style={{ marginTop: '12px', padding: '12px', background: '#2d2d2d', borderRadius: '8px' }}>
+          <div className="setting-hint settings-info-box">
             <strong>💡 Common Set Codes:</strong>
-            <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', fontSize: '0.9em' }}>
+            <div className="set-codes-grid">
               <div>• TLA - Avatar: The Last Airbender</div>
               <div>• FDN - Foundations</div>
               <div>• DSK - Duskmourn</div>
@@ -1128,7 +1056,7 @@ const Settings = () => {
               <span className="about-label">Platform:</span>
               <span className="about-value">Wails + React</span>
             </div>
-            <div className="setting-control" style={{ marginTop: '16px' }}>
+            <div className="setting-control about-button-container">
               <button className="action-button" onClick={() => setShowAbout(true)}>
                 About MTGA Companion
               </button>
