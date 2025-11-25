@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -280,21 +281,95 @@ func (r *QuestRepository) GetQuestStats(startDate, endDate *time.Time) (*models.
 		FROM latest_quests
 	`
 
-	var avgMS sql.NullInt64
+	var avgMS sql.NullFloat64
 	err = r.db.QueryRow(query, args...).Scan(&avgMS)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to calculate average completion time: %w", err)
 	}
 
 	if avgMS.Valid {
-		stats.AverageCompletionMS = avgMS.Int64
+		stats.AverageCompletionMS = int64(avgMS.Float64)
 	}
 
-	// TODO: Calculate total gold earned by parsing rewards JSON
-	// For now, estimate based on completed quests (most quests give 500 or 750 gold)
-	stats.TotalGoldEarned = stats.CompletedQuests * 500 // Conservative estimate
+	// Calculate total gold earned by parsing rewards from completed quests
+	stats.TotalGoldEarned = r.calculateTotalGoldEarned(startDate, endDate)
 
 	return stats, nil
+}
+
+// calculateTotalGoldEarned sums the gold rewards from all completed quests.
+// Falls back to estimate of 500 gold per quest if parsing fails.
+func (r *QuestRepository) calculateTotalGoldEarned(startDate, endDate *time.Time) int {
+	query := `
+		WITH latest_quests AS (
+			SELECT q.*
+			FROM quests q
+			INNER JOIN (
+				SELECT quest_id, MAX(created_at) as max_created
+				FROM quests
+				WHERE completed = 1
+	`
+	args := []interface{}{}
+
+	if startDate != nil {
+		query += " AND DATE(created_at) >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
+	}
+
+	if endDate != nil {
+		query += " AND DATE(created_at) <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
+	}
+
+	query += `
+				GROUP BY quest_id
+			) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		)
+		SELECT COALESCE(rewards, '') as rewards
+		FROM latest_quests
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		// Fall back to estimate on error
+		return 0
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	totalGold := 0
+
+	for rows.Next() {
+		var rewards string
+		if err := rows.Scan(&rewards); err != nil {
+			continue
+		}
+
+		gold := parseGoldFromRewards(rewards)
+		totalGold += gold
+	}
+
+	return totalGold
+}
+
+// parseGoldFromRewards extracts the gold amount from a rewards string.
+// The rewards field can be:
+// - A numeric string like "500" or "750"
+// - Empty string (defaults to 500)
+// - Invalid data (defaults to 500)
+func parseGoldFromRewards(rewards string) int {
+	rewards = strings.TrimSpace(rewards)
+
+	if rewards == "" {
+		return 500 // Default estimate for missing data
+	}
+
+	// Try to parse as integer
+	if gold, err := strconv.Atoi(rewards); err == nil && gold > 0 {
+		return gold
+	}
+
+	// Fall back to conservative estimate
+	return 500
 }
 
 // GetQuestByID retrieves a quest by its database ID
