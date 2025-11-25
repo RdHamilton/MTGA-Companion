@@ -36,7 +36,7 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Historical Draft Replay**: View and replay past draft pick sequences
 - **Card Data Integration**: 17Lands public datasets and Scryfall metadata
 
-### Deck Builder (NEW in v1.3)
+### Deck Builder (v1.3)
 - **Deck Creation & Management**: Build constructed and draft-based decks with full CRUD operations
 - **AI-Powered Recommendations**: Intelligent card suggestions based on color fit, mana curve, synergy, and card quality
 - **Multiple Import Formats**: Import from Arena, plain text, and other common formats
@@ -47,6 +47,18 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Performance Tracking**: Automatic win rate tracking and performance metrics
 - **Tagging & Organization**: Categorize and filter decks with custom tags
 - **Deck Library**: Advanced filtering by format, source, tags, and performance
+
+### Quest & Statistics Tracking (v1.3)
+- **Quest Tracking**: Monitor daily and weekly quest progress
+- **Accurate Gold Calculation**: Parses actual quest rewards instead of estimates
+- **Real-Time Updates**: Live draft updates via `draft:updated` events
+- **Set Symbol Display**: Card displays now show set symbols/icons
+
+### Settings Improvements (v1.3)
+- **Collapsible Accordion Navigation**: Organized settings into collapsible sections
+- **URL Hash Navigation**: Direct links to settings sections (e.g., `#connection`, `#17lands`)
+- **Keyboard Navigation**: Full keyboard support for accessibility
+- **LoadingButton Component**: Consistent loading states across all async operations
 
 ## Documentation
 
@@ -293,7 +305,8 @@ The application will:
 ### Navigation
 
 - **Match History**: View and filter all your matches
-- **Draft**: Real-time draft assistant with recommendations, synergy detection, and format insights (NEW in v1.1)
+- **Draft**: Real-time draft assistant with recommendations, synergy detection, and format insights
+- **Decks**: Deck library with builder, import/export, and AI recommendations (v1.3)
 - **Charts**: Visualize your performance data
   - Win Rate Trend: Performance over time
   - Deck Performance: Win rates by deck

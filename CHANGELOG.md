@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-11-25
+
+### Added
+
+**Deck Builder Feature (Complete)**
+- **Deck Creation & Management** - Build constructed and draft-based decks with full CRUD operations
+- **AI-Powered Card Recommendations** - Intelligent suggestions based on color fit, mana curve, synergy, and card quality (#504)
+- **Multiple Import Formats** - Import from Arena, plain text, and other common formats (#503)
+- **Multiple Export Formats** - Export to Arena, MTGO, MTGGoldfish, and plain text (#505)
+- **Comprehensive Statistics** - Mana curve, color distribution, type breakdown, and land recommendations (#507)
+- **Draft Pool Validation** - Draft decks restricted to cards from the associated draft
+- **Format Legality Checking** - Validate decks for Standard, Historic, Explorer, Alchemy, Brawl, and Commander
+- **Performance Tracking** - Automatic win rate tracking and performance metrics (#506)
+- **Deck Library UI** - Advanced filtering by format, source, tags, and performance (#512)
+- **Complete Documentation** - Comprehensive deck builder guide with API reference (#509)
+
+**Quest & Statistics Tracking**
+- **Quest Gold Calculation** - Accurate gold calculation by parsing actual reward values instead of estimates (#572)
+- **Real-Time Draft Updates** - Live draft updates via `draft:updated` events (#524)
+- **Set Symbol Display** - Card displays now show set symbols/icons (#548)
+
+**Settings Page Improvements**
+- **Collapsible Accordion Navigation** - Organized settings into 7 collapsible sections (#569)
+- **URL Hash Navigation** - Direct links to settings sections (e.g., `/settings#connection`, `/settings#17lands`)
+- **Keyboard Navigation** - Full accessibility support with ArrowUp/Down, Home/End, Enter/Space
+- **LoadingButton Component** - Consistent loading states with spinner animation (#564)
+- **Shared Form Components** - Reusable FormGroup, FormSelect, FormInput components (#565)
+- **Settings Hooks** - Custom hooks for state management (useSettingsAccordion, useDaemonConnection, etc.) (#566)
+- **CSS Extraction** - Moved inline styles to CSS classes for maintainability (#563)
+
+**Testing Infrastructure (Expanded)**
+- **Settings.tsx Tests** - 61 comprehensive tests covering all settings functionality (#570)
+- **Page Tests** - MatchHistory (48 tests), Quests (52 tests), Decks (34 tests) (#551, #552, #553)
+- **Chart Tests** - WinRateTrend, DeckPerformance, RankProgression, FormatDistribution, ResultBreakdown (#550)
+- **Core Infrastructure Tests** - App.test.tsx, Layout.test.tsx, context tests (#549)
+- **Typed Event Payloads** - Strongly-typed event handlers replacing inline type casts (#547)
+- **Unified ConnectionStatus** - Single type definition across Go and TypeScript (#539)
+- **LogReplayProgress Type** - Proper typed structure for daemon log replay events (#537)
+- **Mock Type Improvements** - Replaced `any` types with proper model types in test mocks (#538)
+- **Frontend Test Coverage** - Increased from 62% to 90%+ with 400+ new tests
+
+**Type Safety Improvements**
+- **Typed Event Payloads** - StatsUpdatedEvent, RankUpdatedEvent, QuestUpdatedEvent, DraftUpdatedEvent, etc. (#547)
+- **ConnectionStatus Type** - Unified type definition generated from Go struct (#539)
+- **LogReplayProgress Type** - Proper typed structure for daemon log replay events (#537)
+
+### Fixed
+
+- **Draft Grade Bug** - Fixed draft grade stuck at 59/100 when cards missing ratings (#523)
+- **Deck Statistics** - Fixed showing 0 values for multi-colored draft cards (#522)
+- **Card Recommendations** - Fixed returning 0 suggestions due to nil card services (#521, #511)
+- **Quest Timestamps** - Fixed SQLite timestamp formatting for quest completion tracking (#500)
+- **CardSearch Tests** - Fixed async test timing issues (#531)
+- **ESLint Errors** - Fixed all ESLint errors and warnings across frontend codebase (#532)
+
+### Changed
+
+- **Removed Events Feature** - Removed unused Events tab and related code (#571)
+- **Rank Progression** - Added format selector (Constructed/Limited) to Rank Progression page (#571)
+- **Settings Refactoring** - Complete refactoring of Settings.tsx from monolithic to modular components (#554-#568)
+- **Debug Code Removal** - Removed all console.log statements and debug panels from Settings (#562)
+- **CI Optimization** - Reduced Linux test time from 11min to ~1min (#501)
+
+### Technical
+
+**Code Quality**
+- **Frontend Test Coverage**: 90%+ (up from 62%)
+- **400+ New Tests**: Comprehensive coverage across all pages and components
+- **Type Safety**: Eliminated `any` types in favor of proper model types
+- **Settings Refactoring**: Extracted 7 section components, 5 custom hooks, shared form components
+
+**Performance**
+- Same performance metrics as v1.2
+- Draft analysis: <100ms
+- Memory: ~60-80 MB
+- Startup: ~500ms-1s
+
+### Documentation
+
+- **DECK_BUILDER.md** - Comprehensive deck builder documentation with API reference (#509)
+- **Deck Statistics Testing** - Complete test coverage for deck statistics (#508)
+
 ## [1.2.0] - 2025-11-21
 
 ### Added

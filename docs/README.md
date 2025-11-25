@@ -12,7 +12,11 @@ This directory contains all technical documentation for the MTGA-Companion proje
 ### Development Guides
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development setup and workflow
 - **[DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)** - Current development status and progress tracking
+- **[TESTING.md](TESTING.md)** - Testing guide with component, integration, and E2E tests
 - **[CLAUDE_CODE_GUIDE.md](CLAUDE_CODE_GUIDE.md)** - Guidelines for AI-assisted development (Claude Code)
+
+### Feature Documentation
+- **[DECK_BUILDER.md](DECK_BUILDER.md)** - Comprehensive deck builder documentation with API reference
 
 ### Technical Specifications
 - **[DAEMON_API.md](DAEMON_API.md)** - Daemon WebSocket API specification
@@ -46,7 +50,9 @@ The following documentation files are kept in the project root for GitHub integr
 - **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md), [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md)
 - **MTGA Integration**: [MTGA_LOG_EVENTS.md](MTGA_LOG_EVENTS.md), [MTGA_LOG_RESEARCH.md](MTGA_LOG_RESEARCH.md)
 - **Daemon**: [DAEMON_API.md](DAEMON_API.md), [DAEMON_INSTALLATION.md](DAEMON_INSTALLATION.md)
+- **Deck Builder**: [DECK_BUILDER.md](DECK_BUILDER.md)
 - **UI Development**: [DRAFT_UI_REORGANIZATION.md](DRAFT_UI_REORGANIZATION.md), [GUI_DESIGN_TEMPLATE.md](GUI_DESIGN_TEMPLATE.md)
+- **Testing**: [TESTING.md](TESTING.md)
 - **Database**: [backup.md](backup.md), [FLAG_MIGRATION.md](FLAG_MIGRATION.md)
 
 ### For Developers
