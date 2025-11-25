@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import LoadingButton from '../components/LoadingButton';
+import { SettingItem, SettingToggle, SettingSelect } from '../components/settings';
 import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, FetchSetCards, RefreshSetCards, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
 import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
 import { subscribeToReplayState, getReplayState } from '../App';
@@ -461,156 +462,119 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Connection Mode
-              <span className="setting-description">Choose how the app connects to the daemon</span>
-            </label>
-            <div className="setting-control">
-              <select
-                className="select-input"
-                value={daemonMode}
-                onChange={(e) => handleModeChange(e.target.value)}
-              >
-                <option value="auto">Auto (try daemon, fallback to standalone)</option>
-                <option value="daemon">Daemon Only</option>
-                <option value="standalone">Standalone Only (embedded poller)</option>
-              </select>
-            </div>
-          </div>
+          <SettingSelect
+            label="Connection Mode"
+            description="Choose how the app connects to the daemon"
+            value={daemonMode}
+            onChange={handleModeChange}
+            options={[
+              { value: 'auto', label: 'Auto (try daemon, fallback to standalone)' },
+              { value: 'daemon', label: 'Daemon Only' },
+              { value: 'standalone', label: 'Standalone Only (embedded poller)' },
+            ]}
+          />
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Daemon Port
-              <span className="setting-description">WebSocket port for daemon connection (1024-65535)</span>
-            </label>
-            <div className="setting-control">
-              <input
-                type="number"
-                value={daemonPort}
-                onChange={(e) => handleDaemonPortChange(parseInt(e.target.value))}
-                min="1024"
-                max="65535"
-                className="number-input"
-                disabled={daemonMode === 'standalone'}
-              />
-              <span className="setting-hint">ws://localhost:{daemonPort}</span>
-            </div>
-          </div>
+          <SettingItem
+            label="Daemon Port"
+            description="WebSocket port for daemon connection (1024-65535)"
+            hint={`ws://localhost:${daemonPort}`}
+          >
+            <input
+              type="number"
+              value={daemonPort}
+              onChange={(e) => handleDaemonPortChange(parseInt(e.target.value))}
+              min="1024"
+              max="65535"
+              className="number-input"
+              disabled={daemonMode === 'standalone'}
+            />
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Reconnect
-              <span className="setting-description">Manually reconnect to the daemon service</span>
-            </label>
-            <div className="setting-control">
-              <LoadingButton
-                loading={isReconnecting}
-                loadingText="Reconnecting..."
-                onClick={handleReconnect}
-                disabled={daemonMode === 'standalone'}
-              >
-                Reconnect to Daemon
-              </LoadingButton>
-            </div>
-          </div>
+          <SettingItem
+            label="Reconnect"
+            description="Manually reconnect to the daemon service"
+          >
+            <LoadingButton
+              loading={isReconnecting}
+              loadingText="Reconnecting..."
+              onClick={handleReconnect}
+              disabled={daemonMode === 'standalone'}
+            >
+              Reconnect to Daemon
+            </LoadingButton>
+          </SettingItem>
         </div>
 
         {/* Application Preferences */}
         <div className="settings-section">
           <h2 className="section-title">Application Preferences</h2>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="checkbox-input"
-              />
-              Auto-refresh data
-              <span className="setting-description">Automatically refresh statistics at regular intervals</span>
-            </label>
-          </div>
+          <SettingToggle
+            label="Auto-refresh data"
+            description="Automatically refresh statistics at regular intervals"
+            checked={autoRefresh}
+            onChange={setAutoRefresh}
+          />
 
           {autoRefresh && (
-            <div className="setting-item indented">
-              <label className="setting-label">
-                Refresh Interval (seconds)
-                <span className="setting-description">How often to refresh data automatically</span>
-              </label>
-              <div className="setting-control">
-                <input
-                  type="number"
-                  value={refreshInterval}
-                  onChange={(e) => setRefreshInterval(parseInt(e.target.value))}
-                  min="10"
-                  max="300"
-                  step="10"
-                  className="number-input"
-                />
-              </div>
-            </div>
+            <SettingItem
+              label="Refresh Interval (seconds)"
+              description="How often to refresh data automatically"
+              indented
+            >
+              <input
+                type="number"
+                value={refreshInterval}
+                onChange={(e) => setRefreshInterval(parseInt(e.target.value))}
+                min="10"
+                max="300"
+                step="10"
+                className="number-input"
+              />
+            </SettingItem>
           )}
 
-          <div className="setting-item">
-            <label className="setting-label">
-              <input
-                type="checkbox"
-                checked={showNotifications}
-                onChange={(e) => setShowNotifications(e.target.checked)}
-                className="checkbox-input"
-              />
-              Show notifications
-              <span className="setting-description">Display notifications for match results and updates</span>
-            </label>
-          </div>
+          <SettingToggle
+            label="Show notifications"
+            description="Display notifications for match results and updates"
+            checked={showNotifications}
+            onChange={setShowNotifications}
+          />
         </div>
 
         {/* Data Management */}
         <div className="settings-section">
           <h2 className="section-title">Data Management</h2>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Export Data
-              <span className="setting-description">Export your match history and statistics to a file</span>
-            </label>
-            <div className="setting-control">
-              <button className="action-button" onClick={() => handleExportData('json')}>
-                Export to JSON
-              </button>
-              <button className="action-button" onClick={() => handleExportData('csv')}>
-                Export to CSV
-              </button>
-            </div>
-          </div>
+          <SettingItem
+            label="Export Data"
+            description="Export your match history and statistics to a file"
+          >
+            <button className="action-button" onClick={() => handleExportData('json')}>
+              Export to JSON
+            </button>
+            <button className="action-button" onClick={() => handleExportData('csv')}>
+              Export to CSV
+            </button>
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Import JSON Export
-              <span className="setting-description">Import match data from a JSON file exported by this app (matches only, not full log data)</span>
-            </label>
-            <div className="setting-control">
-              <button className="action-button" onClick={handleImportData}>
-                Import from JSON
-              </button>
-            </div>
-          </div>
+          <SettingItem
+            label="Import JSON Export"
+            description="Import match data from a JSON file exported by this app (matches only, not full log data)"
+          >
+            <button className="action-button" onClick={handleImportData}>
+              Import from JSON
+            </button>
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Import Single Log File
-              <span className="setting-description">
-                Import one MTGA log file from anywhere (backup drive, shared file, etc.). Processes the selected file and imports all data (matches, decks, quests, drafts).
-              </span>
-            </label>
-            <div className="setting-control">
-              <button className="action-button" onClick={handleImportLogFile}>
-                Select Log File...
-              </button>
-            </div>
-          </div>
+          <SettingItem
+            label="Import Single Log File"
+            description="Import one MTGA log file from anywhere (backup drive, shared file, etc.). Processes the selected file and imports all data (matches, decks, quests, drafts)."
+          >
+            <button className="action-button" onClick={handleImportLogFile}>
+              Select Log File...
+            </button>
+          </SettingItem>
 
           <div className="setting-item">
             <label className="setting-label">
@@ -899,114 +863,96 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Draft Format
-              <span className="setting-description">Choose between Premier Draft (BO1) or Quick Draft ratings</span>
-            </label>
-            <div className="setting-control">
-              <select
-                className="select-input select-width-200"
-                value={draftFormat}
-                onChange={(e) => setDraftFormat(e.target.value)}
-              >
-                <option value="PremierDraft">Premier Draft (BO1)</option>
-                <option value="QuickDraft">Quick Draft</option>
-                <option value="TradDraft">Traditional Draft (BO3)</option>
-              </select>
-            </div>
-          </div>
+          <SettingSelect
+            label="Draft Format"
+            description="Choose between Premier Draft (BO1) or Quick Draft ratings"
+            value={draftFormat}
+            onChange={setDraftFormat}
+            options={[
+              { value: 'PremierDraft', label: 'Premier Draft (BO1)' },
+              { value: 'QuickDraft', label: 'Quick Draft' },
+              { value: 'TradDraft', label: 'Traditional Draft (BO3)' },
+            ]}
+          />
 
-          <div className="setting-item">
-            <label className="setting-label">
+          <SettingItem
+            label="Fetch Ratings"
+            description="Download and cache 17Lands ratings for the selected set and format"
+          >
+            <LoadingButton
+              loading={isFetchingRatings}
+              loadingText="Fetching..."
+              onClick={handleFetchSetRatings}
+              disabled={!setCode}
+              variant="primary"
+              className="button-margin-right"
+            >
               Fetch Ratings
-              <span className="setting-description">Download and cache 17Lands ratings for the selected set and format</span>
-            </label>
-            <div className="setting-control">
-              <LoadingButton
-                loading={isFetchingRatings}
-                loadingText="Fetching..."
-                onClick={handleFetchSetRatings}
-                disabled={!setCode}
-                variant="primary"
-                className="button-margin-right"
-              >
-                Fetch Ratings
-              </LoadingButton>
-              <button
-                className="action-button"
-                onClick={handleRefreshSetRatings}
-                disabled={isFetchingRatings || !setCode}
-              >
-                Refresh (Re-download)
-              </button>
-            </div>
-          </div>
+            </LoadingButton>
+            <button
+              className="action-button"
+              onClick={handleRefreshSetRatings}
+              disabled={isFetchingRatings || !setCode}
+            >
+              Refresh (Re-download)
+            </button>
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Fetch Card Data (Scryfall)
-              <span className="setting-description">Download and cache card details (names, images, text) from Scryfall for the selected set</span>
-            </label>
-            <div className="setting-control">
-              <LoadingButton
-                loading={isFetchingCards}
-                loadingText="Fetching..."
-                onClick={handleFetchSetCards}
-                disabled={!setCode}
-                variant="primary"
-                className="button-margin-right"
-              >
-                Fetch Card Data
-              </LoadingButton>
-              <button
-                className="action-button"
-                onClick={handleRefreshSetCards}
-                disabled={isFetchingCards || !setCode}
-              >
-                Refresh (Re-download)
-              </button>
-            </div>
-          </div>
+          <SettingItem
+            label="Fetch Card Data (Scryfall)"
+            description="Download and cache card details (names, images, text) from Scryfall for the selected set"
+          >
+            <LoadingButton
+              loading={isFetchingCards}
+              loadingText="Fetching..."
+              onClick={handleFetchSetCards}
+              disabled={!setCode}
+              variant="primary"
+              className="button-margin-right"
+            >
+              Fetch Card Data
+            </LoadingButton>
+            <button
+              className="action-button"
+              onClick={handleRefreshSetCards}
+              disabled={isFetchingCards || !setCode}
+            >
+              Refresh (Re-download)
+            </button>
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Recalculate Draft Grades
-              <span className="setting-description">Update all draft grades and predictions with the latest 17Lands card ratings</span>
-            </label>
-            <div className="setting-control">
-              <LoadingButton
-                loading={isRecalculating}
-                loadingText="Recalculating..."
-                onClick={handleRecalculateGrades}
-                variant="recalculate"
-              >
-                Recalculate All Drafts
-              </LoadingButton>
-              {recalculateMessage && (
-                <div className={`recalculate-message ${recalculateMessage.startsWith('✓') ? 'success' : 'error'}`}>
-                  {recalculateMessage}
-                </div>
-              )}
-            </div>
-          </div>
+          <SettingItem
+            label="Recalculate Draft Grades"
+            description="Update all draft grades and predictions with the latest 17Lands card ratings"
+          >
+            <LoadingButton
+              loading={isRecalculating}
+              loadingText="Recalculating..."
+              onClick={handleRecalculateGrades}
+              variant="recalculate"
+            >
+              Recalculate All Drafts
+            </LoadingButton>
+            {recalculateMessage && (
+              <div className={`recalculate-message ${recalculateMessage.startsWith('✓') ? 'success' : 'error'}`}>
+                {recalculateMessage}
+              </div>
+            )}
+          </SettingItem>
 
-          <div className="setting-item">
-            <label className="setting-label">
+          <SettingItem
+            label="Clear Dataset Cache"
+            description="Remove cached 17Lands CSV files to free up disk space (ratings in database are preserved)"
+          >
+            <LoadingButton
+              loading={isClearingCache}
+              loadingText="Clearing..."
+              onClick={handleClearDatasetCache}
+              variant="clear-cache"
+            >
               Clear Dataset Cache
-              <span className="setting-description">Remove cached 17Lands CSV files to free up disk space (ratings in database are preserved)</span>
-            </label>
-            <div className="setting-control">
-              <LoadingButton
-                loading={isClearingCache}
-                loadingText="Clearing..."
-                onClick={handleClearDatasetCache}
-                variant="clear-cache"
-              >
-                Clear Dataset Cache
-              </LoadingButton>
-            </div>
-          </div>
+            </LoadingButton>
+          </SettingItem>
 
           {dataSource && (
             <div className="setting-hint settings-success-box">
@@ -1036,19 +982,17 @@ const Settings = () => {
         <div className="settings-section">
           <h2 className="section-title">Appearance</h2>
 
-          <div className="setting-item">
-            <label className="setting-label">
-              Theme
-              <span className="setting-description">Choose your preferred color scheme</span>
-            </label>
-            <div className="setting-control">
-              <select className="select-input">
-                <option value="dark">Dark (Default)</option>
-                <option value="light" disabled>Light (Coming Soon)</option>
-                <option value="auto" disabled>Auto (System Default)</option>
-              </select>
-            </div>
-          </div>
+          <SettingSelect
+            label="Theme"
+            description="Choose your preferred color scheme"
+            value="dark"
+            onChange={() => {}}
+            options={[
+              { value: 'dark', label: 'Dark (Default)' },
+              { value: 'light', label: 'Light (Coming Soon)' },
+              { value: 'auto', label: 'Auto (System Default)' },
+            ]}
+          />
         </div>
 
         {/* About */}
