@@ -121,7 +121,7 @@ func (a *App) StopPoller() {
 }
 
 // GetConnectionStatus returns the current connection status
-func (a *App) GetConnectionStatus() map[string]interface{} {
+func (a *App) GetConnectionStatus() *gui.ConnectionStatus {
 	return a.systemFacade.GetConnectionStatus()
 }
 

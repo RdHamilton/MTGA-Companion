@@ -500,7 +500,7 @@ func (s *SystemFacade) stopDaemonClient(ctx context.Context) {
 }
 
 // GetConnectionStatus returns current connection status for the frontend.
-func (s *SystemFacade) GetConnectionStatus() map[string]interface{} {
+func (s *SystemFacade) GetConnectionStatus() *ConnectionStatus {
 	s.ipcClientMu.Lock()
 	defer s.ipcClientMu.Unlock()
 
@@ -514,12 +514,12 @@ func (s *SystemFacade) GetConnectionStatus() map[string]interface{} {
 		status = "reconnecting"
 	}
 
-	return map[string]interface{}{
-		"status":    status,
-		"connected": connected,
-		"mode":      s.getDaemonModeString(),
-		"url":       s.getDaemonURL(),
-		"port":      s.services.DaemonPort,
+	return &ConnectionStatus{
+		Status:    status,
+		Connected: connected,
+		Mode:      s.getDaemonModeString(),
+		URL:       s.getDaemonURL(),
+		Port:      s.services.DaemonPort,
 	}
 }
 
@@ -594,6 +594,16 @@ func (s *SystemFacade) SwitchToDaemonMode(ctx context.Context) error {
 
 	log.Println("Switched to daemon mode successfully")
 	return nil
+}
+
+// ConnectionStatus represents the current daemon/standalone connection status.
+// Used by the frontend to display connection state.
+type ConnectionStatus struct {
+	Status    string `json:"status"`    // "standalone", "connected", or "reconnecting"
+	Connected bool   `json:"connected"` // true if connected to daemon
+	Mode      string `json:"mode"`      // "daemon" or "standalone"
+	URL       string `json:"url"`       // WebSocket URL for daemon connection
+	Port      int    `json:"port"`      // Daemon port number
 }
 
 // ReplayStatus represents the current state of the replay engine (replay tool).
