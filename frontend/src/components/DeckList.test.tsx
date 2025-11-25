@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckList from './DeckList';
 import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 
 // Helper function to create mock deck
 function createMockDeck(overrides: Partial<models.Deck> = {}): models.Deck {
@@ -50,8 +50,9 @@ function createMockSetCard(overrides: Partial<models.SetCard> = {}): models.SetC
 }
 
 // Helper function to create mock deck statistics
-function createMockStatistics(overrides: any = {}): any {
-  return {
+function createMockStatistics(overrides: Partial<gui.DeckStatistics> = {}): gui.DeckStatistics {
+  return new gui.DeckStatistics({
+    totalCards: 40,
     totalMainboard: 40,
     totalSideboard: 0,
     averageCMC: 2.8,
@@ -65,6 +66,7 @@ function createMockStatistics(overrides: any = {}): any {
       6: 3,
       7: 2,
     },
+    maxCMC: 7,
     colors: {
       white: 15,
       blue: 10,
@@ -74,14 +76,46 @@ function createMockStatistics(overrides: any = {}): any {
       colorless: 10,
       multicolor: 0,
     },
+    types: {
+      creatures: 20,
+      instants: 5,
+      sorceries: 5,
+      enchantments: 2,
+      artifacts: 1,
+      planeswalkers: 0,
+      lands: 17,
+      other: 0,
+    },
     lands: {
       total: 17,
+      basic: 12,
+      nonBasic: 5,
+      ratio: 0.425,
       recommended: 17,
       status: 'good',
       statusMessage: 'Land count looks good',
     },
+    creatures: {
+      total: 20,
+      averagePower: 2.5,
+      averageToughness: 2.5,
+      totalPower: 50,
+      totalToughness: 50,
+    },
+    legality: {
+      standard: true,
+      historic: true,
+      explorer: true,
+      pioneer: true,
+      modern: true,
+      legacy: true,
+      vintage: true,
+      pauper: false,
+      commander: true,
+      brawl: true,
+    },
     ...overrides,
-  };
+  });
 }
 
 describe('DeckList Component', () => {
@@ -302,6 +336,9 @@ describe('DeckList Component', () => {
       const stats = createMockStatistics({
         lands: {
           total: 17,
+          basic: 12,
+          nonBasic: 5,
+          ratio: 0.425,
           recommended: 17,
           status: 'good',
           statusMessage: 'Land count looks good',
