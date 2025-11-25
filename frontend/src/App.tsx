@@ -78,7 +78,8 @@ function ReplayEventHandler() {
     });
 
     const unsubscribeDraftDetected = EventsOn('replay:draft_detected', (data: unknown) => {
-      console.log('[ReplayEventHandler] Draft detected during replay:', data);
+      const eventData = gui.ReplayDraftDetectedEvent.createFrom(data);
+      console.log('[ReplayEventHandler] Draft detected during replay:', eventData);
 
       // Automatically navigate to Draft tab
       navigate('/draft');
@@ -93,7 +94,8 @@ function ReplayEventHandler() {
     });
 
     const unsubscribeError = EventsOn('replay:error', (data: unknown) => {
-      console.error('[ReplayEventHandler] Replay error:', data);
+      const eventData = gui.ReplayErrorEvent.createFrom(data);
+      console.error('[ReplayEventHandler] Replay error:', eventData);
       updateReplayState({
         isActive: false,
         isPaused: false,

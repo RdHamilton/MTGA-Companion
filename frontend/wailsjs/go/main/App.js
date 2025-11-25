@@ -70,6 +70,10 @@ export function FixDraftSessionStatuses() {
   return window['go']['main']['App']['FixDraftSessionStatuses']();
 }
 
+export function GetAchievementUpdatedEvent() {
+  return window['go']['main']['App']['GetAchievementUpdatedEvent']();
+}
+
 export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }
@@ -114,6 +118,10 @@ export function GetCurrentAccount() {
   return window['go']['main']['App']['GetCurrentAccount']();
 }
 
+export function GetDaemonErrorEvent() {
+  return window['go']['main']['App']['GetDaemonErrorEvent']();
+}
+
 export function GetDatasetSource(arg1, arg2) {
   return window['go']['main']['App']['GetDatasetSource'](arg1, arg2);
 }
@@ -136,6 +144,10 @@ export function GetDeckPerformance(arg1) {
 
 export function GetDeckStatistics(arg1) {
   return window['go']['main']['App']['GetDeckStatistics'](arg1);
+}
+
+export function GetDeckUpdatedEvent() {
+  return window['go']['main']['App']['GetDeckUpdatedEvent']();
 }
 
 export function GetDecksByFormat(arg1) {
@@ -172,6 +184,10 @@ export function GetDraftPicks(arg1) {
 
 export function GetDraftSession(arg1) {
   return window['go']['main']['App']['GetDraftSession'](arg1);
+}
+
+export function GetDraftUpdatedEvent() {
+  return window['go']['main']['App']['GetDraftUpdatedEvent']();
 }
 
 export function GetDraftWinRatePrediction(arg1) {
@@ -218,6 +234,10 @@ export function GetQuestStats(arg1, arg2) {
   return window['go']['main']['App']['GetQuestStats'](arg1, arg2);
 }
 
+export function GetQuestUpdatedEvent() {
+  return window['go']['main']['App']['GetQuestUpdatedEvent']();
+}
+
 export function GetRankProgression(arg1) {
   return window['go']['main']['App']['GetRankProgression'](arg1);
 }
@@ -226,8 +246,20 @@ export function GetRankProgressionTimeline(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetRankProgressionTimeline'](arg1, arg2, arg3, arg4);
 }
 
+export function GetRankUpdatedEvent() {
+  return window['go']['main']['App']['GetRankUpdatedEvent']();
+}
+
 export function GetRecommendations(arg1) {
   return window['go']['main']['App']['GetRecommendations'](arg1);
+}
+
+export function GetReplayDraftDetectedEvent() {
+  return window['go']['main']['App']['GetReplayDraftDetectedEvent']();
+}
+
+export function GetReplayErrorEvent() {
+  return window['go']['main']['App']['GetReplayErrorEvent']();
 }
 
 export function GetReplayStatus() {
@@ -248,6 +280,10 @@ export function GetStatsByDeck(arg1) {
 
 export function GetStatsByFormat(arg1) {
   return window['go']['main']['App']['GetStatsByFormat'](arg1);
+}
+
+export function GetStatsUpdatedEvent() {
+  return window['go']['main']['App']['GetStatsUpdatedEvent']();
 }
 
 export function GetTrendAnalysis(arg1, arg2, arg3, arg4) {

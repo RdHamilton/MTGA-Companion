@@ -183,6 +183,58 @@ func (a *App) GetLogReplayProgress() (*gui.LogReplayProgress, error) {
 }
 
 // ========================================
+// Event Type Exposers
+// These methods exist solely to expose event payload types to Wails for
+// TypeScript code generation. They return empty structs and are not called
+// at runtime. Actual event data is delivered via EventsEmit.
+// ========================================
+
+// GetStatsUpdatedEvent exposes StatsUpdatedEvent type to Wails.
+func (a *App) GetStatsUpdatedEvent() (*gui.StatsUpdatedEvent, error) {
+	return a.systemFacade.GetStatsUpdatedEvent(a.ctx)
+}
+
+// GetRankUpdatedEvent exposes RankUpdatedEvent type to Wails.
+func (a *App) GetRankUpdatedEvent() (*gui.RankUpdatedEvent, error) {
+	return a.systemFacade.GetRankUpdatedEvent(a.ctx)
+}
+
+// GetQuestUpdatedEvent exposes QuestUpdatedEvent type to Wails.
+func (a *App) GetQuestUpdatedEvent() (*gui.QuestUpdatedEvent, error) {
+	return a.systemFacade.GetQuestUpdatedEvent(a.ctx)
+}
+
+// GetDraftUpdatedEvent exposes DraftUpdatedEvent type to Wails.
+func (a *App) GetDraftUpdatedEvent() (*gui.DraftUpdatedEvent, error) {
+	return a.systemFacade.GetDraftUpdatedEvent(a.ctx)
+}
+
+// GetDeckUpdatedEvent exposes DeckUpdatedEvent type to Wails.
+func (a *App) GetDeckUpdatedEvent() (*gui.DeckUpdatedEvent, error) {
+	return a.systemFacade.GetDeckUpdatedEvent(a.ctx)
+}
+
+// GetAchievementUpdatedEvent exposes AchievementUpdatedEvent type to Wails.
+func (a *App) GetAchievementUpdatedEvent() (*gui.AchievementUpdatedEvent, error) {
+	return a.systemFacade.GetAchievementUpdatedEvent(a.ctx)
+}
+
+// GetDaemonErrorEvent exposes DaemonErrorEvent type to Wails.
+func (a *App) GetDaemonErrorEvent() (*gui.DaemonErrorEvent, error) {
+	return a.systemFacade.GetDaemonErrorEvent(a.ctx)
+}
+
+// GetReplayErrorEvent exposes ReplayErrorEvent type to Wails.
+func (a *App) GetReplayErrorEvent() (*gui.ReplayErrorEvent, error) {
+	return a.systemFacade.GetReplayErrorEvent(a.ctx)
+}
+
+// GetReplayDraftDetectedEvent exposes ReplayDraftDetectedEvent type to Wails.
+func (a *App) GetReplayDraftDetectedEvent() (*gui.ReplayDraftDetectedEvent, error) {
+	return a.systemFacade.GetReplayDraftDetectedEvent(a.ctx)
+}
+
+// ========================================
 // Match & Statistics Methods (MatchFacade)
 // ========================================
 
