@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import {
   DaemonConnectionSection,
@@ -9,6 +9,8 @@ import {
   SeventeenLandsSection,
   AboutSection,
 } from '../components/settings/sections';
+import { SettingsAccordion } from '../components/settings/SettingsAccordion';
+import type { SettingsAccordionItem } from '../components/settings/SettingsAccordion';
 import {
   useDaemonConnection,
   useLogReplay,
@@ -113,77 +115,104 @@ const Settings = () => {
     setTheme('dark');
   };
 
-  return (
-    <div className="page-container">
-      <div className="settings-header">
-        <h1 className="page-title">Settings</h1>
-        {saved && <div className="save-notification">Settings saved successfully!</div>}
-      </div>
+  // Build accordion items
+  const accordionItems: SettingsAccordionItem[] = useMemo(() => {
+    const items: SettingsAccordionItem[] = [
+      {
+        id: 'connection',
+        label: 'Connection',
+        icon: '🔌',
+        content: (
+          <DaemonConnectionSection
+            connectionStatus={connectionStatus}
+            daemonMode={daemonMode}
+            daemonPort={daemonPort}
+            isReconnecting={isReconnecting}
+            onDaemonPortChange={handleDaemonPortChange}
+            onReconnect={handleReconnect}
+            onModeChange={handleModeChange}
+          />
+        ),
+      },
+      {
+        id: 'preferences',
+        label: 'Preferences',
+        icon: '⚙️',
+        content: (
+          <AppPreferencesSection
+            autoRefresh={autoRefresh}
+            onAutoRefreshChange={setAutoRefresh}
+            refreshInterval={refreshInterval}
+            onRefreshIntervalChange={setRefreshInterval}
+            showNotifications={showNotifications}
+            onShowNotificationsChange={setShowNotifications}
+            theme={theme}
+            onThemeChange={setTheme}
+          />
+        ),
+      },
+      {
+        id: 'import-export',
+        label: 'Import / Export',
+        icon: '📦',
+        content: (
+          <ImportExportSection
+            onExportData={handleExportData}
+            onImportData={handleImportData}
+          />
+        ),
+      },
+      {
+        id: 'data-recovery',
+        label: 'Data Recovery',
+        icon: '🔄',
+        content: (
+          <DataRecoverySection
+            isConnected={isConnected}
+            clearDataBeforeReplay={clearDataBeforeReplay}
+            onClearDataBeforeReplayChange={setClearDataBeforeReplay}
+            isReplaying={isReplaying}
+            replayProgress={replayProgress}
+            onImportLogFile={handleImportLogFile}
+            onReplayLogs={() => handleReplayLogs(isConnected)}
+            onClearAllData={handleClearAllData}
+          />
+        ),
+      },
+      {
+        id: '17lands',
+        label: '17Lands Integration',
+        icon: '📊',
+        content: (
+          <SeventeenLandsSection
+            setCode={setCode}
+            onSetCodeChange={setSetCode}
+            draftFormat={draftFormat}
+            onDraftFormatChange={setDraftFormat}
+            isFetchingRatings={isFetchingRatings}
+            isFetchingCards={isFetchingCards}
+            isRecalculating={isRecalculating}
+            recalculateMessage={recalculateMessage}
+            dataSource={dataSource}
+            isClearingCache={isClearingCache}
+            onFetchSetRatings={handleFetchSetRatings}
+            onRefreshSetRatings={handleRefreshSetRatings}
+            onFetchSetCards={handleFetchSetCards}
+            onRefreshSetCards={handleRefreshSetCards}
+            onRecalculateGrades={handleRecalculateGrades}
+            onClearDatasetCache={handleClearDatasetCache}
+          />
+        ),
+      },
+    ];
 
-      <div className="settings-content">
-        {/* Connection */}
-        <DaemonConnectionSection
-          connectionStatus={connectionStatus}
-          daemonMode={daemonMode}
-          daemonPort={daemonPort}
-          isReconnecting={isReconnecting}
-          onDaemonPortChange={handleDaemonPortChange}
-          onReconnect={handleReconnect}
-          onModeChange={handleModeChange}
-        />
-
-        {/* Preferences (consolidated with theme) */}
-        <AppPreferencesSection
-          autoRefresh={autoRefresh}
-          onAutoRefreshChange={setAutoRefresh}
-          refreshInterval={refreshInterval}
-          onRefreshIntervalChange={setRefreshInterval}
-          showNotifications={showNotifications}
-          onShowNotificationsChange={setShowNotifications}
-          theme={theme}
-          onThemeChange={setTheme}
-        />
-
-        {/* Import / Export */}
-        <ImportExportSection
-          onExportData={handleExportData}
-          onImportData={handleImportData}
-        />
-
-        {/* Data Recovery */}
-        <DataRecoverySection
-          isConnected={isConnected}
-          clearDataBeforeReplay={clearDataBeforeReplay}
-          onClearDataBeforeReplayChange={setClearDataBeforeReplay}
-          isReplaying={isReplaying}
-          replayProgress={replayProgress}
-          onImportLogFile={handleImportLogFile}
-          onReplayLogs={() => handleReplayLogs(isConnected)}
-          onClearAllData={handleClearAllData}
-        />
-
-        {/* 17Lands Integration */}
-        <SeventeenLandsSection
-          setCode={setCode}
-          onSetCodeChange={setSetCode}
-          draftFormat={draftFormat}
-          onDraftFormatChange={setDraftFormat}
-          isFetchingRatings={isFetchingRatings}
-          isFetchingCards={isFetchingCards}
-          isRecalculating={isRecalculating}
-          recalculateMessage={recalculateMessage}
-          dataSource={dataSource}
-          isClearingCache={isClearingCache}
-          onFetchSetRatings={handleFetchSetRatings}
-          onRefreshSetRatings={handleRefreshSetRatings}
-          onFetchSetCards={handleFetchSetCards}
-          onRefreshSetCards={handleRefreshSetCards}
-          onRecalculateGrades={handleRecalculateGrades}
-          onClearDatasetCache={handleClearDatasetCache}
-        />
-
-        {/* Developer Tools - Hidden by default */}
-        {isDeveloperMode && (
+    // Add Developer Tools section if developer mode is enabled
+    if (isDeveloperMode) {
+      items.push({
+        id: 'developer-tools',
+        label: 'Developer Tools',
+        icon: '🛠️',
+        content: (
           <ReplayToolSection
             isConnected={isConnected}
             replayToolActive={replayToolActive}
@@ -200,14 +229,94 @@ const Settings = () => {
             onResumeReplayTool={handleResumeReplayTool}
             onStopReplayTool={handleStopReplayTool}
           />
-        )}
+        ),
+      });
+    }
 
-        {/* About */}
+    // About section is always last
+    items.push({
+      id: 'about',
+      label: 'About',
+      icon: 'ℹ️',
+      content: (
         <AboutSection
           onShowAboutDialog={() => setShowAbout(true)}
           isDeveloperMode={isDeveloperMode}
           onVersionClick={handleVersionClick}
           onToggleDeveloperMode={toggleDeveloperMode}
+        />
+      ),
+    });
+
+    return items;
+  }, [
+    connectionStatus,
+    daemonMode,
+    daemonPort,
+    isReconnecting,
+    handleDaemonPortChange,
+    handleReconnect,
+    handleModeChange,
+    autoRefresh,
+    refreshInterval,
+    showNotifications,
+    theme,
+    handleExportData,
+    handleImportData,
+    isConnected,
+    clearDataBeforeReplay,
+    setClearDataBeforeReplay,
+    isReplaying,
+    replayProgress,
+    handleImportLogFile,
+    handleReplayLogs,
+    handleClearAllData,
+    setCode,
+    setSetCode,
+    draftFormat,
+    setDraftFormat,
+    isFetchingRatings,
+    isFetchingCards,
+    isRecalculating,
+    recalculateMessage,
+    dataSource,
+    isClearingCache,
+    handleFetchSetRatings,
+    handleRefreshSetRatings,
+    handleFetchSetCards,
+    handleRefreshSetCards,
+    handleRecalculateGrades,
+    handleClearDatasetCache,
+    isDeveloperMode,
+    replayToolActive,
+    replayToolPaused,
+    replayToolProgress,
+    replaySpeed,
+    setReplaySpeed,
+    replayFilter,
+    setReplayFilter,
+    pauseOnDraft,
+    setPauseOnDraft,
+    handleStartReplayTool,
+    handlePauseReplayTool,
+    handleResumeReplayTool,
+    handleStopReplayTool,
+    handleVersionClick,
+    toggleDeveloperMode,
+  ]);
+
+  return (
+    <div className="page-container">
+      <div className="settings-header">
+        <h1 className="page-title">Settings</h1>
+        {saved && <div className="save-notification">Settings saved successfully!</div>}
+      </div>
+
+      <div className="settings-content">
+        <SettingsAccordion
+          items={accordionItems}
+          defaultExpanded={['connection']}
+          allowMultiple={true}
         />
 
         {/* Action Buttons */}
