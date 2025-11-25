@@ -5,7 +5,7 @@ import { render } from '../test/utils/testUtils';
 import Draft from './Draft';
 import { mockWailsApp } from '../test/mocks/wailsApp';
 import { mockEventEmitter } from '../test/mocks/wailsRuntime';
-import { models } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 
 // Mock the getReplayState function from App.tsx
 vi.mock('../App', () => ({
@@ -73,8 +73,8 @@ function createMockDraftPick(overrides: Partial<models.DraftPickSession> = {}): 
   });
 }
 
-function createMockCardRating(overrides: Partial<any> = {}): any {
-  return {
+function createMockCardRating(overrides: Partial<gui.CardRatingWithTier> = {}): gui.CardRatingWithTier {
+  return new gui.CardRatingWithTier({
     name: 'Test Card',
     color: 'W',
     rarity: 'rare',
@@ -101,7 +101,7 @@ function createMockCardRating(overrides: Partial<any> = {}): any {
     tier: 'A',
     colors: ['W', 'U'],
     ...overrides,
-  };
+  });
 }
 
 function createMockDeckMetrics(overrides: Partial<models.DeckMetrics> = {}): models.DeckMetrics {

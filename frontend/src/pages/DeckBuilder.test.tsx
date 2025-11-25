@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckBuilder from './DeckBuilder';
 import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models } from '../../wailsjs/go/models';
+import { models, gui } from '../../wailsjs/go/models';
 
 // Mock react-router-dom
 const mockNavigate = vi.fn();
@@ -45,24 +45,63 @@ function createMockDeckCard(overrides: Partial<models.DeckCard> = {}): models.De
 }
 
 // Helper function to create mock deck statistics
-function createMockDeckStatistics(overrides: any = {}): any {
-  return {
+function createMockDeckStatistics(overrides: Partial<gui.DeckStatistics> = {}): gui.DeckStatistics {
+  return new gui.DeckStatistics({
+    totalCards: 15,
     totalMainboard: 15,
     totalSideboard: 0,
     averageCMC: 2.8,
+    manaCurve: { 0: 0, 1: 3, 2: 5, 3: 4, 4: 2, 5: 1 },
+    maxCMC: 5,
     colors: {
       white: 5,
       blue: 5,
       black: 0,
       red: 0,
       green: 5,
+      colorless: 0,
+      multicolor: 0,
+    },
+    types: {
+      creatures: 10,
+      instants: 2,
+      sorceries: 2,
+      enchantments: 1,
+      artifacts: 0,
+      planeswalkers: 0,
+      lands: 0,
+      other: 0,
     },
     lands: {
       total: 0,
+      basic: 0,
+      nonBasic: 0,
+      ratio: 0,
       recommended: 15,
+      status: 'low',
+      statusMessage: 'Add more lands',
+    },
+    creatures: {
+      total: 10,
+      averagePower: 2.5,
+      averageToughness: 2.5,
+      totalPower: 25,
+      totalToughness: 25,
+    },
+    legality: {
+      standard: true,
+      historic: true,
+      explorer: true,
+      pioneer: true,
+      modern: true,
+      legacy: true,
+      vintage: true,
+      pauper: false,
+      commander: true,
+      brawl: true,
     },
     ...overrides,
-  };
+  });
 }
 
 describe('DeckBuilder Component - Export and Validate', () => {
