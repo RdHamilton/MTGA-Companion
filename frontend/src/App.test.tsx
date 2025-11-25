@@ -35,10 +35,6 @@ vi.mock('./pages/Quests', () => ({
   default: () => <div data-testid="quests-page">Quests</div>,
 }));
 
-vi.mock('./pages/Events', () => ({
-  default: () => <div data-testid="events-page">Events</div>,
-}));
-
 vi.mock('./pages/Draft', () => ({
   default: () => <div data-testid="draft-page">Draft</div>,
 }));
@@ -123,14 +119,6 @@ describe('App', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('quests-page')).toBeInTheDocument();
-      });
-    });
-
-    it('should render Events page at /events', async () => {
-      renderAppWithRoute('/events');
-
-      await waitFor(() => {
-        expect(screen.getByTestId('events-page')).toBeInTheDocument();
       });
     });
 

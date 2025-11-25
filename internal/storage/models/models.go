@@ -155,35 +155,6 @@ type RankHistory struct {
 	CreatedAt     time.Time
 }
 
-// DraftEvent represents a draft or sealed event.
-type DraftEvent struct {
-	ID        string
-	AccountID int // Foreign key to accounts
-	EventName string
-	SetCode   string
-	StartTime time.Time
-	EndTime   *time.Time // Nullable if event is ongoing
-	Wins      int
-	Losses    int
-	Status    string  // "active", "completed", "abandoned"
-	DeckID    *string // Nullable, foreign key to decks
-	EntryFee  *string // Nullable: description of entry fee
-	Rewards   *string // Nullable: description of rewards
-	CreatedAt time.Time
-}
-
-// DraftPick represents a single pick made during a draft event.
-type DraftPick struct {
-	ID             int
-	DraftEventID   string // Foreign key to draft_events
-	PackNumber     int
-	PickNumber     int
-	AvailableCards []int     // Card IDs available in the pack
-	SelectedCard   int       // Card ID that was picked
-	Timestamp      time.Time // When the pick was made
-	CreatedAt      time.Time
-}
-
 // StatsFilter provides filtering options for statistics queries.
 type StatsFilter struct {
 	AccountID    *int // Filter by account ID, nil means all accounts

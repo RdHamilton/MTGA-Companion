@@ -19,7 +19,7 @@ const RANK_CLASSES = [
 
 const RankProgression = () => {
   const { filters, updateFilters } = useAppContext();
-  const { dateRange } = filters.rankProgression;
+  const { dateRange, format } = filters.rankProgression;
 
   const [timeline, setTimeline] = useState<storage.RankTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +50,7 @@ const RankProgression = () => {
           break;
       }
 
-      // Rank progression is only tracked for constructed (ranked) play
-      const data = await GetRankProgressionTimeline('constructed', start, now, 'daily');
+      const data = await GetRankProgressionTimeline(format, start, now, 'daily');
       setTimeline(data?.entries || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load rank progression');
@@ -62,7 +61,7 @@ const RankProgression = () => {
   };
 
     loadTimeline();
-  }, [dateRange]);
+  }, [dateRange, format]);
 
   // Convert rank to numeric value for charting
   const rankToNumeric = (rankClass: string | null | undefined, rankLevel: number | null | undefined): number => {
@@ -148,6 +147,13 @@ const RankProgression = () => {
         {/* Filters */}
         <div className="filter-row">
           <div className="filter-group">
+            <label className="filter-label">Format</label>
+            <select value={format} onChange={(e) => updateFilters('rankProgression', { format: e.target.value })}>
+              <option value="constructed">Constructed</option>
+              <option value="limited">Limited</option>
+            </select>
+          </div>
+          <div className="filter-group">
             <label className="filter-label">Date Range</label>
             <select value={dateRange} onChange={(e) => updateFilters('rankProgression', { dateRange: e.target.value })}>
               <option value="7days">Last 7 Days</option>
@@ -158,7 +164,9 @@ const RankProgression = () => {
           </div>
         </div>
         <div className="format-note">
-          <span className="note-text">Showing rank progression for Constructed (Ranked) ladder only</span>
+          <span className="note-text">
+            Showing rank progression for {format === 'constructed' ? 'Constructed' : 'Limited'} (Draft/Sealed) ladder
+          </span>
         </div>
       </div>
 
@@ -177,8 +185,8 @@ const RankProgression = () => {
         <EmptyState
           icon="🏆"
           title="No rank progression data"
-          message="Play ranked matches to track your rank progression over time."
-          helpText="Your rank changes will be displayed here as you climb the ladder in ranked play."
+          message={`Play ${format === 'constructed' ? 'ranked constructed' : 'limited (draft/sealed)'} matches to track your rank progression over time.`}
+          helpText={`Your rank changes will be displayed here as you climb the ${format === 'constructed' ? 'Constructed' : 'Limited'} ladder.`}
         />
       )}
 

@@ -37,10 +37,10 @@ export function ReplayToolSection({
     <div className="settings-section">
       <h2 className="section-title">Replay Testing Tool (Daemon Only)</h2>
       <div className="setting-description settings-section-description">
-        Test draft and event features by replaying historical log files at variable speeds.
-        While replay is active, navigate to Draft or Events pages to watch them populate in real-time.
+        Test draft features by replaying historical log files at variable speeds.
+        While replay is active, navigate to the Draft page to watch it populate in real-time.
         <div className="settings-warning-box">
-          ⚠️ <strong>Important:</strong> Clear draft/event data before starting replay to avoid database conflicts.
+          ⚠️ <strong>Important:</strong> Clear draft data before starting replay to avoid database conflicts.
           Existing draft sessions with the same ID will cause storage failures.
         </div>
       </div>
@@ -88,7 +88,6 @@ export function ReplayToolSection({
                 <option value="all">All Events</option>
                 <option value="draft">Draft Only</option>
                 <option value="match">Matches Only</option>
-                <option value="event">Events Only</option>
               </select>
             </div>
           </div>
@@ -186,7 +185,7 @@ export function ReplayToolSection({
           </div>
 
           <div className="settings-info-box-dark">
-            💡 <strong>Tip:</strong> Navigate to the Draft or Events page to watch them populate in real-time as the replay progresses!
+            💡 <strong>Tip:</strong> Navigate to the Draft page to watch it populate in real-time as the replay progresses!
           </div>
         </div>
       )}

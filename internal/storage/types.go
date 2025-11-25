@@ -12,7 +12,6 @@ type (
 	CollectionCard    = models.CollectionCard
 	CollectionHistory = models.CollectionHistory
 	RankHistory       = models.RankHistory
-	DraftEvent        = models.DraftEvent
 	StatsFilter       = models.StatsFilter
 	Statistics        = models.Statistics
 )

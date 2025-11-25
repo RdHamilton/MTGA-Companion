@@ -303,16 +303,6 @@ func (a *App) GetCurrentAccount() (*models.Account, error) {
 	return a.matchFacade.GetCurrentAccount(a.ctx)
 }
 
-// GetActiveEvents returns all active draft events
-func (a *App) GetActiveEvents() ([]*models.DraftEvent, error) {
-	return a.matchFacade.GetActiveEvents(a.ctx)
-}
-
-// GetEventWinDistribution returns win distribution across events
-func (a *App) GetEventWinDistribution() ([]*storage.EventWinDistribution, error) {
-	return a.matchFacade.GetEventWinDistribution(a.ctx)
-}
-
 // ========================================
 // Draft Methods (DraftFacade)
 // ========================================
