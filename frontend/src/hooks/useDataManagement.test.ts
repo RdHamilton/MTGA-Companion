@@ -170,7 +170,7 @@ describe('useDataManagement', () => {
         ranksStored: 3,
         questsStored: 2,
         draftsStored: 1,
-      });
+      } as any);
 
       const { result } = renderHook(() => useDataManagement());
 
