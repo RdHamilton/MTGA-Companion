@@ -261,7 +261,7 @@ describe('SetSymbol Component', () => {
         iconSvgUri: 'https://svgs.scryfall.io/sets/blb.svg',
       });
 
-      mockWailsApp.GetSetInfo.mockImplementation((setCode: string) => {
+      mockWailsApp.GetSetInfo.mockImplementation((setCode?: string) => {
         if (setCode === 'DSK') return Promise.resolve(dskInfo);
         if (setCode === 'BLB') return Promise.resolve(blbInfo);
         return Promise.resolve(null);
