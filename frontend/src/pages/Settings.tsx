@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import LoadingButton from '../components/LoadingButton';
 import { SettingItem, SettingToggle, SettingSelect } from '../components/settings';
-import { GetConnectionStatus, SetDaemonPort, ReconnectToDaemon, SwitchToStandaloneMode, SwitchToDaemonMode, ExportToJSON, ExportToCSV, ImportFromFile, ImportLogFile, ClearAllData, TriggerReplayLogs, StartReplayWithFileDialog, PauseReplay, ResumeReplay, StopReplay, FetchSetRatings, RefreshSetRatings, FetchSetCards, RefreshSetCards, RecalculateAllDraftGrades, ClearDatasetCache, GetDatasetSource } from '../../wailsjs/go/main/App';
-import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
-import { subscribeToReplayState, getReplayState } from '../App';
-import { showToast } from '../components/ToastContainer';
-import { gui } from '../../wailsjs/go/models';
+import {
+  useDaemonConnection,
+  useLogReplay,
+  useReplayTool,
+  useSeventeenLands,
+  useDataManagement,
+} from '../hooks';
 import './Settings.css';
 
 const Settings = () => {
+  // Local UI state (not extracted to hooks)
   const [dbPath, setDbPath] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
@@ -17,162 +20,73 @@ const Settings = () => {
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
 
-  // Daemon settings
-  const [connectionStatus, setConnectionStatus] = useState<gui.ConnectionStatus>(
-    new gui.ConnectionStatus({
-      status: 'standalone',
-      connected: false,
-      mode: 'standalone',
-      url: 'ws://localhost:9999',
-      port: 9999,
-    })
-  );
-  const [daemonMode, setDaemonMode] = useState('auto');
-  const [daemonPort, setDaemonPortState] = useState(9999);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  // Custom hooks for state management
+  const {
+    connectionStatus,
+    daemonMode,
+    daemonPort,
+    isReconnecting,
+    handleDaemonPortChange,
+    handleReconnect,
+    handleModeChange,
+  } = useDaemonConnection();
 
-  // Replay logs settings
-  const [clearDataBeforeReplay, setClearDataBeforeReplay] = useState(false);
-  const [isReplaying, setIsReplaying] = useState(false);
-  const [replayProgress, setReplayProgress] = useState<gui.LogReplayProgress | null>(null);
+  const {
+    clearDataBeforeReplay,
+    setClearDataBeforeReplay,
+    isReplaying,
+    replayProgress,
+    handleReplayLogs,
+  } = useLogReplay();
 
-  // Replay tool settings - use global state for active/paused to persist across navigation
-  const [replayToolActive, setReplayToolActive] = useState(getReplayState().isActive);
-  const [replayToolPaused, setReplayToolPaused] = useState(getReplayState().isPaused);
-  const [replayToolProgress, setReplayToolProgress] = useState<gui.ReplayStatus | null>(getReplayState().progress);
-  const [replaySpeed, setReplaySpeed] = useState(1.0);
-  const [replayFilter, setReplayFilter] = useState('all');
-  const [pauseOnDraft, setPauseOnDraft] = useState(false);
+  const {
+    replayToolActive,
+    replayToolPaused,
+    replayToolProgress,
+    replaySpeed,
+    setReplaySpeed,
+    replayFilter,
+    setReplayFilter,
+    pauseOnDraft,
+    setPauseOnDraft,
+    handleStartReplayTool,
+    handlePauseReplayTool,
+    handleResumeReplayTool,
+    handleStopReplayTool,
+  } = useReplayTool();
 
-  // 17Lands data settings
-  const [setCode, setSetCode] = useState('');
-  const [draftFormat, setDraftFormat] = useState('PremierDraft');
-  const [isFetchingRatings, setIsFetchingRatings] = useState(false);
-  const [isFetchingCards, setIsFetchingCards] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false);
-  const [recalculateMessage, setRecalculateMessage] = useState('');
-  const [dataSource, setDataSource] = useState<string>('');
-  const [isClearingCache, setIsClearingCache] = useState(false);
+  const {
+    setCode,
+    setSetCode,
+    draftFormat,
+    setDraftFormat,
+    isFetchingRatings,
+    isFetchingCards,
+    isRecalculating,
+    recalculateMessage,
+    dataSource,
+    isClearingCache,
+    handleFetchSetRatings,
+    handleRefreshSetRatings,
+    handleFetchSetCards,
+    handleRefreshSetCards,
+    handleRecalculateGrades,
+    handleClearDatasetCache,
+  } = useSeventeenLands();
 
-  // Load connection status on mount
-  useEffect(() => {
-    loadConnectionStatus();
-  }, []);
+  const {
+    handleExportData,
+    handleImportData,
+    handleImportLogFile,
+    handleClearAllData,
+  } = useDataManagement();
 
-  // Subscribe to global replay state changes
-  useEffect(() => {
-    // Get initial state immediately
-    const initialState = getReplayState();
-    setReplayToolActive(initialState.isActive);
-    setReplayToolPaused(initialState.isPaused);
-    setReplayToolProgress(initialState.progress);
+  // Derived state
+  const isConnected = connectionStatus.status === 'connected';
 
-    // Subscribe to future changes
-    const unsubscribe = subscribeToReplayState((state) => {
-      setReplayToolActive(state.isActive);
-      setReplayToolPaused(state.isPaused);
-      setReplayToolProgress(state.progress);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // Listen for replay events
-  useEffect(() => {
-    const unsubscribeStarted = EventsOn('replay:started', () => {
-      setIsReplaying(true);
-      setReplayProgress(null);
-    });
-
-    const unsubscribeProgress = EventsOn('replay:progress', (data: unknown) => {
-      setReplayProgress(gui.LogReplayProgress.createFrom(data));
-    });
-
-    const unsubscribeCompleted = EventsOn('replay:completed', (data: unknown) => {
-      setIsReplaying(false);
-      setReplayProgress(gui.LogReplayProgress.createFrom(data));
-      // Keep progress visible for a moment, then reload using Wails native method
-      setTimeout(() => {
-        WindowReloadApp(); // Refresh to show updated data
-      }, 2000);
-    });
-
-    const unsubscribeError = EventsOn('replay:error', () => {
-      setIsReplaying(false);
-    });
-
-    // Note: Replay tool events are now handled globally in App.tsx
-    // This ensures state persists across navigation and enables automatic tab switching
-
-    return () => {
-      unsubscribeStarted();
-      unsubscribeProgress();
-      unsubscribeCompleted();
-      unsubscribeError();
-    };
-  }, []);
-
-  const loadConnectionStatus = async () => {
-    try {
-      const status = await GetConnectionStatus();
-      setConnectionStatus(gui.ConnectionStatus.createFrom(status));
-      setDaemonPortState(status.port || 9999);
-    } catch {
-      // Connection status load failed silently - UI will show default state
-    }
-  };
-
-  const handleDaemonPortChange = async (port: number) => {
-    if (port < 1024 || port > 65535) {
-      return;
-    }
-
-    setDaemonPortState(port);
-
-    try {
-      await SetDaemonPort(port);
-    } catch (error) {
-      showToast.show(`Failed to set daemon port: ${error}`, 'error');
-    }
-  };
-
-  const handleReconnect = async () => {
-    setIsReconnecting(true);
-    try {
-      await ReconnectToDaemon();
-      await loadConnectionStatus();
-      showToast.show('Successfully reconnected to daemon', 'success');
-    } catch (error) {
-      showToast.show(`Failed to reconnect to daemon: ${error}`, 'error');
-    } finally {
-      setIsReconnecting(false);
-    }
-  };
-
-  const handleModeChange = async (mode: string) => {
-    setDaemonMode(mode);
-
-    try {
-      if (mode === 'standalone') {
-        await SwitchToStandaloneMode();
-        await loadConnectionStatus();
-        showToast.show('Switched to standalone mode', 'success');
-      } else if (mode === 'daemon') {
-        await SwitchToDaemonMode();
-        await loadConnectionStatus();
-        showToast.show('Switched to daemon mode', 'success');
-      }
-      // 'auto' mode is handled automatically by the app
-    } catch (error) {
-      showToast.show(`Failed to switch mode: ${error}`, 'error');
-    }
-  };
-
+  // Local handlers
   const handleSave = () => {
     // TODO: Implement backend settings save
-    // For now, just show success message
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -182,236 +96,6 @@ const Settings = () => {
     setAutoRefresh(false);
     setRefreshInterval(30);
     setShowNotifications(true);
-  };
-
-  const handleExportData = async (format: 'json' | 'csv') => {
-    try {
-      if (format === 'json') {
-        await ExportToJSON();
-      } else {
-        await ExportToCSV();
-      }
-      showToast.show(`Successfully exported data to ${format.toUpperCase()}!`, 'success');
-    } catch (error) {
-      showToast.show(`Failed to export data: ${error}`, 'error');
-    }
-  };
-
-  const handleImportData = async () => {
-    try {
-      await ImportFromFile();
-      showToast.show('Successfully imported data! Refresh the page to see updated statistics.', 'success');
-    } catch (error) {
-      showToast.show(`Failed to import data: ${error}`, 'error');
-    }
-  };
-
-  const handleImportLogFile = async () => {
-    try {
-      const result = await ImportLogFile();
-
-      // User cancelled
-      if (!result) {
-        return;
-      }
-
-      // Show success message with detailed results
-      showToast.show(
-        `Successfully imported ${result.fileName}! ` +
-        `Entries: ${result.entriesRead}, ` +
-        `Matches: ${result.matchesStored}, ` +
-        `Games: ${result.gamesStored}, ` +
-        `Decks: ${result.decksStored}, ` +
-        `Ranks: ${result.ranksStored}, ` +
-        `Quests: ${result.questsStored}, ` +
-        `Drafts: ${result.draftsStored}. ` +
-        `Refresh to see updated statistics.`,
-        'success'
-      );
-    } catch (error) {
-      showToast.show(`Failed to import log file: ${error}`, 'error');
-    }
-  };
-
-  const handleReplayLogs = async () => {
-    // Check if connected to daemon
-    if (connectionStatus.status !== 'connected') {
-      return;
-    }
-
-    try {
-      await TriggerReplayLogs(clearDataBeforeReplay);
-      // Progress UI will update automatically from events
-    } catch (error) {
-      showToast.show(`Failed to trigger replay: ${error}`, 'error');
-    }
-  };
-
-  // Replay tool handlers
-  const handleStartReplayTool = async () => {
-    // Check if connected to daemon
-    if (connectionStatus.status !== 'connected') {
-      showToast.show('Replay tool requires daemon mode. Please start the daemon service.', 'warning');
-      return;
-    }
-
-    try {
-      await StartReplayWithFileDialog(replaySpeed, replayFilter, pauseOnDraft);
-    } catch (error) {
-      showToast.show(`Failed to start replay: ${error}`, 'error');
-    }
-  };
-
-  const handlePauseReplayTool = async () => {
-    try {
-      await PauseReplay();
-    } catch (error) {
-      showToast.show(`Failed to pause replay: ${error}`, 'error');
-    }
-  };
-
-  const handleResumeReplayTool = async () => {
-    try {
-      await ResumeReplay();
-    } catch (error) {
-      showToast.show(`Failed to resume replay: ${error}`, 'error');
-    }
-  };
-
-  const handleStopReplayTool = async () => {
-    try {
-      await StopReplay();
-    } catch (error) {
-      showToast.show(`Failed to stop replay: ${error}`, 'error');
-    }
-  };
-
-  // 17Lands handlers
-  const handleFetchSetRatings = async () => {
-    if (!setCode || setCode.trim() === '') {
-      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
-      return;
-    }
-
-    setIsFetchingRatings(true);
-    try {
-      await FetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
-
-      // Check data source after fetching
-      try {
-        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
-        setDataSource(source);
-
-        const sourceLabel = source === 's3' ? 'S3 public datasets' :
-                          source === 'web_api' ? 'web API' :
-                          source === 'legacy_api' ? 'legacy API' : source;
-
-        showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}! The data is now cached and ready for use in drafts.`, 'success');
-      } catch {
-        showToast.show(`Successfully fetched 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})! The data is now cached and ready for use in drafts.`, 'success');
-      }
-    } catch (error) {
-      showToast.show(`Failed to fetch 17Lands ratings: ${error}. Make sure: Set code is correct (e.g., TLA, BLB, DSK, FDN), you have internet connection, and 17Lands has data for this set.`, 'error');
-    } finally {
-      setIsFetchingRatings(false);
-    }
-  };
-
-  const handleRefreshSetRatings = async () => {
-    if (!setCode || setCode.trim() === '') {
-      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
-      return;
-    }
-
-    setIsFetchingRatings(true);
-    try {
-      await RefreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
-
-      // Check data source after refreshing
-      try {
-        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
-        setDataSource(source);
-
-        const sourceLabel = source === 's3' ? 'S3 public datasets' :
-                          source === 'web_api' ? 'web API' :
-                          source === 'legacy_api' ? 'legacy API' : source;
-
-        showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!`, 'success');
-      } catch {
-        showToast.show(`Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`, 'success');
-      }
-    } catch (error) {
-      showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
-    } finally {
-      setIsFetchingRatings(false);
-    }
-  };
-
-  const handleFetchSetCards = async () => {
-    if (!setCode || setCode.trim() === '') {
-      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
-      return;
-    }
-
-    setIsFetchingCards(true);
-    try {
-      const count = await FetchSetCards(setCode.trim().toUpperCase());
-      showToast.show(`Successfully fetched ${count} cards for ${setCode.toUpperCase()} from Scryfall! Card data is now cached.`, 'success');
-    } catch (error) {
-      showToast.show(`Failed to fetch cards: ${error}. Make sure the set code is correct and you have internet connection.`, 'error');
-    } finally {
-      setIsFetchingCards(false);
-    }
-  };
-
-  const handleRefreshSetCards = async () => {
-    if (!setCode || setCode.trim() === '') {
-      showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
-      return;
-    }
-
-    setIsFetchingCards(true);
-    try {
-      const count = await RefreshSetCards(setCode.trim().toUpperCase());
-      showToast.show(`Successfully refreshed ${count} cards for ${setCode.toUpperCase()} from Scryfall!`, 'success');
-    } catch (error) {
-      showToast.show(`Failed to refresh cards: ${error}`, 'error');
-    } finally {
-      setIsFetchingCards(false);
-    }
-  };
-
-  const handleRecalculateGrades = async () => {
-    setIsRecalculating(true);
-    setRecalculateMessage('');
-
-    try {
-      const count = await RecalculateAllDraftGrades();
-
-      setRecalculateMessage(`✓ Successfully recalculated ${count} draft session(s)! Draft grades and predictions have been updated.`);
-
-      // Clear message after 5 seconds
-      setTimeout(() => setRecalculateMessage(''), 5000);
-    } catch (error) {
-      setRecalculateMessage(`✗ Failed to recalculate draft grades: ${error}`);
-
-      // Clear error message after 8 seconds
-      setTimeout(() => setRecalculateMessage(''), 8000);
-    } finally {
-      setIsRecalculating(false);
-    }
-  };
-
-  const handleClearDatasetCache = async () => {
-    setIsClearingCache(true);
-    try {
-      await ClearDatasetCache();
-      showToast.show('Successfully cleared dataset cache! Cached CSV files have been deleted to free up disk space. Ratings in the database are preserved.', 'success');
-    } catch (error) {
-      showToast.show(`Failed to clear dataset cache: ${error}`, 'error');
-    } finally {
-      setIsClearingCache(false);
-    }
   };
 
   return (
@@ -600,13 +284,13 @@ const Settings = () => {
               <LoadingButton
                 loading={isReplaying}
                 loadingText="Replaying Logs..."
-                onClick={handleReplayLogs}
-                disabled={connectionStatus.status !== 'connected'}
+                onClick={() => handleReplayLogs(isConnected)}
+                disabled={!isConnected}
                 variant="primary"
               >
                 Replay Historical Logs
               </LoadingButton>
-              {connectionStatus.status !== 'connected' && (
+              {!isConnected && (
                 <div className="setting-hint settings-daemon-hint">
                   Daemon must be running to replay logs
                 </div>
@@ -662,15 +346,7 @@ const Settings = () => {
               <span className="setting-description">Permanently delete all match history and statistics</span>
             </label>
             <div className="setting-control">
-              <button className="danger-button" onClick={async () => {
-                try {
-                  await ClearAllData();
-                  showToast.show('All data has been cleared successfully!', 'success');
-                  window.location.reload(); // Refresh to show empty state
-                } catch (error) {
-                  showToast.show(`Failed to clear data: ${error}`, 'error');
-                }
-              }}>
+              <button className="danger-button" onClick={handleClearAllData}>
                 Clear All Data
               </button>
             </div>
@@ -689,7 +365,7 @@ const Settings = () => {
             </div>
           </div>
 
-          {connectionStatus.status !== 'connected' && (
+          {!isConnected && (
             <div className="setting-hint settings-daemon-warning">
               ⚠️ Replay tool requires daemon mode. Please start the daemon service to use this feature.
             </div>
@@ -760,8 +436,8 @@ const Settings = () => {
                 <div className="setting-control">
                   <button
                     className="action-button primary"
-                    onClick={handleStartReplayTool}
-                    disabled={connectionStatus.status !== 'connected'}
+                    onClick={() => handleStartReplayTool(isConnected)}
+                    disabled={!isConnected}
                   >
                     Select Log File(s) & Start
                   </button>
