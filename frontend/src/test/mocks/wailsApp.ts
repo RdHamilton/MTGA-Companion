@@ -57,6 +57,8 @@ export const mockWailsApp = {
   GetDeckStatistics: vi.fn(() => Promise.resolve({} as any)),
   GetDeckByDraftEvent: vi.fn(() => Promise.resolve({} as any)),
   CreateDeck: vi.fn(() => Promise.resolve({} as any)),
+  DeleteDeck: vi.fn(() => Promise.resolve()),
+  ListDecks: vi.fn(() => Promise.resolve([] as any)),
   GetRecommendations: vi.fn(() => Promise.resolve({} as any)),
   ExportDeckToFile: vi.fn(() => Promise.resolve()),
 };
