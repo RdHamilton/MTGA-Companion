@@ -429,6 +429,17 @@ func (e *ExportFacade) ImportLogFile(ctx context.Context) (*ImportLogFileResult,
 		})
 	}
 
+	if result.CollectionCardsAdded > 0 {
+		e.eventDispatcher.Dispatch(events.Event{
+			Type: "collection:updated",
+			Data: map[string]interface{}{
+				"newCards":   result.CollectionNewCards,
+				"cardsAdded": result.CollectionCardsAdded,
+			},
+			Context: ctx,
+		})
+	}
+
 	return &ImportLogFileResult{
 		FileName:      fileName,
 		EntriesRead:   len(entries),

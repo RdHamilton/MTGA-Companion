@@ -141,11 +141,36 @@ const ToastContainer = () => {
       }
     });
 
+    // Listen for collection:updated events
+    const unsubscribeCollection = EventsOn('collection:updated', (data: unknown) => {
+      const eventData = gui.CollectionUpdatedEvent.createFrom(data);
+      const newCards = eventData.newCards || 0;
+      const cardsAdded = eventData.cardsAdded || 0;
+
+      // Skip during replay to avoid spam
+      if (isReplayActiveRef.current) {
+        return;
+      }
+
+      if (newCards > 0) {
+        addToast(
+          `Collection updated! ${newCards} new card${newCards !== 1 ? 's' : ''} discovered (${cardsAdded} total added)`,
+          'success'
+        );
+      } else if (cardsAdded > 0) {
+        addToast(
+          `Collection updated! ${cardsAdded} card${cardsAdded !== 1 ? 's' : ''} added`,
+          'info'
+        );
+      }
+    });
+
     return () => {
       if (unsubscribeStats) unsubscribeStats();
       if (unsubscribeRank) unsubscribeRank();
       if (unsubscribeQuest) unsubscribeQuest();
       if (unsubscribeDraft) unsubscribeDraft();
+      if (unsubscribeCollection) unsubscribeCollection();
       if (draftUpdateTimerRef.current) {
         clearTimeout(draftUpdateTimerRef.current);
       }

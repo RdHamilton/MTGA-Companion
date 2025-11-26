@@ -110,6 +110,10 @@ export function GetCollectionStats() {
   return window['go']['main']['App']['GetCollectionStats']();
 }
 
+export function GetCollectionUpdatedEvent() {
+  return window['go']['main']['App']['GetCollectionUpdatedEvent']();
+}
+
 export function GetColorRatings(arg1, arg2) {
   return window['go']['main']['App']['GetColorRatings'](arg1, arg2);
 }

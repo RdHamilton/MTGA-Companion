@@ -218,6 +218,11 @@ func (a *App) GetDeckUpdatedEvent() (*gui.DeckUpdatedEvent, error) {
 	return a.systemFacade.GetDeckUpdatedEvent(a.ctx)
 }
 
+// GetCollectionUpdatedEvent exposes CollectionUpdatedEvent type to Wails.
+func (a *App) GetCollectionUpdatedEvent() (*gui.CollectionUpdatedEvent, error) {
+	return a.systemFacade.GetCollectionUpdatedEvent(a.ctx)
+}
+
 // GetAchievementUpdatedEvent exposes AchievementUpdatedEvent type to Wails.
 func (a *App) GetAchievementUpdatedEvent() (*gui.AchievementUpdatedEvent, error) {
 	return a.systemFacade.GetAchievementUpdatedEvent(a.ctx)

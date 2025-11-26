@@ -325,6 +325,20 @@ export namespace gui {
 	        this.mythicCount = source["mythicCount"];
 	    }
 	}
+	export class CollectionUpdatedEvent {
+	    newCards: number;
+	    cardsAdded: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionUpdatedEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.newCards = source["newCards"];
+	        this.cardsAdded = source["cardsAdded"];
+	    }
+	}
 	export class ColorStats {
 	    white: number;
 	    blue: number;

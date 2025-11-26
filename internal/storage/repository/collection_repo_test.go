@@ -14,11 +14,14 @@ func setupCollectionTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("failed to open test database: %v", err)
 	}
 
+	// Schema with composite primary key (account_id, card_id) as per migration 000002
 	schema := `
 		CREATE TABLE collection (
-			card_id INTEGER PRIMARY KEY,
+			account_id INTEGER NOT NULL DEFAULT 1,
+			card_id INTEGER NOT NULL,
 			quantity INTEGER NOT NULL,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (account_id, card_id)
 		);
 
 		CREATE TABLE collection_history (
