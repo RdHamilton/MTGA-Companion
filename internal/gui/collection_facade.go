@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
@@ -96,26 +95,16 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		cardIDs = append(cardIDs, cardID)
 	}
 
-	// Get card metadata - try CardService first (with Scryfall fallback), then SetCardRepo
-	cardMetadataFromService := make(map[int]*cards.Card)
+	// Get card metadata from local database only (SetCardRepo) for fast loading.
+	// Skip CardService API calls as they are too slow for large collections.
+	// Cards without local metadata will still display with Scryfall image URLs from frontend.
 	cardMetadataFromSetRepo := make(map[int]*models.SetCard)
 
-	// First try to get cards from CardService (which has Scryfall fallback)
-	if c.services.CardService != nil {
-		cardsMap, err := c.services.CardService.GetCards(cardIDs)
-		if err == nil {
-			cardMetadataFromService = cardsMap
-		}
-	}
-
-	// For any cards not found via CardService, try SetCardRepo as fallback
 	for _, cardID := range cardIDs {
-		if _, found := cardMetadataFromService[cardID]; !found {
-			arenaID := fmt.Sprintf("%d", cardID)
-			card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
-			if err == nil && card != nil {
-				cardMetadataFromSetRepo[cardID] = card
-			}
+		arenaID := fmt.Sprintf("%d", cardID)
+		card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+		if err == nil && card != nil {
+			cardMetadataFromSetRepo[cardID] = card
 		}
 	}
 
@@ -128,30 +117,8 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			Quantity: quantity,
 		}
 
-		// Try CardService metadata first (from Scryfall)
-		if meta, ok := cardMetadataFromService[cardID]; ok {
-			card.Name = meta.Name
-			card.SetCode = meta.SetCode
-			card.SetName = meta.SetName
-			card.Rarity = meta.Rarity
-			if meta.ManaCost != nil {
-				card.ManaCost = *meta.ManaCost
-			}
-			card.CMC = meta.CMC
-			card.TypeLine = meta.TypeLine
-			card.Colors = meta.Colors
-			card.ColorIdentity = meta.ColorIdentity
-			if meta.ImageURI != nil {
-				card.ImageURI = *meta.ImageURI
-			}
-			if meta.Power != nil {
-				card.Power = *meta.Power
-			}
-			if meta.Toughness != nil {
-				card.Toughness = *meta.Toughness
-			}
-		} else if meta, ok := cardMetadataFromSetRepo[cardID]; ok {
-			// Fallback to SetCardRepo metadata
+		// Use SetCardRepo metadata (local database)
+		if meta, ok := cardMetadataFromSetRepo[cardID]; ok {
 			card.Name = meta.Name
 			card.SetCode = meta.SetCode
 			card.Rarity = meta.Rarity
@@ -168,6 +135,8 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 				card.Toughness = meta.Toughness
 			}
 		}
+		// Cards without local metadata will still display - frontend will use
+		// Scryfall image URL fallback based on card name
 
 		collectionCards = append(collectionCards, card)
 	}
