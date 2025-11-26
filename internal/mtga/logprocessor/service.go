@@ -9,6 +9,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // Service handles processing of MTGA log entries and storing results.
@@ -52,16 +53,18 @@ func (s *Service) SetReplayMode(enabled bool) {
 
 // ProcessResult contains the results of processing log entries.
 type ProcessResult struct {
-	MatchesStored      int
-	GamesStored        int
-	DecksStored        int
-	RanksStored        int
-	QuestsStored       int
-	QuestsCompleted    int
-	AchievementsStored int
-	DraftsStored       int
-	DraftPicksStored   int
-	Errors             []error
+	MatchesStored        int
+	GamesStored          int
+	DecksStored          int
+	RanksStored          int
+	QuestsStored         int
+	QuestsCompleted      int
+	AchievementsStored   int
+	DraftsStored         int
+	DraftPicksStored     int
+	CollectionCardsAdded int // Cards added to collection
+	CollectionNewCards   int // New unique cards discovered
+	Errors               []error
 }
 
 // ProcessLogEntries processes a batch of log entries and stores all extracted data.
@@ -104,6 +107,12 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 
 	// Process draft sessions
 	if err := s.processDrafts(ctx, entries, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process collection from decks and draft picks
+	// This must run AFTER processDecks and processDrafts to aggregate all card data
+	if err := s.processCollection(ctx, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -433,6 +442,215 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
 	// Achievement system removed - skip processing
 	return nil
+}
+
+// MaxCollectionCopies is the maximum number of copies of a non-basic card to track.
+// Arena limits decks to 4 copies of any non-basic card, so we cap at 4.
+const MaxCollectionCopies = 4
+
+// processCollection builds the "known collection" by aggregating cards from:
+// 1. All cards in player decks (from EventGetCoursesV2)
+// 2. All draft picks (from draft_picks table)
+// Cards are capped at 4 copies maximum (matching Arena's deck building rules).
+func (s *Service) processCollection(ctx context.Context, result *ProcessResult) error {
+	if s.dryRun {
+		log.Println("[DRY RUN] Would process collection but skipping in dry run mode")
+		return nil
+	}
+
+	// Aggregate cards from all sources
+	cardCounts := make(map[int]int) // cardID -> quantity
+
+	// Phase 1: Aggregate from deck cards
+	deckCards, err := s.aggregateDeckCards(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to aggregate deck cards: %v", err)
+		// Continue - we can still process draft picks
+	} else {
+		for cardID, qty := range deckCards {
+			cardCounts[cardID] = qty
+		}
+	}
+
+	// Phase 3: Aggregate from draft picks
+	draftCards, err := s.aggregateDraftPicks(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to aggregate draft picks: %v", err)
+		// Continue with what we have
+	} else {
+		for cardID, qty := range draftCards {
+			// Add to existing count, will be capped later
+			cardCounts[cardID] += qty
+		}
+	}
+
+	if len(cardCounts) == 0 {
+		// No cards to process
+		return nil
+	}
+
+	// Cap all counts at MaxCollectionCopies
+	for cardID, qty := range cardCounts {
+		if qty > MaxCollectionCopies {
+			cardCounts[cardID] = MaxCollectionCopies
+		}
+	}
+
+	// Get current collection to detect changes
+	currentCollection, err := s.storage.CollectionRepo().GetAll(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to get current collection: %v", err)
+		currentCollection = make(map[int]int)
+	}
+
+	// Calculate changes
+	var entries []struct {
+		CardID   int
+		Quantity int
+	}
+	newCards := 0
+	cardsAdded := 0
+
+	for cardID, newQty := range cardCounts {
+		currentQty := currentCollection[cardID]
+		if newQty > currentQty {
+			// Card count increased
+			entries = append(entries, struct {
+				CardID   int
+				Quantity int
+			}{CardID: cardID, Quantity: newQty})
+
+			if currentQty == 0 {
+				newCards++
+			}
+			cardsAdded += newQty - currentQty
+		}
+	}
+
+	if len(entries) == 0 {
+		// No changes needed
+		return nil
+	}
+
+	// Convert to CollectionEntry format for bulk upsert
+	collectionEntries := make([]struct {
+		CardID   int
+		Quantity int
+	}, len(entries))
+	copy(collectionEntries, entries)
+
+	// Use type conversion for the repository method
+	repoEntries := make([]repository.CollectionEntry, len(entries))
+	for i, e := range entries {
+		repoEntries[i] = repository.CollectionEntry{
+			CardID:   e.CardID,
+			Quantity: e.Quantity,
+		}
+	}
+
+	// Bulk upsert all changes
+	if err := s.storage.CollectionRepo().UpsertMany(ctx, repoEntries); err != nil {
+		return fmt.Errorf("failed to update collection: %w", err)
+	}
+
+	result.CollectionCardsAdded = cardsAdded
+	result.CollectionNewCards = newCards
+
+	if cardsAdded > 0 || newCards > 0 {
+		log.Printf("✓ Updated collection: %d new cards, %d total cards added", newCards, cardsAdded)
+	}
+
+	return nil
+}
+
+// aggregateDeckCards gets all cards from all player decks and returns card counts.
+// Each card is counted only once per deck (not per quantity in deck) to determine ownership.
+func (s *Service) aggregateDeckCards(ctx context.Context) (map[int]int, error) {
+	// Get all decks for current account
+	// Note: We query deck_cards directly to get card IDs and quantities
+	query := `
+		SELECT dc.card_id, SUM(dc.quantity) as total_qty
+		FROM deck_cards dc
+		JOIN decks d ON dc.deck_id = d.id
+		WHERE d.account_id = ?
+		GROUP BY dc.card_id
+	`
+
+	rows, err := s.storage.GetDB().QueryContext(ctx, query, s.storage.CurrentAccountID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query deck cards: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	cardCounts := make(map[int]int)
+	for rows.Next() {
+		var cardID, totalQty int
+		if err := rows.Scan(&cardID, &totalQty); err != nil {
+			return nil, fmt.Errorf("failed to scan deck card: %w", err)
+		}
+		// Cap at MaxCollectionCopies
+		if totalQty > MaxCollectionCopies {
+			totalQty = MaxCollectionCopies
+		}
+		cardCounts[cardID] = totalQty
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deck cards: %w", err)
+	}
+
+	return cardCounts, nil
+}
+
+// aggregateDraftPicks gets all draft picks and returns card counts.
+// Each picked card counts as one copy.
+func (s *Service) aggregateDraftPicks(ctx context.Context) (map[int]int, error) {
+	// Query draft_picks for all picked cards
+	// draft_picks stores card_id as TEXT (arena card ID string)
+	query := `
+		SELECT dp.card_id, COUNT(*) as pick_count
+		FROM draft_picks dp
+		JOIN draft_sessions ds ON dp.session_id = ds.id
+		GROUP BY dp.card_id
+	`
+
+	rows, err := s.storage.GetDB().QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query draft picks: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	cardCounts := make(map[int]int)
+	for rows.Next() {
+		var cardIDStr string
+		var pickCount int
+		if err := rows.Scan(&cardIDStr, &pickCount); err != nil {
+			return nil, fmt.Errorf("failed to scan draft pick: %w", err)
+		}
+
+		// Convert card ID string to int
+		var cardID int
+		if _, err := fmt.Sscanf(cardIDStr, "%d", &cardID); err != nil {
+			// Skip non-numeric card IDs
+			continue
+		}
+
+		// Cap at MaxCollectionCopies
+		if pickCount > MaxCollectionCopies {
+			pickCount = MaxCollectionCopies
+		}
+		cardCounts[cardID] = pickCount
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating draft picks: %w", err)
+	}
+
+	return cardCounts, nil
 }
 
 // processDrafts parses and stores draft sessions from log entries.
