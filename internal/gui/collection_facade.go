@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
@@ -95,20 +96,31 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		cardIDs = append(cardIDs, cardID)
 	}
 
-	// Get card metadata from the card service
-	cardMetadata := make(map[int]*models.SetCard)
+	// Get card metadata - try CardService first (with Scryfall fallback), then SetCardRepo
+	cardMetadataFromService := make(map[int]*cards.Card)
+	cardMetadataFromSetRepo := make(map[int]*models.SetCard)
+
+	// First try to get cards from CardService (which has Scryfall fallback)
 	if c.services.CardService != nil {
-		for _, cardID := range cardIDs {
+		cardsMap, err := c.services.CardService.GetCards(cardIDs)
+		if err == nil {
+			cardMetadataFromService = cardsMap
+		}
+	}
+
+	// For any cards not found via CardService, try SetCardRepo as fallback
+	for _, cardID := range cardIDs {
+		if _, found := cardMetadataFromService[cardID]; !found {
 			arenaID := fmt.Sprintf("%d", cardID)
 			card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
 			if err == nil && card != nil {
-				cardMetadata[cardID] = card
+				cardMetadataFromSetRepo[cardID] = card
 			}
 		}
 	}
 
 	// Build collection cards with metadata
-	cards := make([]*CollectionCard, 0, len(collection))
+	collectionCards := make([]*CollectionCard, 0, len(collection))
 	for cardID, quantity := range collection {
 		card := &CollectionCard{
 			CardID:   cardID,
@@ -116,8 +128,30 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			Quantity: quantity,
 		}
 
-		// Add metadata if available
-		if meta, ok := cardMetadata[cardID]; ok {
+		// Try CardService metadata first (from Scryfall)
+		if meta, ok := cardMetadataFromService[cardID]; ok {
+			card.Name = meta.Name
+			card.SetCode = meta.SetCode
+			card.SetName = meta.SetName
+			card.Rarity = meta.Rarity
+			if meta.ManaCost != nil {
+				card.ManaCost = *meta.ManaCost
+			}
+			card.CMC = meta.CMC
+			card.TypeLine = meta.TypeLine
+			card.Colors = meta.Colors
+			card.ColorIdentity = meta.ColorIdentity
+			if meta.ImageURI != nil {
+				card.ImageURI = *meta.ImageURI
+			}
+			if meta.Power != nil {
+				card.Power = *meta.Power
+			}
+			if meta.Toughness != nil {
+				card.Toughness = *meta.Toughness
+			}
+		} else if meta, ok := cardMetadataFromSetRepo[cardID]; ok {
+			// Fallback to SetCardRepo metadata
 			card.Name = meta.Name
 			card.SetCode = meta.SetCode
 			card.Rarity = meta.Rarity
@@ -135,41 +169,41 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			}
 		}
 
-		cards = append(cards, card)
+		collectionCards = append(collectionCards, card)
 	}
 
-	totalCount := len(cards)
+	totalCount := len(collectionCards)
 
 	// Apply filters
 	if filter != nil {
-		cards = applyCollectionFilters(cards, filter)
+		collectionCards = applyCollectionFilters(collectionCards, filter)
 	}
 
-	filterCount := len(cards)
+	filterCount := len(collectionCards)
 
 	// Apply sorting
 	if filter != nil && filter.SortBy != "" {
-		sortCollectionCards(cards, filter.SortBy, filter.SortDesc)
+		sortCollectionCards(collectionCards, filter.SortBy, filter.SortDesc)
 	} else {
 		// Default sort by name
-		sortCollectionCards(cards, "name", false)
+		sortCollectionCards(collectionCards, "name", false)
 	}
 
 	// Apply pagination
 	if filter != nil {
-		if filter.Offset > 0 && filter.Offset < len(cards) {
-			cards = cards[filter.Offset:]
-		} else if filter.Offset >= len(cards) {
-			cards = []*CollectionCard{}
+		if filter.Offset > 0 && filter.Offset < len(collectionCards) {
+			collectionCards = collectionCards[filter.Offset:]
+		} else if filter.Offset >= len(collectionCards) {
+			collectionCards = []*CollectionCard{}
 		}
 
-		if filter.Limit > 0 && filter.Limit < len(cards) {
-			cards = cards[:filter.Limit]
+		if filter.Limit > 0 && filter.Limit < len(collectionCards) {
+			collectionCards = collectionCards[:filter.Limit]
 		}
 	}
 
 	return &CollectionResponse{
-		Cards:       cards,
+		Cards:       collectionCards,
 		TotalCount:  totalCount,
 		FilterCount: filterCount,
 	}, nil
