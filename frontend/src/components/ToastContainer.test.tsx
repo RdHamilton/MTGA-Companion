@@ -113,6 +113,111 @@ describe('ToastContainer Component', () => {
     });
   });
 
+  describe('Collection Updates', () => {
+    it('should display collection update toast with new cards', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 5, cardsAdded: 10 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Collection updated! 5 new cards discovered \(10 total added\)/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should display singular form for single new card', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 1, cardsAdded: 1 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Collection updated! 1 new card discovered \(1 total added\)/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should display info toast when cards added but no new cards', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 0, cardsAdded: 3 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Collection updated! 3 cards added/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should display singular form for single card added', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 0, cardsAdded: 1 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Collection updated! 1 card added/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should not display toast when no cards added', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 0, cardsAdded: 0 });
+
+      // Wait a bit to ensure no toast appears
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(screen.queryByText(/Collection updated/i)).not.toBeInTheDocument();
+    });
+
+    it('should skip collection updates during replay mode', async () => {
+      mockReplayState.isActive = true;
+
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 5, cardsAdded: 10 });
+
+      // Wait a bit to ensure no toast appears
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(screen.queryByText(/Collection updated/i)).not.toBeInTheDocument();
+    });
+
+    it('should show collection updates after replay stops', async () => {
+      mockReplayState.isActive = true;
+
+      render(<ToastContainer />);
+
+      // Stop replay
+      mockReplayState.isActive = false;
+      mockSubscribers.forEach(sub => sub(mockReplayState));
+
+      // Now emit collection update
+      mockEventEmitter.emit('collection:updated', { newCards: 2, cardsAdded: 5 });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Collection updated! 2 new cards discovered/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should display success toast for new cards', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 3, cardsAdded: 3 });
+
+      await waitFor(() => {
+        const toast = screen.getByText(/Collection updated! 3 new cards/i).closest('.toast');
+        expect(toast).toHaveClass('toast-success');
+      });
+    });
+
+    it('should display info toast for cards added without new cards', async () => {
+      render(<ToastContainer />);
+
+      mockEventEmitter.emit('collection:updated', { newCards: 0, cardsAdded: 5 });
+
+      await waitFor(() => {
+        const toast = screen.getByText(/Collection updated! 5 cards added/i).closest('.toast');
+        expect(toast).toHaveClass('toast-info');
+      });
+    });
+  });
+
   describe('Draft Updates', () => {
     it('should display draft update toast in normal mode', async () => {
       render(<ToastContainer />);
