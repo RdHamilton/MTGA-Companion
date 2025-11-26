@@ -75,8 +75,6 @@ export function GetCurrentAccount():Promise<models.Account>;
 
 export function GetDaemonErrorEvent():Promise<gui.DaemonErrorEvent>;
 
-export function GetDaemonProcessStatus():Promise<gui.DaemonProcessStatus>;
-
 export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
 
 export function GetDeck(arg1:string):Promise<gui.DeckWithCards>;
@@ -122,6 +120,10 @@ export function GetMatchGames(arg1:string):Promise<Array<models.Game>>;
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
 export function GetMissingCards(arg1:string,arg2:number,arg3:number):Promise<models.MissingCardsAnalysis>;
+
+export function GetMissingCardsForDeck(arg1:string):Promise<gui.MissingCardsForDeckResponse>;
+
+export function GetMissingCardsForSet(arg1:string):Promise<gui.MissingCardsForSetResponse>;
 
 export function GetPerformanceMetrics(arg1:models.StatsFilter):Promise<models.PerformanceMetrics>;
 
@@ -173,8 +175,6 @@ export function ImportLogFile():Promise<gui.ImportLogFileResult>;
 
 export function Initialize(arg1:string):Promise<void>;
 
-export function IsDaemonAutoStartEnabled():Promise<boolean>;
-
 export function ListDecks():Promise<Array<gui.DeckListItem>>;
 
 export function PauseReplay():Promise<void>;
@@ -197,21 +197,13 @@ export function RepairDraftSession(arg1:string):Promise<void>;
 
 export function ResetDraftPerformanceMetrics():Promise<void>;
 
-export function RestartDaemonProcess():Promise<void>;
-
 export function ResumeReplay():Promise<void>;
 
-export function SetDaemonAutoStart(arg1:boolean):Promise<void>;
-
 export function SetDaemonPort(arg1:number):Promise<void>;
-
-export function StartDaemonProcess():Promise<void>;
 
 export function StartPoller():Promise<void>;
 
 export function StartReplayWithFileDialog(arg1:number,arg2:string,arg3:boolean):Promise<void>;
-
-export function StopDaemonProcess():Promise<void>;
 
 export function StopPoller():Promise<void>;
 

@@ -392,3 +392,273 @@ func rarityOrder(rarity string) int {
 		return 0
 	}
 }
+
+// MissingCard represents a card that is missing from the player's collection.
+type MissingCard struct {
+	CardID         int      `json:"cardId"`
+	ArenaID        int      `json:"arenaId"`
+	Name           string   `json:"name"`
+	SetCode        string   `json:"setCode"`
+	SetName        string   `json:"setName"`
+	Rarity         string   `json:"rarity"`
+	ManaCost       string   `json:"manaCost"`
+	CMC            float64  `json:"cmc"`
+	TypeLine       string   `json:"typeLine"`
+	Colors         []string `json:"colors"`
+	ImageURI       string   `json:"imageUri"`
+	QuantityNeeded int      `json:"quantityNeeded"` // How many copies are needed
+	QuantityOwned  int      `json:"quantityOwned"`  // How many copies owned
+}
+
+// MissingCardsForDeckResponse contains missing cards analysis for a deck.
+type MissingCardsForDeckResponse struct {
+	DeckID          string         `json:"deckId"`
+	DeckName        string         `json:"deckName"`
+	TotalMissing    int            `json:"totalMissing"`    // Total number of missing card copies
+	UniqueMissing   int            `json:"uniqueMissing"`   // Number of unique missing cards
+	MissingCards    []*MissingCard `json:"missingCards"`    // List of missing cards, sorted by rarity (mythic first)
+	WildcardsNeeded *WildcardCost  `json:"wildcardsNeeded"` // Wildcard cost breakdown
+	IsComplete      bool           `json:"isComplete"`      // True if deck can be built with current collection
+}
+
+// MissingCardsForSetResponse contains missing cards analysis for a set.
+type MissingCardsForSetResponse struct {
+	SetCode         string         `json:"setCode"`
+	SetName         string         `json:"setName"`
+	TotalMissing    int            `json:"totalMissing"`    // Total missing card copies
+	UniqueMissing   int            `json:"uniqueMissing"`   // Unique missing cards
+	MissingCards    []*MissingCard `json:"missingCards"`    // List of missing cards
+	WildcardsNeeded *WildcardCost  `json:"wildcardsNeeded"` // Wildcard cost breakdown
+	CompletionPct   float64        `json:"completionPct"`   // Set completion percentage
+}
+
+// WildcardCost represents the wildcard cost to complete a deck or set.
+type WildcardCost struct {
+	Common   int `json:"common"`
+	Uncommon int `json:"uncommon"`
+	Rare     int `json:"rare"`
+	Mythic   int `json:"mythic"`
+	Total    int `json:"total"`
+}
+
+// GetMissingCardsForDeck returns missing cards analysis for a specific deck.
+func (c *CollectionFacade) GetMissingCardsForDeck(ctx context.Context, deckID string) (*MissingCardsForDeckResponse, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get the deck
+	deck, err := c.services.Storage.DeckRepo().GetByID(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck: %v", err)}
+	}
+	if deck == nil {
+		return nil, &AppError{Message: "Deck not found"}
+	}
+
+	// Get deck cards
+	deckCards, err := c.services.Storage.DeckRepo().GetCards(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck cards: %v", err)}
+	}
+
+	// Get player's collection
+	var collection map[int]int
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		collection, err = c.services.Storage.GetCollection(ctx)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get collection: %v", err)}
+	}
+
+	// Calculate missing cards
+	missingCards := make([]*MissingCard, 0)
+	wildcardCost := &WildcardCost{}
+	totalMissing := 0
+
+	for _, deckCard := range deckCards {
+		owned := collection[deckCard.CardID]
+		needed := deckCard.Quantity - owned
+
+		if needed > 0 {
+			totalMissing += needed
+
+			// Get card metadata
+			arenaID := fmt.Sprintf("%d", deckCard.CardID)
+			cardMeta, _ := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+
+			missing := &MissingCard{
+				CardID:         deckCard.CardID,
+				ArenaID:        deckCard.CardID,
+				QuantityNeeded: needed,
+				QuantityOwned:  owned,
+			}
+
+			if cardMeta != nil {
+				missing.Name = cardMeta.Name
+				missing.SetCode = cardMeta.SetCode
+				missing.Rarity = cardMeta.Rarity
+				missing.ManaCost = cardMeta.ManaCost
+				missing.CMC = float64(cardMeta.CMC)
+				missing.TypeLine = strings.Join(cardMeta.Types, " ")
+				missing.Colors = cardMeta.Colors
+				missing.ImageURI = cardMeta.ImageURL
+
+				// Add to wildcard cost
+				switch strings.ToLower(cardMeta.Rarity) {
+				case "common":
+					wildcardCost.Common += needed
+				case "uncommon":
+					wildcardCost.Uncommon += needed
+				case "rare":
+					wildcardCost.Rare += needed
+				case "mythic":
+					wildcardCost.Mythic += needed
+				}
+			}
+
+			missingCards = append(missingCards, missing)
+		}
+	}
+
+	// Sort missing cards by rarity (mythic first, then rare, uncommon, common)
+	sort.Slice(missingCards, func(i, j int) bool {
+		return rarityOrder(missingCards[i].Rarity) > rarityOrder(missingCards[j].Rarity)
+	})
+
+	wildcardCost.Total = wildcardCost.Common + wildcardCost.Uncommon + wildcardCost.Rare + wildcardCost.Mythic
+
+	return &MissingCardsForDeckResponse{
+		DeckID:          deckID,
+		DeckName:        deck.Name,
+		TotalMissing:    totalMissing,
+		UniqueMissing:   len(missingCards),
+		MissingCards:    missingCards,
+		WildcardsNeeded: wildcardCost,
+		IsComplete:      totalMissing == 0,
+	}, nil
+}
+
+// GetMissingCardsForSet returns missing cards analysis for a specific set.
+func (c *CollectionFacade) GetMissingCardsForSet(ctx context.Context, setCode string) (*MissingCardsForSetResponse, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get all cards in the set
+	setCards, err := c.services.Storage.SetCardRepo().GetCardsBySet(ctx, setCode)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get set cards: %v", err)}
+	}
+	if len(setCards) == 0 {
+		return nil, &AppError{Message: fmt.Sprintf("No cards found for set: %s", setCode)}
+	}
+
+	// Get player's collection
+	var collection map[int]int
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		collection, err = c.services.Storage.GetCollection(ctx)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get collection: %v", err)}
+	}
+
+	// Calculate missing cards (max 4 copies of each)
+	missingCards := make([]*MissingCard, 0)
+	wildcardCost := &WildcardCost{}
+	totalMissing := 0
+	totalPossible := 0
+	totalOwned := 0
+	setName := ""
+
+	for _, card := range setCards {
+		// Get ArenaID as int for collection lookup
+		arenaID := 0
+		if card.ArenaID != "" {
+			_, _ = fmt.Sscanf(card.ArenaID, "%d", &arenaID)
+		}
+
+		// Skip basic lands for completion calculation (unlimited copies allowed)
+		isBasicLand := strings.Contains(strings.ToLower(card.Rarity), "basic") ||
+			(strings.Contains(strings.Join(card.Types, " "), "Basic") && strings.Contains(strings.Join(card.Types, " "), "Land"))
+
+		maxCopies := 4
+		if isBasicLand {
+			continue // Skip basic lands
+		}
+
+		owned := collection[arenaID]
+		if owned > maxCopies {
+			owned = maxCopies
+		}
+
+		totalPossible += maxCopies
+		totalOwned += owned
+
+		needed := maxCopies - owned
+		if needed > 0 {
+			totalMissing += needed
+
+			missing := &MissingCard{
+				CardID:         arenaID,
+				ArenaID:        arenaID,
+				Name:           card.Name,
+				SetCode:        card.SetCode,
+				Rarity:         card.Rarity,
+				ManaCost:       card.ManaCost,
+				CMC:            float64(card.CMC),
+				TypeLine:       strings.Join(card.Types, " "),
+				Colors:         card.Colors,
+				ImageURI:       card.ImageURL,
+				QuantityNeeded: needed,
+				QuantityOwned:  owned,
+			}
+
+			missingCards = append(missingCards, missing)
+
+			// Add to wildcard cost
+			switch strings.ToLower(card.Rarity) {
+			case "common":
+				wildcardCost.Common += needed
+			case "uncommon":
+				wildcardCost.Uncommon += needed
+			case "rare":
+				wildcardCost.Rare += needed
+			case "mythic":
+				wildcardCost.Mythic += needed
+			}
+		}
+
+		// Capture set name
+		if setName == "" {
+			setName = card.SetCode // Use set code as fallback
+		}
+	}
+
+	// Sort missing cards by rarity (mythic first)
+	sort.Slice(missingCards, func(i, j int) bool {
+		return rarityOrder(missingCards[i].Rarity) > rarityOrder(missingCards[j].Rarity)
+	})
+
+	wildcardCost.Total = wildcardCost.Common + wildcardCost.Uncommon + wildcardCost.Rare + wildcardCost.Mythic
+
+	// Calculate completion percentage
+	completionPct := 0.0
+	if totalPossible > 0 {
+		completionPct = float64(totalOwned) / float64(totalPossible) * 100
+	}
+
+	return &MissingCardsForSetResponse{
+		SetCode:         setCode,
+		SetName:         setName,
+		TotalMissing:    totalMissing,
+		UniqueMissing:   len(missingCards),
+		MissingCards:    missingCards,
+		WildcardsNeeded: wildcardCost,
+		CompletionPct:   completionPct,
+	}, nil
+}

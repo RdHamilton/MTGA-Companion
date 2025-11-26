@@ -405,26 +405,6 @@ export namespace gui {
 	        this.details = source["details"];
 	    }
 	}
-	export class DaemonProcessStatus {
-	    status: string;
-	    pid?: number;
-	    port: number;
-	    uptime?: number;
-	    lastError?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DaemonProcessStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.status = source["status"];
-	        this.pid = source["pid"];
-	        this.port = source["port"];
-	        this.uptime = source["uptime"];
-	        this.lastError = source["lastError"];
-	    }
-	}
 	export class DeckLibraryFilter {
 	    format?: string;
 	    source?: string;
@@ -940,6 +920,146 @@ export namespace gui {
 	        this.error = source["error"];
 	    }
 	}
+	export class MissingCard {
+	    cardId: number;
+	    arenaId: number;
+	    name: string;
+	    setCode: string;
+	    setName: string;
+	    rarity: string;
+	    manaCost: string;
+	    cmc: number;
+	    typeLine: string;
+	    colors: string[];
+	    imageUri: string;
+	    quantityNeeded: number;
+	    quantityOwned: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MissingCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardId = source["cardId"];
+	        this.arenaId = source["arenaId"];
+	        this.name = source["name"];
+	        this.setCode = source["setCode"];
+	        this.setName = source["setName"];
+	        this.rarity = source["rarity"];
+	        this.manaCost = source["manaCost"];
+	        this.cmc = source["cmc"];
+	        this.typeLine = source["typeLine"];
+	        this.colors = source["colors"];
+	        this.imageUri = source["imageUri"];
+	        this.quantityNeeded = source["quantityNeeded"];
+	        this.quantityOwned = source["quantityOwned"];
+	    }
+	}
+	export class WildcardCost {
+	    common: number;
+	    uncommon: number;
+	    rare: number;
+	    mythic: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WildcardCost(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.common = source["common"];
+	        this.uncommon = source["uncommon"];
+	        this.rare = source["rare"];
+	        this.mythic = source["mythic"];
+	        this.total = source["total"];
+	    }
+	}
+	export class MissingCardsForDeckResponse {
+	    deckId: string;
+	    deckName: string;
+	    totalMissing: number;
+	    uniqueMissing: number;
+	    missingCards: MissingCard[];
+	    wildcardsNeeded?: WildcardCost;
+	    isComplete: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MissingCardsForDeckResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckId = source["deckId"];
+	        this.deckName = source["deckName"];
+	        this.totalMissing = source["totalMissing"];
+	        this.uniqueMissing = source["uniqueMissing"];
+	        this.missingCards = this.convertValues(source["missingCards"], MissingCard);
+	        this.wildcardsNeeded = this.convertValues(source["wildcardsNeeded"], WildcardCost);
+	        this.isComplete = source["isComplete"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MissingCardsForSetResponse {
+	    setCode: string;
+	    setName: string;
+	    totalMissing: number;
+	    uniqueMissing: number;
+	    missingCards: MissingCard[];
+	    wildcardsNeeded?: WildcardCost;
+	    completionPct: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MissingCardsForSetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.setCode = source["setCode"];
+	        this.setName = source["setName"];
+	        this.totalMissing = source["totalMissing"];
+	        this.uniqueMissing = source["uniqueMissing"];
+	        this.missingCards = this.convertValues(source["missingCards"], MissingCard);
+	        this.wildcardsNeeded = this.convertValues(source["wildcardsNeeded"], WildcardCost);
+	        this.completionPct = source["completionPct"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class QuestUpdatedEvent {
 	    completed: number;
 	    count: number;
@@ -1065,6 +1185,7 @@ export namespace gui {
 	        this.games = source["games"];
 	    }
 	}
+	
 
 }
 
