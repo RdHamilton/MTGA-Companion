@@ -665,3 +665,13 @@ func (a *App) GetSetCompletion() ([]*models.SetCompletion, error) {
 func (a *App) GetRecentCollectionChanges(limit int) ([]*gui.CollectionChangeEntry, error) {
 	return a.collectionFacade.GetRecentChanges(a.ctx, limit)
 }
+
+// GetMissingCardsForDeck returns missing cards analysis for a specific deck.
+func (a *App) GetMissingCardsForDeck(deckID string) (*gui.MissingCardsForDeckResponse, error) {
+	return a.collectionFacade.GetMissingCardsForDeck(a.ctx, deckID)
+}
+
+// GetMissingCardsForSet returns missing cards analysis for a specific set.
+func (a *App) GetMissingCardsForSet(setCode string) (*gui.MissingCardsForSetResponse, error) {
+	return a.collectionFacade.GetMissingCardsForSet(a.ctx, setCode)
+}
