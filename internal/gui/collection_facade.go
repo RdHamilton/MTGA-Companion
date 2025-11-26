@@ -135,8 +135,12 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 				card.Toughness = meta.Toughness
 			}
 		}
-		// Cards without local metadata will still display - frontend will use
-		// Scryfall image URL fallback based on card name
+
+		// If no image URI from database, use card back placeholder
+		// The Scryfall API redirect URLs don't work reliably in WebView
+		if card.ImageURI == "" {
+			card.ImageURI = "https://cards.scryfall.io/back.png"
+		}
 
 		collectionCards = append(collectionCards, card)
 	}
