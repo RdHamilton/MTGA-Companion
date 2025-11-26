@@ -560,6 +560,117 @@ describe('Collection', () => {
     });
   });
 
+  describe('Set Completion Panel', () => {
+    it('should show Set Completion button', async () => {
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
+      });
+    });
+
+    it('should toggle Set Completion panel visibility', async () => {
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show Set Completion' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Hide Set Completion' })).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Card Display Features', () => {
+    it('should display card with not-owned class when quantity is 0', async () => {
+      const mockCards = [createMockCollectionCard({ quantity: 0 })];
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
+      });
+
+      const card = screen.getByRole('img', { name: 'Lightning Bolt' }).closest('.collection-card');
+      expect(card).toHaveClass('not-owned');
+    });
+
+    it('should show x0 badge for unowned cards', async () => {
+      const mockCards = [createMockCollectionCard({ quantity: 0 })];
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('x0')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Empty State Variations', () => {
+    it('should show filter adjustment suggestion when filters are active', async () => {
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse([]));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 100, totalCards: 100 }));
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('No Cards Found')).toBeInTheDocument();
+      });
+
+      // Toggle a color filter
+      const redButton = screen.getByTitle('Red');
+      fireEvent.click(redButton);
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      await waitFor(() => {
+        expect(screen.getByText('Try adjusting your filters')).toBeInTheDocument();
+      });
+    });
+
+    it('should show "start playing" message when collection is truly empty', async () => {
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse([]));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Your collection is empty. Start playing to add cards!')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Sort Options', () => {
     it('should have sort dropdown', async () => {
       mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));

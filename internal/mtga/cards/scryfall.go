@@ -128,9 +128,9 @@ type CollectionRequest struct {
 
 // CollectionResponse is the response from /cards/collection.
 type CollectionResponse struct {
-	Object   string          `json:"object"`
+	Object   string           `json:"object"`
 	NotFound []CardIdentifier `json:"not_found"`
-	Data     []*ScryfallCard `json:"data"`
+	Data     []*ScryfallCard  `json:"data"`
 }
 
 // GetCardsByArenaIDs fetches multiple cards by their Arena IDs using the batch /cards/collection endpoint.
