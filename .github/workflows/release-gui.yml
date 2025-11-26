@@ -10,129 +10,20 @@ on:
         description: 'Version to build (e.g., v1.0.0)'
         required: true
         default: 'v1.0.0'
-      include-daemon:
-        description: 'Include daemon in release'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 
 permissions:
   contents: write
 
 jobs:
-  # Build daemon for all platforms first
-  build-daemon-windows:
-    name: Build Daemon (Windows)
-    runs-on: windows-latest
-    if: github.event.inputs.include-daemon != 'false'
-
-    steps:
-      - name: Checkout daemon repo
-        uses: actions/checkout@v4
-        with:
-          repository: RdHamilton/mtga-tracker-daemon
-          ref: master
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build daemon
-        run: dotnet publish ./src/mtga-tracker-daemon -c Release -r win-x64 --self-contained -o ./publish
-
-      - name: Upload daemon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: daemon-windows
-          path: ./publish/
-          retention-days: 1
-
-  build-daemon-macos:
-    name: Build Daemon (macOS)
-    runs-on: macos-latest
-    if: github.event.inputs.include-daemon != 'false'
-
-    steps:
-      - name: Checkout daemon repo
-        uses: actions/checkout@v4
-        with:
-          repository: RdHamilton/mtga-tracker-daemon
-          ref: master
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build daemon (universal)
-        run: |
-          dotnet publish ./src/mtga-tracker-daemon -c Release -r osx-x64 --self-contained -o ./publish-x64
-          dotnet publish ./src/mtga-tracker-daemon -c Release -r osx-arm64 --self-contained -o ./publish-arm64
-
-      - name: Upload x64 daemon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: daemon-macos-x64
-          path: ./publish-x64/
-          retention-days: 1
-
-      - name: Upload arm64 daemon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: daemon-macos-arm64
-          path: ./publish-arm64/
-          retention-days: 1
-
-  build-daemon-linux:
-    name: Build Daemon (Linux)
-    runs-on: ubuntu-latest
-    if: github.event.inputs.include-daemon != 'false'
-
-    steps:
-      - name: Checkout daemon repo
-        uses: actions/checkout@v4
-        with:
-          repository: RdHamilton/mtga-tracker-daemon
-          ref: master
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build daemon
-        run: dotnet publish ./src/mtga-tracker-daemon -c Release -r linux-x64 --self-contained -o ./publish
-
-      - name: Upload daemon artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: daemon-linux
-          path: ./publish/
-          retention-days: 1
-
-  # Build MTGA-Companion with daemon
   build-windows:
     name: Build Windows
     runs-on: windows-latest
-    needs: [build-daemon-windows]
-    if: always() && (needs.build-daemon-windows.result == 'success' || needs.build-daemon-windows.result == 'skipped')
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Download daemon artifact
-      if: needs.build-daemon-windows.result == 'success'
-      uses: actions/download-artifact@v4
-      with:
-        name: daemon-windows
-        path: ./resources/daemon
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -152,13 +43,6 @@ jobs:
     - name: Build Windows Application
       run: wails build -platform windows/amd64 -clean
 
-    - name: Bundle daemon with app
-      if: needs.build-daemon-windows.result == 'success'
-      run: |
-        mkdir -p build/bin/daemon
-        Copy-Item -Path resources/daemon/* -Destination build/bin/daemon/ -Recurse
-      shell: pwsh
-
     - name: Create distribution archive
       run: |
         mkdir -p dist
@@ -175,28 +59,12 @@ jobs:
   build-macos:
     name: Build macOS
     runs-on: macos-latest
-    needs: [build-daemon-macos]
-    if: always() && (needs.build-daemon-macos.result == 'success' || needs.build-daemon-macos.result == 'skipped')
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Download daemon x64 artifact
-      if: needs.build-daemon-macos.result == 'success'
-      uses: actions/download-artifact@v4
-      with:
-        name: daemon-macos-x64
-        path: ./resources/daemon-x64
-
-    - name: Download daemon arm64 artifact
-      if: needs.build-daemon-macos.result == 'success'
-      uses: actions/download-artifact@v4
-      with:
-        name: daemon-macos-arm64
-        path: ./resources/daemon-arm64
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -216,17 +84,6 @@ jobs:
     - name: Build macOS Application (Universal Binary)
       run: wails build -platform darwin/universal -clean
 
-    - name: Bundle daemon with app
-      if: needs.build-daemon-macos.result == 'success'
-      run: |
-        # Create daemon directory inside app bundle
-        mkdir -p "build/bin/MTGA-Companion.app/Contents/Resources/daemon"
-        # Copy both architectures (app will select at runtime based on arch)
-        cp -R resources/daemon-x64/* "build/bin/MTGA-Companion.app/Contents/Resources/daemon/"
-        # Store arm64 separately for runtime selection
-        mkdir -p "build/bin/MTGA-Companion.app/Contents/Resources/daemon-arm64"
-        cp -R resources/daemon-arm64/* "build/bin/MTGA-Companion.app/Contents/Resources/daemon-arm64/"
-
     - name: Create distribution archive
       run: |
         mkdir -p dist
@@ -243,21 +100,12 @@ jobs:
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
-    needs: [build-daemon-linux]
-    if: always() && (needs.build-daemon-linux.result == 'success' || needs.build-daemon-linux.result == 'skipped')
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Download daemon artifact
-      if: needs.build-daemon-linux.result == 'success'
-      uses: actions/download-artifact@v4
-      with:
-        name: daemon-linux
-        path: ./resources/daemon
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -282,18 +130,11 @@ jobs:
     - name: Build Linux Application
       run: wails build -platform linux/amd64 -clean
 
-    - name: Bundle daemon with app
-      if: needs.build-daemon-linux.result == 'success'
-      run: |
-        mkdir -p build/bin/daemon
-        cp -R resources/daemon/* build/bin/daemon/
-        chmod +x build/bin/daemon/mtga-tracker-daemon
-
     - name: Create distribution archive
       run: |
         mkdir -p dist
         cd build/bin
-        tar -czf ../../dist/mtga-companion-linux-amd64.tar.gz mtga-companion daemon README.md LICENSE 2>/dev/null || tar -czf ../../dist/mtga-companion-linux-amd64.tar.gz mtga-companion daemon
+        tar -czf ../../dist/mtga-companion-linux-amd64.tar.gz mtga-companion
 
     - name: Upload Linux artifacts
       uses: actions/upload-artifact@v4

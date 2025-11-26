@@ -130,10 +130,6 @@ export function GetDaemonErrorEvent() {
   return window['go']['main']['App']['GetDaemonErrorEvent']();
 }
 
-export function GetDaemonProcessStatus() {
-  return window['go']['main']['App']['GetDaemonProcessStatus']();
-}
-
 export function GetDatasetSource(arg1, arg2) {
   return window['go']['main']['App']['GetDatasetSource'](arg1, arg2);
 }
@@ -326,10 +322,6 @@ export function Initialize(arg1) {
   return window['go']['main']['App']['Initialize'](arg1);
 }
 
-export function IsDaemonAutoStartEnabled() {
-  return window['go']['main']['App']['IsDaemonAutoStartEnabled']();
-}
-
 export function ListDecks() {
   return window['go']['main']['App']['ListDecks']();
 }
@@ -374,24 +366,12 @@ export function ResetDraftPerformanceMetrics() {
   return window['go']['main']['App']['ResetDraftPerformanceMetrics']();
 }
 
-export function RestartDaemonProcess() {
-  return window['go']['main']['App']['RestartDaemonProcess']();
-}
-
 export function ResumeReplay() {
   return window['go']['main']['App']['ResumeReplay']();
 }
 
-export function SetDaemonAutoStart(arg1) {
-  return window['go']['main']['App']['SetDaemonAutoStart'](arg1);
-}
-
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
-}
-
-export function StartDaemonProcess() {
-  return window['go']['main']['App']['StartDaemonProcess']();
 }
 
 export function StartPoller() {
@@ -400,10 +380,6 @@ export function StartPoller() {
 
 export function StartReplayWithFileDialog(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartReplayWithFileDialog'](arg1, arg2, arg3);
-}
-
-export function StopDaemonProcess() {
-  return window['go']['main']['App']['StopDaemonProcess']();
 }
 
 export function StopPoller() {

@@ -405,26 +405,6 @@ export namespace gui {
 	        this.details = source["details"];
 	    }
 	}
-	export class DaemonProcessStatus {
-	    status: string;
-	    pid?: number;
-	    port: number;
-	    uptime?: number;
-	    lastError?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DaemonProcessStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.status = source["status"];
-	        this.pid = source["pid"];
-	        this.port = source["port"];
-	        this.uptime = source["uptime"];
-	        this.lastError = source["lastError"];
-	    }
-	}
 	export class DeckLibraryFilter {
 	    format?: string;
 	    source?: string;
