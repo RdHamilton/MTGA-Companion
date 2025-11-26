@@ -173,6 +173,158 @@ export namespace gui {
 		    return a;
 		}
 	}
+	export class CollectionCard {
+	    cardId: number;
+	    arenaId: number;
+	    quantity: number;
+	    name: string;
+	    setCode: string;
+	    setName: string;
+	    rarity: string;
+	    manaCost: string;
+	    cmc: number;
+	    typeLine: string;
+	    colors: string[];
+	    colorIdentity: string[];
+	    imageUri: string;
+	    power?: string;
+	    toughness?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardId = source["cardId"];
+	        this.arenaId = source["arenaId"];
+	        this.quantity = source["quantity"];
+	        this.name = source["name"];
+	        this.setCode = source["setCode"];
+	        this.setName = source["setName"];
+	        this.rarity = source["rarity"];
+	        this.manaCost = source["manaCost"];
+	        this.cmc = source["cmc"];
+	        this.typeLine = source["typeLine"];
+	        this.colors = source["colors"];
+	        this.colorIdentity = source["colorIdentity"];
+	        this.imageUri = source["imageUri"];
+	        this.power = source["power"];
+	        this.toughness = source["toughness"];
+	    }
+	}
+	export class CollectionChangeEntry {
+	    cardId: number;
+	    cardName?: string;
+	    setCode?: string;
+	    rarity?: string;
+	    quantityDelta: number;
+	    quantityAfter: number;
+	    timestamp: number;
+	    source?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionChangeEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardId = source["cardId"];
+	        this.cardName = source["cardName"];
+	        this.setCode = source["setCode"];
+	        this.rarity = source["rarity"];
+	        this.quantityDelta = source["quantityDelta"];
+	        this.quantityAfter = source["quantityAfter"];
+	        this.timestamp = source["timestamp"];
+	        this.source = source["source"];
+	    }
+	}
+	export class CollectionFilter {
+	    searchTerm?: string;
+	    setCode?: string;
+	    rarity?: string;
+	    colors?: string[];
+	    cardType?: string;
+	    ownedOnly: boolean;
+	    sortBy?: string;
+	    sortDesc: boolean;
+	    limit?: number;
+	    offset?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionFilter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.searchTerm = source["searchTerm"];
+	        this.setCode = source["setCode"];
+	        this.rarity = source["rarity"];
+	        this.colors = source["colors"];
+	        this.cardType = source["cardType"];
+	        this.ownedOnly = source["ownedOnly"];
+	        this.sortBy = source["sortBy"];
+	        this.sortDesc = source["sortDesc"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	    }
+	}
+	export class CollectionResponse {
+	    cards: CollectionCard[];
+	    totalCount: number;
+	    filterCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cards = this.convertValues(source["cards"], CollectionCard);
+	        this.totalCount = source["totalCount"];
+	        this.filterCount = source["filterCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CollectionStats {
+	    totalUniqueCards: number;
+	    totalCards: number;
+	    commonCount: number;
+	    uncommonCount: number;
+	    rareCount: number;
+	    mythicCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalUniqueCards = source["totalUniqueCards"];
+	        this.totalCards = source["totalCards"];
+	        this.commonCount = source["commonCount"];
+	        this.uncommonCount = source["uncommonCount"];
+	        this.rareCount = source["rareCount"];
+	        this.mythicCount = source["mythicCount"];
+	    }
+	}
 	export class ColorStats {
 	    white: number;
 	    blue: number;
@@ -251,6 +403,26 @@ export namespace gui {
 	        this.error = source["error"];
 	        this.code = source["code"];
 	        this.details = source["details"];
+	    }
+	}
+	export class DaemonProcessStatus {
+	    status: string;
+	    pid?: number;
+	    port: number;
+	    uptime?: number;
+	    lastError?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DaemonProcessStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.pid = source["pid"];
+	        this.port = source["port"];
+	        this.uptime = source["uptime"];
+	        this.lastError = source["lastError"];
 	    }
 	}
 	export class DeckLibraryFilter {
@@ -1442,60 +1614,6 @@ export namespace models {
 		    return a;
 		}
 	}
-	export class DraftEvent {
-	    ID: string;
-	    AccountID: number;
-	    EventName: string;
-	    SetCode: string;
-	    StartTime: time.Time;
-	    EndTime?: time.Time;
-	    Wins: number;
-	    Losses: number;
-	    Status: string;
-	    DeckID?: string;
-	    EntryFee?: string;
-	    Rewards?: string;
-	    CreatedAt: time.Time;
-	
-	    static createFrom(source: any = {}) {
-	        return new DraftEvent(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ID = source["ID"];
-	        this.AccountID = source["AccountID"];
-	        this.EventName = source["EventName"];
-	        this.SetCode = source["SetCode"];
-	        this.StartTime = this.convertValues(source["StartTime"], time.Time);
-	        this.EndTime = this.convertValues(source["EndTime"], time.Time);
-	        this.Wins = source["Wins"];
-	        this.Losses = source["Losses"];
-	        this.Status = source["Status"];
-	        this.DeckID = source["DeckID"];
-	        this.EntryFee = source["EntryFee"];
-	        this.Rewards = source["Rewards"];
-	        this.CreatedAt = this.convertValues(source["CreatedAt"], time.Time);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class DraftPackSession {
 	    ID: number;
 	    SessionID: string;
@@ -1978,6 +2096,24 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class RarityCompletion {
+	    Rarity: string;
+	    Total: number;
+	    Owned: number;
+	    Percentage: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RarityCompletion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Rarity = source["Rarity"];
+	        this.Total = source["Total"];
+	        this.Owned = source["Owned"];
+	        this.Percentage = source["Percentage"];
+	    }
+	}
 	export class SetCard {
 	    ID: number;
 	    SetCode: string;
@@ -2020,6 +2156,46 @@ export namespace models {
 	        this.ImageURLSmall = source["ImageURLSmall"];
 	        this.ImageURLArt = source["ImageURLArt"];
 	        this.FetchedAt = this.convertValues(source["FetchedAt"], time.Time);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SetCompletion {
+	    SetCode: string;
+	    SetName: string;
+	    TotalCards: number;
+	    OwnedCards: number;
+	    Percentage: number;
+	    RarityBreakdown: Record<string, RarityCompletion>;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetCompletion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.SetCode = source["SetCode"];
+	        this.SetName = source["SetName"];
+	        this.TotalCards = source["TotalCards"];
+	        this.OwnedCards = source["OwnedCards"];
+	        this.Percentage = source["Percentage"];
+	        this.RarityBreakdown = this.convertValues(source["RarityBreakdown"], RarityCompletion, true);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2316,20 +2492,6 @@ export namespace seventeenlands {
 
 export namespace storage {
 	
-	export class EventWinDistribution {
-	    record: string;
-	    count: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new EventWinDistribution(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.record = source["record"];
-	        this.count = source["count"];
-	    }
-	}
 	export class RankTimelineEntry {
 	    timestamp: time.Time;
 	    date: string;

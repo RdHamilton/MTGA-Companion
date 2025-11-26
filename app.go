@@ -27,12 +27,13 @@ type App struct {
 	ctx context.Context
 
 	// Facades - Domain-specific interfaces to backend services
-	matchFacade  *gui.MatchFacade
-	draftFacade  *gui.DraftFacade
-	cardFacade   *gui.CardFacade
-	deckFacade   *gui.DeckFacade
-	exportFacade *gui.ExportFacade
-	systemFacade *gui.SystemFacade
+	matchFacade      *gui.MatchFacade
+	draftFacade      *gui.DraftFacade
+	cardFacade       *gui.CardFacade
+	deckFacade       *gui.DeckFacade
+	exportFacade     *gui.ExportFacade
+	systemFacade     *gui.SystemFacade
+	collectionFacade *gui.CollectionFacade
 
 	// Shared services used by facades
 	services *gui.Services
@@ -56,13 +57,14 @@ func NewApp() *App {
 
 	// Create app with facades, passing event dispatcher to those that need it
 	return &App{
-		services:     services,
-		matchFacade:  gui.NewMatchFacade(services),
-		draftFacade:  gui.NewDraftFacade(services),
-		cardFacade:   gui.NewCardFacade(services),
-		deckFacade:   gui.NewDeckFacade(services),
-		exportFacade: gui.NewExportFacade(services, systemFacade.GetEventDispatcher()),
-		systemFacade: systemFacade,
+		services:         services,
+		matchFacade:      gui.NewMatchFacade(services),
+		draftFacade:      gui.NewDraftFacade(services),
+		cardFacade:       gui.NewCardFacade(services),
+		deckFacade:       gui.NewDeckFacade(services),
+		exportFacade:     gui.NewExportFacade(services, systemFacade.GetEventDispatcher()),
+		systemFacade:     systemFacade,
+		collectionFacade: gui.NewCollectionFacade(services),
 	}
 }
 
@@ -698,4 +700,28 @@ func (a *App) ExportDeckToFile(deckID string) error {
 // ValidateDeckWithDialog validates a deck and shows result in a native dialog
 func (a *App) ValidateDeckWithDialog(deckID string) error {
 	return a.deckFacade.ValidateDeckWithDialog(a.ctx, deckID)
+}
+
+// ========================================
+// Collection Methods (CollectionFacade)
+// ========================================
+
+// GetCollection returns the player's collection with optional filtering.
+func (a *App) GetCollection(filter *gui.CollectionFilter) (*gui.CollectionResponse, error) {
+	return a.collectionFacade.GetCollection(a.ctx, filter)
+}
+
+// GetCollectionStats returns summary statistics about the collection.
+func (a *App) GetCollectionStats() (*gui.CollectionStats, error) {
+	return a.collectionFacade.GetCollectionStats(a.ctx)
+}
+
+// GetSetCompletion returns set completion statistics.
+func (a *App) GetSetCompletion() ([]*models.SetCompletion, error) {
+	return a.collectionFacade.GetSetCompletion(a.ctx)
+}
+
+// GetRecentCollectionChanges returns recent collection changes.
+func (a *App) GetRecentCollectionChanges(limit int) ([]*gui.CollectionChangeEntry, error) {
+	return a.collectionFacade.GetRecentChanges(a.ctx, limit)
 }

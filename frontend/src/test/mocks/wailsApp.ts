@@ -74,6 +74,11 @@ export const mockWailsApp = {
   ListDecks: vi.fn(() => Promise.resolve([] as any)),
   GetRecommendations: vi.fn(() => Promise.resolve({} as any)),
   ExportDeckToFile: vi.fn(() => Promise.resolve()),
+  // Collection methods
+  GetCollection: vi.fn(() => Promise.resolve({ cards: [], totalCount: 0, filterCount: 0 } as any)),
+  GetCollectionStats: vi.fn(() => Promise.resolve({} as any)),
+  GetSetCompletion: vi.fn(() => Promise.resolve([] as any[])),
+  GetRecentCollectionChanges: vi.fn(() => Promise.resolve([] as any[])),
 };
 
 export function resetMocks() {

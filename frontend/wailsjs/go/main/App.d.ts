@@ -7,9 +7,9 @@ import {insights} from '../models';
 import {seventeenlands} from '../models';
 import {metrics} from '../models';
 import {prediction} from '../models';
-import {storage} from '../models';
 import {pickquality} from '../models';
 import {time} from '../models';
+import {storage} from '../models';
 
 export function AddCard(arg1:string,arg2:number,arg3:number,arg4:string,arg5:boolean):Promise<void>;
 
@@ -49,8 +49,6 @@ export function GetAchievementUpdatedEvent():Promise<gui.AchievementUpdatedEvent
 
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
-export function GetActiveEvents():Promise<Array<models.DraftEvent>>;
-
 export function GetActiveQuests():Promise<Array<models.Quest>>;
 
 export function GetAllSetInfo():Promise<Array<gui.SetInfo>>;
@@ -63,6 +61,10 @@ export function GetCardRatingByArenaID(arg1:string,arg2:string,arg3:string):Prom
 
 export function GetCardRatings(arg1:string,arg2:string):Promise<Array<gui.CardRatingWithTier>>;
 
+export function GetCollection(arg1:gui.CollectionFilter):Promise<gui.CollectionResponse>;
+
+export function GetCollectionStats():Promise<gui.CollectionStats>;
+
 export function GetColorRatings(arg1:string,arg2:string):Promise<Array<seventeenlands.ColorRating>>;
 
 export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.DraftSession>>;
@@ -72,6 +74,8 @@ export function GetConnectionStatus():Promise<gui.ConnectionStatus>;
 export function GetCurrentAccount():Promise<models.Account>;
 
 export function GetDaemonErrorEvent():Promise<gui.DaemonErrorEvent>;
+
+export function GetDaemonProcessStatus():Promise<gui.DaemonProcessStatus>;
 
 export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
 
@@ -109,8 +113,6 @@ export function GetDraftUpdatedEvent():Promise<gui.DraftUpdatedEvent>;
 
 export function GetDraftWinRatePrediction(arg1:string):Promise<prediction.DeckPrediction>;
 
-export function GetEventWinDistribution():Promise<Array<storage.EventWinDistribution>>;
-
 export function GetFormatInsights(arg1:string,arg2:string):Promise<insights.FormatInsights>;
 
 export function GetLogReplayProgress():Promise<gui.LogReplayProgress>;
@@ -137,6 +139,8 @@ export function GetRankProgressionTimeline(arg1:string,arg2:time.Time,arg3:time.
 
 export function GetRankUpdatedEvent():Promise<gui.RankUpdatedEvent>;
 
+export function GetRecentCollectionChanges(arg1:number):Promise<Array<gui.CollectionChangeEntry>>;
+
 export function GetRecommendations(arg1:gui.GetRecommendationsRequest):Promise<gui.GetRecommendationsResponse>;
 
 export function GetReplayDraftDetectedEvent():Promise<gui.ReplayDraftDetectedEvent>;
@@ -146,6 +150,8 @@ export function GetReplayErrorEvent():Promise<gui.ReplayErrorEvent>;
 export function GetReplayStatus():Promise<gui.ReplayStatus>;
 
 export function GetSetCards(arg1:string):Promise<Array<models.SetCard>>;
+
+export function GetSetCompletion():Promise<Array<models.SetCompletion>>;
 
 export function GetSetInfo(arg1:string):Promise<gui.SetInfo>;
 
@@ -166,6 +172,8 @@ export function ImportFromFile():Promise<void>;
 export function ImportLogFile():Promise<gui.ImportLogFileResult>;
 
 export function Initialize(arg1:string):Promise<void>;
+
+export function IsDaemonAutoStartEnabled():Promise<boolean>;
 
 export function ListDecks():Promise<Array<gui.DeckListItem>>;
 
@@ -189,13 +197,21 @@ export function RepairDraftSession(arg1:string):Promise<void>;
 
 export function ResetDraftPerformanceMetrics():Promise<void>;
 
+export function RestartDaemonProcess():Promise<void>;
+
 export function ResumeReplay():Promise<void>;
 
+export function SetDaemonAutoStart(arg1:boolean):Promise<void>;
+
 export function SetDaemonPort(arg1:number):Promise<void>;
+
+export function StartDaemonProcess():Promise<void>;
 
 export function StartPoller():Promise<void>;
 
 export function StartReplayWithFileDialog(arg1:number,arg2:string,arg3:boolean):Promise<void>;
+
+export function StopDaemonProcess():Promise<void>;
 
 export function StopPoller():Promise<void>;
 
