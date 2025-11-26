@@ -219,11 +219,12 @@ describe('Collection', () => {
 
       await vi.advanceTimersByTimeAsync(100);
 
+      // Cards are displayed as images with alt text containing the card name
       await waitFor(() => {
-        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
       });
-      expect(screen.getByText('Counterspell')).toBeInTheDocument();
-      expect(screen.getByText('Giant Growth')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'Counterspell' })).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'Giant Growth' })).toBeInTheDocument();
     });
 
     it('should display page title', async () => {
@@ -275,8 +276,11 @@ describe('Collection', () => {
       });
     });
 
-    it('should display set code on cards', async () => {
-      const mockCards = [createMockCollectionCard({ setCode: 'dsk' })];
+    it('should render card images with correct src', async () => {
+      const mockCards = [createMockCollectionCard({
+        name: 'Test Card',
+        imageUri: 'https://cards.scryfall.io/normal/front/1/2/test.jpg'
+      })];
       mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockGetAllSetInfo.mockResolvedValue([]);
@@ -286,7 +290,8 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('DSK')).toBeInTheDocument();
+        const img = screen.getByRole('img', { name: 'Test Card' });
+        expect(img).toHaveAttribute('src', 'https://cards.scryfall.io/normal/front/1/2/test.jpg');
       });
     });
   });
@@ -502,9 +507,56 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
       });
       expect(screen.queryByText(/Page/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Card Image Handling', () => {
+    it('should use imageUri directly from card data', async () => {
+      const mockCards = [
+        createMockCollectionCard({
+          cardId: 1,
+          name: 'Test Card',
+          imageUri: 'https://cards.scryfall.io/normal/front/1/2/test-card.jpg',
+        }),
+      ];
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        const img = screen.getByRole('img', { name: 'Test Card' });
+        expect(img).toHaveAttribute('src', 'https://cards.scryfall.io/normal/front/1/2/test-card.jpg');
+      });
+    });
+
+    it('should use placeholder when imageUri is empty', async () => {
+      const mockCards = [
+        createMockCollectionCard({
+          cardId: 1,
+          name: 'Unknown Card',
+          imageUri: '',
+        }),
+      ];
+      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockGetAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        const img = screen.getByRole('img', { name: 'Unknown Card' });
+        // Should use the card back placeholder
+        expect(img).toHaveAttribute('src', 'https://cards.scryfall.io/back.png');
+      });
     });
   });
 
@@ -556,10 +608,10 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
       });
 
-      const card = screen.getByText('Lightning Bolt').closest('.collection-card');
+      const card = screen.getByRole('img', { name: 'Lightning Bolt' }).closest('.collection-card');
       expect(card).toHaveClass('not-owned');
     });
 
@@ -575,22 +627,6 @@ describe('Collection', () => {
 
       await waitFor(() => {
         expect(screen.getByText('x0')).toBeInTheDocument();
-      });
-    });
-
-    it('should display card title attribute for full name', async () => {
-      const mockCards = [createMockCollectionCard({ name: 'Very Long Card Name That Gets Truncated' })];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
-
-      renderWithRouter(<Collection />);
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      await waitFor(() => {
-        const cardName = screen.getByText('Very Long Card Name That Gets Truncated');
-        expect(cardName).toHaveAttribute('title', 'Very Long Card Name That Gets Truncated');
       });
     });
   });

@@ -95,20 +95,21 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		cardIDs = append(cardIDs, cardID)
 	}
 
-	// Get card metadata from the card service
-	cardMetadata := make(map[int]*models.SetCard)
-	if c.services.CardService != nil {
-		for _, cardID := range cardIDs {
-			arenaID := fmt.Sprintf("%d", cardID)
-			card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
-			if err == nil && card != nil {
-				cardMetadata[cardID] = card
-			}
+	// Get card metadata from local database only (SetCardRepo) for fast loading.
+	// Skip CardService API calls as they are too slow for large collections.
+	// Cards without local metadata will still display with Scryfall image URLs from frontend.
+	cardMetadataFromSetRepo := make(map[int]*models.SetCard)
+
+	for _, cardID := range cardIDs {
+		arenaID := fmt.Sprintf("%d", cardID)
+		card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+		if err == nil && card != nil {
+			cardMetadataFromSetRepo[cardID] = card
 		}
 	}
 
 	// Build collection cards with metadata
-	cards := make([]*CollectionCard, 0, len(collection))
+	collectionCards := make([]*CollectionCard, 0, len(collection))
 	for cardID, quantity := range collection {
 		card := &CollectionCard{
 			CardID:   cardID,
@@ -116,8 +117,8 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			Quantity: quantity,
 		}
 
-		// Add metadata if available
-		if meta, ok := cardMetadata[cardID]; ok {
+		// Use SetCardRepo metadata (local database)
+		if meta, ok := cardMetadataFromSetRepo[cardID]; ok {
 			card.Name = meta.Name
 			card.SetCode = meta.SetCode
 			card.Rarity = meta.Rarity
@@ -135,41 +136,47 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			}
 		}
 
-		cards = append(cards, card)
+		// If no image URI from database, use card back placeholder
+		// The Scryfall API redirect URLs don't work reliably in WebView
+		if card.ImageURI == "" {
+			card.ImageURI = "https://cards.scryfall.io/back.png"
+		}
+
+		collectionCards = append(collectionCards, card)
 	}
 
-	totalCount := len(cards)
+	totalCount := len(collectionCards)
 
 	// Apply filters
 	if filter != nil {
-		cards = applyCollectionFilters(cards, filter)
+		collectionCards = applyCollectionFilters(collectionCards, filter)
 	}
 
-	filterCount := len(cards)
+	filterCount := len(collectionCards)
 
 	// Apply sorting
 	if filter != nil && filter.SortBy != "" {
-		sortCollectionCards(cards, filter.SortBy, filter.SortDesc)
+		sortCollectionCards(collectionCards, filter.SortBy, filter.SortDesc)
 	} else {
 		// Default sort by name
-		sortCollectionCards(cards, "name", false)
+		sortCollectionCards(collectionCards, "name", false)
 	}
 
 	// Apply pagination
 	if filter != nil {
-		if filter.Offset > 0 && filter.Offset < len(cards) {
-			cards = cards[filter.Offset:]
-		} else if filter.Offset >= len(cards) {
-			cards = []*CollectionCard{}
+		if filter.Offset > 0 && filter.Offset < len(collectionCards) {
+			collectionCards = collectionCards[filter.Offset:]
+		} else if filter.Offset >= len(collectionCards) {
+			collectionCards = []*CollectionCard{}
 		}
 
-		if filter.Limit > 0 && filter.Limit < len(cards) {
-			cards = cards[:filter.Limit]
+		if filter.Limit > 0 && filter.Limit < len(collectionCards) {
+			collectionCards = collectionCards[:filter.Limit]
 		}
 	}
 
 	return &CollectionResponse{
-		Cards:       cards,
+		Cards:       collectionCards,
 		TotalCount:  totalCount,
 		FilterCount: filterCount,
 	}, nil

@@ -126,45 +126,71 @@ func (s *Service) GetCard(arenaID int) (*Card, error) {
 }
 
 // GetCards retrieves multiple cards by their Arena IDs.
+// Uses batch API calls for efficiency when fetching from Scryfall.
 func (s *Service) GetCards(arenaIDs []int) (map[int]*Card, error) {
+	if len(arenaIDs) == 0 {
+		return make(map[int]*Card), nil
+	}
+
 	cards := make(map[int]*Card, len(arenaIDs))
-	var mu sync.Mutex
+	var missingIDs []int
 
-	// Use a worker pool to fetch cards concurrently
-	type result struct {
-		arenaID int
-		card    *Card
-		err     error
-	}
-
-	results := make(chan result, len(arenaIDs))
-	sem := make(chan struct{}, 10) // Limit concurrent requests
-
-	var wg sync.WaitGroup
-	for _, id := range arenaIDs {
-		wg.Add(1)
-		go func(arenaID int) {
-			defer wg.Done()
-			sem <- struct{}{}        // Acquire semaphore
-			defer func() { <-sem }() // Release semaphore
-
-			card, err := s.GetCard(arenaID)
-			results <- result{arenaID: arenaID, card: card, err: err}
-		}(id)
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	// Collect results
-	for res := range results {
-		if res.err == nil && res.card != nil {
-			mu.Lock()
-			cards[res.arenaID] = res.card
-			mu.Unlock()
+	// First, check cache and database for all cards
+	for _, arenaID := range arenaIDs {
+		// Check cache first
+		if s.config.EnableCache && s.cache != nil {
+			if card := s.cache.Get(arenaID); card != nil {
+				cards[arenaID] = card
+				continue
+			}
 		}
+
+		// Check database
+		if s.config.EnableDB && s.db != nil {
+			card, err := s.getCardFromDB(arenaID)
+			if err == nil && card != nil {
+				// Add to cache
+				if s.config.EnableCache && s.cache != nil {
+					s.cache.Set(arenaID, card)
+				}
+				cards[arenaID] = card
+				continue
+			}
+		}
+
+		// Card not found locally, add to missing list
+		missingIDs = append(missingIDs, arenaID)
+	}
+
+	// If no missing cards or API fallback disabled, return what we have
+	if len(missingIDs) == 0 || !s.config.FallbackToAPI {
+		return cards, nil
+	}
+
+	// Fetch missing cards using batch API
+	fetchedCards, err := s.scryfall.GetCardsByArenaIDs(missingIDs)
+	if err != nil {
+		// Log error but return what we have
+		return cards, nil
+	}
+
+	// Process fetched cards
+	for _, card := range fetchedCards {
+		if card == nil {
+			continue
+		}
+
+		// Store in database for future lookups
+		if s.config.EnableDB && s.db != nil {
+			_ = s.saveCardToDB(card) // Ignore errors, we have the card data
+		}
+
+		// Add to cache
+		if s.config.EnableCache && s.cache != nil {
+			s.cache.Set(card.ArenaID, card)
+		}
+
+		cards[card.ArenaID] = card
 	}
 
 	return cards, nil

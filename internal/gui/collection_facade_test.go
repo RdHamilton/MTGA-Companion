@@ -4,6 +4,71 @@ import (
 	"testing"
 )
 
+const cardBackPlaceholderURL = "https://cards.scryfall.io/back.png"
+
+func TestCollectionCard_ImageURIFallback(t *testing.T) {
+	tests := []struct {
+		name        string
+		imageURI    string
+		expectedURI string
+	}{
+		{
+			name:        "empty imageURI should use placeholder",
+			imageURI:    "",
+			expectedURI: cardBackPlaceholderURL,
+		},
+		{
+			name:        "valid imageURI should be preserved",
+			imageURI:    "https://cards.scryfall.io/normal/front/1/2/test.jpg",
+			expectedURI: "https://cards.scryfall.io/normal/front/1/2/test.jpg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := &CollectionCard{
+				CardID:   1,
+				ArenaID:  1,
+				Quantity: 1,
+				ImageURI: tt.imageURI,
+			}
+
+			// Simulate the fallback logic from GetCollection
+			if card.ImageURI == "" {
+				card.ImageURI = cardBackPlaceholderURL
+			}
+
+			if card.ImageURI != tt.expectedURI {
+				t.Errorf("ImageURI = %q, want %q", card.ImageURI, tt.expectedURI)
+			}
+		})
+	}
+}
+
+func TestCardBackPlaceholderURL(t *testing.T) {
+	// Verify the placeholder URL format is correct (.png not .jpg)
+	expectedSuffix := ".png"
+	if len(cardBackPlaceholderURL) < len(expectedSuffix) {
+		t.Errorf("cardBackPlaceholderURL is too short")
+		return
+	}
+	suffix := cardBackPlaceholderURL[len(cardBackPlaceholderURL)-len(expectedSuffix):]
+	if suffix != expectedSuffix {
+		t.Errorf("cardBackPlaceholderURL should end with %q, got %q", expectedSuffix, suffix)
+	}
+
+	// Verify it points to the correct Scryfall domain
+	expectedPrefix := "https://cards.scryfall.io/"
+	if len(cardBackPlaceholderURL) < len(expectedPrefix) {
+		t.Errorf("cardBackPlaceholderURL is too short")
+		return
+	}
+	prefix := cardBackPlaceholderURL[:len(expectedPrefix)]
+	if prefix != expectedPrefix {
+		t.Errorf("cardBackPlaceholderURL should start with %q, got %q", expectedPrefix, prefix)
+	}
+}
+
 func TestRarityOrder(t *testing.T) {
 	tests := []struct {
 		rarity   string

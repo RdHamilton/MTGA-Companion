@@ -8,12 +8,8 @@ import { gui } from '../../wailsjs/go/models';
 import SetCompletionPanel from '../components/SetCompletion';
 import './Collection.css';
 
-// Card image URL builder for Scryfall
-const getCardImageUrl = (imageUri: string, cardName: string): string => {
-  if (imageUri) return imageUri;
-  // Fallback to Scryfall named search
-  return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}&format=image&version=normal`;
-};
+// Placeholder for cards without metadata
+const CARD_BACK_PLACEHOLDER = 'https://cards.scryfall.io/back.png';
 
 // Color icon mapping
 const colorIcons: Record<string, string> = {
@@ -346,34 +342,30 @@ export default function Collection() {
       ) : (
         <>
           <div className="card-grid">
-            {cards.map((card) => (
-              <div
-                key={`${card.cardId}-${card.setCode}`}
-                className={`collection-card ${card.quantity === 0 ? 'not-owned' : ''}`}
-              >
-                <div className="card-image-container">
+            {cards.map((card) => {
+              const imageUrl = card.imageUri || CARD_BACK_PLACEHOLDER;
+              return (
+                <div
+                  key={`${card.cardId}-${card.setCode}`}
+                  className={`collection-card ${card.quantity === 0 ? 'not-owned' : ''}`}
+                >
                   <img
-                    src={getCardImageUrl(card.imageUri, card.name)}
-                    alt={card.name}
-                    className="card-image"
-                    loading="lazy"
+                    src={imageUrl}
+                    alt={card.name || `Card #${card.arenaId}`}
+                    style={{ width: '100%', borderRadius: '12px' }}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = 'https://cards.scryfall.io/normal/front/0/c/0c082aa8-bf7f-47f2-baf8-43ad253fd7d7.jpg?1562826021';
+                      if (target.src !== CARD_BACK_PLACEHOLDER) {
+                        target.src = CARD_BACK_PLACEHOLDER;
+                      }
                     }}
                   />
                   <div className="card-quantity-badge" style={{ backgroundColor: rarityColors[card.rarity?.toLowerCase()] || '#333' }}>
                     x{card.quantity}
                   </div>
                 </div>
-                <div className="card-info">
-                  <span className="card-name" title={card.name}>
-                    {card.name}
-                  </span>
-                  <span className="card-set">{card.setCode?.toUpperCase()}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}

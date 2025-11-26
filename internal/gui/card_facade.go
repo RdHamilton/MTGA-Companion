@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -337,25 +338,46 @@ func (c *CardFacade) GetSetInfo(ctx context.Context, setCode string) (*SetInfo, 
 }
 
 // GetAllSetInfo returns information about all known sets.
+// Falls back to set_cards table if sets table is empty.
 func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {
 	if c.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
+	// First try the sets table (populated from Scryfall)
 	sets, err := c.services.Storage.GetAllSets(ctx)
 	if err != nil {
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get all sets: %v", err)}
 	}
 
-	result := make([]*SetInfo, len(sets))
-	for i, set := range sets {
+	// If we have sets from the main table, use them
+	if len(sets) > 0 {
+		result := make([]*SetInfo, len(sets))
+		for i, set := range sets {
+			result[i] = &SetInfo{
+				Code:       set.Code,
+				Name:       set.Name,
+				IconSVGURI: set.IconSVGURI,
+				SetType:    set.SetType,
+				ReleasedAt: set.ReleasedAt,
+				CardCount:  set.CardCount,
+			}
+		}
+		return result, nil
+	}
+
+	// Fallback: get unique set codes from set_cards table
+	cachedSets, err := c.services.Storage.SetCardRepo().GetCachedSets(ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get cached sets: %v", err)}
+	}
+
+	// Build set info from cached set codes (name defaults to uppercase code)
+	result := make([]*SetInfo, len(cachedSets))
+	for i, code := range cachedSets {
 		result[i] = &SetInfo{
-			Code:       set.Code,
-			Name:       set.Name,
-			IconSVGURI: set.IconSVGURI,
-			SetType:    set.SetType,
-			ReleasedAt: set.ReleasedAt,
-			CardCount:  set.CardCount,
+			Code: code,
+			Name: strings.ToUpper(code), // Use uppercase code as name fallback
 		}
 	}
 
