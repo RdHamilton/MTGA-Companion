@@ -65,6 +65,8 @@ export function GetCollection(arg1:gui.CollectionFilter):Promise<gui.CollectionR
 
 export function GetCollectionStats():Promise<gui.CollectionStats>;
 
+export function GetCollectionUpdatedEvent():Promise<gui.CollectionUpdatedEvent>;
+
 export function GetColorRatings(arg1:string,arg2:string):Promise<Array<seventeenlands.ColorRating>>;
 
 export function GetCompletedDraftSessions(arg1:number):Promise<Array<models.DraftSession>>;
