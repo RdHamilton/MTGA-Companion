@@ -901,12 +901,22 @@ func (s *Service) StoreDeckFromParser(ctx context.Context, deckID, name, format,
 	Quantity int
 },
 ) error {
+	// Ensure we have a valid account ID (fix for issue #618)
+	// If currentAccountID is 0, use default account ID 1
+	accountID := s.currentAccountID
+	if accountID == 0 {
+		accountID = 1
+		log.Printf("[StoreDeck] WARNING: currentAccountID is 0, using default account ID 1 for deck '%s'", name)
+	}
+
 	// Convert to storage models
+	// Source "arena" indicates this deck was synced from MTGA (parsed from logs)
 	deck := &models.Deck{
 		ID:         deckID,
-		AccountID:  s.currentAccountID,
+		AccountID:  accountID,
 		Name:       name,
 		Format:     format,
+		Source:     "arena",
 		CreatedAt:  created,
 		ModifiedAt: modified,
 		LastPlayed: lastPlayed,

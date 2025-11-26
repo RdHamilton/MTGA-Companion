@@ -45,7 +45,7 @@ func setupDeckTestDB(t *testing.T) *sql.DB {
 			last_played DATETIME,
 			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 			FOREIGN KEY (draft_event_id) REFERENCES draft_sessions(id) ON DELETE SET NULL,
-			CHECK(source IN ('draft', 'constructed', 'imported'))
+			CHECK(source IN ('draft', 'constructed', 'imported', 'arena'))
 		);
 
 		CREATE TABLE deck_cards (
