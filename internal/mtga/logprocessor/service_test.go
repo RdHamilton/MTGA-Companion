@@ -337,6 +337,181 @@ func TestProcessResult_Structure(t *testing.T) {
 	}
 }
 
+func TestProcessCollection_FromDecks(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// First, store some decks with cards to the database
+	// Create a deck directly in the database
+	now := time.Now()
+	_, err := service.GetDB().ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, modified_at)
+		VALUES ('test-deck-1', 1, 'Test Deck', 'Standard', 'arena', ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to insert test deck: %v", err)
+	}
+
+	// Add cards to the deck
+	_, err = service.GetDB().ExecContext(ctx, `
+		INSERT INTO deck_cards (deck_id, card_id, quantity, board)
+		VALUES
+			('test-deck-1', 12345, 4, 'main'),
+			('test-deck-1', 67890, 2, 'main'),
+			('test-deck-1', 11111, 1, 'sideboard')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to insert deck cards: %v", err)
+	}
+
+	// Process collection
+	processor := NewService(service)
+	result := &ProcessResult{}
+	err = processor.processCollection(ctx, result)
+	if err != nil {
+		t.Fatalf("processCollection failed: %v", err)
+	}
+
+	// Verify collection was updated
+	if result.CollectionNewCards != 3 {
+		t.Errorf("Expected 3 new cards, got %d", result.CollectionNewCards)
+	}
+
+	// Verify quantities
+	collection, err := service.CollectionRepo().GetAll(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get collection: %v", err)
+	}
+
+	if collection[12345] != 4 {
+		t.Errorf("Expected card 12345 to have quantity 4, got %d", collection[12345])
+	}
+	if collection[67890] != 2 {
+		t.Errorf("Expected card 67890 to have quantity 2, got %d", collection[67890])
+	}
+	if collection[11111] != 1 {
+		t.Errorf("Expected card 11111 to have quantity 1, got %d", collection[11111])
+	}
+}
+
+func TestProcessCollection_CapAt4Copies(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create a deck with more than 4 copies across multiple decks
+	now := time.Now()
+	_, err := service.GetDB().ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, modified_at)
+		VALUES
+			('test-deck-1', 1, 'Test Deck 1', 'Standard', 'arena', ?, ?),
+			('test-deck-2', 1, 'Test Deck 2', 'Standard', 'arena', ?, ?)
+	`, now, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to insert test decks: %v", err)
+	}
+
+	// Add cards - total should exceed 4
+	_, err = service.GetDB().ExecContext(ctx, `
+		INSERT INTO deck_cards (deck_id, card_id, quantity, board)
+		VALUES
+			('test-deck-1', 12345, 4, 'main'),
+			('test-deck-2', 12345, 4, 'main')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to insert deck cards: %v", err)
+	}
+
+	// Process collection
+	processor := NewService(service)
+	result := &ProcessResult{}
+	err = processor.processCollection(ctx, result)
+	if err != nil {
+		t.Fatalf("processCollection failed: %v", err)
+	}
+
+	// Verify collection was capped at 4
+	collection, err := service.CollectionRepo().GetAll(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get collection: %v", err)
+	}
+
+	if collection[12345] != 4 {
+		t.Errorf("Expected card 12345 to be capped at 4, got %d", collection[12345])
+	}
+}
+
+func TestProcessCollection_NoChanges(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Process empty collection - should not error
+	processor := NewService(service)
+	result := &ProcessResult{}
+	err := processor.processCollection(ctx, result)
+	if err != nil {
+		t.Fatalf("processCollection failed on empty data: %v", err)
+	}
+
+	// Verify no changes reported
+	if result.CollectionNewCards != 0 {
+		t.Errorf("Expected 0 new cards, got %d", result.CollectionNewCards)
+	}
+	if result.CollectionCardsAdded != 0 {
+		t.Errorf("Expected 0 cards added, got %d", result.CollectionCardsAdded)
+	}
+}
+
+func TestProcessCollection_DryRunMode(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create a deck with cards
+	now := time.Now()
+	_, err := service.GetDB().ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, modified_at)
+		VALUES ('test-deck-1', 1, 'Test Deck', 'Standard', 'arena', ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to insert test deck: %v", err)
+	}
+
+	_, err = service.GetDB().ExecContext(ctx, `
+		INSERT INTO deck_cards (deck_id, card_id, quantity, board)
+		VALUES ('test-deck-1', 12345, 4, 'main')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to insert deck cards: %v", err)
+	}
+
+	// Enable dry run mode
+	processor := NewService(service)
+	processor.SetDryRun(true)
+
+	result := &ProcessResult{}
+	err = processor.processCollection(ctx, result)
+	if err != nil {
+		t.Fatalf("processCollection failed in dry run mode: %v", err)
+	}
+
+	// Verify collection was NOT updated
+	collection, err := service.CollectionRepo().GetAll(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get collection: %v", err)
+	}
+
+	if len(collection) != 0 {
+		t.Errorf("Expected empty collection in dry run mode, got %d cards", len(collection))
+	}
+}
+
 // Benchmark tests
 func BenchmarkProcessLogEntries(b *testing.B) {
 	service, cleanup := setupTestService(&testing.T{})

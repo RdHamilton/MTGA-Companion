@@ -80,6 +80,11 @@ func (s *Service) GetDB() *sql.DB {
 	return s.db.Conn()
 }
 
+// CurrentAccountID returns the current active account ID.
+func (s *Service) CurrentAccountID() int {
+	return s.currentAccountID
+}
+
 // BulkImportSettings stores the original database settings before bulk import mode.
 type BulkImportSettings struct {
 	Synchronous string
@@ -1945,6 +1950,11 @@ func (s *Service) SetCardRepo() repository.SetCardRepository {
 // DraftRatingsRepo returns the draft ratings repository.
 func (s *Service) DraftRatingsRepo() repository.DraftRatingsRepository {
 	return s.draftRatings
+}
+
+// CollectionRepo returns the collection repository.
+func (s *Service) CollectionRepo() repository.CollectionRepository {
+	return s.collection
 }
 
 // DeckRepo returns the deck repository.

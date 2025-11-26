@@ -59,11 +59,13 @@ func NewCollectionRepository(db *sql.DB) CollectionRepository {
 }
 
 // UpsertCard inserts or updates a card in the collection.
+// Uses default account_id = 1 for single-account mode.
 func (r *collectionRepository) UpsertCard(ctx context.Context, cardID int, quantity int) error {
+	// Collection table has composite primary key (account_id, card_id) after migration 000002
 	query := `
-		INSERT INTO collection (card_id, quantity, updated_at)
-		VALUES (?, ?, ?)
-		ON CONFLICT(card_id) DO UPDATE SET
+		INSERT INTO collection (account_id, card_id, quantity, updated_at)
+		VALUES (1, ?, ?, ?)
+		ON CONFLICT(account_id, card_id) DO UPDATE SET
 			quantity = excluded.quantity,
 			updated_at = excluded.updated_at
 	`
@@ -271,6 +273,7 @@ func (r *collectionRepository) GetRecentChanges(ctx context.Context, limit int) 
 
 // UpsertMany inserts or updates multiple cards in a single transaction.
 // Uses batch operations for performance (<1s for full collection).
+// Uses default account_id = 1 for single-account mode.
 func (r *collectionRepository) UpsertMany(ctx context.Context, entries []CollectionEntry) error {
 	if len(entries) == 0 {
 		return nil
@@ -286,10 +289,11 @@ func (r *collectionRepository) UpsertMany(ctx context.Context, entries []Collect
 	}()
 
 	// Prepare the upsert statement
+	// Collection table has composite primary key (account_id, card_id) after migration 000002
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO collection (card_id, quantity, updated_at)
-		VALUES (?, ?, ?)
-		ON CONFLICT(card_id) DO UPDATE SET
+		INSERT INTO collection (account_id, card_id, quantity, updated_at)
+		VALUES (1, ?, ?, ?)
+		ON CONFLICT(account_id, card_id) DO UPDATE SET
 			quantity = excluded.quantity,
 			updated_at = excluded.updated_at
 	`)
