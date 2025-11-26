@@ -1,8 +1,9 @@
 .decks-page {
   padding: 2rem;
-  height: 100%;
+  flex: 1;
   overflow-y: auto;
   box-sizing: border-box;
+  min-height: 0; /* Required for flex child to scroll */
 }
 
 /* Loading and Error States */
