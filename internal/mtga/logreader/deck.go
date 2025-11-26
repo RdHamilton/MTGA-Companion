@@ -1,6 +1,9 @@
 package logreader
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // DeckLibrary represents all player decks.
 type DeckLibrary struct {
@@ -112,9 +115,9 @@ func parseCourseWithDeck(courseMap map[string]interface{}) *PlayerDeck {
 		return nil
 	}
 
-	// Extract Name
+	// Extract Name (clean up localization keys if present)
 	if name, ok := summaryMap["Name"].(string); ok {
-		deck.Name = name
+		deck.Name = cleanDeckName(name)
 	}
 
 	// Extract Description
@@ -222,4 +225,24 @@ func parseDeckCards(cardsData []interface{}) []DeckCard {
 	}
 
 	return cards
+}
+
+// cleanDeckName converts MTGA localization keys to readable deck names.
+// Example: "?=?Loc/Decks/Precon/Precon_EPP2024_UW" -> "Precon EPP2024 UW"
+func cleanDeckName(name string) string {
+	// Check for localization key pattern
+	if !strings.HasPrefix(name, "?=?Loc/") {
+		return name
+	}
+
+	// Extract the last path segment: "?=?Loc/Decks/Precon/Precon_EPP2024_UW" -> "Precon_EPP2024_UW"
+	lastSlash := strings.LastIndex(name, "/")
+	if lastSlash == -1 || lastSlash >= len(name)-1 {
+		return name
+	}
+
+	identifier := name[lastSlash+1:]
+
+	// Replace underscores with spaces
+	return strings.ReplaceAll(identifier, "_", " ")
 }

@@ -2,6 +2,9 @@
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* Loading and Error States */

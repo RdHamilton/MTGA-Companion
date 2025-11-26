@@ -262,3 +262,56 @@ func TestParseDecks_FromLogFile(t *testing.T) {
 		t.Errorf("ParseDecks() deck name = %s, want Test Deck", deck.Name)
 	}
 }
+
+func TestCleanDeckName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "regular name unchanged",
+			input:    "My Cool Deck",
+			expected: "My Cool Deck",
+		},
+		{
+			name:     "precon localization key",
+			input:    "?=?Loc/Decks/Precon/Precon_EPP2024_UW",
+			expected: "Precon EPP2024 UW",
+		},
+		{
+			name:     "precon with player name",
+			input:    "?=?Loc/Decks/Precon/2022_WC/Player_JanM",
+			expected: "Player JanM",
+		},
+		{
+			name:     "precon NPE historic brawl",
+			input:    "?=?Loc/Decks/Precon/Precon_NPE_HistoricBrawl_GW",
+			expected: "Precon NPE HistoricBrawl GW",
+		},
+		{
+			name:     "color codes deck",
+			input:    "?=?Loc/Decks/Precon/CC_ANB_W",
+			expected: "CC ANB W",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "non-deck localization key",
+			input:    "?=?Loc/Other/Something",
+			expected: "Something",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := cleanDeckName(tt.input)
+			if result != tt.expected {
+				t.Errorf("cleanDeckName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
