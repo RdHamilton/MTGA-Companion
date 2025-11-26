@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import LoadingButton from '../../LoadingButton';
 import { SettingItem, SettingSelect } from '../';
 import { gui } from '../../../../wailsjs/go/models';
@@ -21,6 +22,12 @@ export function DaemonConnectionSection({
   onReconnect,
   onModeChange,
 }: DaemonConnectionSectionProps) {
+  const [portInput, setPortInput] = useState(String(daemonPort));
+
+  // Sync local state when prop changes externally
+  useEffect(() => {
+    setPortInput(String(daemonPort));
+  }, [daemonPort]);
   return (
     <div className="settings-section">
       <h2 className="section-title">Daemon Connection</h2>
@@ -58,11 +65,23 @@ export function DaemonConnectionSection({
         hint={`ws://localhost:${daemonPort}`}
       >
         <input
-          type="number"
-          value={daemonPort}
-          onChange={(e) => onDaemonPortChange(parseInt(e.target.value))}
-          min="1024"
-          max="65535"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={portInput}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '');
+            setPortInput(value);
+          }}
+          onBlur={() => {
+            const port = parseInt(portInput, 10);
+            if (port >= 1024 && port <= 65535) {
+              onDaemonPortChange(port);
+            } else {
+              // Reset to current valid port if invalid
+              setPortInput(String(daemonPort));
+            }
+          }}
           className="number-input"
           disabled={daemonMode === 'standalone'}
         />

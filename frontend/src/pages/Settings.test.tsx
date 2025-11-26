@@ -353,6 +353,7 @@ describe('Settings', () => {
 
       const portInput = screen.getByDisplayValue('9999');
       fireEvent.change(portInput, { target: { value: '8080' } });
+      fireEvent.blur(portInput); // Port is validated and saved on blur
 
       await waitFor(() => {
         expect(SetDaemonPort).toHaveBeenCalledWith(8080);

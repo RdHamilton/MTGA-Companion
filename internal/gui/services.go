@@ -3,7 +3,6 @@ package gui
 import (
 	"context"
 
-	"github.com/ramonehamilton/MTGA-Companion/internal/daemon/manager"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -39,11 +38,8 @@ type Services struct {
 	// Log monitoring
 	Poller *logreader.Poller
 
-	// IPC/Daemon communication
+	// IPC/Daemon communication (Go daemon on port 9999)
 	IPCClient *ipc.Client
-
-	// Daemon subprocess management
-	DaemonManager *manager.Manager
 
 	// Performance metrics
 	DraftMetrics *metrics.DraftMetrics
@@ -51,9 +47,6 @@ type Services struct {
 	// Daemon mode flag
 	DaemonMode bool
 	DaemonPort int
-
-	// Daemon auto-start preference
-	DaemonAutoStart bool
 }
 
 // AppError represents an application error with a user-friendly message.

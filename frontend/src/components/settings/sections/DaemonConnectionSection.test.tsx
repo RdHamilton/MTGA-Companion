@@ -87,14 +87,41 @@ describe('DaemonConnectionSection', () => {
       expect(screen.getByText('ws://localhost:8888')).toBeInTheDocument();
     });
 
-    it('calls onDaemonPortChange when port changes', () => {
+    it('calls onDaemonPortChange when port changes on blur', () => {
       const onDaemonPortChange = vi.fn();
       render(<DaemonConnectionSection {...defaultProps} onDaemonPortChange={onDaemonPortChange} />);
 
       const input = screen.getByDisplayValue('9999');
       fireEvent.change(input, { target: { value: '8080' } });
+      fireEvent.blur(input);
 
       expect(onDaemonPortChange).toHaveBeenCalledWith(8080);
+    });
+
+    it('allows typing any digits before blur', () => {
+      const onDaemonPortChange = vi.fn();
+      render(<DaemonConnectionSection {...defaultProps} onDaemonPortChange={onDaemonPortChange} />);
+
+      const input = screen.getByDisplayValue('9999');
+      fireEvent.change(input, { target: { value: '68' } });
+
+      // Should show intermediate value while typing
+      expect(screen.getByDisplayValue('68')).toBeInTheDocument();
+      // Should not call handler until blur
+      expect(onDaemonPortChange).not.toHaveBeenCalled();
+    });
+
+    it('resets to valid port if invalid on blur', () => {
+      const onDaemonPortChange = vi.fn();
+      render(<DaemonConnectionSection {...defaultProps} daemonPort={9999} onDaemonPortChange={onDaemonPortChange} />);
+
+      const input = screen.getByDisplayValue('9999');
+      fireEvent.change(input, { target: { value: '500' } }); // Invalid - below 1024
+      fireEvent.blur(input);
+
+      // Should reset to original valid port
+      expect(screen.getByDisplayValue('9999')).toBeInTheDocument();
+      expect(onDaemonPortChange).not.toHaveBeenCalled();
     });
 
     it('disables port input in standalone mode', () => {
