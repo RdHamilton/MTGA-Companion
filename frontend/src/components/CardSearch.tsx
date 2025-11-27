@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { GetCardByArenaID, GetAllSetInfo, SearchCardsWithCollection } from '../../wailsjs/go/main/App';
-import { models, gui } from '../../wailsjs/go/models';
+import { gui } from '../../wailsjs/go/models';
 import SetSymbol from './SetSymbol';
 import './CardSearch.css';
 
@@ -32,8 +32,22 @@ interface TypeFilter {
   land: boolean;
 }
 
-// Card with ownership information from the API
-interface CardWithOwned extends models.SetCard {
+// Card data with ownership information
+interface CardWithOwned {
+  ID?: number;
+  SetCode: string;
+  ArenaID: string;
+  ScryfallID?: string;
+  Name: string;
+  ManaCost?: string;
+  CMC: number;
+  Types?: string[];
+  Colors?: string[];
+  Rarity?: string;
+  Text?: string;
+  Power?: string;
+  Toughness?: string;
+  ImageURL?: string;
   ownedQuantity?: number;
 }
 
@@ -138,12 +152,8 @@ export default function CardSearch({
     setError(null);
     try {
       const results = await SearchCardsWithCollection(debouncedSearchTerm, selectedSets, 100, collectionOnly);
-      // Map results to CardWithOwned interface
-      const cardsWithOwned: CardWithOwned[] = (results || []).map((r: gui.CardWithOwned) => ({
-        ...r,
-        ownedQuantity: r.ownedQuantity,
-      }));
-      setAllCards(cardsWithOwned);
+      // Results already match CardWithOwned interface
+      setAllCards((results || []) as CardWithOwned[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search cards');
       setAllCards([]);
