@@ -417,6 +417,168 @@
   box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
 }
 
+/* Collection Filter Toggle */
+.collection-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #252525;
+  border-radius: 6px;
+}
+
+.collection-filter-group .filter-label {
+  color: #aaa;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.collection-toggle {
+  display: flex;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #444;
+}
+
+.collection-toggle .toggle-option {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.collection-toggle .toggle-option:hover {
+  background: #333;
+  color: #fff;
+}
+
+.collection-toggle .toggle-option.active {
+  background: #4a9eff;
+  color: #fff;
+}
+
+/* Owned Quantity Indicator */
+.owned-quantity {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.not-owned {
+  color: #888;
+  font-style: italic;
+}
+
+/* Set Filter */
+.set-filter-group {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  padding: 0.75rem;
+  background: #252525;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.set-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.set-filter-toggle:hover {
+  background: #333;
+  border-color: #555;
+}
+
+.set-filter-toggle.has-filters {
+  background: #4a9eff;
+  border-color: #4a9eff;
+  color: #fff;
+}
+
+.toggle-icon {
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+.clear-sets-button {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid #666;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-sets-button:hover {
+  background: #333;
+  border-color: #888;
+  color: #fff;
+}
+
+.set-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.set-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.set-filter-option:hover {
+  background: #333;
+}
+
+.set-filter-option input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #4a9eff;
+}
+
+.set-filter-option .set-name {
+  color: #ddd;
+  font-size: 0.875rem;
+}
+
+.no-sets {
+  padding: 1rem;
+  text-align: center;
+  color: #888;
+  font-size: 0.875rem;
+}
+
 /* Scrollbar Styling */
 .search-results::-webkit-scrollbar {
   width: 8px;

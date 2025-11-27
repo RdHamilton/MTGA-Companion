@@ -22,6 +22,10 @@ type SetCardRepository interface {
 	// GetCardsBySet retrieves all cards for a given set code.
 	GetCardsBySet(ctx context.Context, setCode string) ([]*models.SetCard, error)
 
+	// SearchCards searches for cards by name across all cached sets.
+	// Optionally filter by set codes. Returns up to limit results.
+	SearchCards(ctx context.Context, query string, setCodes []string, limit int) ([]*models.SetCard, error)
+
 	// IsSetCached checks if a set has been cached.
 	IsSetCached(ctx context.Context, setCode string) (bool, error)
 
@@ -330,4 +334,109 @@ func (r *setCardRepository) DeleteSet(ctx context.Context, setCode string) error
 	query := `DELETE FROM set_cards WHERE set_code = ?`
 	_, err := r.db.ExecContext(ctx, query, setCode)
 	return err
+}
+
+// SearchCards searches for cards by name across all cached sets.
+// If setCodes is empty, searches all sets. Returns up to limit results.
+func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCodes []string, limit int) ([]*models.SetCard, error) {
+	if limit <= 0 {
+		limit = 50 // Default limit
+	}
+	if limit > 200 {
+		limit = 200 // Max limit to prevent performance issues
+	}
+
+	var sqlQuery string
+	var args []interface{}
+
+	if len(setCodes) > 0 {
+		// Build placeholders for IN clause
+		placeholders := make([]string, len(setCodes))
+		for i, code := range setCodes {
+			placeholders[i] = "?"
+			args = append(args, code)
+		}
+		sqlQuery = `
+			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+			FROM set_cards
+			WHERE name LIKE ? AND set_code IN (` + joinStrings(placeholders, ",") + `)
+			ORDER BY name
+			LIMIT ?
+		`
+		// Prepend the name query, append the limit
+		args = append([]interface{}{"%" + query + "%"}, args...)
+		args = append(args, limit)
+	} else {
+		sqlQuery = `
+			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
+				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+			FROM set_cards
+			WHERE name LIKE ?
+			ORDER BY name
+			LIMIT ?
+		`
+		args = []interface{}{"%" + query + "%", limit}
+	}
+
+	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	cards := []*models.SetCard{}
+	for rows.Next() {
+		card := &models.SetCard{}
+		var typesJSON, colorsJSON string
+
+		err := rows.Scan(
+			&card.ID,
+			&card.SetCode,
+			&card.ArenaID,
+			&card.ScryfallID,
+			&card.Name,
+			&card.ManaCost,
+			&card.CMC,
+			&typesJSON,
+			&colorsJSON,
+			&card.Rarity,
+			&card.Text,
+			&card.Power,
+			&card.Toughness,
+			&card.ImageURL,
+			&card.ImageURLSmall,
+			&card.ImageURLArt,
+			&card.FetchedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse JSON arrays
+		if err := json.Unmarshal([]byte(typesJSON), &card.Types); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(colorsJSON), &card.Colors); err != nil {
+			return nil, err
+		}
+
+		cards = append(cards, card)
+	}
+
+	return cards, rows.Err()
+}
+
+// joinStrings joins strings with a separator (simple helper to avoid importing strings package).
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }

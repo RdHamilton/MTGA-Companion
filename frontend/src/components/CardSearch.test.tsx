@@ -94,7 +94,7 @@ describe('CardSearch Component', () => {
         />
       );
 
-      expect(screen.getByText('Loading cards...')).toBeInTheDocument();
+      expect(screen.getByText('Searching...')).toBeInTheDocument();
     });
 
     it('should display empty state when draft pool is empty', async () => {
@@ -110,7 +110,7 @@ describe('CardSearch Component', () => {
 
       // Wait for loading to finish and empty state to appear
       await waitFor(() => {
-        expect(screen.queryByText('Loading cards...')).not.toBeInTheDocument();
+        expect(screen.queryByText('Searching...')).not.toBeInTheDocument();
       });
 
       expect(screen.getByText('No cards available in draft pool')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('CardSearch Component', () => {
   });
 
   describe('Constructed Mode', () => {
-    it('should show error message for constructed mode', async () => {
+    it('should show instruction to type search term for constructed mode', async () => {
       render(
         <CardSearch
           isDraftDeck={false}
@@ -130,7 +130,7 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Please select a set to search for cards')).toBeInTheDocument();
+        expect(screen.getByText('Type at least 2 characters to search')).toBeInTheDocument();
       });
     });
 
@@ -147,6 +147,173 @@ describe('CardSearch Component', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('Draft Mode')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should search cards when typing at least 2 characters', async () => {
+      const card = { ...createMockSetCard({ ArenaID: '123', Name: 'Lightning Bolt' }), ownedQuantity: 2 };
+      mockWailsApp.SearchCardsWithCollection.mockResolvedValue([card]);
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'lig');
+
+      await waitFor(() => {
+        expect(mockWailsApp.SearchCardsWithCollection).toHaveBeenCalledWith('lig', [], 100, false);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+      });
+    });
+
+    it('should display set filter button for constructed mode', async () => {
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([
+        { code: 'dsk', name: 'Duskmourn', iconSvgUri: '', setType: 'expansion', releasedAt: '', cardCount: 0 },
+      ]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Sets:/)).toBeInTheDocument();
+      });
+    });
+
+    it('should display collection filter toggle for constructed mode', async () => {
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('All Cards')).toBeInTheDocument();
+        expect(screen.getByText('My Collection')).toBeInTheDocument();
+      });
+    });
+
+    it('should filter by collection when toggle is clicked', async () => {
+      const ownedCard = { ...createMockSetCard({ ArenaID: '123', Name: 'Owned Card' }), ownedQuantity: 4 };
+      mockWailsApp.SearchCardsWithCollection.mockResolvedValue([ownedCard]);
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      // Click on "My Collection" toggle
+      const collectionToggle = screen.getByText('My Collection');
+      await userEvent.click(collectionToggle);
+
+      // Search for a card
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'owned');
+
+      await waitFor(() => {
+        expect(mockWailsApp.SearchCardsWithCollection).toHaveBeenCalledWith('owned', [], 100, true);
+      });
+    });
+
+    it('should display owned quantity for cards in constructed mode', async () => {
+      const cardWithOwned = { ...createMockSetCard({ ArenaID: '123', Name: 'Test Card' }), ownedQuantity: 3 };
+      mockWailsApp.SearchCardsWithCollection.mockResolvedValue([cardWithOwned]);
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'test');
+
+      await waitFor(() => {
+        expect(screen.getByText('3x owned')).toBeInTheDocument();
+      });
+    });
+
+    it('should display "Not owned" for cards not in collection', async () => {
+      const cardNotOwned = { ...createMockSetCard({ ArenaID: '123', Name: 'Test Card' }), ownedQuantity: 0 };
+      mockWailsApp.SearchCardsWithCollection.mockResolvedValue([cardNotOwned]);
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'test');
+
+      await waitFor(() => {
+        expect(screen.getByText('Not owned')).toBeInTheDocument();
+      });
+    });
+
+    it('should show collection empty message when collection filter active and no results', async () => {
+      mockWailsApp.SearchCardsWithCollection.mockResolvedValue([]);
+      mockWailsApp.GetAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      // Click on "My Collection" toggle
+      const collectionToggle = screen.getByText('My Collection');
+      await userEvent.click(collectionToggle);
+
+      // Search for a card
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'nonexistent');
+
+      await waitFor(() => {
+        expect(screen.getByText('No cards in your collection match this search')).toBeInTheDocument();
       });
     });
   });
@@ -179,7 +346,7 @@ describe('CardSearch Component', () => {
       });
 
       // Search for "lightning"
-      const searchInput = screen.getByPlaceholderText('Search card name...');
+      const searchInput = screen.getByPlaceholderText('Filter draft pool...');
       await userEvent.type(searchInput, 'lightning');
 
       // Only Lightning Bolt should be visible
@@ -207,7 +374,7 @@ describe('CardSearch Component', () => {
         expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Search card name...');
+      const searchInput = screen.getByPlaceholderText('Filter draft pool...');
       await userEvent.type(searchInput, 'LIGHTNING');
 
       await waitFor(() => {
@@ -233,11 +400,11 @@ describe('CardSearch Component', () => {
         expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Search card name...');
+      const searchInput = screen.getByPlaceholderText('Filter draft pool...');
       await userEvent.type(searchInput, 'Nonexistent Card');
 
       await waitFor(() => {
-        expect(screen.getByText('No cards match your search criteria')).toBeInTheDocument();
+        expect(screen.getByText('No cards match your search in draft pool')).toBeInTheDocument();
       });
     });
   });

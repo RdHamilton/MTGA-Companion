@@ -27,6 +27,10 @@ type CollectionRepository interface {
 	// GetCard retrieves the quantity of a specific card.
 	GetCard(ctx context.Context, cardID int) (int, error)
 
+	// GetCards retrieves quantities for multiple cards. Returns a map of cardID -> quantity.
+	// Cards not in the collection will have quantity 0 (not included in map).
+	GetCards(ctx context.Context, cardIDs []int) (map[int]int, error)
+
 	// GetAll retrieves the entire collection as a map of cardID -> quantity.
 	GetAll(ctx context.Context) (map[int]int, error)
 
@@ -93,6 +97,61 @@ func (r *collectionRepository) GetCard(ctx context.Context, cardID int) (int, er
 	}
 
 	return quantity, nil
+}
+
+// GetCards retrieves quantities for multiple cards. Returns a map of cardID -> quantity.
+// Cards not in the collection will not be included in the map.
+func (r *collectionRepository) GetCards(ctx context.Context, cardIDs []int) (map[int]int, error) {
+	if len(cardIDs) == 0 {
+		return make(map[int]int), nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(cardIDs))
+	args := make([]interface{}, len(cardIDs))
+	for i, id := range cardIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`SELECT card_id, quantity FROM collection WHERE card_id IN (%s)`,
+		joinStringsSQL(placeholders, ","))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cards: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	collection := make(map[int]int)
+	for rows.Next() {
+		var cardID, quantity int
+		err := rows.Scan(&cardID, &quantity)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan card: %w", err)
+		}
+		collection[cardID] = quantity
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating collection: %w", err)
+	}
+
+	return collection, nil
+}
+
+// joinStringsSQL joins strings with a separator for SQL queries.
+func joinStringsSQL(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }
 
 // GetAll retrieves the entire collection as a map of cardID -> quantity.
