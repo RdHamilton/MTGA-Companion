@@ -658,6 +658,16 @@ func (a *App) ValidateDeckWithDialog(deckID string) error {
 	return a.deckFacade.ValidateDeckWithDialog(a.ctx, deckID)
 }
 
+// ClassifyDeckArchetype classifies a deck into its archetype based on card composition
+func (a *App) ClassifyDeckArchetype(deckID string) (*gui.ArchetypeClassificationResult, error) {
+	return a.deckFacade.ClassifyDeckArchetype(a.ctx, deckID)
+}
+
+// ClassifyDraftPoolArchetype classifies a draft pool based on picked cards
+func (a *App) ClassifyDraftPoolArchetype(draftEventID string) (*gui.ArchetypeClassificationResult, error) {
+	return a.deckFacade.ClassifyDraftPoolArchetype(a.ctx, draftEventID)
+}
+
 // ========================================
 // Collection Methods (CollectionFacade)
 // ========================================

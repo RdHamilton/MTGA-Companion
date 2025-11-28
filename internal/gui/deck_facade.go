@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/archetype"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
@@ -2029,4 +2030,216 @@ func convertSetCardToCard(setCard *models.SetCard) *cards.Card {
 	}
 
 	return card
+}
+
+// ArchetypeClassificationResult represents the result of classifying a deck archetype.
+type ArchetypeClassificationResult struct {
+	PrimaryArchetype   string                       `json:"primaryArchetype"`
+	SecondaryArchetype *string                      `json:"secondaryArchetype,omitempty"`
+	Confidence         float64                      `json:"confidence"` // 0.0-1.0
+	ConfidencePercent  int                          `json:"confidencePercent"` // 0-100
+	ColorIdentity      string                       `json:"colorIdentity"`
+	DominantColors     []string                     `json:"dominantColors"`
+	ColorPair          *ColorPairInfo               `json:"colorPair,omitempty"`
+	SignatureCards     []int                        `json:"signatureCards"`
+	Indicators         []ArchetypeIndicatorInfo     `json:"indicators"`
+	TotalCards         int                          `json:"totalCards"`
+	Analysis           *DeckArchetypeAnalysis       `json:"analysis"`
+}
+
+// ColorPairInfo represents a detected color pair.
+type ColorPairInfo struct {
+	Colors string `json:"colors"` // e.g., "WU"
+	Name   string `json:"name"`   // e.g., "Azorius"
+}
+
+// ArchetypeIndicatorInfo represents a card that indicates a specific archetype.
+type ArchetypeIndicatorInfo struct {
+	CardID   int     `json:"cardID"`
+	CardName string  `json:"cardName"`
+	Weight   float64 `json:"weight"`
+	Reason   string  `json:"reason"`
+}
+
+// DeckArchetypeAnalysis provides detailed breakdown of deck composition.
+type DeckArchetypeAnalysis struct {
+	ColorCounts      map[string]int `json:"colorCounts"`
+	ColorlessCount   int            `json:"colorlessCount"`
+	GoldCount        int            `json:"goldCount"`
+	CreatureCount    int            `json:"creatureCount"`
+	InstantCount     int            `json:"instantCount"`
+	SorceryCount     int            `json:"sorceryCount"`
+	ArtifactCount    int            `json:"artifactCount"`
+	EnchantmentCount int            `json:"enchantmentCount"`
+	PlaneswalkerCount int           `json:"planeswalkerCount"`
+	LandCount        int            `json:"landCount"`
+	ManaCurve        map[int]int    `json:"manaCurve"`
+	AvgCMC           float64        `json:"avgCMC"`
+	RareCounts       map[string]int `json:"rareCounts"`
+}
+
+// ClassifyDeckArchetype classifies a deck into its archetype.
+func (d *DeckFacade) ClassifyDeckArchetype(ctx context.Context, deckID string) (*ArchetypeClassificationResult, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Create classifier
+	classifier := archetype.NewClassifier(
+		d.services.CardService,
+		d.services.Storage.DeckRepo(),
+		d.services.Storage.DeckPerformanceRepo(),
+	)
+
+	// Classify the deck
+	result, err := classifier.ClassifyDeck(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to classify deck: %v", err)}
+	}
+
+	// Convert to response format
+	response := &ArchetypeClassificationResult{
+		PrimaryArchetype:   result.PrimaryArchetype,
+		SecondaryArchetype: result.SecondaryArchetype,
+		Confidence:         result.Confidence,
+		ConfidencePercent:  int(result.Confidence * 100),
+		ColorIdentity:      result.ColorIdentity,
+		DominantColors:     result.DominantColors,
+		SignatureCards:     result.SignatureCards,
+		TotalCards:         result.TotalCards,
+	}
+
+	// Convert color pair
+	if result.ColorPair != nil {
+		response.ColorPair = &ColorPairInfo{
+			Colors: result.ColorPair.Colors,
+			Name:   result.ColorPair.Name,
+		}
+	}
+
+	// Convert indicators
+	response.Indicators = make([]ArchetypeIndicatorInfo, len(result.ArchetypeIndicators))
+	for i, ind := range result.ArchetypeIndicators {
+		response.Indicators[i] = ArchetypeIndicatorInfo{
+			CardID:   ind.CardID,
+			CardName: ind.CardName,
+			Weight:   ind.Weight,
+			Reason:   ind.Reason,
+		}
+	}
+
+	// Convert analysis
+	if result.Analysis != nil {
+		response.Analysis = &DeckArchetypeAnalysis{
+			ColorCounts:       result.Analysis.ColorCounts,
+			ColorlessCount:    result.Analysis.ColorlessCount,
+			GoldCount:         result.Analysis.GoldCount,
+			CreatureCount:     result.Analysis.CreatureCount,
+			InstantCount:      result.Analysis.InstantCount,
+			SorceryCount:      result.Analysis.SorceryCount,
+			ArtifactCount:     result.Analysis.ArtifactCount,
+			EnchantmentCount:  result.Analysis.EnchantmentCount,
+			PlaneswalkerCount: result.Analysis.PlaneswalkerCount,
+			LandCount:         result.Analysis.LandCount,
+			ManaCurve:         result.Analysis.ManaCurve,
+			AvgCMC:            result.Analysis.AvgCMC,
+			RareCounts:        result.Analysis.RareCounts,
+		}
+	}
+
+	log.Printf("Classified deck %s as %s (%.0f%% confidence)", deckID, result.PrimaryArchetype, result.Confidence*100)
+	return response, nil
+}
+
+// ClassifyDraftPoolArchetype classifies a draft pool based on picked cards.
+func (d *DeckFacade) ClassifyDraftPoolArchetype(ctx context.Context, draftEventID string) (*ArchetypeClassificationResult, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Get draft cards
+	var cardIDs []int
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		cardIDs, err = d.services.Storage.DeckRepo().GetDraftCards(ctx, draftEventID)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft cards: %v", err)}
+	}
+
+	if len(cardIDs) == 0 {
+		return nil, &AppError{Message: "No cards in draft pool"}
+	}
+
+	// Create classifier
+	classifier := archetype.NewClassifier(
+		d.services.CardService,
+		d.services.Storage.DeckRepo(),
+		d.services.Storage.DeckPerformanceRepo(),
+	)
+
+	// Classify the draft pool
+	result, err := classifier.ClassifyDraftPool(cardIDs)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to classify draft pool: %v", err)}
+	}
+
+	// Convert to response format (same as ClassifyDeckArchetype)
+	response := &ArchetypeClassificationResult{
+		PrimaryArchetype:   result.PrimaryArchetype,
+		SecondaryArchetype: result.SecondaryArchetype,
+		Confidence:         result.Confidence,
+		ConfidencePercent:  int(result.Confidence * 100),
+		ColorIdentity:      result.ColorIdentity,
+		DominantColors:     result.DominantColors,
+		SignatureCards:     result.SignatureCards,
+		TotalCards:         result.TotalCards,
+	}
+
+	if result.ColorPair != nil {
+		response.ColorPair = &ColorPairInfo{
+			Colors: result.ColorPair.Colors,
+			Name:   result.ColorPair.Name,
+		}
+	}
+
+	response.Indicators = make([]ArchetypeIndicatorInfo, len(result.ArchetypeIndicators))
+	for i, ind := range result.ArchetypeIndicators {
+		response.Indicators[i] = ArchetypeIndicatorInfo{
+			CardID:   ind.CardID,
+			CardName: ind.CardName,
+			Weight:   ind.Weight,
+			Reason:   ind.Reason,
+		}
+	}
+
+	if result.Analysis != nil {
+		response.Analysis = &DeckArchetypeAnalysis{
+			ColorCounts:       result.Analysis.ColorCounts,
+			ColorlessCount:    result.Analysis.ColorlessCount,
+			GoldCount:         result.Analysis.GoldCount,
+			CreatureCount:     result.Analysis.CreatureCount,
+			InstantCount:      result.Analysis.InstantCount,
+			SorceryCount:      result.Analysis.SorceryCount,
+			ArtifactCount:     result.Analysis.ArtifactCount,
+			EnchantmentCount:  result.Analysis.EnchantmentCount,
+			PlaneswalkerCount: result.Analysis.PlaneswalkerCount,
+			LandCount:         result.Analysis.LandCount,
+			ManaCurve:         result.Analysis.ManaCurve,
+			AvgCMC:            result.Analysis.AvgCMC,
+			RareCounts:        result.Analysis.RareCounts,
+		}
+	}
+
+	log.Printf("Classified draft pool %s as %s (%.0f%% confidence)", draftEventID, result.PrimaryArchetype, result.Confidence*100)
+	return response, nil
 }
