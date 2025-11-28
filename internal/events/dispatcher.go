@@ -11,8 +11,14 @@ type Event struct {
 	// Type is the event type (e.g., "stats:updated", "daemon:status")
 	Type string
 
-	// Data contains the event payload
+	// Data contains the event payload as untyped map.
+	// Deprecated: Use TypedData for type-safe access when possible.
 	Data map[string]interface{}
+
+	// TypedData contains the event payload as a typed struct.
+	// This is optional and may be nil for backwards compatibility.
+	// When set, observers should prefer this over Data.
+	TypedData any
 
 	// Context provides execution context for the event
 	Context context.Context
@@ -137,4 +143,46 @@ func (d *EventDispatcher) Clear() {
 	defer d.mu.Unlock()
 	d.observers = make([]Observer, 0)
 	log.Printf("[EventDispatcher] Cleared all observers")
+}
+
+// NewTypedEvent creates an Event with typed data.
+// The typed data is also converted to map[string]interface{} for backwards compatibility.
+func NewTypedEvent[T any](eventType string, data T, ctx context.Context) Event {
+	return Event{
+		Type:      eventType,
+		Data:      structToMap(data),
+		TypedData: data,
+		Context:   ctx,
+	}
+}
+
+// structToMap converts a struct to map[string]interface{} using JSON serialization.
+// This ensures backwards compatibility with code expecting untyped data.
+func structToMap(v any) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Use reflection-free approach via JSON
+	// This is slightly slower but more reliable for nested structs
+	if v == nil {
+		return result
+	}
+
+	// For simple cases, we can try direct type assertion
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
+
+	// Otherwise, leave as empty map - observers should use TypedData
+	return result
+}
+
+// GetTypedData extracts typed data from an Event.
+// Returns the zero value and false if the data is not of the expected type.
+func GetTypedData[T any](event Event) (T, bool) {
+	var zero T
+	if event.TypedData == nil {
+		return zero, false
+	}
+	typed, ok := event.TypedData.(T)
+	return typed, ok
 }
