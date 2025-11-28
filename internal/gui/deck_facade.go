@@ -2034,17 +2034,17 @@ func convertSetCardToCard(setCard *models.SetCard) *cards.Card {
 
 // ArchetypeClassificationResult represents the result of classifying a deck archetype.
 type ArchetypeClassificationResult struct {
-	PrimaryArchetype   string                       `json:"primaryArchetype"`
-	SecondaryArchetype *string                      `json:"secondaryArchetype,omitempty"`
-	Confidence         float64                      `json:"confidence"` // 0.0-1.0
-	ConfidencePercent  int                          `json:"confidencePercent"` // 0-100
-	ColorIdentity      string                       `json:"colorIdentity"`
-	DominantColors     []string                     `json:"dominantColors"`
-	ColorPair          *ColorPairInfo               `json:"colorPair,omitempty"`
-	SignatureCards     []int                        `json:"signatureCards"`
-	Indicators         []ArchetypeIndicatorInfo     `json:"indicators"`
-	TotalCards         int                          `json:"totalCards"`
-	Analysis           *DeckArchetypeAnalysis       `json:"analysis"`
+	PrimaryArchetype   string                   `json:"primaryArchetype"`
+	SecondaryArchetype *string                  `json:"secondaryArchetype,omitempty"`
+	Confidence         float64                  `json:"confidence"`        // 0.0-1.0
+	ConfidencePercent  int                      `json:"confidencePercent"` // 0-100
+	ColorIdentity      string                   `json:"colorIdentity"`
+	DominantColors     []string                 `json:"dominantColors"`
+	ColorPair          *ColorPairInfo           `json:"colorPair,omitempty"`
+	SignatureCards     []int                    `json:"signatureCards"`
+	Indicators         []ArchetypeIndicatorInfo `json:"indicators"`
+	TotalCards         int                      `json:"totalCards"`
+	Analysis           *DeckArchetypeAnalysis   `json:"analysis"`
 }
 
 // ColorPairInfo represents a detected color pair.
@@ -2063,19 +2063,19 @@ type ArchetypeIndicatorInfo struct {
 
 // DeckArchetypeAnalysis provides detailed breakdown of deck composition.
 type DeckArchetypeAnalysis struct {
-	ColorCounts      map[string]int `json:"colorCounts"`
-	ColorlessCount   int            `json:"colorlessCount"`
-	GoldCount        int            `json:"goldCount"`
-	CreatureCount    int            `json:"creatureCount"`
-	InstantCount     int            `json:"instantCount"`
-	SorceryCount     int            `json:"sorceryCount"`
-	ArtifactCount    int            `json:"artifactCount"`
-	EnchantmentCount int            `json:"enchantmentCount"`
-	PlaneswalkerCount int           `json:"planeswalkerCount"`
-	LandCount        int            `json:"landCount"`
-	ManaCurve        map[int]int    `json:"manaCurve"`
-	AvgCMC           float64        `json:"avgCMC"`
-	RareCounts       map[string]int `json:"rareCounts"`
+	ColorCounts       map[string]int `json:"colorCounts"`
+	ColorlessCount    int            `json:"colorlessCount"`
+	GoldCount         int            `json:"goldCount"`
+	CreatureCount     int            `json:"creatureCount"`
+	InstantCount      int            `json:"instantCount"`
+	SorceryCount      int            `json:"sorceryCount"`
+	ArtifactCount     int            `json:"artifactCount"`
+	EnchantmentCount  int            `json:"enchantmentCount"`
+	PlaneswalkerCount int            `json:"planeswalkerCount"`
+	LandCount         int            `json:"landCount"`
+	ManaCurve         map[int]int    `json:"manaCurve"`
+	AvgCMC            float64        `json:"avgCMC"`
+	RareCounts        map[string]int `json:"rareCounts"`
 }
 
 // ClassifyDeckArchetype classifies a deck into its archetype.
