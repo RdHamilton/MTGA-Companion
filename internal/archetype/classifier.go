@@ -33,13 +33,13 @@ var DefaultColorPairs = []ColorPair{
 
 // ClassificationResult represents the result of classifying a deck.
 type ClassificationResult struct {
-	PrimaryArchetype    string              // Primary archetype name
-	SecondaryArchetype  *string             // Secondary archetype if applicable
-	Confidence          float64             // 0.0-1.0
-	ColorIdentity       string              // Detected color identity
-	DominantColors      []string            // Primary colors in the deck
-	ColorPair           *ColorPair          // Detected color pair if applicable
-	SignatureCards      []int               // Arena IDs of signature cards
+	PrimaryArchetype    string               // Primary archetype name
+	SecondaryArchetype  *string              // Secondary archetype if applicable
+	Confidence          float64              // 0.0-1.0
+	ColorIdentity       string               // Detected color identity
+	DominantColors      []string             // Primary colors in the deck
+	ColorPair           *ColorPair           // Detected color pair if applicable
+	SignatureCards      []int                // Arena IDs of signature cards
 	ArchetypeIndicators []ArchetypeIndicator // Cards that indicate the archetype
 	TotalCards          int
 	Analysis            *DeckAnalysis
@@ -47,16 +47,16 @@ type ClassificationResult struct {
 
 // ArchetypeIndicator represents a card that indicates a specific archetype.
 type ArchetypeIndicator struct {
-	CardID     int
-	CardName   string
-	Weight     float64 // How strongly this card indicates the archetype
-	Reason     string  // Why this card indicates the archetype
+	CardID   int
+	CardName string
+	Weight   float64 // How strongly this card indicates the archetype
+	Reason   string  // Why this card indicates the archetype
 }
 
 // DeckAnalysis provides detailed breakdown of deck composition.
 type DeckAnalysis struct {
 	// Color distribution
-	ColorCounts   map[string]int // W, U, B, R, G -> count
+	ColorCounts    map[string]int // W, U, B, R, G -> count
 	ColorlessCount int
 	GoldCount      int // Multi-colored cards
 
@@ -79,9 +79,9 @@ type DeckAnalysis struct {
 
 // Classifier provides archetype classification for decks.
 type Classifier struct {
-	cardService  *cards.Service
-	deckRepo     repository.DeckRepository
-	perfRepo     repository.DeckPerformanceRepository
+	cardService *cards.Service
+	deckRepo    repository.DeckRepository
+	perfRepo    repository.DeckPerformanceRepository
 }
 
 // NewClassifier creates a new archetype classifier.
