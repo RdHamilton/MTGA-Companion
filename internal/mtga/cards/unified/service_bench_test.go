@@ -2,24 +2,26 @@ package unified
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // BenchmarkGetCard benchmarks single card retrieval.
 func BenchmarkGetCard(b *testing.B) {
 	arenaID := 12345
 	metadata := &mockMetadataProvider{
-		cards: map[int]*storage.Card{
+		cards: map[int]*models.SetCard{
 			arenaID: {
-				ID:       "test-id",
-				ArenaID:  &arenaID,
+				ID:       1,
+				ArenaID:  fmt.Sprintf("%d", arenaID),
 				Name:     "Test Card",
 				ManaCost: "{2}{R}",
-				CMC:      3.0,
-				TypeLine: "Creature - Human",
+				CMC:      3,
+				Types:    []string{"Creature"},
 				Rarity:   "rare",
 				SetCode:  "BLB",
 			},
@@ -58,22 +60,22 @@ func BenchmarkGetCards(b *testing.B) {
 	arenaID3 := 3333
 
 	metadata := &mockMetadataProvider{
-		cards: map[int]*storage.Card{
+		cards: map[int]*models.SetCard{
 			arenaID1: {
-				ID:      "id-1",
-				ArenaID: &arenaID1,
+				ID:      1,
+				ArenaID: fmt.Sprintf("%d", arenaID1),
 				Name:    "Card 1",
 				SetCode: "BLB",
 			},
 			arenaID2: {
-				ID:      "id-2",
-				ArenaID: &arenaID2,
+				ID:      2,
+				ArenaID: fmt.Sprintf("%d", arenaID2),
 				Name:    "Card 2",
 				SetCode: "BLB",
 			},
 			arenaID3: {
-				ID:      "id-3",
-				ArenaID: &arenaID3,
+				ID:      3,
+				ArenaID: fmt.Sprintf("%d", arenaID3),
 				Name:    "Card 3",
 				SetCode: "MKM",
 			},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,7 +65,7 @@ func ExportMetaSnapshot(ctx context.Context, service *storage.Service, setCode, 
 	rows := make([]*MetaSnapshotRow, 0, len(ratings))
 	for i, rating := range ratings {
 		// Get card metadata
-		card, err := service.GetCardByArenaID(ctx, rating.ArenaID)
+		card, err := service.SetCardRepo().GetCardByArenaID(ctx, strconv.Itoa(rating.ArenaID))
 		if err != nil || card == nil {
 			// Skip cards we don't have metadata for
 			continue
@@ -76,7 +77,7 @@ func ExportMetaSnapshot(ctx context.Context, service *storage.Service, setCode, 
 			SetCode:     card.SetCode,
 			Rarity:      card.Rarity,
 			Colors:      strings.Join(card.Colors, ""),
-			CMC:         card.CMC,
+			CMC:         float64(card.CMC),
 			GIHWR:       rating.GIHWR,
 			OHWR:        rating.OHWR,
 			ALSA:        rating.ALSA,
@@ -126,7 +127,7 @@ func ExportMetaSnapshotByRarity(ctx context.Context, service *storage.Service, s
 	// Group by rarity
 	byRarity := make(map[string][]*storage.DraftCardRating)
 	for _, rating := range ratings {
-		card, err := service.GetCardByArenaID(ctx, rating.ArenaID)
+		card, err := service.SetCardRepo().GetCardByArenaID(ctx, strconv.Itoa(rating.ArenaID))
 		if err != nil || card == nil {
 			continue
 		}
@@ -155,7 +156,7 @@ func ExportMetaSnapshotByRarity(ctx context.Context, service *storage.Service, s
 
 		// Convert to export rows
 		for i, rating := range rarityRatings {
-			card, err := service.GetCardByArenaID(ctx, rating.ArenaID)
+			card, err := service.SetCardRepo().GetCardByArenaID(ctx, strconv.Itoa(rating.ArenaID))
 			if err != nil || card == nil {
 				continue
 			}
@@ -166,7 +167,7 @@ func ExportMetaSnapshotByRarity(ctx context.Context, service *storage.Service, s
 				SetCode:     card.SetCode,
 				Rarity:      card.Rarity,
 				Colors:      strings.Join(card.Colors, ""),
-				CMC:         card.CMC,
+				CMC:         float64(card.CMC),
 				GIHWR:       rating.GIHWR,
 				OHWR:        rating.OHWR,
 				ALSA:        rating.ALSA,

@@ -3,7 +3,10 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // DeckAnalysis contains comprehensive analysis of a deck.
@@ -102,8 +105,8 @@ func (s *Service) AnalyzeDeck(ctx context.Context, deckID string) (*DeckAnalysis
 
 	// Analyze each card
 	for _, dc := range mainDeckCards {
-		// Get card metadata
-		card, err := s.GetCardByArenaID(ctx, dc.CardID)
+		// Get card metadata from set_cards table
+		card, err := s.setCard.GetCardByArenaID(ctx, strconv.Itoa(dc.CardID))
 		if err != nil {
 			// Skip cards without metadata
 			continue
@@ -116,12 +119,12 @@ func (s *Service) AnalyzeDeck(ctx context.Context, deckID string) (*DeckAnalysis
 		totalCards += quantity
 
 		// Mana curve analysis
-		cmc := int(card.CMC)
+		cmc := card.CMC
 		analysis.ManaCurve.Curve[cmc] += quantity
 		if cmc > analysis.ManaCurve.MaxCMC {
 			analysis.ManaCurve.MaxCMC = cmc
 		}
-		totalCMC += card.CMC * float64(quantity)
+		totalCMC += float64(cmc) * float64(quantity)
 
 		// Color distribution analysis
 		analyzeColors(card, quantity, &analysis.ColorDist)
@@ -155,7 +158,7 @@ func (s *Service) AnalyzeDeck(ctx context.Context, deckID string) (*DeckAnalysis
 }
 
 // analyzeColors updates color distribution based on card colors.
-func analyzeColors(card *Card, quantity int, dist *ColorDistribution) {
+func analyzeColors(card *models.SetCard, quantity int, dist *ColorDistribution) {
 	if len(card.Colors) == 0 {
 		dist.Colorless += quantity
 		return
@@ -184,28 +187,38 @@ func analyzeColors(card *Card, quantity int, dist *ColorDistribution) {
 	}
 }
 
-// analyzeTypes updates type breakdown based on card type line.
-func analyzeTypes(card *Card, quantity int, breakdown *TypeBreakdown) {
-	typeLine := strings.ToLower(card.TypeLine)
-
-	// Check for each type (order matters for multi-type cards)
-	if strings.Contains(typeLine, "land") {
-		breakdown.Lands += quantity
-	} else if strings.Contains(typeLine, "creature") {
-		breakdown.Creatures += quantity
-	} else if strings.Contains(typeLine, "planeswalker") {
-		breakdown.Planeswalkers += quantity
-	} else if strings.Contains(typeLine, "instant") {
-		breakdown.Instants += quantity
-	} else if strings.Contains(typeLine, "sorcery") {
-		breakdown.Sorceries += quantity
-	} else if strings.Contains(typeLine, "enchantment") {
-		breakdown.Enchantments += quantity
-	} else if strings.Contains(typeLine, "artifact") {
-		breakdown.Artifacts += quantity
-	} else {
-		breakdown.Other += quantity
+// analyzeTypes updates type breakdown based on card types.
+func analyzeTypes(card *models.SetCard, quantity int, breakdown *TypeBreakdown) {
+	// Check types array for card type
+	for _, cardType := range card.Types {
+		typeLower := strings.ToLower(cardType)
+		switch typeLower {
+		case "land":
+			breakdown.Lands += quantity
+			return
+		case "creature":
+			breakdown.Creatures += quantity
+			return
+		case "planeswalker":
+			breakdown.Planeswalkers += quantity
+			return
+		case "instant":
+			breakdown.Instants += quantity
+			return
+		case "sorcery":
+			breakdown.Sorceries += quantity
+			return
+		case "enchantment":
+			breakdown.Enchantments += quantity
+			return
+		case "artifact":
+			breakdown.Artifacts += quantity
+			return
+		}
 	}
+
+	// If no recognized type found
+	breakdown.Other += quantity
 }
 
 // countBasicLands counts the number of basic lands in a deck.
@@ -225,7 +238,7 @@ func countBasicLands(cards []*struct {
 
 	count := 0
 	for _, dc := range cards {
-		card, err := s.GetCardByArenaID(ctx, dc.CardID)
+		card, err := s.setCard.GetCardByArenaID(ctx, strconv.Itoa(dc.CardID))
 		if err != nil || card == nil {
 			continue
 		}
