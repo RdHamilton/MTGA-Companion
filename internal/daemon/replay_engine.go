@@ -588,28 +588,29 @@ func (r *ReplayEngine) GetStatus() map[string]interface{} {
 // This ensures a clean state when replaying draft events for testing.
 func (r *ReplayEngine) clearDraftSessions() error {
 	ctx := context.Background()
-	db := r.service.storage.GetDB()
+	draftRepo := r.service.storage.DraftRepo()
 
 	// Count existing data before delete
-	var sessionsBefore, picksBefore, packsBefore int
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&sessionsBefore)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&picksBefore)
-	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&packsBefore)
+	sessionsBefore, _ := draftRepo.GetSessionCount(ctx)
+	picksBefore, _ := draftRepo.GetPickCount(ctx)
+	packsBefore, _ := draftRepo.GetPackCount(ctx)
+	log.Printf("[Replay] Before cleanup - Sessions: %d, Picks: %d, Packs: %d", sessionsBefore, picksBefore, packsBefore)
 
-	// Explicitly delete picks and packs first (in case CASCADE isn't enabled)
-	// This ensures we don't have orphaned picks/packs
-	if _, err := db.ExecContext(ctx, `DELETE FROM draft_picks`); err != nil {
-		log.Printf("Warning: Failed to delete draft_picks: %v", err)
+	// Clear all draft data using repository
+	sessionsDeleted, picksDeleted, packsDeleted, err := draftRepo.ClearAllSessions(ctx)
+	if err != nil {
+		return fmt.Errorf("clear draft sessions: %w", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `DELETE FROM draft_packs`); err != nil {
-		log.Printf("Warning: Failed to delete draft_packs: %v", err)
+	// Verify cleanup
+	sessionsAfter, _ := draftRepo.GetSessionCount(ctx)
+	picksAfter, _ := draftRepo.GetPickCount(ctx)
+	packsAfter, _ := draftRepo.GetPackCount(ctx)
+
+	if picksAfter > 0 || packsAfter > 0 || sessionsAfter > 0 {
+		log.Printf("[Replay] WARNING: Data still remains after cleanup - Sessions: %d, Picks: %d, Packs: %d", sessionsAfter, picksAfter, packsAfter)
 	}
 
-	if _, err := db.ExecContext(ctx, `DELETE FROM draft_sessions`); err != nil {
-		return fmt.Errorf("delete draft sessions: %w", err)
-	}
-
-	log.Printf("Cleared %d session(s), %d pick(s), %d pack(s) from database", sessionsBefore, picksBefore, packsBefore)
+	log.Printf("[Replay] Cleared %d session(s), %d pick(s), %d pack(s) from database", sessionsDeleted, picksDeleted, packsDeleted)
 	return nil
 }
