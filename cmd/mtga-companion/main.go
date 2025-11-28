@@ -806,6 +806,7 @@ func runDaemonCommand() {
 	daemonConfig.PollInterval = *pollInterval
 	daemonConfig.UseFSNotify = *useFSNotify
 	daemonConfig.EnableMetrics = *enableMetrics
+	daemonConfig.CORSConfig = daemon.CORSConfigFromEnv()
 
 	// Create and start daemon
 	daemonService := daemon.New(daemonConfig, service)
@@ -941,6 +942,7 @@ func runReplayCommand() {
 	daemonConfig := daemon.DefaultConfig()
 	daemonConfig.Port = *port
 	daemonConfig.DBPath = finalDBPath
+	daemonConfig.CORSConfig = daemon.CORSConfigFromEnv()
 
 	// Create daemon service
 	daemonService := daemon.New(daemonConfig, stor)

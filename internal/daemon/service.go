@@ -50,7 +50,7 @@ func New(config *Config, storage *storage.Service) *Service {
 		config:       config,
 		storage:      storage,
 		logProcessor: logprocessor.NewService(storage),
-		wsServer:     NewWebSocketServer(config.Port),
+		wsServer:     NewWebSocketServerWithCORS(config.Port, config.CORSConfig),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
