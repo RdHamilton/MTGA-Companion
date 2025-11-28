@@ -403,3 +403,118 @@ func TestWebSocketServer_SetService(t *testing.T) {
 		t.Error("Expected service to be set")
 	}
 }
+
+func TestNewWebSocketServerWithCORS(t *testing.T) {
+	corsConfig := CORSConfig{
+		AllowAllOrigins: false,
+		AllowedOrigins:  []string{"https://example.com"},
+	}
+
+	server := NewWebSocketServerWithCORS(9999, corsConfig)
+
+	if server == nil {
+		t.Fatal("NewWebSocketServerWithCORS returned nil")
+	}
+
+	if server.corsConfig.AllowAllOrigins {
+		t.Error("Expected AllowAllOrigins to be false")
+	}
+
+	if len(server.corsConfig.AllowedOrigins) != 1 {
+		t.Errorf("Expected 1 allowed origin, got %d", len(server.corsConfig.AllowedOrigins))
+	}
+}
+
+func TestWebSocketServer_CheckOrigin_AllowAll(t *testing.T) {
+	server := NewWebSocketServerWithCORS(9999, CORSConfig{
+		AllowAllOrigins: true,
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://random-origin.com")
+
+	if !server.checkOrigin(req) {
+		t.Error("Expected origin to be allowed when AllowAllOrigins is true")
+	}
+}
+
+func TestWebSocketServer_CheckOrigin_SpecificOrigins(t *testing.T) {
+	server := NewWebSocketServerWithCORS(9999, CORSConfig{
+		AllowAllOrigins: false,
+		AllowedOrigins:  []string{"https://example.com", "https://app.example.com"},
+	})
+
+	// Test allowed origin
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+
+	if !server.checkOrigin(req) {
+		t.Error("Expected https://example.com to be allowed")
+	}
+
+	// Test second allowed origin
+	req2 := httptest.NewRequest("GET", "/", nil)
+	req2.Header.Set("Origin", "https://app.example.com")
+
+	if !server.checkOrigin(req2) {
+		t.Error("Expected https://app.example.com to be allowed")
+	}
+
+	// Test disallowed origin
+	req3 := httptest.NewRequest("GET", "/", nil)
+	req3.Header.Set("Origin", "https://evil.com")
+
+	if server.checkOrigin(req3) {
+		t.Error("Expected https://evil.com to be rejected")
+	}
+}
+
+func TestWebSocketServer_CheckOrigin_NoOriginHeader(t *testing.T) {
+	server := NewWebSocketServerWithCORS(9999, CORSConfig{
+		AllowAllOrigins: false,
+		AllowedOrigins:  []string{"https://example.com"},
+	})
+
+	// Request without Origin header (same-origin request)
+	req := httptest.NewRequest("GET", "/", nil)
+
+	if !server.checkOrigin(req) {
+		t.Error("Expected same-origin request (no Origin header) to be allowed")
+	}
+}
+
+func TestWebSocketServer_CheckOrigin_EmptyOriginsAndNotAllowAll(t *testing.T) {
+	server := NewWebSocketServerWithCORS(9999, CORSConfig{
+		AllowAllOrigins: false,
+		AllowedOrigins:  nil, // No origins allowed
+	})
+
+	// Request with Origin header should be rejected
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+
+	if server.checkOrigin(req) {
+		t.Error("Expected cross-origin request to be rejected when no origins allowed")
+	}
+
+	// Request without Origin header should still be allowed (same-origin)
+	req2 := httptest.NewRequest("GET", "/", nil)
+
+	if !server.checkOrigin(req2) {
+		t.Error("Expected same-origin request to be allowed")
+	}
+}
+
+func TestWebSocketServer_CheckOrigin_Wildcard(t *testing.T) {
+	server := NewWebSocketServerWithCORS(9999, CORSConfig{
+		AllowAllOrigins: false,
+		AllowedOrigins:  []string{"*"},
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://any-origin.com")
+
+	if !server.checkOrigin(req) {
+		t.Error("Expected wildcard to allow any origin")
+	}
+}

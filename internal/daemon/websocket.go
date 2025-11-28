@@ -20,29 +20,69 @@ type Event struct {
 
 // WebSocketServer manages WebSocket connections and event broadcasting.
 type WebSocketServer struct {
-	port      int
-	clients   map[*websocket.Conn]bool
-	clientsMu sync.RWMutex
-	broadcast chan Event
-	upgrader  websocket.Upgrader
-	server    *http.Server
-	service   *Service // Reference to parent service for health checks
+	port       int
+	clients    map[*websocket.Conn]bool
+	clientsMu  sync.RWMutex
+	broadcast  chan Event
+	upgrader   websocket.Upgrader
+	server     *http.Server
+	service    *Service // Reference to parent service for health checks
+	corsConfig CORSConfig
 }
 
 // NewWebSocketServer creates a new WebSocket server.
 func NewWebSocketServer(port int) *WebSocketServer {
-	return &WebSocketServer{
-		port:      port,
-		clients:   make(map[*websocket.Conn]bool),
-		broadcast: make(chan Event, 100),
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all origins for development
-				// TODO: Make this configurable for production
-				return true
-			},
-		},
+	return NewWebSocketServerWithCORS(port, DefaultCORSConfig())
+}
+
+// NewWebSocketServerWithCORS creates a new WebSocket server with custom CORS configuration.
+func NewWebSocketServerWithCORS(port int, corsConfig CORSConfig) *WebSocketServer {
+	s := &WebSocketServer{
+		port:       port,
+		clients:    make(map[*websocket.Conn]bool),
+		broadcast:  make(chan Event, 100),
+		corsConfig: corsConfig,
 	}
+
+	s.upgrader = websocket.Upgrader{
+		CheckOrigin: s.checkOrigin,
+	}
+
+	return s
+}
+
+// checkOrigin validates the request origin against the configured CORS policy.
+func (s *WebSocketServer) checkOrigin(r *http.Request) bool {
+	// If AllowAllOrigins is true, allow everything
+	if s.corsConfig.AllowAllOrigins {
+		return true
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No origin header means same-origin request, allow it
+		return true
+	}
+
+	// If no specific origins are configured and AllowAllOrigins is false,
+	// deny all cross-origin requests (same-origin only)
+	if len(s.corsConfig.AllowedOrigins) == 0 {
+		log.Printf("CORS: Rejected origin %s (no allowed origins configured)", origin)
+		return false
+	}
+
+	// Check if origin is in the allowed list
+	for _, allowed := range s.corsConfig.AllowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if allowed == origin {
+			return true
+		}
+	}
+
+	log.Printf("CORS: Rejected origin %s (allowed: %v)", origin, s.corsConfig.AllowedOrigins)
+	return false
 }
 
 // SetService sets the parent service reference for health checks.
