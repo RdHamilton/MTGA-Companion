@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { GetCardByArenaID } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { GetCardByArenaID, GetAllSetInfo, SearchCardsWithCollection } from '../../wailsjs/go/main/App';
+import { gui } from '../../wailsjs/go/models';
 import SetSymbol from './SetSymbol';
 import './CardSearch.css';
 
@@ -32,6 +32,25 @@ interface TypeFilter {
   land: boolean;
 }
 
+// Card data with ownership information
+interface CardWithOwned {
+  ID?: number;
+  SetCode: string;
+  ArenaID: string;
+  ScryfallID?: string;
+  Name: string;
+  ManaCost?: string;
+  CMC: number;
+  Types?: string[];
+  Colors?: string[];
+  Rarity?: string;
+  Text?: string;
+  Power?: string;
+  Toughness?: string;
+  ImageURL?: string;
+  ownedQuantity?: number;
+}
+
 export default function CardSearch({
   isDraftDeck,
   draftCardIDs = [],
@@ -40,12 +59,17 @@ export default function CardSearch({
   onRemoveCard,
 }: CardSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [allCards, setAllCards] = useState<models.SetCard[]>([]);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [allCards, setAllCards] = useState<CardWithOwned[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedBoard, setSelectedBoard] = useState<'main' | 'sideboard'>('main');
   const [cmcMin, setCmcMin] = useState<number | ''>('');
   const [cmcMax, setCmcMax] = useState<number | ''>('');
+  const [sets, setSets] = useState<gui.SetInfo[]>([]);
+  const [selectedSets, setSelectedSets] = useState<string[]>([]);
+  const [showSetFilter, setShowSetFilter] = useState(false);
+  const [collectionOnly, setCollectionOnly] = useState(false);
   const [colorFilter, setColorFilter] = useState<ColorFilter>({
     white: false,
     blue: false,
@@ -65,21 +89,37 @@ export default function CardSearch({
     land: false,
   });
 
-  // Load all available cards (or draft pool for draft decks)
+  // Debounce search term
   useEffect(() => {
-    const loadCards = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (isDraftDeck) {
-          // For draft decks: load only draft pool cards
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Load available sets for filtering (only for constructed)
+  useEffect(() => {
+    if (!isDraftDeck) {
+      GetAllSetInfo()
+        .then((setInfo) => setSets(setInfo || []))
+        .catch((err) => console.error('Failed to load sets:', err));
+    }
+  }, [isDraftDeck]);
+
+  // Load draft pool cards for draft decks
+  useEffect(() => {
+    if (isDraftDeck) {
+      const loadDraftCards = async () => {
+        setLoading(true);
+        setError(null);
+        try {
           if (draftCardIDs.length > 0) {
-            const cards: models.SetCard[] = [];
+            const cards: CardWithOwned[] = [];
             for (const cardID of draftCardIDs) {
               try {
                 const card = await GetCardByArenaID(String(cardID));
                 if (card) {
-                  cards.push(card);
+                  cards.push(card as CardWithOwned);
                 }
               } catch (err) {
                 console.error(`Failed to load card ${cardID}:`, err);
@@ -87,30 +127,51 @@ export default function CardSearch({
             }
             setAllCards(cards);
           } else {
-            // Empty draft pool - let the empty state message show
             setAllCards([]);
           }
-        } else {
-          // For constructed decks: would need to load all cards
-          // For now, we'll show a message that constructed search needs set selection
-          setError('Please select a set to search for cards');
-          setAllCards([]);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load cards');
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load cards');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCards();
+      };
+      loadDraftCards();
+    }
   }, [isDraftDeck, draftCardIDs]);
 
-  // Filter cards based on search term and filters
+  // Search cards for constructed decks
+  const searchConstructedCards = useCallback(async () => {
+    if (isDraftDeck || debouncedSearchTerm.length < 2) {
+      if (!isDraftDeck) {
+        setAllCards([]);
+      }
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await SearchCardsWithCollection(debouncedSearchTerm, selectedSets, 100, collectionOnly);
+      // Results already match CardWithOwned interface
+      setAllCards((results || []) as CardWithOwned[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search cards');
+      setAllCards([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isDraftDeck, debouncedSearchTerm, selectedSets, collectionOnly]);
+
+  // Trigger search when debounced term, set filter, or collection filter changes
+  useEffect(() => {
+    searchConstructedCards();
+  }, [searchConstructedCards]);
+
+  // Filter cards based on local filters (for draft, filter the draft pool; for constructed, filter search results)
   const filteredCards = useMemo(() => {
     return allCards.filter((card) => {
-      // Search term filter (case-insensitive)
-      if (searchTerm && !card.Name.toLowerCase().includes(searchTerm.toLowerCase())) {
+      // For draft decks, also filter by search term locally
+      if (isDraftDeck && searchTerm && !card.Name.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
 
@@ -132,15 +193,15 @@ export default function CardSearch({
         if (colorFilter.colorless && !isColorless) return false;
         if (colorFilter.multicolor && !isMulticolor) return false;
 
-        // Check individual colors (for mono-color cards)
-        if (!isColorless && !isMulticolor) {
+        // Check individual colors
+        if (!colorFilter.colorless && !colorFilter.multicolor) {
           const colorMatch =
             (colorFilter.white && colors.includes('W')) ||
             (colorFilter.blue && colors.includes('U')) ||
             (colorFilter.black && colors.includes('B')) ||
             (colorFilter.red && colors.includes('R')) ||
             (colorFilter.green && colors.includes('G'));
-          if (!colorMatch) return false;
+          if (!colorMatch && !isColorless && !isMulticolor) return false;
         }
       }
 
@@ -161,9 +222,9 @@ export default function CardSearch({
 
       return true;
     });
-  }, [allCards, searchTerm, cmcMin, cmcMax, colorFilter, typeFilter]);
+  }, [allCards, searchTerm, isDraftDeck, cmcMin, cmcMax, colorFilter, typeFilter]);
 
-  const handleAddCard = async (card: models.SetCard, quantity: number = 1) => {
+  const handleAddCard = async (card: CardWithOwned, quantity: number = 1) => {
     try {
       const arenaID = parseInt(card.ArenaID);
       await onAddCard(arenaID, quantity, selectedBoard);
@@ -172,7 +233,7 @@ export default function CardSearch({
     }
   };
 
-  const handleRemoveCard = async (card: models.SetCard) => {
+  const handleRemoveCard = async (card: CardWithOwned) => {
     try {
       const arenaID = parseInt(card.ArenaID);
       const existing = existingCards.get(arenaID);
@@ -195,6 +256,16 @@ export default function CardSearch({
     return draftCardIDs.filter((id) => id === cardID).length;
   };
 
+  const toggleSetFilter = (setCode: string) => {
+    setSelectedSets((prev) =>
+      prev.includes(setCode) ? prev.filter((s) => s !== setCode) : [...prev, setCode]
+    );
+  };
+
+  const clearSetFilter = () => {
+    setSelectedSets([]);
+  };
+
   return (
     <div className="card-search">
       <div className="card-search-header">
@@ -212,12 +283,68 @@ export default function CardSearch({
         <input
           type="text"
           className="search-input"
-          placeholder="Search card name..."
+          placeholder={isDraftDeck ? 'Filter draft pool...' : 'Search cards (min 2 characters)...'}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           autoComplete="off"
         />
       </div>
+
+      {/* Collection Filter Toggle for Constructed */}
+      {!isDraftDeck && (
+        <div className="collection-filter-group">
+          <span className="filter-label">Show:</span>
+          <div className="collection-toggle">
+            <button
+              className={`toggle-option ${!collectionOnly ? 'active' : ''}`}
+              onClick={() => setCollectionOnly(false)}
+            >
+              All Cards
+            </button>
+            <button
+              className={`toggle-option ${collectionOnly ? 'active' : ''}`}
+              onClick={() => setCollectionOnly(true)}
+            >
+              My Collection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Set Filter for Constructed */}
+      {!isDraftDeck && (
+        <div className="filter-group set-filter-group">
+          <button
+            className={`set-filter-toggle ${selectedSets.length > 0 ? 'has-filters' : ''}`}
+            onClick={() => setShowSetFilter(!showSetFilter)}
+          >
+            Sets: {selectedSets.length > 0 ? `${selectedSets.length} selected` : 'All'}
+            <span className="toggle-icon">{showSetFilter ? '▲' : '▼'}</span>
+          </button>
+          {selectedSets.length > 0 && (
+            <button className="clear-sets-button" onClick={clearSetFilter}>
+              Clear
+            </button>
+          )}
+          {showSetFilter && (
+            <div className="set-filter-dropdown">
+              {sets.map((set) => (
+                <label key={set.code} className="set-filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedSets.includes(set.code)}
+                    onChange={() => toggleSetFilter(set.code)}
+                  />
+                  <span className="set-name">
+                    {set.name} ({set.code.toUpperCase()})
+                  </span>
+                </label>
+              ))}
+              {sets.length === 0 && <div className="no-sets">No sets cached yet</div>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="search-filters">
@@ -308,16 +435,20 @@ export default function CardSearch({
 
       {/* Results */}
       <div className="search-results">
-        {loading && <div className="loading">Loading cards...</div>}
+        {loading && <div className="loading">Searching...</div>}
         {error && <div className="error">{error}</div>}
 
         {!loading && !error && filteredCards.length === 0 && (
           <div className="no-results">
-            {searchTerm || Object.values(colorFilter).some((v) => v) || Object.values(typeFilter).some((v) => v)
-              ? 'No cards match your search criteria'
-              : isDraftDeck
-              ? 'No cards available in draft pool'
-              : 'Start typing to search for cards'}
+            {isDraftDeck
+              ? searchTerm
+                ? 'No cards match your search in draft pool'
+                : 'No cards available in draft pool'
+              : searchTerm.length < 2
+                ? 'Type at least 2 characters to search'
+                : collectionOnly
+                  ? 'No cards in your collection match this search'
+                  : 'No cards found. Try a different search term.'}
           </div>
         )}
 
@@ -329,12 +460,11 @@ export default function CardSearch({
               const inDeck = getCardInDeck(arenaID);
               const available = getAvailableQuantity(arenaID);
               const inDeckQuantity = inDeck?.quantity || 0;
+              const ownedQuantity = card.ownedQuantity || 0;
 
               return (
-                <div key={card.ArenaID} className={`card-result ${inDeck ? 'in-deck' : ''}`}>
-                  {card.ImageURL && (
-                    <img src={card.ImageURL} alt={card.Name} className="card-image" />
-                  )}
+                <div key={`${card.ArenaID}-${card.SetCode}`} className={`card-result ${inDeck ? 'in-deck' : ''}`}>
+                  {card.ImageURL && <img src={card.ImageURL} alt={card.Name} className="card-image" />}
                   <div className="card-info">
                     <div className="card-name">{card.Name}</div>
                     <div className="card-type">{(card.Types || []).join(' — ')}</div>
@@ -355,12 +485,20 @@ export default function CardSearch({
                           Available: {available - inDeckQuantity} / {available}
                         </span>
                       )}
+                      {!isDraftDeck && ownedQuantity > 0 && (
+                        <span className="owned-quantity">{ownedQuantity}x owned</span>
+                      )}
+                      {!isDraftDeck && ownedQuantity === 0 && (
+                        <span className="not-owned">Not owned</span>
+                      )}
                     </div>
                   </div>
                   <div className="card-actions">
                     {inDeck && (
                       <div className="in-deck-info">
-                        <span className="in-deck-badge">{inDeck.quantity}x in {inDeck.board}</span>
+                        <span className="in-deck-badge">
+                          {inDeck.quantity}x in {inDeck.board}
+                        </span>
                       </div>
                     )}
                     {(!isDraftDeck || inDeckQuantity < available) && (

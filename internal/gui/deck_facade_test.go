@@ -250,6 +250,76 @@ func TestConvertSetCardToCard_NilInput(t *testing.T) {
 	}
 }
 
+func TestNormalizeDeckSource(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputSource    string
+		expectedSource string
+		shouldError    bool
+	}{
+		{
+			name:           "manual maps to constructed",
+			inputSource:    "manual",
+			expectedSource: "constructed",
+			shouldError:    false,
+		},
+		{
+			name:           "import maps to imported",
+			inputSource:    "import",
+			expectedSource: "imported",
+			shouldError:    false,
+		},
+		{
+			name:           "draft stays draft",
+			inputSource:    "draft",
+			expectedSource: "draft",
+			shouldError:    false,
+		},
+		{
+			name:           "constructed stays constructed",
+			inputSource:    "constructed",
+			expectedSource: "constructed",
+			shouldError:    false,
+		},
+		{
+			name:           "imported stays imported",
+			inputSource:    "imported",
+			expectedSource: "imported",
+			shouldError:    false,
+		},
+		{
+			name:           "invalid source returns error",
+			inputSource:    "invalid",
+			expectedSource: "",
+			shouldError:    true,
+		},
+		{
+			name:           "empty source returns error",
+			inputSource:    "",
+			expectedSource: "",
+			shouldError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalized, err := normalizeDeckSource(tt.inputSource)
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("normalizeDeckSource(%q) expected error, got nil", tt.inputSource)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("normalizeDeckSource(%q) unexpected error: %v", tt.inputSource, err)
+				}
+				if normalized != tt.expectedSource {
+					t.Errorf("normalizeDeckSource(%q) = %q, want %q", tt.inputSource, normalized, tt.expectedSource)
+				}
+			}
+		})
+	}
+}
+
 func TestConvertSetCardToCard_MultiTypeCard(t *testing.T) {
 	setCard := &models.SetCard{
 		ArenaID:    "99999",

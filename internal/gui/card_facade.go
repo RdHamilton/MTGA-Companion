@@ -337,6 +337,133 @@ func (c *CardFacade) GetSetInfo(ctx context.Context, setCode string) (*SetInfo, 
 	}, nil
 }
 
+// SearchCards searches for cards by name across all cached sets.
+// If setCodes is empty or nil, searches all sets.
+// Returns up to limit results (default 50, max 200).
+func (c *CardFacade) SearchCards(ctx context.Context, query string, setCodes []string, limit int) ([]*models.SetCard, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if query == "" {
+		return []*models.SetCard{}, nil
+	}
+
+	var cards []*models.SetCard
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		cards, err = c.services.Storage.SetCardRepo().SearchCards(ctx, query, setCodes, limit)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to search cards: %v", err)}
+	}
+
+	return cards, nil
+}
+
+// CardWithOwned represents a SetCard with collection ownership information.
+type CardWithOwned struct {
+	*models.SetCard
+	OwnedQuantity int `json:"ownedQuantity"`
+}
+
+// SearchCardsWithCollection searches for cards and includes collection ownership information.
+// If collectionOnly is true, only returns cards that are in the collection.
+func (c *CardFacade) SearchCardsWithCollection(ctx context.Context, query string, setCodes []string, limit int, collectionOnly bool) ([]*CardWithOwned, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if query == "" {
+		return []*CardWithOwned{}, nil
+	}
+
+	// First, search for cards
+	var cards []*models.SetCard
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		cards, err = c.services.Storage.SetCardRepo().SearchCards(ctx, query, setCodes, limit)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to search cards: %v", err)}
+	}
+
+	if len(cards) == 0 {
+		return []*CardWithOwned{}, nil
+	}
+
+	// Extract arena IDs to look up in collection
+	cardIDs := make([]int, 0, len(cards))
+	for _, card := range cards {
+		// Parse ArenaID as int
+		var arenaID int
+		if _, err := fmt.Sscanf(card.ArenaID, "%d", &arenaID); err == nil && arenaID > 0 {
+			cardIDs = append(cardIDs, arenaID)
+		}
+	}
+
+	// Get collection quantities
+	var collectionMap map[int]int
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		collectionMap, err = c.services.Storage.CollectionRepo().GetCards(ctx, cardIDs)
+		return err
+	})
+	if err != nil {
+		// Log but don't fail - collection data is optional
+		log.Printf("Warning: Failed to get collection quantities: %v", err)
+		collectionMap = make(map[int]int)
+	}
+
+	// Build results with ownership info
+	results := make([]*CardWithOwned, 0, len(cards))
+	for _, card := range cards {
+		var arenaID int
+		if _, err := fmt.Sscanf(card.ArenaID, "%d", &arenaID); err != nil {
+			continue
+		}
+
+		owned := collectionMap[arenaID]
+
+		// If collectionOnly, skip cards not in collection
+		if collectionOnly && owned == 0 {
+			continue
+		}
+
+		results = append(results, &CardWithOwned{
+			SetCard:       card,
+			OwnedQuantity: owned,
+		})
+	}
+
+	return results, nil
+}
+
+// GetCollectionQuantities returns the collection quantities for a list of arena IDs.
+func (c *CardFacade) GetCollectionQuantities(ctx context.Context, arenaIDs []int) (map[int]int, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if len(arenaIDs) == 0 {
+		return make(map[int]int), nil
+	}
+
+	var collectionMap map[int]int
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		collectionMap, err = c.services.Storage.CollectionRepo().GetCards(ctx, arenaIDs)
+		return err
+	})
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get collection quantities: %v", err)}
+	}
+
+	return collectionMap, nil
+}
+
 // GetAllSetInfo returns information about all known sets.
 // Falls back to set_cards table if sets table is empty.
 func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {

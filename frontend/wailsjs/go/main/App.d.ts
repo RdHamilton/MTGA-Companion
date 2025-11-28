@@ -201,6 +201,10 @@ export function ResetDraftPerformanceMetrics():Promise<void>;
 
 export function ResumeReplay():Promise<void>;
 
+export function SearchCards(arg1:string,arg2:Array<string>,arg3:number):Promise<Array<models.SetCard>>;
+
+export function SearchCardsWithCollection(arg1:string,arg2:Array<string>,arg3:number,arg4:boolean):Promise<Array<gui.CardWithOwned>>;
+
 export function SetDaemonPort(arg1:number):Promise<void>;
 
 export function StartPoller():Promise<void>;

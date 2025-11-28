@@ -54,6 +54,21 @@ type DeckListItem struct {
 	Tags          []string   `json:"tags,omitempty"`
 }
 
+// normalizeDeckSource validates and normalizes deck source values.
+// It accepts 'manual' as alias for 'constructed', and 'import' as alias for 'imported'.
+func normalizeDeckSource(source string) (string, error) {
+	switch source {
+	case "manual":
+		return "constructed", nil
+	case "import":
+		return "imported", nil
+	case "draft", "constructed", "imported":
+		return source, nil
+	default:
+		return "", fmt.Errorf("invalid deck source: %s", source)
+	}
+}
+
 // CreateDeck creates a new deck.
 func (d *DeckFacade) CreateDeck(ctx context.Context, name, format, source string, draftEventID *string) (*models.Deck, error) {
 	if d.services.Storage == nil {
@@ -67,12 +82,18 @@ func (d *DeckFacade) CreateDeck(ctx context.Context, name, format, source string
 	}
 
 	now := time.Now()
+	// Validate and normalize source
+	normalizedSource, err := normalizeDeckSource(source)
+	if err != nil {
+		return nil, &AppError{Message: err.Error()}
+	}
+
 	deck := &models.Deck{
 		ID:            uuid.New().String(),
 		AccountID:     accountID,
 		Name:          name,
 		Format:        format,
-		Source:        source,
+		Source:        normalizedSource,
 		DraftEventID:  draftEventID,
 		MatchesPlayed: 0,
 		MatchesWon:    0,
@@ -82,17 +103,12 @@ func (d *DeckFacade) CreateDeck(ctx context.Context, name, format, source string
 		ModifiedAt:    now,
 	}
 
-	// Validate source
-	if source != "draft" && source != "constructed" && source != "imported" {
-		return nil, &AppError{Message: fmt.Sprintf("Invalid deck source: %s", source)}
-	}
-
 	// If source is draft, draft_event_id is required
-	if source == "draft" && draftEventID == nil {
+	if normalizedSource == "draft" && draftEventID == nil {
 		return nil, &AppError{Message: "Draft event ID required for draft decks"}
 	}
 
-	err := storage.RetryOnBusy(func() error {
+	err = storage.RetryOnBusy(func() error {
 		return d.services.Storage.DeckRepo().Create(ctx, deck)
 	})
 	if err != nil {

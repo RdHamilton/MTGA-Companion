@@ -469,6 +469,19 @@ func (a *App) GetCardByArenaID(arenaID string) (*models.SetCard, error) {
 	return a.cardFacade.GetCardByArenaID(a.ctx, arenaID)
 }
 
+// SearchCards searches for cards by name across all cached sets.
+// If setCodes is empty or nil, searches all sets.
+// Returns up to limit results (default 50, max 200).
+func (a *App) SearchCards(query string, setCodes []string, limit int) ([]*models.SetCard, error) {
+	return a.cardFacade.SearchCards(a.ctx, query, setCodes, limit)
+}
+
+// SearchCardsWithCollection searches for cards and includes collection ownership information.
+// If collectionOnly is true, only returns cards that are in the collection.
+func (a *App) SearchCardsWithCollection(query string, setCodes []string, limit int, collectionOnly bool) ([]*gui.CardWithOwned, error) {
+	return a.cardFacade.SearchCardsWithCollection(a.ctx, query, setCodes, limit, collectionOnly)
+}
+
 // GetCardRatings returns all card ratings for a set and draft format with tier information
 func (a *App) GetCardRatings(setCode string, draftFormat string) ([]gui.CardRatingWithTier, error) {
 	return a.cardFacade.GetCardRatings(a.ctx, setCode, draftFormat)

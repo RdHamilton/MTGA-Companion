@@ -382,6 +382,14 @@ export function ResumeReplay() {
   return window['go']['main']['App']['ResumeReplay']();
 }
 
+export function SearchCards(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SearchCards'](arg1, arg2, arg3);
+}
+
+export function SearchCardsWithCollection(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SearchCardsWithCollection'](arg1, arg2, arg3, arg4);
+}
+
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
 }

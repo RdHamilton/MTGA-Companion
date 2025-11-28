@@ -1161,18 +1161,20 @@ func (s *Service) GetRecentCollectionChanges(ctx context.Context, limit int) ([]
 }
 
 // GetSetCompletion calculates set completion percentages.
-// Requires card metadata to be populated in the cards table.
+// Uses set_cards table (populated by Scryfall fetcher) and joins with sets table for names.
 func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion, error) {
-	// Query all sets and their card counts by rarity from the cards table
+	// Query all sets and their card counts by rarity from the set_cards table
+	// Join with sets table to get the set name
 	query := `
 		SELECT
-			set_code,
-			set_name,
-			rarity,
+			sc.set_code,
+			COALESCE(st.name, UPPER(sc.set_code)) as set_name,
+			sc.rarity,
 			COUNT(*) as total
-		FROM cards
-		GROUP BY set_code, set_name, rarity
-		ORDER BY set_code, rarity
+		FROM set_cards sc
+		LEFT JOIN sets st ON sc.set_code = st.code
+		GROUP BY sc.set_code, sc.rarity
+		ORDER BY sc.set_code, sc.rarity
 	`
 
 	conn := s.db.Conn()
@@ -1222,10 +1224,10 @@ func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion
 		return nil, fmt.Errorf("failed to get collection: %w", err)
 	}
 
-	// Query card arena IDs with their sets and rarities
+	// Query card arena IDs with their sets and rarities from set_cards
 	cardQuery := `
 		SELECT arena_id, set_code, rarity
-		FROM cards
+		FROM set_cards
 	`
 
 	cardRows, err := conn.QueryContext(ctx, cardQuery)
@@ -1239,11 +1241,17 @@ func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion
 
 	// Count owned cards per set and rarity
 	for cardRows.Next() {
-		var arenaID int
+		var arenaIDStr string
 		var setCode, rarity string
 
-		if err := cardRows.Scan(&arenaID, &setCode, &rarity); err != nil {
+		if err := cardRows.Scan(&arenaIDStr, &setCode, &rarity); err != nil {
 			return nil, fmt.Errorf("failed to scan card: %w", err)
+		}
+
+		// Convert arena_id from string to int for collection lookup
+		var arenaID int
+		if _, err := fmt.Sscanf(arenaIDStr, "%d", &arenaID); err != nil {
+			continue // Skip cards with invalid arena IDs
 		}
 
 		// Check if player owns this card
