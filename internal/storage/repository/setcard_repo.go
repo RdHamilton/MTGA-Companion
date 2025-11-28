@@ -8,6 +8,21 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
+// MetadataStaleness contains counts of fresh/stale metadata.
+type MetadataStaleness struct {
+	Total     int
+	Fresh     int
+	Stale     int
+	VeryStale int
+}
+
+// StaleCard represents a card with stale metadata.
+type StaleCard struct {
+	ArenaID     string
+	SetCode     string
+	LastUpdated string
+}
+
 // SetCardRepository provides methods for managing set cards cached from Scryfall.
 type SetCardRepository interface {
 	// SaveCard saves a set card to the database.
@@ -34,6 +49,13 @@ type SetCardRepository interface {
 
 	// DeleteSet removes all cards for a given set (for cache invalidation).
 	DeleteSet(ctx context.Context, setCode string) error
+
+	// Staleness tracking methods
+	// GetMetadataStaleness returns counts of fresh, stale, and very stale cards.
+	GetMetadataStaleness(ctx context.Context, staleAgeSeconds, veryStaleAgeSeconds int) (*MetadataStaleness, error)
+
+	// GetStaleCards returns cards with stale metadata, ordered by oldest first.
+	GetStaleCards(ctx context.Context, staleAgeSeconds, limit int) ([]*StaleCard, error)
 }
 
 type setCardRepository struct {
@@ -439,4 +461,59 @@ func joinStrings(strs []string, sep string) string {
 		result += sep + strs[i]
 	}
 	return result
+}
+
+// GetMetadataStaleness returns counts of fresh, stale, and very stale cards.
+func (r *setCardRepository) GetMetadataStaleness(ctx context.Context, staleAgeSeconds, veryStaleAgeSeconds int) (*MetadataStaleness, error) {
+	query := `
+		SELECT
+			COUNT(*) as total,
+			COALESCE(SUM(CASE WHEN fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as fresh,
+			COALESCE(SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds')
+				AND fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as stale,
+			COALESCE(SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as very_stale
+		FROM set_cards
+		WHERE fetched_at IS NOT NULL
+	`
+
+	var result MetadataStaleness
+	err := r.db.QueryRowContext(ctx, query,
+		staleAgeSeconds,
+		staleAgeSeconds,
+		veryStaleAgeSeconds,
+		veryStaleAgeSeconds,
+	).Scan(&result.Total, &result.Fresh, &result.Stale, &result.VeryStale)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetStaleCards returns cards with stale metadata, ordered by oldest first.
+func (r *setCardRepository) GetStaleCards(ctx context.Context, staleAgeSeconds, limit int) ([]*StaleCard, error) {
+	query := `
+		SELECT arena_id, set_code, fetched_at
+		FROM set_cards
+		WHERE fetched_at < datetime('now', '-' || ? || ' seconds')
+		ORDER BY fetched_at ASC
+		LIMIT ?
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, staleAgeSeconds, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var cards []*StaleCard
+	for rows.Next() {
+		card := &StaleCard{}
+		if err := rows.Scan(&card.ArenaID, &card.SetCode, &card.LastUpdated); err != nil {
+			continue
+		}
+		cards = append(cards, card)
+	}
+
+	return cards, rows.Err()
 }

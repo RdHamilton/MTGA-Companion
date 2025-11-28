@@ -169,29 +169,21 @@ func (st *StalenessTracker) getMetadataStaleness(ctx context.Context) (*metadata
 	staleAge := DataTypeMetadata.StaleAge()
 	veryStaleAge := staleAge * 2
 
-	query := `
-		SELECT
-			COUNT(*) as total,
-			SUM(CASE WHEN last_updated >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as fresh,
-			SUM(CASE WHEN last_updated < datetime('now', '-' || ? || ' seconds')
-				AND last_updated >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as stale,
-			SUM(CASE WHEN last_updated < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as very_stale
-		FROM cards
-		WHERE last_updated IS NOT NULL
-	`
-
-	var result metadataStaleness
-	err := st.storage.GetDB().QueryRowContext(ctx, query,
-		int(staleAge.Seconds()),
+	repoResult, err := st.storage.SetCardRepo().GetMetadataStaleness(
+		ctx,
 		int(staleAge.Seconds()),
 		int(veryStaleAge.Seconds()),
-		int(veryStaleAge.Seconds()),
-	).Scan(&result.Total, &result.Fresh, &result.Stale, &result.VeryStale)
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return &metadataStaleness{
+		Total:     repoResult.Total,
+		Fresh:     repoResult.Fresh,
+		Stale:     repoResult.Stale,
+		VeryStale: repoResult.VeryStale,
+	}, nil
 }
 
 type statisticsStaleness struct {
@@ -205,85 +197,43 @@ type statisticsStaleness struct {
 func (st *StalenessTracker) getStatisticsStaleness(ctx context.Context) (*statisticsStaleness, error) {
 	staleAge := DataTypeStatistics.StaleAge()
 
-	// Count total, fresh, and stale statistics
-	countQuery := `
-		SELECT
-			COUNT(DISTINCT arena_id || '-' || expansion || '-' || format) as total,
-			SUM(CASE WHEN last_updated >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as fresh,
-			SUM(CASE WHEN last_updated < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as stale
-		FROM draft_card_ratings
-		WHERE last_updated IS NOT NULL
-	`
-
-	var result statisticsStaleness
-	err := st.storage.GetDB().QueryRowContext(ctx, countQuery,
-		int(staleAge.Seconds()),
-		int(staleAge.Seconds()),
-	).Scan(&result.Total, &result.Fresh, &result.Stale)
+	repoResult, err := st.storage.DraftRatingsRepo().GetStatisticsStaleness(ctx, int(staleAge.Seconds()))
 	if err != nil {
 		return nil, err
 	}
 
-	// Get stale sets
-	setsQuery := `
-		SELECT DISTINCT expansion
-		FROM draft_card_ratings
-		WHERE last_updated < datetime('now', '-' || ? || ' seconds')
-		ORDER BY expansion
-	`
-
-	rows, err := st.storage.GetDB().QueryContext(ctx, setsQuery, int(staleAge.Seconds()))
-	if err != nil {
-		return &result, nil // Return counts even if sets query fails
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var setCode string
-		if err := rows.Scan(&setCode); err != nil {
-			continue
-		}
-		result.StaleSets = append(result.StaleSets, setCode)
-	}
-
-	return &result, nil
+	return &statisticsStaleness{
+		Total:     repoResult.Total,
+		Fresh:     repoResult.Fresh,
+		Stale:     repoResult.Stale,
+		StaleSets: repoResult.StaleSets,
+	}, nil
 }
 
 // GetStaleCards returns cards with stale metadata.
 func (st *StalenessTracker) GetStaleCards(ctx context.Context, limit int) ([]RefreshItem, error) {
 	staleAge := DataTypeMetadata.StaleAge()
 
-	query := `
-		SELECT arena_id, set, last_updated
-		FROM cards
-		WHERE last_updated < datetime('now', '-' || ? || ' seconds')
-		ORDER BY last_updated ASC
-		LIMIT ?
-	`
-
-	rows, err := st.storage.GetDB().QueryContext(ctx, query, int(staleAge.Seconds()), limit)
+	staleCards, err := st.storage.SetCardRepo().GetStaleCards(ctx, int(staleAge.Seconds()), limit)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
 	var items []RefreshItem
-	for rows.Next() {
-		var arenaID int
-		var setCode string
-		var lastUpdatedStr string
+	for _, card := range staleCards {
+		lastUpdated, _ := time.Parse("2006-01-02 15:04:05", card.LastUpdated)
+		staleDays := int(time.Since(lastUpdated).Hours() / 24)
 
-		if err := rows.Scan(&arenaID, &setCode, &lastUpdatedStr); err != nil {
+		// Convert ArenaID string to int
+		var arenaID int
+		if _, err := fmt.Sscanf(card.ArenaID, "%d", &arenaID); err != nil {
 			continue
 		}
-
-		lastUpdated, _ := time.Parse("2006-01-02 15:04:05", lastUpdatedStr)
-		staleDays := int(time.Since(lastUpdated).Hours() / 24)
 
 		items = append(items, RefreshItem{
 			Type:        DataTypeMetadata,
 			ArenaID:     arenaID,
-			SetCode:     setCode,
+			SetCode:     card.SetCode,
 			LastUpdated: lastUpdated,
 			StaleDays:   staleDays,
 		})
@@ -296,35 +246,20 @@ func (st *StalenessTracker) GetStaleCards(ctx context.Context, limit int) ([]Ref
 func (st *StalenessTracker) GetStaleStats(ctx context.Context) ([]RefreshItem, error) {
 	staleAge := DataTypeStatistics.StaleAge()
 
-	query := `
-		SELECT DISTINCT expansion, format, MAX(last_updated) as last_updated
-		FROM draft_card_ratings
-		WHERE last_updated < datetime('now', '-' || ? || ' seconds')
-		GROUP BY expansion, format
-		ORDER BY last_updated ASC
-	`
-
-	rows, err := st.storage.GetDB().QueryContext(ctx, query, int(staleAge.Seconds()))
+	staleStats, err := st.storage.DraftRatingsRepo().GetStaleStats(ctx, int(staleAge.Seconds()))
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
 	var items []RefreshItem
-	for rows.Next() {
-		var setCode, format, lastUpdatedStr string
-
-		if err := rows.Scan(&setCode, &format, &lastUpdatedStr); err != nil {
-			continue
-		}
-
-		lastUpdated, _ := time.Parse("2006-01-02 15:04:05", lastUpdatedStr)
+	for _, stat := range staleStats {
+		lastUpdated, _ := time.Parse("2006-01-02 15:04:05", stat.LastUpdated)
 		staleDays := int(time.Since(lastUpdated).Hours() / 24)
 
 		items = append(items, RefreshItem{
 			Type:        DataTypeStatistics,
-			SetCode:     setCode,
-			Format:      format,
+			SetCode:     stat.SetCode,
+			Format:      stat.Format,
 			LastUpdated: lastUpdated,
 			StaleDays:   staleDays,
 		})
