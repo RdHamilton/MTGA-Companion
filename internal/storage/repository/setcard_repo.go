@@ -468,10 +468,10 @@ func (r *setCardRepository) GetMetadataStaleness(ctx context.Context, staleAgeSe
 	query := `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as fresh,
-			SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds')
-				AND fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as stale,
-			SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as very_stale
+			COALESCE(SUM(CASE WHEN fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as fresh,
+			COALESCE(SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds')
+				AND fetched_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as stale,
+			COALESCE(SUM(CASE WHEN fetched_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as very_stale
 		FROM set_cards
 		WHERE fetched_at IS NOT NULL
 	`

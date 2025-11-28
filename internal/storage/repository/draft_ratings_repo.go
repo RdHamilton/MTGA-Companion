@@ -718,8 +718,8 @@ func (r *draftRatingsRepository) GetStatisticsStaleness(ctx context.Context, sta
 	countQuery := `
 		SELECT
 			COUNT(DISTINCT arena_id || '-' || set_code || '-' || draft_format) as total,
-			SUM(CASE WHEN cached_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as fresh,
-			SUM(CASE WHEN cached_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as stale
+			COALESCE(SUM(CASE WHEN cached_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as fresh,
+			COALESCE(SUM(CASE WHEN cached_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END), 0) as stale
 		FROM draft_card_ratings
 		WHERE cached_at IS NOT NULL
 	`
