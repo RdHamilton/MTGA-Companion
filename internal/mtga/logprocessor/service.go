@@ -1015,9 +1015,6 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 	existingSession, err := s.storage.DraftRepo().GetSession(ctx, data.SessionID)
 	if err == nil && existingSession != nil {
 		// Session exists - only update picks/packs, don't recreate session
-		if s.replayMode {
-			log.Printf("DEBUG: [REPLAY] Session %s already exists, only adding new picks/packs", data.SessionID)
-		}
 
 		// Store new picks (INSERT OR REPLACE will handle duplicates)
 		for _, pick := range data.Picks {
@@ -1076,9 +1073,6 @@ func (s *Service) storeDraftSession(ctx context.Context, data *draftSessionData)
 	}
 
 	// Session doesn't exist yet, create it
-	if s.replayMode {
-		log.Printf("DEBUG: [REPLAY] Session %s doesn't exist, creating new session", data.SessionID)
-	}
 
 	// Create draft session (first time or non-replay mode)
 	session := &models.DraftSession{
