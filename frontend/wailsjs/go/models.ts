@@ -525,6 +525,8 @@ export namespace gui {
 	    modifiedAt: time.Time;
 	    lastPlayed?: time.Time;
 	    tags?: string[];
+	    currentStreak: number;
+	    averageDuration?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new DeckListItem(source);
@@ -543,6 +545,8 @@ export namespace gui {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], time.Time);
 	        this.lastPlayed = this.convertValues(source["lastPlayed"], time.Time);
 	        this.tags = source["tags"];
+	        this.currentStreak = source["currentStreak"];
+	        this.averageDuration = source["averageDuration"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
