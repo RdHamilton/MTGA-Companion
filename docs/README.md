@@ -16,6 +16,7 @@ This directory contains all technical documentation for the MTGA-Companion proje
 - **[CLAUDE_CODE_GUIDE.md](CLAUDE_CODE_GUIDE.md)** - Guidelines for AI-assisted development (Claude Code)
 
 ### Feature Documentation
+- **[COLLECTION.md](COLLECTION.md)** - Collection tracking, set completion, and missing cards analysis
 - **[DECK_BUILDER.md](DECK_BUILDER.md)** - Comprehensive deck builder documentation with API reference
 
 ### Technical Specifications
@@ -50,6 +51,7 @@ The following documentation files are kept in the project root for GitHub integr
 - **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md), [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md)
 - **MTGA Integration**: [MTGA_LOG_EVENTS.md](MTGA_LOG_EVENTS.md), [MTGA_LOG_RESEARCH.md](MTGA_LOG_RESEARCH.md)
 - **Daemon**: [DAEMON_API.md](DAEMON_API.md), [DAEMON_INSTALLATION.md](DAEMON_INSTALLATION.md)
+- **Collection**: [COLLECTION.md](COLLECTION.md)
 - **Deck Builder**: [DECK_BUILDER.md](DECK_BUILDER.md)
 - **UI Development**: [DRAFT_UI_REORGANIZATION.md](DRAFT_UI_REORGANIZATION.md), [GUI_DESIGN_TEMPLATE.md](GUI_DESIGN_TEMPLATE.md)
 - **Testing**: [TESTING.md](TESTING.md)
