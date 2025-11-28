@@ -3,7 +3,6 @@ package recommendations
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -117,19 +116,14 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 	}
 
 	// Analyze deck composition
-	log.Printf("Debug: About to analyze deck with %d cards", len(deck.Cards))
 	analysis := analyzeDeck(deck)
-	log.Printf("Debug: Deck analysis complete, primary colors: %v", analysis.PrimaryColors)
 
 	// Get candidate cards
 	var candidates []*cards.Card
 	if filters.OnlyDraftPool && len(filters.DraftPool) > 0 {
 		// For draft decks, only consider draft pool
-		log.Printf("Debug: Fetching %d cards from draft pool", len(filters.DraftPool))
-
 		// Try SetCardRepo first (faster, has cards from log parsing)
 		if e.setCardRepo != nil {
-			log.Printf("Debug: Using SetCardRepo to fetch draft pool cards")
 			candidates = make([]*cards.Card, 0, len(filters.DraftPool))
 			for _, arenaID := range filters.DraftPool {
 				setCard, err := e.setCardRepo.GetCardByArenaID(ctx, fmt.Sprintf("%d", arenaID))
@@ -137,25 +131,19 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 					// Convert setCard to cards.Card
 					card := convertSetCardToCardsCard(setCard)
 					candidates = append(candidates, card)
-				} else {
-					log.Printf("Debug: Card %d not found in SetCardRepo: %v", arenaID, err)
 				}
 			}
-			log.Printf("Debug: Got %d cards from SetCardRepo", len(candidates))
 		} else {
 			// Fallback to CardService (Scryfall API)
-			log.Printf("Debug: SetCardRepo not available, using CardService")
 			cardMap, err := e.cardService.GetCards(filters.DraftPool)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get draft cards: %w", err)
 			}
-			log.Printf("Debug: Got %d cards from cardService", len(cardMap))
 			candidates = make([]*cards.Card, 0, len(cardMap))
 			for _, card := range cardMap {
 				candidates = append(candidates, card)
 			}
 		}
-		log.Printf("Debug: Built %d candidate cards", len(candidates))
 	} else {
 		// For constructed, we'd query all available cards
 		// For now, return empty since we need card database integration
@@ -164,33 +152,25 @@ func (e *RuleBasedEngine) GetRecommendations(ctx context.Context, deck *DeckCont
 
 	// Score each candidate
 	recommendations := make([]*CardRecommendation, 0)
-	log.Printf("Debug: Starting to score %d candidates", len(candidates))
-	for i, card := range candidates {
-		log.Printf("Debug: Scoring card %d/%d: %s (arena_id=%d)", i+1, len(candidates), card.Name, card.ArenaID)
-
+	for _, card := range candidates {
 		// Skip cards already in deck
 		if isCardInDeck(card.ArenaID, deck.Cards) {
-			log.Printf("Debug: Card %s already in deck, skipping", card.Name)
 			continue
 		}
 
 		// Apply filters
 		if !matchesFilters(card, filters) {
-			log.Printf("Debug: Card %s doesn't match filters, skipping", card.Name)
 			continue
 		}
 
 		// Calculate recommendation score
-		log.Printf("Debug: Calling scoreCard for %s", card.Name)
 		rec := e.scoreCard(ctx, card, deck, analysis)
-		log.Printf("Debug: Card %s scored: %.2f", card.Name, rec.Score)
 
 		// Apply score threshold
 		if rec.Score >= filters.MinScore {
 			recommendations = append(recommendations, rec)
 		}
 	}
-	log.Printf("Debug: Scored all candidates, got %d recommendations", len(recommendations))
 
 	// Sort by score (descending)
 	sortRecommendations(recommendations)
@@ -226,33 +206,22 @@ func (e *RuleBasedEngine) RecordAcceptance(ctx context.Context, deckID string, c
 
 // scoreCard calculates recommendation score for a card.
 func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) *CardRecommendation {
-	log.Printf("Debug: scoreCard starting for %s", card.Name)
 	factors := &ScoreFactors{}
 
 	// Factor 1: Color fit (30% weight)
-	log.Printf("Debug: Calculating color fit")
 	factors.ColorFit = scoreColorFit(card, analysis)
-	log.Printf("Debug: Color fit = %.2f", factors.ColorFit)
 
 	// Factor 2: Mana curve (25% weight)
-	log.Printf("Debug: Calculating mana curve")
 	factors.ManaCurve = scoreManaCurve(card, analysis)
-	log.Printf("Debug: Mana curve = %.2f", factors.ManaCurve)
 
 	// Factor 3: Card quality from ratings (25% weight)
-	log.Printf("Debug: Calculating card quality")
 	factors.Quality = e.scoreCardQuality(ctx, card, deck)
-	log.Printf("Debug: Quality = %.2f", factors.Quality)
 
 	// Factor 4: Synergy (15% weight)
-	log.Printf("Debug: Calculating synergy")
 	factors.Synergy = scoreSynergy(card, deck, analysis)
-	log.Printf("Debug: Synergy = %.2f", factors.Synergy)
 
 	// Factor 5: Playability (5% weight)
-	log.Printf("Debug: Calculating playability")
 	factors.Playable = scorePlayability(card, deck)
-	log.Printf("Debug: Playability = %.2f", factors.Playable)
 
 	// Calculate weighted overall score
 	score := (factors.ColorFit * 0.30) +
@@ -466,31 +435,22 @@ func scoreManaCurve(card *cards.Card, analysis *DeckAnalysis) float64 {
 // scoreCardQuality calculates intrinsic card quality based on ratings.
 // scoreCardQuality scores a card based on 17Lands ratings data.
 func (e *RuleBasedEngine) scoreCardQuality(ctx context.Context, card *cards.Card, deck *DeckContext) float64 {
-	log.Printf("Debug: scoreCardQuality called for card=%s, ratingsRepo=%v, setCode=%s, format=%s",
-		card.Name, e.ratingsRepo != nil, deck.SetCode, deck.DraftFormat)
-
 	// If we don't have set/format info, fall back to rarity-based scoring
 	if e.ratingsRepo == nil || deck.SetCode == "" || deck.DraftFormat == "" {
-		log.Printf("Debug: Using fallback scoring (ratingsRepo nil=%v, setCode empty=%v, format empty=%v)",
-			e.ratingsRepo == nil, deck.SetCode == "", deck.DraftFormat == "")
 		return e.fallbackQualityScore(card)
 	}
 
 	// Fetch 17Lands ratings for this card
 	arenaIDStr := fmt.Sprintf("%d", card.ArenaID)
-	log.Printf("Debug: Fetching ratings for arena_id=%s, set=%s, format=%s", arenaIDStr, deck.SetCode, deck.DraftFormat)
 	rating, err := e.ratingsRepo.GetCardRatingByArenaID(ctx, deck.SetCode, deck.DraftFormat, arenaIDStr)
 	if err != nil {
 		// Error fetching ratings, use fallback
-		log.Printf("Debug: Failed to get ratings: %v, using fallback", err)
 		return e.fallbackQualityScore(card)
 	}
 	if rating == nil {
 		// No ratings available in database, use fallback
-		log.Printf("Debug: No ratings found for %s (arena_id=%s), using fallback", card.Name, arenaIDStr)
 		return e.fallbackQualityScore(card)
 	}
-	log.Printf("Debug: Got ratings for %s: GIHWR=%.3f, OHWR=%.3f", card.Name, rating.GIHWR, rating.OHWR)
 
 	// Calculate quality score from 17Lands metrics
 	// Weight: 50% GIHWR, 30% OHWR, 10% ATA, 10% ALSA
