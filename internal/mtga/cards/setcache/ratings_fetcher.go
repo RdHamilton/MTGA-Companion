@@ -19,15 +19,6 @@ type RatingsFetcher struct {
 	ratingsRepo          repository.DraftRatingsRepository
 }
 
-// NewRatingsFetcher creates a new ratings fetcher.
-// Deprecated: Use NewRatingsFetcherWithDatasets instead.
-func NewRatingsFetcher(client *seventeenlands.Client, ratingsRepo repository.DraftRatingsRepository) *RatingsFetcher {
-	return &RatingsFetcher{
-		seventeenLandsClient: client,
-		ratingsRepo:          ratingsRepo,
-	}
-}
-
 // NewRatingsFetcherWithDatasets creates a new ratings fetcher with dataset service support.
 func NewRatingsFetcherWithDatasets(datasetService *datasets.Service, ratingsRepo repository.DraftRatingsRepository) *RatingsFetcher {
 	return &RatingsFetcher{
