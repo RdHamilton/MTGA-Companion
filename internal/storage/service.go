@@ -28,23 +28,53 @@ type Service struct {
 	draft            repository.DraftRepository
 	setCard          repository.SetCardRepository
 	draftRatings     repository.DraftRatingsRepository
+	inventory        repository.InventoryRepository
 	currentAccountID int // Current active account ID
 }
 
-// NewService creates a new storage service.
+// ServiceConfig holds optional repository overrides for dependency injection.
+// All fields are optional - if nil, the default implementation will be created.
+type ServiceConfig struct {
+	Matches      repository.MatchRepository
+	Stats        repository.StatsRepository
+	Decks        repository.DeckRepository
+	Collection   repository.CollectionRepository
+	Accounts     repository.AccountRepository
+	RankHistory  repository.RankHistoryRepository
+	Quests       *QuestRepository
+	Draft        repository.DraftRepository
+	SetCard      repository.SetCardRepository
+	DraftRatings repository.DraftRatingsRepository
+	Inventory    repository.InventoryRepository
+}
+
+// NewService creates a new storage service with default repository implementations.
 func NewService(db *DB) *Service {
+	return NewServiceWithConfig(db, nil)
+}
+
+// NewServiceWithConfig creates a new storage service with optional repository overrides.
+// Any nil repository in the config will use the default implementation.
+func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
+	if cfg == nil {
+		cfg = &ServiceConfig{}
+	}
+
+	conn := db.Conn()
+
 	svc := &Service{
 		db:           db,
-		matches:      repository.NewMatchRepository(db.Conn()),
-		stats:        repository.NewStatsRepository(db.Conn()),
-		decks:        repository.NewDeckRepository(db.Conn()),
-		collection:   repository.NewCollectionRepository(db.Conn()),
-		accounts:     repository.NewAccountRepository(db.Conn()),
-		rankHistory:  repository.NewRankHistoryRepository(db.Conn()),
-		quests:       NewQuestRepository(db.Conn()),
-		draft:        repository.NewDraftRepository(db.Conn()),
-		setCard:      repository.NewSetCardRepository(db.Conn()),
-		draftRatings: repository.NewDraftRatingsRepository(db.Conn()),
+		matches:      orDefault(cfg.Matches, func() repository.MatchRepository { return repository.NewMatchRepository(conn) }),
+		stats:        orDefault(cfg.Stats, func() repository.StatsRepository { return repository.NewStatsRepository(conn) }),
+		decks:        orDefault(cfg.Decks, func() repository.DeckRepository { return repository.NewDeckRepository(conn) }),
+		collection:   orDefault(cfg.Collection, func() repository.CollectionRepository { return repository.NewCollectionRepository(conn) }),
+		accounts:     orDefault(cfg.Accounts, func() repository.AccountRepository { return repository.NewAccountRepository(conn) }),
+		rankHistory:  orDefault(cfg.RankHistory, func() repository.RankHistoryRepository { return repository.NewRankHistoryRepository(conn) }),
+		quests:       orDefaultQuest(cfg.Quests, func() *QuestRepository { return NewQuestRepository(conn) }),
+		draft:        orDefault(cfg.Draft, func() repository.DraftRepository { return repository.NewDraftRepository(conn) }),
+		setCard:      orDefault(cfg.SetCard, func() repository.SetCardRepository { return repository.NewSetCardRepository(conn) }),
+		draftRatings: orDefault(cfg.DraftRatings, func() repository.DraftRatingsRepository { return repository.NewDraftRatingsRepository(conn) }),
+		inventory:    orDefault(cfg.Inventory, func() repository.InventoryRepository { return repository.NewInventoryRepository(conn) }),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -73,6 +103,23 @@ func NewService(db *DB) *Service {
 	}
 
 	return svc
+}
+
+// orDefault returns the provided value if not nil, otherwise calls the factory function.
+func orDefault[T any](val T, factory func() T) T {
+	// Use reflection to check if val is nil (works for interface types)
+	if any(val) == nil {
+		return factory()
+	}
+	return val
+}
+
+// orDefaultQuest is a specialized version for *QuestRepository since it's a concrete type.
+func orDefaultQuest(val *QuestRepository, factory func() *QuestRepository) *QuestRepository {
+	if val == nil {
+		return factory()
+	}
+	return val
 }
 
 // GetDB returns the underlying database connection.
@@ -1919,6 +1966,11 @@ func (s *Service) CollectionRepo() repository.CollectionRepository {
 // DeckRepo returns the deck repository.
 func (s *Service) DeckRepo() repository.DeckRepository {
 	return s.decks
+}
+
+// InventoryRepo returns the inventory repository.
+func (s *Service) InventoryRepo() repository.InventoryRepository {
+	return s.inventory
 }
 
 // ClearAllMatches deletes all matches and games for the current account.
