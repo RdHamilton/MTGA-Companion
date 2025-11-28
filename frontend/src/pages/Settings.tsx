@@ -18,17 +18,31 @@ import {
   useSeventeenLands,
   useDataManagement,
   useDeveloperMode,
+  useSettings,
 } from '../hooks';
 import './Settings.css';
 
 const Settings = () => {
   // Local UI state
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(30);
-  const [showNotifications, setShowNotifications] = useState(true);
-  const [theme, setTheme] = useState('dark');
   const [saved, setSaved] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+
+  // Settings from backend
+  const {
+    autoRefresh,
+    refreshInterval,
+    showNotifications,
+    theme,
+    isLoading: isLoadingSettings,
+    isSaving,
+    error: settingsError,
+    setAutoRefresh,
+    setRefreshInterval,
+    setShowNotifications,
+    setTheme,
+    saveSettings,
+    resetToDefaults,
+  } = useSettings();
 
   // Developer mode hook
   const {
@@ -102,17 +116,16 @@ const Settings = () => {
   const isConnected = connectionStatus.status === 'connected';
 
   // Local handlers
-  const handleSave = () => {
-    // TODO: Implement backend settings save
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    const success = await saveSettings();
+    if (success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
   };
 
   const handleReset = () => {
-    setAutoRefresh(false);
-    setRefreshInterval(30);
-    setShowNotifications(true);
-    setTheme('dark');
+    resetToDefaults();
   };
 
   // Build accordion items
@@ -319,12 +332,25 @@ const Settings = () => {
           allowMultiple={true}
         />
 
+        {/* Settings Error */}
+        {settingsError && (
+          <div className="settings-error">Error: {settingsError}</div>
+        )}
+
         {/* Action Buttons */}
         <div className="settings-actions">
-          <button className="primary-button" onClick={handleSave}>
-            Save Settings
+          <button
+            className="primary-button"
+            onClick={handleSave}
+            disabled={isSaving || isLoadingSettings}
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
           </button>
-          <button className="secondary-button" onClick={handleReset}>
+          <button
+            className="secondary-button"
+            onClick={handleReset}
+            disabled={isSaving || isLoadingSettings}
+          >
             Reset to Defaults
           </button>
         </div>

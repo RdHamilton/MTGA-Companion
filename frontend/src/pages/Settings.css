@@ -16,6 +16,15 @@
   animation: slideInDown 0.3s ease-out;
 }
 
+.settings-error {
+  background-color: rgba(255, 100, 100, 0.15);
+  border: 1px solid #ff6464;
+  color: #ff6464;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
 @keyframes slideInDown {
   from {
     opacity: 0;

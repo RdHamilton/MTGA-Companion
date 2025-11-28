@@ -29,6 +29,8 @@ vi.mock('../../wailsjs/go/main/App', () => ({
   ImportFromFile: vi.fn(),
   ImportLogFile: vi.fn(),
   ClearAllData: vi.fn(),
+  GetAllSettings: vi.fn(),
+  SaveAllSettings: vi.fn(),
 }));
 
 vi.mock('../../wailsjs/runtime/runtime', () => ({
@@ -68,6 +70,8 @@ import {
   ImportFromFile,
   ImportLogFile,
   ClearAllData,
+  GetAllSettings,
+  SaveAllSettings,
 } from '../../wailsjs/go/main/App';
 import { showToast } from '../components/ToastContainer';
 
@@ -80,6 +84,16 @@ const defaultConnectionStatus = {
   port: 9999,
 };
 
+// Default mock settings
+const defaultSettings = {
+  autoRefresh: false,
+  refreshInterval: 30,
+  showNotifications: true,
+  theme: 'dark',
+  daemonPort: 9999,
+  daemonMode: 'standalone',
+};
+
 describe('Settings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,6 +102,8 @@ describe('Settings', () => {
 
     // Default mock implementations
     (GetConnectionStatus as ReturnType<typeof vi.fn>).mockResolvedValue(defaultConnectionStatus);
+    (GetAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue(defaultSettings);
+    (SaveAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   });
 
   describe('rendering', () => {
@@ -912,18 +928,35 @@ describe('Settings', () => {
   });
 
   describe('Save/Reset actions', () => {
-    it('shows success notification when save is clicked', () => {
+    it('shows success notification when save is clicked', async () => {
       render(<Settings />);
 
+      // Wait for settings to load from backend first (button is disabled while loading)
       const saveButton = screen.getByRole('button', { name: /save settings/i });
+      await waitFor(() => {
+        expect(saveButton).not.toBeDisabled();
+      });
+
+      // Click save button
       fireEvent.click(saveButton);
 
-      // Notification should appear
-      expect(screen.getByText('Settings saved successfully!')).toBeInTheDocument();
+      // Wait for the async save to complete and notification to appear
+      await waitFor(() => {
+        expect(screen.getByText('Settings saved successfully!')).toBeInTheDocument();
+      });
+
+      // Verify SaveAllSettings was called
+      expect(SaveAllSettings).toHaveBeenCalled();
     });
 
-    it('resets preferences when reset is clicked', () => {
+    it('resets preferences when reset is clicked', async () => {
       render(<Settings />);
+
+      // Wait for settings to load from backend (button becomes enabled)
+      const resetButton = screen.getByRole('button', { name: /reset to defaults/i });
+      await waitFor(() => {
+        expect(resetButton).not.toBeDisabled();
+      });
 
       // Expand preferences section
       const preferencesHeader = screen.getByRole('button', { name: /preferences/i });
@@ -936,11 +969,12 @@ describe('Settings', () => {
       expect(autoRefreshCheckbox).toBeChecked();
 
       // Reset
-      const resetButton = screen.getByRole('button', { name: /reset to defaults/i });
       fireEvent.click(resetButton);
 
-      // Auto-refresh should be unchecked
-      expect(autoRefreshCheckbox).not.toBeChecked();
+      // Auto-refresh should be unchecked after reset
+      await waitFor(() => {
+        expect(autoRefreshCheckbox).not.toBeChecked();
+      });
     });
   });
 

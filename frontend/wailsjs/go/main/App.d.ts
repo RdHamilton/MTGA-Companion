@@ -45,13 +45,13 @@ export function FetchSetRatings(arg1:string,arg2:string):Promise<void>;
 
 export function FixDraftSessionStatuses():Promise<number>;
 
-export function GetAchievementUpdatedEvent():Promise<gui.AchievementUpdatedEvent>;
-
 export function GetActiveDraftSessions():Promise<Array<models.DraftSession>>;
 
 export function GetActiveQuests():Promise<Array<models.Quest>>;
 
 export function GetAllSetInfo():Promise<Array<gui.SetInfo>>;
+
+export function GetAllSettings():Promise<gui.AppSettings>;
 
 export function GetArchetypeCards(arg1:string,arg2:string,arg3:string):Promise<insights.ArchetypeCards>;
 
@@ -159,6 +159,8 @@ export function GetSetCompletion():Promise<Array<models.SetCompletion>>;
 
 export function GetSetInfo(arg1:string):Promise<gui.SetInfo>;
 
+export function GetSetting(arg1:string):Promise<any>;
+
 export function GetStats(arg1:models.StatsFilter):Promise<models.Statistics>;
 
 export function GetStatsByDeck(arg1:models.StatsFilter):Promise<Record<string, models.Statistics>>;
@@ -201,11 +203,15 @@ export function ResetDraftPerformanceMetrics():Promise<void>;
 
 export function ResumeReplay():Promise<void>;
 
+export function SaveAllSettings(arg1:gui.AppSettings):Promise<void>;
+
 export function SearchCards(arg1:string,arg2:Array<string>,arg3:number):Promise<Array<models.SetCard>>;
 
 export function SearchCardsWithCollection(arg1:string,arg2:Array<string>,arg3:number,arg4:boolean):Promise<Array<gui.CardWithOwned>>;
 
 export function SetDaemonPort(arg1:number):Promise<void>;
+
+export function SetSetting(arg1:string,arg2:any):Promise<void>;
 
 export function StartPoller():Promise<void>;
 
