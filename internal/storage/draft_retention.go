@@ -2,9 +2,10 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // RetentionPolicy defines rules for keeping historical draft statistics.
@@ -68,52 +69,33 @@ type CleanupResult struct {
 
 // GetAllSnapshots returns all draft card rating snapshots for analysis.
 func (s *Service) GetAllSnapshots(ctx context.Context) ([]*SnapshotInfo, error) {
-	query := `
-		SELECT
-			id, arena_id, expansion, format, colors,
-			start_date, end_date, cached_at, last_updated
-		FROM draft_card_ratings
-		ORDER BY cached_at DESC
-	`
-
-	rows, err := s.db.Conn().QueryContext(ctx, query)
+	repoSnapshots, err := s.draftRatings.GetAllSnapshots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query snapshots: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var snapshots []*SnapshotInfo
-	for rows.Next() {
-		snapshot := &SnapshotInfo{}
-		var cachedAtStr, lastUpdatedStr string
-
-		err := rows.Scan(
-			&snapshot.ID,
-			&snapshot.ArenaID,
-			&snapshot.Expansion,
-			&snapshot.Format,
-			&snapshot.Colors,
-			&snapshot.StartDate,
-			&snapshot.EndDate,
-			&cachedAtStr,
-			&lastUpdatedStr,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan snapshot: %w", err)
-		}
-
-		// Parse timestamps
-		snapshot.CachedAt, _ = time.Parse("2006-01-02 15:04:05", cachedAtStr)
-		snapshot.LastUpdated, _ = time.Parse("2006-01-02 15:04:05", lastUpdatedStr)
-
-		snapshots = append(snapshots, snapshot)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating snapshots: %w", err)
+	// Convert repository snapshots to storage snapshots
+	snapshots := make([]*SnapshotInfo, len(repoSnapshots))
+	for i, rs := range repoSnapshots {
+		snapshots[i] = convertRepoSnapshotToStorage(rs)
 	}
 
 	return snapshots, nil
+}
+
+// convertRepoSnapshotToStorage converts a repository SnapshotInfo to storage SnapshotInfo.
+func convertRepoSnapshotToStorage(rs *repository.SnapshotInfo) *SnapshotInfo {
+	return &SnapshotInfo{
+		ID:          rs.ID,
+		ArenaID:     rs.ArenaID,
+		Expansion:   rs.Expansion,
+		Format:      rs.Format,
+		Colors:      rs.Colors,
+		StartDate:   rs.StartDate,
+		EndDate:     rs.EndDate,
+		CachedAt:    rs.CachedAt,
+		LastUpdated: rs.LastUpdated,
+	}
 }
 
 // CleanupOldSnapshots removes old snapshots according to the retention policy.
@@ -253,84 +235,20 @@ func (s *Service) shouldKeepSnapshot(snapshot *SnapshotInfo, groupSnapshots []*S
 
 // deleteSnapshotsBatch deletes a batch of snapshots by ID.
 func (s *Service) deleteSnapshotsBatch(ctx context.Context, ids []int) error {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	// Build IN clause
-	query := `DELETE FROM draft_card_ratings WHERE id IN (`
-	args := make([]interface{}, len(ids))
-	for i, id := range ids {
-		if i > 0 {
-			query += ","
-		}
-		query += "?"
-		args[i] = id
-	}
-	query += ")"
-
-	_, err := s.db.Conn().ExecContext(ctx, query, args...)
-	return err
+	return s.draftRatings.DeleteSnapshotsBatch(ctx, ids)
 }
 
 // GetSnapshotCount returns the number of snapshots for each expansion.
 func (s *Service) GetSnapshotCount(ctx context.Context) (map[string]int, error) {
-	query := `
-		SELECT expansion, COUNT(*) as count
-		FROM draft_card_ratings
-		GROUP BY expansion
-		ORDER BY count DESC
-	`
-
-	rows, err := s.db.Conn().QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query snapshot counts: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	counts := make(map[string]int)
-	for rows.Next() {
-		var expansion string
-		var count int
-		if err := rows.Scan(&expansion, &count); err != nil {
-			return nil, fmt.Errorf("failed to scan count: %w", err)
-		}
-		counts[expansion] = count
-	}
-
-	return counts, rows.Err()
+	return s.draftRatings.GetSnapshotCountByExpansion(ctx)
 }
 
 // GetOldestSnapshot returns the oldest snapshot date.
 func (s *Service) GetOldestSnapshot(ctx context.Context) (time.Time, error) {
-	query := `SELECT MIN(cached_at) FROM draft_card_ratings`
-
-	var cachedAtStr sql.NullString
-	err := s.db.Conn().QueryRowContext(ctx, query).Scan(&cachedAtStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	if !cachedAtStr.Valid {
-		return time.Time{}, nil
-	}
-
-	return time.Parse("2006-01-02 15:04:05", cachedAtStr.String)
+	return s.draftRatings.GetOldestSnapshotDate(ctx)
 }
 
 // GetNewestSnapshot returns the newest snapshot date.
 func (s *Service) GetNewestSnapshot(ctx context.Context) (time.Time, error) {
-	query := `SELECT MAX(cached_at) FROM draft_card_ratings`
-
-	var cachedAtStr sql.NullString
-	err := s.db.Conn().QueryRowContext(ctx, query).Scan(&cachedAtStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	if !cachedAtStr.Valid {
-		return time.Time{}, nil
-	}
-
-	return time.Parse("2006-01-02 15:04:05", cachedAtStr.String)
+	return s.draftRatings.GetNewestSnapshotDate(ctx)
 }
