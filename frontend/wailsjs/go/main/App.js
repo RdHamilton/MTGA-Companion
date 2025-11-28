@@ -70,10 +70,6 @@ export function FixDraftSessionStatuses() {
   return window['go']['main']['App']['FixDraftSessionStatuses']();
 }
 
-export function GetAchievementUpdatedEvent() {
-  return window['go']['main']['App']['GetAchievementUpdatedEvent']();
-}
-
 export function GetActiveDraftSessions() {
   return window['go']['main']['App']['GetActiveDraftSessions']();
 }
@@ -84,6 +80,10 @@ export function GetActiveQuests() {
 
 export function GetAllSetInfo() {
   return window['go']['main']['App']['GetAllSetInfo']();
+}
+
+export function GetAllSettings() {
+  return window['go']['main']['App']['GetAllSettings']();
 }
 
 export function GetArchetypeCards(arg1, arg2, arg3) {
@@ -298,6 +298,10 @@ export function GetSetInfo(arg1) {
   return window['go']['main']['App']['GetSetInfo'](arg1);
 }
 
+export function GetSetting(arg1) {
+  return window['go']['main']['App']['GetSetting'](arg1);
+}
+
 export function GetStats(arg1) {
   return window['go']['main']['App']['GetStats'](arg1);
 }
@@ -382,6 +386,10 @@ export function ResumeReplay() {
   return window['go']['main']['App']['ResumeReplay']();
 }
 
+export function SaveAllSettings(arg1) {
+  return window['go']['main']['App']['SaveAllSettings'](arg1);
+}
+
 export function SearchCards(arg1, arg2, arg3) {
   return window['go']['main']['App']['SearchCards'](arg1, arg2, arg3);
 }
@@ -392,6 +400,10 @@ export function SearchCardsWithCollection(arg1, arg2, arg3, arg4) {
 
 export function SetDaemonPort(arg1) {
   return window['go']['main']['App']['SetDaemonPort'](arg1);
+}
+
+export function SetSetting(arg1, arg2) {
+  return window['go']['main']['App']['SetSetting'](arg1, arg2);
 }
 
 export function StartPoller() {

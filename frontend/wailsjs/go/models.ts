@@ -33,16 +33,26 @@ export namespace grading {
 
 export namespace gui {
 	
-	export class AchievementUpdatedEvent {
-	    count: number;
+	export class AppSettings {
+	    autoRefresh: boolean;
+	    refreshInterval: number;
+	    showNotifications: boolean;
+	    theme: string;
+	    daemonPort: number;
+	    daemonMode: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AchievementUpdatedEvent(source);
+	        return new AppSettings(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.count = source["count"];
+	        this.autoRefresh = source["autoRefresh"];
+	        this.refreshInterval = source["refreshInterval"];
+	        this.showNotifications = source["showNotifications"];
+	        this.theme = source["theme"];
+	        this.daemonPort = source["daemonPort"];
+	        this.daemonMode = source["daemonMode"];
 	    }
 	}
 	export class CardRatingWithTier {
