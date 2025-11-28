@@ -43,6 +43,26 @@ type DraftRatingsRepository interface {
 
 	// Lookup methods
 	GetSetCodeByArenaID(ctx context.Context, arenaID string) (string, error)
+
+	// Staleness tracking methods
+	GetStatisticsStaleness(ctx context.Context, staleAgeSeconds int) (*StatisticsStaleness, error)
+	GetStaleSets(ctx context.Context, staleAgeSeconds int) ([]string, error)
+	GetStaleStats(ctx context.Context, staleAgeSeconds int) ([]*StaleStatItem, error)
+}
+
+// StatisticsStaleness contains counts of fresh/stale statistics.
+type StatisticsStaleness struct {
+	Total     int
+	Fresh     int
+	Stale     int
+	StaleSets []string
+}
+
+// StaleStatItem represents a set with stale statistics.
+type StaleStatItem struct {
+	SetCode     string
+	Format      string
+	LastUpdated string
 }
 
 // SnapshotInfo contains information about a draft statistics snapshot.
@@ -691,4 +711,91 @@ func (r *draftRatingsRepository) GetSetCodeByArenaID(ctx context.Context, arenaI
 		return "", err
 	}
 	return setCode, nil
+}
+
+// GetStatisticsStaleness returns counts of fresh and stale draft statistics.
+func (r *draftRatingsRepository) GetStatisticsStaleness(ctx context.Context, staleAgeSeconds int) (*StatisticsStaleness, error) {
+	countQuery := `
+		SELECT
+			COUNT(DISTINCT arena_id || '-' || set_code || '-' || draft_format) as total,
+			SUM(CASE WHEN cached_at >= datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as fresh,
+			SUM(CASE WHEN cached_at < datetime('now', '-' || ? || ' seconds') THEN 1 ELSE 0 END) as stale
+		FROM draft_card_ratings
+		WHERE cached_at IS NOT NULL
+	`
+
+	result := &StatisticsStaleness{
+		StaleSets: []string{},
+	}
+	err := r.db.QueryRowContext(ctx, countQuery, staleAgeSeconds, staleAgeSeconds).Scan(
+		&result.Total, &result.Fresh, &result.Stale,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get stale sets
+	staleSets, err := r.GetStaleSets(ctx, staleAgeSeconds)
+	if err != nil {
+		// Return counts even if sets query fails
+		return result, nil
+	}
+	result.StaleSets = staleSets
+
+	return result, nil
+}
+
+// GetStaleSets returns distinct set codes with stale statistics.
+func (r *draftRatingsRepository) GetStaleSets(ctx context.Context, staleAgeSeconds int) ([]string, error) {
+	query := `
+		SELECT DISTINCT set_code
+		FROM draft_card_ratings
+		WHERE cached_at < datetime('now', '-' || ? || ' seconds')
+		ORDER BY set_code
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, staleAgeSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sets []string
+	for rows.Next() {
+		var setCode string
+		if err := rows.Scan(&setCode); err != nil {
+			continue
+		}
+		sets = append(sets, setCode)
+	}
+
+	return sets, rows.Err()
+}
+
+// GetStaleStats returns sets/formats with stale statistics, ordered by oldest first.
+func (r *draftRatingsRepository) GetStaleStats(ctx context.Context, staleAgeSeconds int) ([]*StaleStatItem, error) {
+	query := `
+		SELECT DISTINCT set_code, draft_format, MAX(cached_at) as last_updated
+		FROM draft_card_ratings
+		WHERE cached_at < datetime('now', '-' || ? || ' seconds')
+		GROUP BY set_code, draft_format
+		ORDER BY last_updated ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, staleAgeSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []*StaleStatItem
+	for rows.Next() {
+		item := &StaleStatItem{}
+		if err := rows.Scan(&item.SetCode, &item.Format, &item.LastUpdated); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
 }
