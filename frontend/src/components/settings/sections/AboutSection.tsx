@@ -23,7 +23,7 @@ export function AboutSection({
             onClick={onVersionClick}
             title="Click 5 times to toggle developer mode"
           >
-            1.0.0
+            1.3.1
           </span>
         </div>
         <div className="about-item">

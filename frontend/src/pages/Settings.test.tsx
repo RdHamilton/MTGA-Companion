@@ -793,7 +793,7 @@ describe('Settings', () => {
       fireEvent.click(aboutHeader);
 
       expect(screen.getByText('Version:')).toBeInTheDocument();
-      expect(screen.getByText('1.0.0')).toBeInTheDocument();
+      expect(screen.getByText('1.3.1')).toBeInTheDocument();
     });
 
     it('renders build information', () => {
@@ -870,7 +870,7 @@ describe('Settings', () => {
       fireEvent.click(aboutHeader);
 
       // Click version 5 times quickly (within 3 second timeout)
-      const versionElement = screen.getByText('1.0.0');
+      const versionElement = screen.getByText('1.3.1');
       for (let i = 0; i < 5; i++) {
         fireEvent.click(versionElement);
       }

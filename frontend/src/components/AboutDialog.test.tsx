@@ -78,7 +78,7 @@ describe('AboutDialog', () => {
     it('should render version number', () => {
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
 
-      expect(screen.getByText(/Version 1\.0\.0/)).toBeInTheDocument();
+      expect(screen.getByText(/Version 1\.3\.1/)).toBeInTheDocument();
     });
   });
 
@@ -229,7 +229,7 @@ describe('AboutDialog', () => {
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
 
       const currentYear = new Date().getFullYear();
-      const copyrightRegex = new RegExp(`2024-${currentYear} MTGA Companion Contributors`);
+      const copyrightRegex = new RegExp(`2024-${currentYear} Ray Hamilton Engineering LLC`);
       expect(screen.getByText(copyrightRegex)).toBeInTheDocument();
     });
 
@@ -339,7 +339,7 @@ describe('AboutDialog', () => {
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
 
       const currentYear = new Date().getFullYear();
-      const copyrightText = screen.getByText(/MTGA Companion Contributors/);
+      const copyrightText = screen.getByText(/Ray Hamilton Engineering LLC/);
       expect(copyrightText.textContent).toContain(currentYear.toString());
     });
 
