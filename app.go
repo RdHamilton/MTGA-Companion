@@ -17,6 +17,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/prediction"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+	"github.com/ramonehamilton/MTGA-Companion/internal/version"
 )
 
 // App struct - Refactored to use Facade pattern (v1.2 Phase 1)
@@ -713,4 +714,13 @@ func (a *App) GetSetting(key string) (interface{}, error) {
 // SetSetting saves a single setting.
 func (a *App) SetSetting(key string, value interface{}) error {
 	return a.settingsFacade.SetSetting(a.ctx, key, value)
+}
+
+// ========================================
+// Version Methods
+// ========================================
+
+// GetAppVersion returns the current application version.
+func (a *App) GetAppVersion() string {
+	return version.GetVersion()
 }

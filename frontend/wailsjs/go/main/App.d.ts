@@ -53,6 +53,8 @@ export function GetAllSetInfo():Promise<Array<gui.SetInfo>>;
 
 export function GetAllSettings():Promise<gui.AppSettings>;
 
+export function GetAppVersion():Promise<string>;
+
 export function GetArchetypeCards(arg1:string,arg2:string,arg3:string):Promise<insights.ArchetypeCards>;
 
 export function GetCardByArenaID(arg1:string):Promise<models.SetCard>;

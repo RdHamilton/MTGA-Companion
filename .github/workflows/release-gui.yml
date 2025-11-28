@@ -40,8 +40,18 @@ jobs:
     - name: Install Wails CLI
       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+    - name: Get version from tag
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Build Windows Application
-      run: wails build -platform windows/amd64 -clean
+      run: wails build -platform windows/amd64 -clean -ldflags "-X github.com/ramonehamilton/MTGA-Companion/internal/version.Version=${{ steps.version.outputs.VERSION }}"
 
     - name: Create distribution archive
       run: |
@@ -81,8 +91,17 @@ jobs:
     - name: Install Wails CLI
       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+    - name: Get version from tag
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Build macOS Application (Universal Binary)
-      run: wails build -platform darwin/universal -clean
+      run: wails build -platform darwin/universal -clean -ldflags "-X github.com/ramonehamilton/MTGA-Companion/internal/version.Version=${{ steps.version.outputs.VERSION }}"
 
     - name: Create distribution archive
       run: |
@@ -127,8 +146,17 @@ jobs:
     - name: Install Wails CLI
       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+    - name: Get version from tag
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Build Linux Application
-      run: wails build -platform linux/amd64 -clean
+      run: wails build -platform linux/amd64 -clean -ldflags "-X github.com/ramonehamilton/MTGA-Companion/internal/version.Version=${{ steps.version.outputs.VERSION }}"
 
     - name: Create distribution archive
       run: |

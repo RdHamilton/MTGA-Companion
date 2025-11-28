@@ -1,8 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AboutDialog from './AboutDialog';
 
+// Mock the Wails App module
+vi.mock('../../wailsjs/go/main/App', () => ({
+  GetAppVersion: vi.fn(),
+}));
+
+import { GetAppVersion } from '../../wailsjs/go/main/App';
+
 describe('AboutDialog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (GetAppVersion as ReturnType<typeof vi.fn>).mockResolvedValue('v1.3.1');
+  });
   describe('Visibility', () => {
     it('should render when isOpen is true', () => {
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
@@ -75,10 +86,28 @@ describe('AboutDialog', () => {
       expect(appName.tagName).toBe('H3');
     });
 
-    it('should render version number', () => {
+    it('should render version number from backend', async () => {
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
 
-      expect(screen.getByText(/Version 1\.3\.1/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Version v1\.3\.1/)).toBeInTheDocument();
+      });
+      expect(GetAppVersion).toHaveBeenCalled();
+    });
+
+    it('should show loading state initially', () => {
+      render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
+
+      expect(screen.getByText(/Version Loading.../)).toBeInTheDocument();
+    });
+
+    it('should show Unknown when version fetch fails', async () => {
+      (GetAppVersion as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Failed'));
+      render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Version Unknown/)).toBeInTheDocument();
+      });
     });
   });
 
