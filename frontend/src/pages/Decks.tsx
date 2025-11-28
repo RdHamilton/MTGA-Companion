@@ -98,6 +98,25 @@ export default function Decks() {
     return new Date(String(date)).toLocaleDateString();
   };
 
+  const formatStreak = (streak: number) => {
+    if (streak === 0) return null;
+    if (streak > 0) {
+      return { text: `${streak}W`, className: 'win-streak', icon: '🔥' };
+    }
+    return { text: `${Math.abs(streak)}L`, className: 'loss-streak', icon: '❄️' };
+  };
+
+  const formatDuration = (seconds: number | undefined) => {
+    if (!seconds) return null;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      return `~${minutes}m avg`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `~${hours}h ${mins}m avg`;
+  };
+
   if (loading) {
     return (
       <div className="decks-page loading-state">
@@ -166,6 +185,21 @@ export default function Decks() {
                     <span className="deck-date">Modified: {formatDate(deck.modifiedAt)}</span>
                   )}
                 </div>
+                {deck.matchesPlayed > 0 && (
+                  <div className="deck-stats-row">
+                    <span className="deck-win-rate">
+                      {Math.round(deck.matchWinRate * 100)}% WR ({deck.matchesPlayed} matches)
+                    </span>
+                    {formatStreak(deck.currentStreak) && (
+                      <span className={`deck-streak ${formatStreak(deck.currentStreak)?.className}`}>
+                        {formatStreak(deck.currentStreak)?.icon} {formatStreak(deck.currentStreak)?.text}
+                      </span>
+                    )}
+                    {formatDuration(deck.averageDuration) && (
+                      <span className="deck-duration">{formatDuration(deck.averageDuration)}</span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="deck-card-footer">
                 <button

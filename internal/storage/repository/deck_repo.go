@@ -510,7 +510,92 @@ func (r *deckRepository) GetPerformance(ctx context.Context, deckID string) (*mo
 		perf.GameWinRate = float64(perf.GamesWon) / float64(perf.GamesPlayed)
 	}
 
-	// TODO: Implement streak calculation and average duration from matches table
+	// Calculate streaks and average duration from matches table
+	streakQuery := `
+		SELECT result, duration_seconds
+		FROM matches
+		WHERE deck_id = ?
+		ORDER BY timestamp DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, streakQuery, deckID)
+	if err != nil {
+		// Don't fail the whole request if streak query fails, just return without streak data
+		return perf, nil
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var (
+		results           []string
+		longestWinStreak  int
+		longestLossStreak int
+		totalDuration     int64
+		durationCount     int
+	)
+
+	for rows.Next() {
+		var result string
+		var duration *int
+		if err := rows.Scan(&result, &duration); err != nil {
+			continue
+		}
+		results = append(results, result)
+		if duration != nil && *duration > 0 {
+			totalDuration += int64(*duration)
+			durationCount++
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return perf, nil
+	}
+
+	// Calculate current streak (from most recent matches)
+	if len(results) > 0 {
+		firstResult := results[0]
+		currentStreak := 0
+		for _, result := range results {
+			if result == firstResult {
+				if firstResult == "win" {
+					currentStreak++
+				} else {
+					currentStreak--
+				}
+			} else {
+				break
+			}
+		}
+		perf.CurrentWinStreak = currentStreak
+	}
+
+	// Calculate longest streaks by iterating through all matches (oldest to newest)
+	winStreak := 0
+	lossStreak := 0
+	for i := len(results) - 1; i >= 0; i-- {
+		if results[i] == "win" {
+			winStreak++
+			lossStreak = 0
+			if winStreak > longestWinStreak {
+				longestWinStreak = winStreak
+			}
+		} else {
+			lossStreak++
+			winStreak = 0
+			if lossStreak > longestLossStreak {
+				longestLossStreak = lossStreak
+			}
+		}
+	}
+	perf.LongestWinStreak = longestWinStreak
+	perf.LongestLossStreak = longestLossStreak
+
+	// Calculate average duration
+	if durationCount > 0 {
+		avgDuration := float64(totalDuration) / float64(durationCount)
+		perf.AverageDuration = &avgDuration
+	}
 
 	return perf, nil
 }

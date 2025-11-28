@@ -41,17 +41,19 @@ type DeckWithCards struct {
 
 // DeckListItem represents a summary of a deck for list views.
 type DeckListItem struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Format        string     `json:"format"`
-	Source        string     `json:"source"`
-	ColorIdentity *string    `json:"colorIdentity"`
-	CardCount     int        `json:"cardCount"`
-	MatchesPlayed int        `json:"matchesPlayed"`
-	MatchWinRate  float64    `json:"matchWinRate"`
-	ModifiedAt    time.Time  `json:"modifiedAt"`
-	LastPlayed    *time.Time `json:"lastPlayed,omitempty"`
-	Tags          []string   `json:"tags,omitempty"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Format          string     `json:"format"`
+	Source          string     `json:"source"`
+	ColorIdentity   *string    `json:"colorIdentity"`
+	CardCount       int        `json:"cardCount"`
+	MatchesPlayed   int        `json:"matchesPlayed"`
+	MatchWinRate    float64    `json:"matchWinRate"`
+	ModifiedAt      time.Time  `json:"modifiedAt"`
+	LastPlayed      *time.Time `json:"lastPlayed,omitempty"`
+	Tags            []string   `json:"tags,omitempty"`
+	CurrentStreak   int        `json:"currentStreak"`   // Positive for wins, negative for losses
+	AverageDuration *float64   `json:"averageDuration"` // Average match duration in seconds
 }
 
 // normalizeDeckSource validates and normalizes deck source values.
@@ -230,18 +232,29 @@ func (d *DeckFacade) ListDecks(ctx context.Context) ([]*DeckListItem, error) {
 			winRate = float64(deck.MatchesWon) / float64(deck.MatchesPlayed)
 		}
 
+		// Get performance data for streak and duration
+		var currentStreak int
+		var avgDuration *float64
+		perf, perfErr := d.services.Storage.DeckRepo().GetPerformance(ctx, deck.ID)
+		if perfErr == nil && perf != nil {
+			currentStreak = perf.CurrentWinStreak
+			avgDuration = perf.AverageDuration
+		}
+
 		items = append(items, &DeckListItem{
-			ID:            deck.ID,
-			Name:          deck.Name,
-			Format:        deck.Format,
-			Source:        deck.Source,
-			ColorIdentity: deck.ColorIdentity,
-			CardCount:     cardCount,
-			MatchesPlayed: deck.MatchesPlayed,
-			MatchWinRate:  winRate,
-			ModifiedAt:    deck.ModifiedAt,
-			LastPlayed:    deck.LastPlayed,
-			Tags:          tagNames,
+			ID:              deck.ID,
+			Name:            deck.Name,
+			Format:          deck.Format,
+			Source:          deck.Source,
+			ColorIdentity:   deck.ColorIdentity,
+			CardCount:       cardCount,
+			MatchesPlayed:   deck.MatchesPlayed,
+			MatchWinRate:    winRate,
+			ModifiedAt:      deck.ModifiedAt,
+			LastPlayed:      deck.LastPlayed,
+			Tags:            tagNames,
+			CurrentStreak:   currentStreak,
+			AverageDuration: avgDuration,
 		})
 	}
 
@@ -293,17 +306,28 @@ func (d *DeckFacade) GetDecksBySource(ctx context.Context, source string) ([]*De
 			winRate = float64(deck.MatchesWon) / float64(deck.MatchesPlayed)
 		}
 
+		// Get performance data for streak and duration
+		var currentStreak int
+		var avgDuration *float64
+		perf, perfErr := d.services.Storage.DeckRepo().GetPerformance(ctx, deck.ID)
+		if perfErr == nil && perf != nil {
+			currentStreak = perf.CurrentWinStreak
+			avgDuration = perf.AverageDuration
+		}
+
 		items = append(items, &DeckListItem{
-			ID:            deck.ID,
-			Name:          deck.Name,
-			Format:        deck.Format,
-			Source:        deck.Source,
-			ColorIdentity: deck.ColorIdentity,
-			CardCount:     cardCount,
-			MatchesPlayed: deck.MatchesPlayed,
-			MatchWinRate:  winRate,
-			ModifiedAt:    deck.ModifiedAt,
-			LastPlayed:    deck.LastPlayed,
+			ID:              deck.ID,
+			Name:            deck.Name,
+			Format:          deck.Format,
+			Source:          deck.Source,
+			ColorIdentity:   deck.ColorIdentity,
+			CardCount:       cardCount,
+			MatchesPlayed:   deck.MatchesPlayed,
+			MatchWinRate:    winRate,
+			ModifiedAt:      deck.ModifiedAt,
+			LastPlayed:      deck.LastPlayed,
+			CurrentStreak:   currentStreak,
+			AverageDuration: avgDuration,
 		})
 	}
 
