@@ -932,13 +932,12 @@ describe('Settings', () => {
       render(<Settings />);
 
       // Wait for settings to load from backend first (button is disabled while loading)
+      const saveButton = screen.getByRole('button', { name: /save settings/i });
       await waitFor(() => {
-        expect(GetAllSettings).toHaveBeenCalled();
+        expect(saveButton).not.toBeDisabled();
       });
 
-      // Get save button and click it (it should be enabled now)
-      const saveButton = screen.getByRole('button', { name: /save settings/i });
-      expect(saveButton).not.toBeDisabled();
+      // Click save button
       fireEvent.click(saveButton);
 
       // Wait for the async save to complete and notification to appear
@@ -953,9 +952,10 @@ describe('Settings', () => {
     it('resets preferences when reset is clicked', async () => {
       render(<Settings />);
 
-      // Wait for settings to load from backend
+      // Wait for settings to load from backend (button becomes enabled)
+      const resetButton = screen.getByRole('button', { name: /reset to defaults/i });
       await waitFor(() => {
-        expect(GetAllSettings).toHaveBeenCalled();
+        expect(resetButton).not.toBeDisabled();
       });
 
       // Expand preferences section
@@ -969,7 +969,6 @@ describe('Settings', () => {
       expect(autoRefreshCheckbox).toBeChecked();
 
       // Reset
-      const resetButton = screen.getByRole('button', { name: /reset to defaults/i });
       fireEvent.click(resetButton);
 
       // Auto-refresh should be unchecked after reset
