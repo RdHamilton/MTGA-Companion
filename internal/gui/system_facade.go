@@ -361,16 +361,6 @@ func (s *SystemFacade) setupEventHandlers(ctx context.Context) {
 		})
 	})
 
-	// Handle achievement:updated events from daemon
-	s.services.IPCClient.On("achievement:updated", func(data map[string]interface{}) {
-		log.Printf("Received achievement:updated event from daemon: %v", data)
-		s.eventDispatcher.Dispatch(events.Event{
-			Type:    "achievement:updated",
-			Data:    data,
-			Context: ctx,
-		})
-	})
-
 	// Handle draft:updated events from daemon
 	s.services.IPCClient.On("draft:updated", func(data map[string]interface{}) {
 		log.Printf("Received draft:updated event from daemon: %v", data)
@@ -692,12 +682,6 @@ type CollectionUpdatedEvent struct {
 	CardsAdded int `json:"cardsAdded"` // Total cards added to collection
 }
 
-// AchievementUpdatedEvent is the payload for achievement:updated events.
-// Sent when achievement progress changes.
-type AchievementUpdatedEvent struct {
-	Count int `json:"count"` // Number of achievements updated
-}
-
 // DaemonErrorEvent is the payload for daemon:error events.
 // Sent when daemon encounters an error.
 type DaemonErrorEvent struct {
@@ -950,11 +934,6 @@ func (s *SystemFacade) GetDeckUpdatedEvent(ctx context.Context) (*DeckUpdatedEve
 // GetCollectionUpdatedEvent exposes CollectionUpdatedEvent type to Wails.
 func (s *SystemFacade) GetCollectionUpdatedEvent(ctx context.Context) (*CollectionUpdatedEvent, error) {
 	return &CollectionUpdatedEvent{}, nil
-}
-
-// GetAchievementUpdatedEvent exposes AchievementUpdatedEvent type to Wails.
-func (s *SystemFacade) GetAchievementUpdatedEvent(ctx context.Context) (*AchievementUpdatedEvent, error) {
-	return &AchievementUpdatedEvent{}, nil
 }
 
 // GetDaemonErrorEvent exposes DaemonErrorEvent type to Wails.

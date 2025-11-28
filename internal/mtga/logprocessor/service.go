@@ -59,7 +59,6 @@ type ProcessResult struct {
 	RanksStored          int
 	QuestsStored         int
 	QuestsCompleted      int
-	AchievementsStored   int
 	DraftsStored         int
 	DraftPicksStored     int
 	CollectionCardsAdded int // Cards added to collection
@@ -97,11 +96,6 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 	// Process graph state for progress tracking (daily wins, weekly wins, etc.)
 	// Note: We don't use this for quest COMPLETION anymore - that's handled automatically
 	if err := s.processGraphState(ctx, entries, result); err != nil {
-		result.Errors = append(result.Errors, err)
-	}
-
-	// Process achievements
-	if err := s.processAchievements(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -434,13 +428,6 @@ func (s *Service) processGraphState(ctx context.Context, entries []*logreader.Lo
 		}
 	}
 
-	return nil
-}
-
-// processAchievements parses and stores achievements from log entries.
-// NOTE: Achievement system temporarily disabled - removed from UI
-func (s *Service) processAchievements(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
-	// Achievement system removed - skip processing
 	return nil
 }
 

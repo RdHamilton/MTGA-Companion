@@ -48,12 +48,6 @@ type CollectionUpdatedEvent struct {
 	CardsAdded int `json:"cardsAdded"` // Total cards added to collection
 }
 
-// AchievementUpdatedEvent is the payload for achievement:updated events.
-// Sent when achievement progress changes.
-type AchievementUpdatedEvent struct {
-	Count int `json:"count"` // Number of achievements updated
-}
-
 // DaemonStatusEvent is the payload for daemon:status events.
 // Sent when daemon connection status changes.
 type DaemonStatusEvent struct {

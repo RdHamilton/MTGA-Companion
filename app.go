@@ -223,11 +223,6 @@ func (a *App) GetCollectionUpdatedEvent() (*gui.CollectionUpdatedEvent, error) {
 	return a.systemFacade.GetCollectionUpdatedEvent(a.ctx)
 }
 
-// GetAchievementUpdatedEvent exposes AchievementUpdatedEvent type to Wails.
-func (a *App) GetAchievementUpdatedEvent() (*gui.AchievementUpdatedEvent, error) {
-	return a.systemFacade.GetAchievementUpdatedEvent(a.ctx)
-}
-
 // GetDaemonErrorEvent exposes DaemonErrorEvent type to Wails.
 func (a *App) GetDaemonErrorEvent() (*gui.DaemonErrorEvent, error) {
 	return a.systemFacade.GetDaemonErrorEvent(a.ctx)

@@ -296,31 +296,6 @@ type DoubleRankUp struct {
 	SeasonOrdinal int       // Season when it occurred
 }
 
-// Achievement represents a player achievement/milestone in MTGA.
-type Achievement struct {
-	ID              int
-	AccountID       int // Foreign key to accounts
-	GraphID         string
-	NodeID          string
-	Status          string // "Available", "Completed", "InProgress"
-	CurrentProgress int    // Current progress toward achievement
-	MaxProgress     *int   // Nullable: max progress required (if applicable)
-	CompletedAt     *time.Time
-	FirstSeen       time.Time // When first detected
-	LastUpdated     time.Time // Last progress update
-	CreatedAt       time.Time
-}
-
-// AchievementStats represents achievement statistics.
-type AchievementStats struct {
-	TotalAchievements     int
-	CompletedAchievements int
-	InProgressCount       int
-	CompletionRate        float64
-	RecentlyCompleted     int // Completed in last 7 days
-	CloseToComplete       int // Within 90% of completion
-}
-
 // DraftSession represents a Quick Draft session parsed from MTGA logs.
 type DraftSession struct {
 	ID                   string
