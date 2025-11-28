@@ -37,6 +37,12 @@ type DraftRepository interface {
 
 	// Predictions
 	UpdateSessionPrediction(ctx context.Context, sessionID string, winRate, winRateMin, winRateMax float64, factorsJSON string, predictedAt time.Time) error
+
+	// Cleanup
+	ClearAllSessions(ctx context.Context) (sessionsDeleted, picksDeleted, packsDeleted int64, err error)
+	GetSessionCount(ctx context.Context) (int, error)
+	GetPickCount(ctx context.Context) (int, error)
+	GetPackCount(ctx context.Context) (int, error)
 }
 
 type draftRepository struct {
@@ -586,4 +592,52 @@ func (r *draftRepository) UpdateSessionPrediction(ctx context.Context, sessionID
 	`
 	_, err := r.db.ExecContext(ctx, query, winRate, winRateMin, winRateMax, factorsJSON, predictedAt, sessionID)
 	return err
+}
+
+// ClearAllSessions deletes all draft sessions, picks, and packs from the database.
+// Returns the count of each type deleted.
+func (r *draftRepository) ClearAllSessions(ctx context.Context) (sessionsDeleted, picksDeleted, packsDeleted int64, err error) {
+	// Delete picks first (foreign key relationship)
+	picksResult, err := r.db.ExecContext(ctx, `DELETE FROM draft_picks`)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	picksDeleted, _ = picksResult.RowsAffected()
+
+	// Delete packs (foreign key relationship)
+	packsResult, err := r.db.ExecContext(ctx, `DELETE FROM draft_packs`)
+	if err != nil {
+		return 0, picksDeleted, 0, err
+	}
+	packsDeleted, _ = packsResult.RowsAffected()
+
+	// Delete sessions
+	sessionsResult, err := r.db.ExecContext(ctx, `DELETE FROM draft_sessions`)
+	if err != nil {
+		return 0, picksDeleted, packsDeleted, err
+	}
+	sessionsDeleted, _ = sessionsResult.RowsAffected()
+
+	return sessionsDeleted, picksDeleted, packsDeleted, nil
+}
+
+// GetSessionCount returns the total number of draft sessions.
+func (r *draftRepository) GetSessionCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_sessions`).Scan(&count)
+	return count, err
+}
+
+// GetPickCount returns the total number of draft picks.
+func (r *draftRepository) GetPickCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_picks`).Scan(&count)
+	return count, err
+}
+
+// GetPackCount returns the total number of draft packs.
+func (r *draftRepository) GetPackCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&count)
+	return count, err
 }
