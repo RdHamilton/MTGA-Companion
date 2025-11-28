@@ -31,6 +31,7 @@ vi.mock('../../wailsjs/go/main/App', () => ({
   ClearAllData: vi.fn(),
   GetAllSettings: vi.fn(),
   SaveAllSettings: vi.fn(),
+  GetAppVersion: vi.fn(),
 }));
 
 vi.mock('../../wailsjs/runtime/runtime', () => ({
@@ -72,6 +73,7 @@ import {
   ClearAllData,
   GetAllSettings,
   SaveAllSettings,
+  GetAppVersion,
 } from '../../wailsjs/go/main/App';
 import { showToast } from '../components/ToastContainer';
 
@@ -104,6 +106,7 @@ describe('Settings', () => {
     (GetConnectionStatus as ReturnType<typeof vi.fn>).mockResolvedValue(defaultConnectionStatus);
     (GetAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue(defaultSettings);
     (SaveAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (GetAppVersion as ReturnType<typeof vi.fn>).mockResolvedValue('v1.3.1');
   });
 
   describe('rendering', () => {

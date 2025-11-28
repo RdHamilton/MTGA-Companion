@@ -86,6 +86,10 @@ export function GetAllSettings() {
   return window['go']['main']['App']['GetAllSettings']();
 }
 
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
+}
+
 export function GetArchetypeCards(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetArchetypeCards'](arg1, arg2, arg3);
 }

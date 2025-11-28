@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+import { GetAppVersion } from '../../wailsjs/go/main/App';
 import './AboutDialog.css';
 
 interface AboutDialogProps {
@@ -6,9 +8,17 @@ interface AboutDialogProps {
 }
 
 const AboutDialog = ({ isOpen, onClose }: AboutDialogProps) => {
-  if (!isOpen) return null;
+  const [version, setVersion] = useState('Loading...');
 
-  const version = '1.3.1';
+  useEffect(() => {
+    if (isOpen) {
+      GetAppVersion()
+        .then((v) => setVersion(v))
+        .catch(() => setVersion('Unknown'));
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
