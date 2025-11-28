@@ -33,6 +33,7 @@ type App struct {
 	exportFacade     *gui.ExportFacade
 	systemFacade     *gui.SystemFacade
 	collectionFacade *gui.CollectionFacade
+	settingsFacade   *gui.SettingsFacade
 
 	// Shared services used by facades
 	services *gui.Services
@@ -59,6 +60,7 @@ func NewApp() *App {
 		exportFacade:     gui.NewExportFacade(services, systemFacade.GetEventDispatcher()),
 		systemFacade:     systemFacade,
 		collectionFacade: gui.NewCollectionFacade(services),
+		settingsFacade:   gui.NewSettingsFacade(services),
 	}
 }
 
@@ -687,4 +689,28 @@ func (a *App) GetMissingCardsForDeck(deckID string) (*gui.MissingCardsForDeckRes
 // GetMissingCardsForSet returns missing cards analysis for a specific set.
 func (a *App) GetMissingCardsForSet(setCode string) (*gui.MissingCardsForSetResponse, error) {
 	return a.collectionFacade.GetMissingCardsForSet(a.ctx, setCode)
+}
+
+// ========================================
+// Settings Methods (SettingsFacade)
+// ========================================
+
+// GetAllSettings retrieves all user settings.
+func (a *App) GetAllSettings() (*gui.AppSettings, error) {
+	return a.settingsFacade.GetAllSettings(a.ctx)
+}
+
+// SaveAllSettings saves all user settings.
+func (a *App) SaveAllSettings(settings *gui.AppSettings) error {
+	return a.settingsFacade.SaveAllSettings(a.ctx, settings)
+}
+
+// GetSetting retrieves a single setting by key.
+func (a *App) GetSetting(key string) (interface{}, error) {
+	return a.settingsFacade.GetSetting(a.ctx, key)
+}
+
+// SetSetting saves a single setting.
+func (a *App) SetSetting(key string, value interface{}) error {
+	return a.settingsFacade.SetSetting(a.ctx, key, value)
 }

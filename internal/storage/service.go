@@ -29,6 +29,7 @@ type Service struct {
 	setCard          repository.SetCardRepository
 	draftRatings     repository.DraftRatingsRepository
 	inventory        repository.InventoryRepository
+	settings         repository.SettingsRepository
 	currentAccountID int // Current active account ID
 }
 
@@ -46,6 +47,7 @@ type ServiceConfig struct {
 	SetCard      repository.SetCardRepository
 	DraftRatings repository.DraftRatingsRepository
 	Inventory    repository.InventoryRepository
+	Settings     repository.SettingsRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -75,6 +77,7 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 		setCard:      orDefault(cfg.SetCard, func() repository.SetCardRepository { return repository.NewSetCardRepository(conn) }),
 		draftRatings: orDefault(cfg.DraftRatings, func() repository.DraftRatingsRepository { return repository.NewDraftRatingsRepository(conn) }),
 		inventory:    orDefault(cfg.Inventory, func() repository.InventoryRepository { return repository.NewInventoryRepository(conn) }),
+		settings:     orDefault(cfg.Settings, func() repository.SettingsRepository { return repository.NewSettingsRepository(conn) }),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -1976,6 +1979,11 @@ func (s *Service) InventoryRepo() repository.InventoryRepository {
 // RankHistoryRepo returns the rank history repository.
 func (s *Service) RankHistoryRepo() repository.RankHistoryRepository {
 	return s.rankHistory
+}
+
+// SettingsRepo returns the settings repository.
+func (s *Service) SettingsRepo() repository.SettingsRepository {
+	return s.settings
 }
 
 // ClearAllMatches deletes all matches and games for the current account.

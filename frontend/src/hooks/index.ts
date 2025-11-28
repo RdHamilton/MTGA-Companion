@@ -17,3 +17,5 @@ export { useDeveloperMode } from './useDeveloperMode';
 
 export { useSettingsAccordion } from './useSettingsAccordion';
 export type { AccordionSection, UseSettingsAccordionOptions } from './useSettingsAccordion';
+
+export { useSettings } from './useSettings';
