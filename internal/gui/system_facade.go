@@ -118,9 +118,7 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 
 	// Initialize RecommendationEngine (depends on CardService, SetCardRepo, and DraftRatingsRepo)
 	ratingsRepo := s.services.Storage.DraftRatingsRepo()
-	log.Printf("Debug: cardService=%v, setCardRepo=%v, ratingsRepo=%v", cardService, setCardRepo, ratingsRepo)
 	s.services.RecommendationEngine = recommendations.NewRuleBasedEngineWithSetRepo(cardService, setCardRepo, ratingsRepo)
-	log.Printf("Debug: RecommendationEngine initialized: %v", s.services.RecommendationEngine)
 
 	log.Println("Card services initialized successfully")
 	return nil

@@ -761,7 +761,6 @@ func (d *DraftFacade) backfillPickQualityData(ctx context.Context, sessionID, se
 		pack, hasPack := packMap[packKey]
 		if !hasPack {
 			// No pack data - mark as N/A since we can't calculate pick quality without alternatives
-			log.Printf("[DEBUG] No pack data for pick %d (P%dP%d) - marking as N/A", pick.ID, pick.PackNumber+1, pick.PickNumber+1)
 			if err := d.services.Storage.DraftRepo().UpdatePickQuality(ctx, pick.ID, "N/A", 0, 0.0, 0.0, "[]"); err != nil {
 				log.Printf("Warning: Failed to update pick quality for pick %d: %v", pick.ID, err)
 			} else {
@@ -776,14 +775,7 @@ func (d *DraftFacade) backfillPickQualityData(ctx context.Context, sessionID, se
 		var grade string
 		if err != nil || pickedRating == nil {
 			// No rating available for this card - mark as N/A
-			log.Printf("[DEBUG] No rating found for card ID %s in set %s - marking as N/A", pick.CardID, setCode)
 			grade = "N/A"
-
-			// Still try to fetch card image from Scryfall by looking up from set_cards table
-			card, err := d.services.SetFetcher.GetCardByArenaID(ctx, pick.CardID)
-			if err != nil || card == nil {
-				log.Printf("[DEBUG] No cached card found for Arena ID %s", pick.CardID)
-			}
 
 			// Save pick with N/A grade
 			if err := d.services.Storage.DraftRepo().UpdatePickQuality(ctx, pick.ID, grade, 0, 0.0, 0.0, "[]"); err != nil {
@@ -794,21 +786,14 @@ func (d *DraftFacade) backfillPickQualityData(ctx context.Context, sessionID, se
 			continue
 		}
 
-		log.Printf("[DEBUG] Found rating for card ID %s: name='%s'", pick.CardID, pickedRating.Name)
-
 		// Ensure we have Scryfall card data for images (FetchCardByName checks cache first)
 		if pickedRating.Name != "" {
-			log.Printf("[DEBUG] Attempting to fetch card: %s (ID: %s)", pickedRating.Name, pick.CardID)
 			card, err := d.services.SetFetcher.FetchCardByName(ctx, setCode, pickedRating.Name, pick.CardID)
 			if err != nil {
 				log.Printf("Warning: Failed to fetch card %s (ID: %s) by name: %v", pickedRating.Name, pick.CardID, err)
 			} else if card != nil {
-				log.Printf("✓ Fetched/cached card: %s (ID: %s)", pickedRating.Name, pick.CardID)
-			} else {
-				log.Printf("[DEBUG] FetchCardByName returned nil for %s (ID: %s)", pickedRating.Name, pick.CardID)
+				log.Printf("Fetched/cached card: %s (ID: %s)", pickedRating.Name, pick.CardID)
 			}
-		} else {
-			log.Printf("[DEBUG] Skipping fetch - card name is empty for ID %s", pick.CardID)
 		}
 
 		// Get ratings for all cards in pack to find alternatives
