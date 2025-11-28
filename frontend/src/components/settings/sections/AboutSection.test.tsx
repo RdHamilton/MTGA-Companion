@@ -18,7 +18,7 @@ describe('AboutSection', () => {
   it('displays version info', () => {
     render(<AboutSection {...defaultProps} />);
     expect(screen.getByText('Version:')).toBeInTheDocument();
-    expect(screen.getByText('1.0.0')).toBeInTheDocument();
+    expect(screen.getByText('1.3.1')).toBeInTheDocument();
   });
 
   it('displays build info', () => {
@@ -52,14 +52,14 @@ describe('AboutSection', () => {
       const onVersionClick = vi.fn();
       render(<AboutSection {...defaultProps} onVersionClick={onVersionClick} />);
 
-      fireEvent.click(screen.getByText('1.0.0'));
+      fireEvent.click(screen.getByText('1.3.1'));
 
       expect(onVersionClick).toHaveBeenCalled();
     });
 
     it('version element has clickable class', () => {
       render(<AboutSection {...defaultProps} />);
-      const versionElement = screen.getByText('1.0.0');
+      const versionElement = screen.getByText('1.3.1');
       expect(versionElement).toHaveClass('about-version-clickable');
     });
   });

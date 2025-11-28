@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-11-28
+
+### Added
+
+**Collection Tracking Feature (Complete)**
+- **Automatic Collection Tracking** - Pure log-based collection tracking from MTGA game data (#617)
+- **Collection Page UI** - Visual card browser with full card images, quantity badges, and rarity indicators (#602)
+- **Set Completion Tracking** - Track progress toward completing each MTG set with rarity breakdown (#603)
+- **Missing Cards Analysis** - Analyze missing cards for decks and sets with wildcard cost breakdown (#604)
+- **Collection Change Notifications** - Real-time notifications when collection changes are detected (#605)
+- **Card Search in Deck Builder** - Search cards with collection filter to see only owned cards (#626)
+- **Collection Component Tests** - Comprehensive test coverage for all collection UI components (#607)
+- **Collection User Documentation** - Complete user guide for collection features (#608)
+
+**Cross-Platform Compatibility**
+- **Removed .NET Daemon Dependency** - Collection tracking now works natively without the Windows-only .NET daemon (#619)
+- **Native Log-Based Tracking** - Cross-platform solution that works on Windows, macOS, and Linux
+
+### Fixed
+
+- **Decks with NULL account_id** - Fixed decks stored with NULL account_id not appearing in deck list (#618)
+- **Collection Card Images** - Fixed card images displaying as slivers instead of full images (#625)
+- **Collection Card Metadata** - Fixed all cards showing as "Ambush Viper" with broken images (#625)
+- **SET Dropdown Empty** - Fixed SET filter dropdown being empty on Collection page (#625)
+- **DFC Image Handling** - Fixed double-faced card images using correct card_faces[0].ImageURIs (#625)
+- **Card Back Placeholder** - Fixed card back placeholder URL from .jpg to .png (#625)
+
+### Changed
+
+- **Collection Architecture** - Simplified collection tracking to work without external daemon
+
+### Technical
+
+**Code Quality**
+- **Frontend Test Coverage**: 1337 tests passing
+- **All Go Tests**: Passing
+- **Linter**: 0 issues (golangci-lint)
+
+### Documentation
+
+- **COLLECTION.md** - Comprehensive collection features user guide
+- **Wiki Updates** - Updated Usage Guide with collection features
+
 ## [1.3.0] - 2025-11-25
 
 ### Added

@@ -8,7 +8,7 @@ interface AboutDialogProps {
 const AboutDialog = ({ isOpen, onClose }: AboutDialogProps) => {
   if (!isOpen) return null;
 
-  const version = '1.0.0'; // TODO: Get from build process or app config
+  const version = '1.3.1';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -101,7 +101,7 @@ const AboutDialog = ({ isOpen, onClose }: AboutDialogProps) => {
 
           <div className="about-section">
             <p className="copyright">
-              © 2024-{new Date().getFullYear()} MTGA Companion Contributors
+              © 2024-{new Date().getFullYear()} Ray Hamilton Engineering LLC
             </p>
             <p className="disclaimer">
               This application is not affiliated with or endorsed by Wizards of the Coast.
