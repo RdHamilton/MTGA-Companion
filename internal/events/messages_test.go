@@ -106,7 +106,6 @@ func TestEventMessageTypes(t *testing.T) {
 		{"DraftUpdatedEvent", DraftUpdatedEvent{Count: 1, Picks: 15}},
 		{"DeckUpdatedEvent", DeckUpdatedEvent{Count: 5}},
 		{"CollectionUpdatedEvent", CollectionUpdatedEvent{NewCards: 10, CardsAdded: 40}},
-		{"AchievementUpdatedEvent", AchievementUpdatedEvent{Count: 2}},
 		{"DaemonStatusEvent", DaemonStatusEvent{Status: "connected", Connected: true}},
 		{"DaemonConnectedEvent", DaemonConnectedEvent{Version: "1.0.0"}},
 		{"DaemonErrorEvent", DaemonErrorEvent{Error: "test error", Code: "ERR_001"}},

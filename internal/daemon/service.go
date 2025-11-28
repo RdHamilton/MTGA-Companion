@@ -298,16 +298,6 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 		})
 	}
 
-	if result.AchievementsStored > 0 {
-		log.Printf("Stored %d achievement(s)", result.AchievementsStored)
-		s.wsServer.Broadcast(Event{
-			Type: "achievement:updated",
-			Data: map[string]interface{}{
-				"count": result.AchievementsStored,
-			},
-		})
-	}
-
 	if result.DraftsStored > 0 {
 		log.Printf("Stored %d draft session(s) with %d picks", result.DraftsStored, result.DraftPicksStored)
 		s.wsServer.Broadcast(Event{
@@ -608,7 +598,6 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 			totalResult.RanksStored += result.RanksStored
 			totalResult.QuestsStored += result.QuestsStored
 			totalResult.QuestsCompleted += result.QuestsCompleted
-			totalResult.AchievementsStored += result.AchievementsStored
 			totalResult.DraftsStored += result.DraftsStored
 			totalResult.DraftPicksStored += result.DraftPicksStored
 			totalResult.Errors = append(totalResult.Errors, result.Errors...)
