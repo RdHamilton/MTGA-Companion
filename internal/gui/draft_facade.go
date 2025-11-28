@@ -1053,10 +1053,8 @@ func (d *DraftFacade) RepairDraftSession(ctx context.Context, sessionID string) 
 		if correctTotalPicks != session.TotalPicks {
 			log.Printf("[RepairDraftSession] Updating TotalPicks from %d to %d", session.TotalPicks, correctTotalPicks)
 
-			// Update session TotalPicks
-			query := `UPDATE draft_sessions SET total_picks = ? WHERE id = ?`
-			_, err := d.services.Storage.GetDB().ExecContext(ctx, query, correctTotalPicks, sessionID)
-			if err != nil {
+			// Update session TotalPicks using repository
+			if err := d.services.Storage.DraftRepo().UpdateSessionTotalPicks(ctx, sessionID, correctTotalPicks); err != nil {
 				return &AppError{Message: fmt.Sprintf("Failed to update TotalPicks: %v", err)}
 			}
 		}

@@ -33,6 +33,11 @@ func setupDraftTestDB(t *testing.T) *sql.DB {
 			color_discipline_score REAL,
 			deck_composition_score REAL,
 			strategic_score REAL,
+			predicted_win_rate REAL,
+			predicted_win_rate_min REAL,
+			predicted_win_rate_max REAL,
+			prediction_factors TEXT,
+			predicted_at TIMESTAMP,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
@@ -760,5 +765,66 @@ func TestDraftRepository_GetCompletedSessions(t *testing.T) {
 
 	if len(limited) != 1 {
 		t.Errorf("expected 1 completed session with limit, got %d", len(limited))
+	}
+}
+
+func TestDraftRepository_UpdateSessionPrediction(t *testing.T) {
+	db := setupDraftTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewDraftRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create a session first
+	session := &models.DraftSession{
+		ID:         "session-pred",
+		EventName:  "QuickDraft_FDN",
+		SetCode:    "FDN",
+		DraftType:  "quick_draft",
+		StartTime:  now,
+		Status:     "completed",
+		TotalPicks: 45,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := repo.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Update prediction
+	predictedAt := time.Now()
+	factorsJSON := `{"base_win_rate":0.55,"card_quality":0.05,"synergy":-0.02}`
+
+	err := repo.UpdateSessionPrediction(ctx, "session-pred", 0.58, 0.52, 0.64, factorsJSON, predictedAt)
+	if err != nil {
+		t.Fatalf("UpdateSessionPrediction failed: %v", err)
+	}
+
+	// Verify prediction was saved
+	retrieved, err := repo.GetSession(ctx, "session-pred")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.PredictedWinRate == nil {
+		t.Fatal("PredictedWinRate is nil after update")
+	}
+	if *retrieved.PredictedWinRate != 0.58 {
+		t.Errorf("expected PredictedWinRate 0.58, got %f", *retrieved.PredictedWinRate)
+	}
+	if *retrieved.PredictedWinRateMin != 0.52 {
+		t.Errorf("expected PredictedWinRateMin 0.52, got %f", *retrieved.PredictedWinRateMin)
+	}
+	if *retrieved.PredictedWinRateMax != 0.64 {
+		t.Errorf("expected PredictedWinRateMax 0.64, got %f", *retrieved.PredictedWinRateMax)
+	}
+	if retrieved.PredictionFactors == nil || *retrieved.PredictionFactors != factorsJSON {
+		t.Errorf("PredictionFactors mismatch")
 	}
 }

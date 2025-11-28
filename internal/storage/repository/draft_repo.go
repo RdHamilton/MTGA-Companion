@@ -35,6 +35,9 @@ type DraftRepository interface {
 	// Grades
 	UpdateSessionGrade(ctx context.Context, sessionID string, overallGrade string, overallScore int, pickQuality, colorDiscipline, deckComposition, strategic float64) error
 
+	// Predictions
+	UpdateSessionPrediction(ctx context.Context, sessionID string, winRate, winRateMin, winRateMax float64, factorsJSON string, predictedAt time.Time) error
+
 	// Cleanup
 	ClearAllSessions(ctx context.Context) (sessionsDeleted, picksDeleted, packsDeleted int64, err error)
 	GetSessionCount(ctx context.Context) (int, error)
@@ -77,7 +80,10 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 	query := `
 		SELECT id, event_name, set_code, draft_type, start_time, end_time, status, total_picks,
 			overall_grade, overall_score, pick_quality_score, color_discipline_score,
-			deck_composition_score, strategic_score, created_at, updated_at
+			deck_composition_score, strategic_score,
+			predicted_win_rate, predicted_win_rate_min, predicted_win_rate_max,
+			prediction_factors, predicted_at,
+			created_at, updated_at
 		FROM draft_sessions
 		WHERE id = ?
 	`
@@ -91,6 +97,11 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 	var colorDiscipline sql.NullFloat64
 	var deckComposition sql.NullFloat64
 	var strategic sql.NullFloat64
+	var predictedWinRate sql.NullFloat64
+	var predictedWinRateMin sql.NullFloat64
+	var predictedWinRateMax sql.NullFloat64
+	var predictionFactors sql.NullString
+	var predictedAt sql.NullTime
 
 	err := row.Scan(
 		&session.ID,
@@ -107,6 +118,11 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 		&colorDiscipline,
 		&deckComposition,
 		&strategic,
+		&predictedWinRate,
+		&predictedWinRateMin,
+		&predictedWinRateMax,
+		&predictionFactors,
+		&predictedAt,
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	)
@@ -138,6 +154,21 @@ func (r *draftRepository) GetSession(ctx context.Context, id string) (*models.Dr
 	}
 	if strategic.Valid {
 		session.StrategicScore = &strategic.Float64
+	}
+	if predictedWinRate.Valid {
+		session.PredictedWinRate = &predictedWinRate.Float64
+	}
+	if predictedWinRateMin.Valid {
+		session.PredictedWinRateMin = &predictedWinRateMin.Float64
+	}
+	if predictedWinRateMax.Valid {
+		session.PredictedWinRateMax = &predictedWinRateMax.Float64
+	}
+	if predictionFactors.Valid {
+		session.PredictionFactors = &predictionFactors.String
+	}
+	if predictedAt.Valid {
+		session.PredictedAt = &predictedAt.Time
 	}
 
 	return session, nil
@@ -544,6 +575,22 @@ func (r *draftRepository) UpdateSessionGrade(ctx context.Context, sessionID stri
 		WHERE id = ?
 	`
 	_, err := r.db.ExecContext(ctx, query, overallGrade, overallScore, pickQuality, colorDiscipline, deckComposition, strategic, time.Now(), sessionID)
+	return err
+}
+
+// UpdateSessionPrediction updates the win rate prediction fields for a draft session.
+func (r *draftRepository) UpdateSessionPrediction(ctx context.Context, sessionID string, winRate, winRateMin, winRateMax float64, factorsJSON string, predictedAt time.Time) error {
+	query := `
+		UPDATE draft_sessions
+		SET predicted_win_rate = ?,
+		    predicted_win_rate_min = ?,
+		    predicted_win_rate_max = ?,
+		    prediction_factors = ?,
+		    predicted_at = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, winRate, winRateMin, winRateMax, factorsJSON, predictedAt, sessionID)
 	return err
 }
 
