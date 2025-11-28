@@ -10,12 +10,13 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
+// Note: database/sql is still used in NewService to create repositories
+
 // Service handles win rate prediction for draft decks
 type Service struct {
 	draftRepo   repository.DraftRepository
 	ratingsRepo repository.DraftRatingsRepository
 	setCardRepo repository.SetCardRepository
-	db          *sql.DB
 }
 
 // NewService creates a new prediction service
@@ -24,7 +25,6 @@ func NewService(db *sql.DB) *Service {
 		draftRepo:   repository.NewDraftRepository(db),
 		ratingsRepo: repository.NewDraftRatingsRepository(db),
 		setCardRepo: repository.NewSetCardRepository(db),
-		db:          db,
 	}
 }
 
@@ -167,24 +167,15 @@ func (s *Service) storePrediction(sessionID string, prediction *DeckPrediction) 
 		return fmt.Errorf("failed to convert factors to JSON: %w", err)
 	}
 
-	query := `
-		UPDATE draft_sessions
-		SET predicted_win_rate = ?,
-		    predicted_win_rate_min = ?,
-		    predicted_win_rate_max = ?,
-		    prediction_factors = ?,
-		    predicted_at = ?,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`
-
-	_, err = s.db.Exec(query,
+	ctx := context.Background()
+	err = s.draftRepo.UpdateSessionPrediction(
+		ctx,
+		sessionID,
 		prediction.PredictedWinRate,
 		prediction.PredictedWinRateMin,
 		prediction.PredictedWinRateMax,
 		factorsJSON,
 		prediction.PredictedAt,
-		sessionID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update session with prediction: %w", err)
