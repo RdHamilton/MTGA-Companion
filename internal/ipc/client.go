@@ -16,8 +16,12 @@ type Event struct {
 	Timestamp time.Time              `json:"timestamp"`
 }
 
-// EventHandler is a function that handles events.
+// EventHandler is a function that handles events with untyped data.
 type EventHandler func(data map[string]interface{})
+
+// TypedEventHandler is a function that handles events with typed data.
+// The type parameter T specifies the expected event payload type.
+type TypedEventHandler[T any] func(data T)
 
 // DisconnectHandler is a function that is called when the connection is lost.
 type DisconnectHandler func()
@@ -85,6 +89,30 @@ func (c *Client) On(eventType string, handler EventHandler) {
 	defer c.handlersMu.Unlock()
 
 	c.handlers[eventType] = append(c.handlers[eventType], handler)
+}
+
+// OnTyped registers a type-safe event handler for a specific event type.
+// The handler receives decoded typed data instead of map[string]interface{}.
+// If decoding fails, an error is logged and the handler is not called.
+func OnTyped[T any](c *Client, eventType string, handler TypedEventHandler[T]) {
+	c.On(eventType, func(data map[string]interface{}) {
+		var typed T
+		if err := DecodeEventData(data, &typed); err != nil {
+			log.Printf("Failed to decode %s event: %v", eventType, err)
+			return
+		}
+		handler(typed)
+	})
+}
+
+// DecodeEventData decodes map[string]interface{} into a typed struct.
+// Uses JSON marshal/unmarshal for reliable type conversion.
+func DecodeEventData[T any](data map[string]interface{}, target *T) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bytes, target)
 }
 
 // OnDisconnect registers a handler that is called when the connection is lost.
@@ -216,7 +244,18 @@ func (c *Client) SendPing() error {
 }
 
 // Send sends a generic message to the daemon.
+// Deprecated: Use SendTyped for type-safe message sending.
 func (c *Client) Send(message map[string]interface{}) error {
+	if c.conn == nil {
+		return websocket.ErrCloseSent
+	}
+
+	return c.conn.WriteJSON(message)
+}
+
+// SendTyped sends a typed message to the daemon.
+// The message must be a struct with JSON tags.
+func (c *Client) SendTyped(message any) error {
 	if c.conn == nil {
 		return websocket.ErrCloseSent
 	}
