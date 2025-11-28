@@ -35,6 +35,7 @@ type App struct {
 	systemFacade     *gui.SystemFacade
 	collectionFacade *gui.CollectionFacade
 	settingsFacade   *gui.SettingsFacade
+	feedbackFacade   *gui.FeedbackFacade
 
 	// Shared services used by facades
 	services *gui.Services
@@ -62,6 +63,7 @@ func NewApp() *App {
 		systemFacade:     systemFacade,
 		collectionFacade: gui.NewCollectionFacade(services),
 		settingsFacade:   gui.NewSettingsFacade(services),
+		feedbackFacade:   gui.NewFeedbackFacade(services),
 	}
 }
 
@@ -723,4 +725,38 @@ func (a *App) SetSetting(key string, value interface{}) error {
 // GetAppVersion returns the current application version.
 func (a *App) GetAppVersion() string {
 	return version.GetVersion()
+}
+
+// ========================================
+// Recommendation Feedback Methods (FeedbackFacade)
+// ========================================
+
+// RecordRecommendation records a new recommendation event for ML training.
+func (a *App) RecordRecommendation(req *gui.RecordRecommendationRequest) (*gui.RecordRecommendationResponse, error) {
+	return a.feedbackFacade.RecordRecommendation(a.ctx, req)
+}
+
+// RecordRecommendationAction records the user's action on a recommendation.
+func (a *App) RecordRecommendationAction(req *gui.RecordActionRequest) error {
+	return a.feedbackFacade.RecordAction(a.ctx, req)
+}
+
+// RecordRecommendationOutcome records the match outcome for a recommendation.
+func (a *App) RecordRecommendationOutcome(req *gui.RecordOutcomeRequest) error {
+	return a.feedbackFacade.RecordOutcome(a.ctx, req)
+}
+
+// GetRecommendationStats returns aggregated recommendation statistics.
+func (a *App) GetRecommendationStats(recType *string) (*gui.RecommendationStatsResponse, error) {
+	return a.feedbackFacade.GetRecommendationStats(a.ctx, recType)
+}
+
+// GetFeedbackDashboardMetrics returns comprehensive feedback metrics for the dashboard.
+func (a *App) GetFeedbackDashboardMetrics() (*gui.DashboardMetricsResponse, error) {
+	return a.feedbackFacade.GetDashboardMetrics(a.ctx)
+}
+
+// ExportMLTrainingData exports feedback data for ML training.
+func (a *App) ExportMLTrainingData(limit int) (*gui.MLTrainingDataExport, error) {
+	return a.feedbackFacade.ExportMLTrainingData(a.ctx, limit)
 }
