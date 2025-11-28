@@ -3,16 +3,18 @@ package unified
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // CardMetadataProvider provides card metadata (Scryfall data).
 type CardMetadataProvider interface {
-	GetCard(ctx context.Context, arenaID int) (*storage.Card, error)
-	GetCards(ctx context.Context, arenaIDs []int) ([]*storage.Card, error)
-	GetSetCards(ctx context.Context, setCode string) ([]*storage.Card, error)
+	GetCard(ctx context.Context, arenaID int) (*models.SetCard, error)
+	GetCards(ctx context.Context, arenaIDs []int) ([]*models.SetCard, error)
+	GetSetCards(ctx context.Context, setCode string) ([]*models.SetCard, error)
 }
 
 // DraftStatsProvider provides draft statistics (17Lands data).
@@ -75,7 +77,7 @@ func (s *Service) GetCards(ctx context.Context, arenaIDs []int, format string) (
 	}
 
 	// 2. Group cards by set for efficient stats fetching
-	cardsBySet := make(map[string][]*storage.Card)
+	cardsBySet := make(map[string][]*models.SetCard)
 	for _, card := range cards {
 		cardsBySet[card.SetCode] = append(cardsBySet[card.SetCode], card)
 	}
@@ -97,8 +99,9 @@ func (s *Service) GetCards(ctx context.Context, arenaIDs []int, format string) (
 	unified := make([]*UnifiedCard, len(cards))
 	for i, card := range cards {
 		var stats *storage.DraftCardRating
-		if card.ArenaID != nil {
-			stats = statsMap[*card.ArenaID]
+		arenaID := parseArenaID(card.ArenaID)
+		if arenaID > 0 {
+			stats = statsMap[arenaID]
 		}
 		unified[i] = s.composeCard(card, stats)
 	}
@@ -127,8 +130,9 @@ func (s *Service) GetSetCards(ctx context.Context, setCode, format string) ([]*U
 	unified := make([]*UnifiedCard, len(cards))
 	for i, card := range cards {
 		var stats *storage.DraftCardRating
-		if card.ArenaID != nil {
-			stats = statsMap[*card.ArenaID]
+		arenaID := parseArenaID(card.ArenaID)
+		if arenaID > 0 {
+			stats = statsMap[arenaID]
 		}
 		unified[i] = s.composeCard(card, stats)
 	}
@@ -136,33 +140,29 @@ func (s *Service) GetSetCards(ctx context.Context, setCode, format string) ([]*U
 	return unified, nil
 }
 
-// composeCard combines metadata and optional draft stats into a unified card.
-func (s *Service) composeCard(card *storage.Card, stats *storage.DraftCardRating) *UnifiedCard {
-	unified := &UnifiedCard{
-		ID:              card.ID,
-		Name:            card.Name,
-		ManaCost:        card.ManaCost,
-		CMC:             card.CMC,
-		TypeLine:        card.TypeLine,
-		OracleText:      card.OracleText,
-		Colors:          card.Colors,
-		ColorIdentity:   card.ColorIdentity,
-		Rarity:          card.Rarity,
-		SetCode:         card.SetCode,
-		CollectorNumber: card.CollectorNumber,
-		Power:           card.Power,
-		Toughness:       card.Toughness,
-		Loyalty:         card.Loyalty,
-		ImageURIs:       card.ImageURIs,
-		Layout:          card.Layout,
-		CardFaces:       card.CardFaces,
-		Legalities:      card.Legalities,
-		ReleasedAt:      card.ReleasedAt,
-		MetadataSource:  SourceCache,
-	}
+// parseArenaID converts string ArenaID to int
+func parseArenaID(arenaID string) int {
+	var id int
+	_, _ = fmt.Sscanf(arenaID, "%d", &id)
+	return id
+}
 
-	if card.ArenaID != nil {
-		unified.ArenaID = *card.ArenaID
+// composeCard combines metadata and optional draft stats into a unified card.
+func (s *Service) composeCard(card *models.SetCard, stats *storage.DraftCardRating) *UnifiedCard {
+	unified := &UnifiedCard{
+		ID:             fmt.Sprintf("%d", card.ID),
+		ArenaID:        parseArenaID(card.ArenaID),
+		Name:           card.Name,
+		ManaCost:       card.ManaCost,
+		CMC:            float64(card.CMC),
+		TypeLine:       strings.Join(card.Types, " "),
+		Colors:         card.Colors,
+		ColorIdentity:  card.Colors, // SetCard doesn't have separate color identity
+		Rarity:         card.Rarity,
+		SetCode:        card.SetCode,
+		Power:          card.Power,
+		Toughness:      card.Toughness,
+		MetadataSource: SourceCache,
 	}
 
 	// Add draft stats if available

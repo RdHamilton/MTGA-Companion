@@ -2,20 +2,22 @@ package unified
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // mockMetadataProvider implements CardMetadataProvider for testing.
 type mockMetadataProvider struct {
-	cards    map[int]*storage.Card
-	setCards map[string][]*storage.Card
+	cards    map[int]*models.SetCard
+	setCards map[string][]*models.SetCard
 	err      error
 }
 
-func (m *mockMetadataProvider) GetCard(ctx context.Context, arenaID int) (*storage.Card, error) {
+func (m *mockMetadataProvider) GetCard(ctx context.Context, arenaID int) (*models.SetCard, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -26,11 +28,11 @@ func (m *mockMetadataProvider) GetCard(ctx context.Context, arenaID int) (*stora
 	return card, nil
 }
 
-func (m *mockMetadataProvider) GetCards(ctx context.Context, arenaIDs []int) ([]*storage.Card, error) {
+func (m *mockMetadataProvider) GetCards(ctx context.Context, arenaIDs []int) ([]*models.SetCard, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	var cards []*storage.Card
+	var cards []*models.SetCard
 	for _, id := range arenaIDs {
 		if card, ok := m.cards[id]; ok {
 			cards = append(cards, card)
@@ -39,7 +41,7 @@ func (m *mockMetadataProvider) GetCards(ctx context.Context, arenaIDs []int) ([]
 	return cards, nil
 }
 
-func (m *mockMetadataProvider) GetSetCards(ctx context.Context, setCode string) ([]*storage.Card, error) {
+func (m *mockMetadataProvider) GetSetCards(ctx context.Context, setCode string) ([]*models.SetCard, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -75,14 +77,14 @@ func (m *mockDraftStatsProvider) GetCardRatingsForSet(ctx context.Context, expan
 func TestGetCard_WithStats(t *testing.T) {
 	arenaID := 12345
 	metadata := &mockMetadataProvider{
-		cards: map[int]*storage.Card{
+		cards: map[int]*models.SetCard{
 			arenaID: {
-				ID:       "test-id",
-				ArenaID:  &arenaID,
+				ID:       1,
+				ArenaID:  fmt.Sprintf("%d", arenaID),
 				Name:     "Test Card",
 				ManaCost: "{2}{R}",
-				CMC:      3.0,
-				TypeLine: "Creature - Human",
+				CMC:      3,
+				Types:    []string{"Creature"},
 				Rarity:   "rare",
 				SetCode:  "BLB",
 			},
@@ -134,10 +136,10 @@ func TestGetCard_WithStats(t *testing.T) {
 func TestGetCard_WithoutStats(t *testing.T) {
 	arenaID := 12345
 	metadata := &mockMetadataProvider{
-		cards: map[int]*storage.Card{
+		cards: map[int]*models.SetCard{
 			arenaID: {
-				ID:      "test-id",
-				ArenaID: &arenaID,
+				ID:      1,
+				ArenaID: fmt.Sprintf("%d", arenaID),
 				Name:    "Test Card",
 				SetCode: "BLB",
 			},
@@ -176,22 +178,22 @@ func TestGetCards_Batch(t *testing.T) {
 	arenaID3 := 3333
 
 	metadata := &mockMetadataProvider{
-		cards: map[int]*storage.Card{
+		cards: map[int]*models.SetCard{
 			arenaID1: {
-				ID:      "id-1",
-				ArenaID: &arenaID1,
+				ID:      1,
+				ArenaID: fmt.Sprintf("%d", arenaID1),
 				Name:    "Card 1",
 				SetCode: "BLB",
 			},
 			arenaID2: {
-				ID:      "id-2",
-				ArenaID: &arenaID2,
+				ID:      2,
+				ArenaID: fmt.Sprintf("%d", arenaID2),
 				Name:    "Card 2",
 				SetCode: "BLB",
 			},
 			arenaID3: {
-				ID:      "id-3",
-				ArenaID: &arenaID3,
+				ID:      3,
+				ArenaID: fmt.Sprintf("%d", arenaID3),
 				Name:    "Card 3",
 				SetCode: "MKM",
 			},
@@ -247,10 +249,10 @@ func TestGetSetCards(t *testing.T) {
 	arenaID2 := 2222
 
 	metadata := &mockMetadataProvider{
-		setCards: map[string][]*storage.Card{
+		setCards: map[string][]*models.SetCard{
 			"BLB": {
-				{ID: "id-1", ArenaID: &arenaID1, Name: "Card 1", SetCode: "BLB"},
-				{ID: "id-2", ArenaID: &arenaID2, Name: "Card 2", SetCode: "BLB"},
+				{ID: 1, ArenaID: fmt.Sprintf("%d", arenaID1), Name: "Card 1", SetCode: "BLB"},
+				{ID: 2, ArenaID: fmt.Sprintf("%d", arenaID2), Name: "Card 2", SetCode: "BLB"},
 			},
 		},
 	}

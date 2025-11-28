@@ -58,7 +58,7 @@ func ExportCardPerformanceTrend(ctx context.Context, service *storage.Service, a
 	// Get card name if available
 	cardName := trend.CardName
 	if cardName == "" {
-		card, err := service.GetCardByArenaID(ctx, arenaID)
+		card, err := service.SetCardRepo().GetCardByArenaID(ctx, fmt.Sprintf("%d", arenaID))
 		if err == nil && card != nil {
 			cardName = card.Name
 		}
@@ -127,7 +127,7 @@ func ExportMultipleCardTrends(ctx context.Context, service *storage.Service, are
 		// Get card name if available
 		cardName := trend.CardName
 		if cardName == "" {
-			card, err := service.GetCardByArenaID(ctx, arenaID)
+			card, err := service.SetCardRepo().GetCardByArenaID(ctx, fmt.Sprintf("%d", arenaID))
 			if err == nil && card != nil {
 				cardName = card.Name
 			}
