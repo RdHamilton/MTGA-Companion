@@ -429,6 +429,7 @@ func TestServiceRepositoryGetters(t *testing.T) {
 		"CollectionRepo":   svc.CollectionRepo(),
 		"DeckRepo":         svc.DeckRepo(),
 		"InventoryRepo":    svc.InventoryRepo(),
+		"RankHistoryRepo":  svc.RankHistoryRepo(),
 	}
 
 	for name, getter := range getters {

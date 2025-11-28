@@ -1973,6 +1973,11 @@ func (s *Service) InventoryRepo() repository.InventoryRepository {
 	return s.inventory
 }
 
+// RankHistoryRepo returns the rank history repository.
+func (s *Service) RankHistoryRepo() repository.RankHistoryRepository {
+	return s.rankHistory
+}
+
 // ClearAllMatches deletes all matches and games for the current account.
 func (s *Service) ClearAllMatches(ctx context.Context) error {
 	return s.matches.DeleteAll(ctx, s.currentAccountID)

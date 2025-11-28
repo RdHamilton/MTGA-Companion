@@ -179,12 +179,27 @@ func correlateRanksWithMatches(matches []matchData, rankSnapshots []RankSnapshot
 }
 
 // StoreRankHistory stores rank progression in the database.
+// It extracts rank snapshots from log entries and stores them using the rank history repository.
 func (s *Service) StoreRankHistory(ctx context.Context, entries []*logreader.LogEntry) error {
-	_ = extractRankSnapshots(entries)
+	snapshots := extractRankSnapshots(entries)
 
-	// TODO: Implement rank history repository and storage
-	// For now, we'll just correlate with matches
-	// In the future, we should store rank history separately
+	for _, snapshot := range snapshots {
+		// Convert RankSnapshot to models.RankHistory
+		rank := &models.RankHistory{
+			AccountID:     s.currentAccountID,
+			Timestamp:     snapshot.Timestamp,
+			Format:        snapshot.Format,
+			SeasonOrdinal: snapshot.SeasonOrdinal,
+			RankClass:     snapshot.RankClass,
+			RankLevel:     snapshot.RankLevel,
+			RankStep:      snapshot.RankStep,
+			CreatedAt:     snapshot.Timestamp,
+		}
+
+		if err := s.rankHistory.Create(ctx, rank); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
