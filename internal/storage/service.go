@@ -17,37 +17,41 @@ import (
 
 // Service provides high-level operations for storing and retrieving MTGA data.
 type Service struct {
-	db               *DB
-	matches          repository.MatchRepository
-	stats            repository.StatsRepository
-	decks            repository.DeckRepository
-	collection       repository.CollectionRepository
-	accounts         repository.AccountRepository
-	rankHistory      repository.RankHistoryRepository
-	quests           *QuestRepository
-	draft            repository.DraftRepository
-	setCard          repository.SetCardRepository
-	draftRatings     repository.DraftRatingsRepository
-	inventory        repository.InventoryRepository
-	settings         repository.SettingsRepository
-	currentAccountID int // Current active account ID
+	db                     *DB
+	matches                repository.MatchRepository
+	stats                  repository.StatsRepository
+	decks                  repository.DeckRepository
+	collection             repository.CollectionRepository
+	accounts               repository.AccountRepository
+	rankHistory            repository.RankHistoryRepository
+	quests                 *QuestRepository
+	draft                  repository.DraftRepository
+	setCard                repository.SetCardRepository
+	draftRatings           repository.DraftRatingsRepository
+	inventory              repository.InventoryRepository
+	settings               repository.SettingsRepository
+	deckPerformance        repository.DeckPerformanceRepository
+	recommendationFeedback repository.RecommendationFeedbackRepository
+	currentAccountID       int // Current active account ID
 }
 
 // ServiceConfig holds optional repository overrides for dependency injection.
 // All fields are optional - if nil, the default implementation will be created.
 type ServiceConfig struct {
-	Matches      repository.MatchRepository
-	Stats        repository.StatsRepository
-	Decks        repository.DeckRepository
-	Collection   repository.CollectionRepository
-	Accounts     repository.AccountRepository
-	RankHistory  repository.RankHistoryRepository
-	Quests       *QuestRepository
-	Draft        repository.DraftRepository
-	SetCard      repository.SetCardRepository
-	DraftRatings repository.DraftRatingsRepository
-	Inventory    repository.InventoryRepository
-	Settings     repository.SettingsRepository
+	Matches                repository.MatchRepository
+	Stats                  repository.StatsRepository
+	Decks                  repository.DeckRepository
+	Collection             repository.CollectionRepository
+	Accounts               repository.AccountRepository
+	RankHistory            repository.RankHistoryRepository
+	Quests                 *QuestRepository
+	Draft                  repository.DraftRepository
+	SetCard                repository.SetCardRepository
+	DraftRatings           repository.DraftRatingsRepository
+	Inventory              repository.InventoryRepository
+	Settings               repository.SettingsRepository
+	DeckPerformance        repository.DeckPerformanceRepository
+	RecommendationFeedback repository.RecommendationFeedbackRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -65,19 +69,23 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 	conn := db.Conn()
 
 	svc := &Service{
-		db:           db,
-		matches:      orDefault(cfg.Matches, func() repository.MatchRepository { return repository.NewMatchRepository(conn) }),
-		stats:        orDefault(cfg.Stats, func() repository.StatsRepository { return repository.NewStatsRepository(conn) }),
-		decks:        orDefault(cfg.Decks, func() repository.DeckRepository { return repository.NewDeckRepository(conn) }),
-		collection:   orDefault(cfg.Collection, func() repository.CollectionRepository { return repository.NewCollectionRepository(conn) }),
-		accounts:     orDefault(cfg.Accounts, func() repository.AccountRepository { return repository.NewAccountRepository(conn) }),
-		rankHistory:  orDefault(cfg.RankHistory, func() repository.RankHistoryRepository { return repository.NewRankHistoryRepository(conn) }),
-		quests:       orDefaultQuest(cfg.Quests, func() *QuestRepository { return NewQuestRepository(conn) }),
-		draft:        orDefault(cfg.Draft, func() repository.DraftRepository { return repository.NewDraftRepository(conn) }),
-		setCard:      orDefault(cfg.SetCard, func() repository.SetCardRepository { return repository.NewSetCardRepository(conn) }),
-		draftRatings: orDefault(cfg.DraftRatings, func() repository.DraftRatingsRepository { return repository.NewDraftRatingsRepository(conn) }),
-		inventory:    orDefault(cfg.Inventory, func() repository.InventoryRepository { return repository.NewInventoryRepository(conn) }),
-		settings:     orDefault(cfg.Settings, func() repository.SettingsRepository { return repository.NewSettingsRepository(conn) }),
+		db:              db,
+		matches:         orDefault(cfg.Matches, func() repository.MatchRepository { return repository.NewMatchRepository(conn) }),
+		stats:           orDefault(cfg.Stats, func() repository.StatsRepository { return repository.NewStatsRepository(conn) }),
+		decks:           orDefault(cfg.Decks, func() repository.DeckRepository { return repository.NewDeckRepository(conn) }),
+		collection:      orDefault(cfg.Collection, func() repository.CollectionRepository { return repository.NewCollectionRepository(conn) }),
+		accounts:        orDefault(cfg.Accounts, func() repository.AccountRepository { return repository.NewAccountRepository(conn) }),
+		rankHistory:     orDefault(cfg.RankHistory, func() repository.RankHistoryRepository { return repository.NewRankHistoryRepository(conn) }),
+		quests:          orDefaultQuest(cfg.Quests, func() *QuestRepository { return NewQuestRepository(conn) }),
+		draft:           orDefault(cfg.Draft, func() repository.DraftRepository { return repository.NewDraftRepository(conn) }),
+		setCard:         orDefault(cfg.SetCard, func() repository.SetCardRepository { return repository.NewSetCardRepository(conn) }),
+		draftRatings:    orDefault(cfg.DraftRatings, func() repository.DraftRatingsRepository { return repository.NewDraftRatingsRepository(conn) }),
+		inventory:       orDefault(cfg.Inventory, func() repository.InventoryRepository { return repository.NewInventoryRepository(conn) }),
+		settings:        orDefault(cfg.Settings, func() repository.SettingsRepository { return repository.NewSettingsRepository(conn) }),
+		deckPerformance: orDefault(cfg.DeckPerformance, func() repository.DeckPerformanceRepository { return repository.NewDeckPerformanceRepository(conn) }),
+		recommendationFeedback: orDefault(cfg.RecommendationFeedback, func() repository.RecommendationFeedbackRepository {
+			return repository.NewRecommendationFeedbackRepository(conn)
+		}),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -2089,6 +2097,16 @@ type ProcessedLogFile struct {
 	MatchesFound  int
 	FileSizeBytes int64
 	CreatedAt     time.Time
+}
+
+// DeckPerformanceRepo returns the deck performance repository.
+func (s *Service) DeckPerformanceRepo() repository.DeckPerformanceRepository {
+	return s.deckPerformance
+}
+
+// RecommendationFeedbackRepo returns the recommendation feedback repository.
+func (s *Service) RecommendationFeedbackRepo() repository.RecommendationFeedbackRepository {
+	return s.recommendationFeedback
 }
 
 // Close closes the database connection.

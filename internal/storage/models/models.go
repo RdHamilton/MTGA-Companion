@@ -389,3 +389,112 @@ type SetCard struct {
 	ImageURLArt   string
 	FetchedAt     time.Time
 }
+
+// DeckPerformanceHistory records individual match results with deck state snapshots for ML training.
+type DeckPerformanceHistory struct {
+	ID                  int
+	AccountID           int
+	DeckID              string
+	MatchID             string
+	Archetype           *string  // Primary archetype classification
+	SecondaryArchetype  *string  // Secondary archetype if applicable
+	ArchetypeConfidence *float64 // Confidence score 0.0-1.0
+	ColorIdentity       string   // e.g., "WU", "RG", "WUBRG"
+	CardCount           int      // Number of cards in deck
+	Result              string   // "win" or "loss"
+	GamesWon            int
+	GamesLost           int
+	DurationSeconds     *int
+	Format              string  // e.g., "Draft", "Constructed", "Limited"
+	EventType           *string // e.g., "QuickDraft", "PremierDraft", "Ranked"
+	OpponentArchetype   *string // If known from detection
+	RankTier            *string // Player rank at time of match
+	MatchTimestamp      time.Time
+	CreatedAt           time.Time
+}
+
+// DeckArchetype stores archetype definitions and their performance statistics.
+type DeckArchetype struct {
+	ID              int
+	Name            string  // e.g., "UW Flyers", "BR Sacrifice"
+	SetCode         *string // Set this archetype applies to (nil for constructed)
+	Format          string  // "draft", "constructed", "limited"
+	ColorIdentity   string  // Primary colors
+	SignatureCards  *string // JSON array of card IDs
+	SynergyPatterns *string // JSON array of synergy patterns
+	TotalMatches    int
+	TotalWins       int
+	AvgWinRate      *float64
+	Source          string // "system", "17lands", "user", "ml"
+	ExternalID      *string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+// ArchetypeCardWeight stores which cards are associated with which archetypes and their weights.
+type ArchetypeCardWeight struct {
+	ID          int
+	ArchetypeID int
+	CardID      int
+	Weight      float64 // 0.0-10.0, higher = stronger indicator
+	IsSignature bool    // True if this is a signature/key card
+	Source      string  // "system", "17lands", "user", "ml"
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// RecommendationFeedback tracks user responses to card/deck recommendations for ML training.
+type RecommendationFeedback struct {
+	ID                   int
+	AccountID            int
+	RecommendationType   string // "card_pick", "deck_card", "archetype", "sideboard"
+	RecommendationID     string // Unique ID for this recommendation instance
+	RecommendedCardID    *int
+	RecommendedArchetype *string
+	ContextData          string // JSON: deck state, available picks, game state, etc.
+	Action               string // "accepted", "rejected", "ignored", "alternate"
+	AlternateChoiceID    *int
+	OutcomeMatchID       *string
+	OutcomeResult        *string // "win" or "loss"
+	RecommendationScore  *float64
+	RecommendationRank   *int
+	RecommendedAt        time.Time
+	RespondedAt          *time.Time
+	OutcomeRecordedAt    *time.Time
+	CreatedAt            time.Time
+}
+
+// ArchetypeClassification represents the result of classifying a deck.
+type ArchetypeClassification struct {
+	PrimaryArchetype   string
+	SecondaryArchetype *string
+	Confidence         float64 // 0.0-1.0
+	ColorIdentity      string
+	SignatureCards     []int     // Card IDs of signature cards found
+	MatchingWeights    []float64 // Weights of matched cards
+}
+
+// ArchetypePerformanceStats provides aggregated performance for an archetype.
+type ArchetypePerformanceStats struct {
+	ArchetypeID   int
+	ArchetypeName string
+	Format        string
+	SetCode       *string
+	TotalMatches  int
+	TotalWins     int
+	WinRate       float64
+	AvgDuration   *float64
+	ColorIdentity string
+}
+
+// RecommendationStats provides aggregated statistics for recommendations.
+type RecommendationStats struct {
+	TotalRecommendations int
+	AcceptedCount        int
+	RejectedCount        int
+	IgnoredCount         int
+	AlternateCount       int
+	AcceptanceRate       float64
+	WinRateOnAccepted    *float64
+	WinRateOnRejected    *float64
+}
