@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -43,6 +44,9 @@ type DraftRepository interface {
 	GetSessionCount(ctx context.Context) (int, error)
 	GetPickCount(ctx context.Context) (int, error)
 	GetPackCount(ctx context.Context) (int, error)
+
+	// Aggregation
+	GetAllPickCardCounts(ctx context.Context) (map[int]int, error)
 }
 
 type draftRepository struct {
@@ -640,4 +644,45 @@ func (r *draftRepository) GetPackCount(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_packs`).Scan(&count)
 	return count, err
+}
+
+// GetAllPickCardCounts returns aggregated card counts across all draft picks.
+// Returns a map of card ID (as int) to pick count.
+func (r *draftRepository) GetAllPickCardCounts(ctx context.Context) (map[int]int, error) {
+	query := `
+		SELECT dp.card_id, COUNT(*) as pick_count
+		FROM draft_picks dp
+		JOIN draft_sessions ds ON dp.session_id = ds.id
+		GROUP BY dp.card_id
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query draft picks: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	cardCounts := make(map[int]int)
+	for rows.Next() {
+		var cardIDStr string
+		var pickCount int
+		if err := rows.Scan(&cardIDStr, &pickCount); err != nil {
+			return nil, fmt.Errorf("failed to scan draft pick: %w", err)
+		}
+
+		// Convert card ID string to int
+		var cardID int
+		if _, err := fmt.Sscanf(cardIDStr, "%d", &cardID); err != nil {
+			// Skip non-numeric card IDs
+			continue
+		}
+
+		cardCounts[cardID] = pickCount
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating draft picks: %w", err)
+	}
+
+	return cardCounts, nil
 }

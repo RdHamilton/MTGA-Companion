@@ -566,39 +566,16 @@ func (s *Service) processCollection(ctx context.Context, result *ProcessResult) 
 // aggregateDeckCards gets all cards from all player decks and returns card counts.
 // Each card is counted only once per deck (not per quantity in deck) to determine ownership.
 func (s *Service) aggregateDeckCards(ctx context.Context) (map[int]int, error) {
-	// Get all decks for current account
-	// Note: We query deck_cards directly to get card IDs and quantities
-	query := `
-		SELECT dc.card_id, SUM(dc.quantity) as total_qty
-		FROM deck_cards dc
-		JOIN decks d ON dc.deck_id = d.id
-		WHERE d.account_id = ?
-		GROUP BY dc.card_id
-	`
-
-	rows, err := s.storage.GetDB().QueryContext(ctx, query, s.storage.CurrentAccountID())
+	cardCounts, err := s.storage.DeckRepo().GetCardCountsByAccount(ctx, s.storage.CurrentAccountID())
 	if err != nil {
-		return nil, fmt.Errorf("failed to query deck cards: %w", err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	cardCounts := make(map[int]int)
-	for rows.Next() {
-		var cardID, totalQty int
-		if err := rows.Scan(&cardID, &totalQty); err != nil {
-			return nil, fmt.Errorf("failed to scan deck card: %w", err)
-		}
-		// Cap at MaxCollectionCopies
-		if totalQty > MaxCollectionCopies {
-			totalQty = MaxCollectionCopies
-		}
-		cardCounts[cardID] = totalQty
+		return nil, fmt.Errorf("failed to get deck card counts: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating deck cards: %w", err)
+	// Cap at MaxCollectionCopies
+	for cardID, qty := range cardCounts {
+		if qty > MaxCollectionCopies {
+			cardCounts[cardID] = MaxCollectionCopies
+		}
 	}
 
 	return cardCounts, nil
@@ -607,47 +584,16 @@ func (s *Service) aggregateDeckCards(ctx context.Context) (map[int]int, error) {
 // aggregateDraftPicks gets all draft picks and returns card counts.
 // Each picked card counts as one copy.
 func (s *Service) aggregateDraftPicks(ctx context.Context) (map[int]int, error) {
-	// Query draft_picks for all picked cards
-	// draft_picks stores card_id as TEXT (arena card ID string)
-	query := `
-		SELECT dp.card_id, COUNT(*) as pick_count
-		FROM draft_picks dp
-		JOIN draft_sessions ds ON dp.session_id = ds.id
-		GROUP BY dp.card_id
-	`
-
-	rows, err := s.storage.GetDB().QueryContext(ctx, query)
+	cardCounts, err := s.storage.DraftRepo().GetAllPickCardCounts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query draft picks: %w", err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	cardCounts := make(map[int]int)
-	for rows.Next() {
-		var cardIDStr string
-		var pickCount int
-		if err := rows.Scan(&cardIDStr, &pickCount); err != nil {
-			return nil, fmt.Errorf("failed to scan draft pick: %w", err)
-		}
-
-		// Convert card ID string to int
-		var cardID int
-		if _, err := fmt.Sscanf(cardIDStr, "%d", &cardID); err != nil {
-			// Skip non-numeric card IDs
-			continue
-		}
-
-		// Cap at MaxCollectionCopies
-		if pickCount > MaxCollectionCopies {
-			pickCount = MaxCollectionCopies
-		}
-		cardCounts[cardID] = pickCount
+		return nil, fmt.Errorf("failed to get draft pick counts: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating draft picks: %w", err)
+	// Cap at MaxCollectionCopies
+	for cardID, count := range cardCounts {
+		if count > MaxCollectionCopies {
+			cardCounts[cardID] = MaxCollectionCopies
+		}
 	}
 
 	return cardCounts, nil
@@ -1171,10 +1117,7 @@ func (s *Service) reconstructFirstPicks(ctx context.Context, sessionID string, p
 func (s *Service) inferSetCodeFromCardID(cardID string) string {
 	ctx := context.Background()
 
-	// Query draft_card_ratings for this card ID
-	query := `SELECT DISTINCT set_code FROM draft_card_ratings WHERE arena_id = ? LIMIT 1`
-	var setCode string
-	err := s.storage.GetDB().QueryRowContext(ctx, query, cardID).Scan(&setCode)
+	setCode, err := s.storage.DraftRatingsRepo().GetSetCodeByArenaID(ctx, cardID)
 	if err != nil {
 		// Card not found in ratings - this is expected if ratings haven't been fetched yet
 		return ""

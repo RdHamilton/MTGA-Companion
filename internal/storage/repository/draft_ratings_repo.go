@@ -40,6 +40,9 @@ type DraftRatingsRepository interface {
 	GetExpansionCardIDs(ctx context.Context, expansion string, days int) ([]int, error)
 	GetCardRatingHistory(ctx context.Context, arenaID int, expansion string) ([]*CardRatingSnapshot, error)
 	GetPeriodAverages(ctx context.Context, expansion string, startDate, endDate time.Time) (map[int]*PeriodAverage, error)
+
+	// Lookup methods
+	GetSetCodeByArenaID(ctx context.Context, arenaID string) (string, error)
 }
 
 // SnapshotInfo contains information about a draft statistics snapshot.
@@ -673,4 +676,19 @@ func (r *draftRatingsRepository) GetPeriodAverages(ctx context.Context, expansio
 	}
 
 	return averages, rows.Err()
+}
+
+// GetSetCodeByArenaID returns the set code for a card by its Arena ID.
+// Returns empty string if not found.
+func (r *draftRatingsRepository) GetSetCodeByArenaID(ctx context.Context, arenaID string) (string, error) {
+	query := `SELECT DISTINCT set_code FROM draft_card_ratings WHERE arena_id = ? LIMIT 1`
+	var setCode string
+	err := r.db.QueryRowContext(ctx, query, arenaID).Scan(&setCode)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return setCode, nil
 }

@@ -86,6 +86,10 @@ type DeckRepository interface {
 
 	// GetByFilters retrieves decks matching multiple filter criteria.
 	GetByFilters(ctx context.Context, filter *DeckFilter) ([]*models.Deck, error)
+
+	// GetCardCountsByAccount returns aggregated card counts across all decks for an account.
+	// Returns a map of card ID to total quantity across all decks.
+	GetCardCountsByAccount(ctx context.Context, accountID int) (map[int]int, error)
 }
 
 // deckRepository is the concrete implementation of DeckRepository.
@@ -902,4 +906,36 @@ func (r *deckRepository) scanDecks(rows *sql.Rows) ([]*models.Deck, error) {
 	}
 
 	return decks, nil
+}
+
+// GetCardCountsByAccount returns aggregated card counts across all decks for an account.
+func (r *deckRepository) GetCardCountsByAccount(ctx context.Context, accountID int) (map[int]int, error) {
+	query := `
+		SELECT dc.card_id, SUM(dc.quantity) as total_qty
+		FROM deck_cards dc
+		JOIN decks d ON dc.deck_id = d.id
+		WHERE d.account_id = ?
+		GROUP BY dc.card_id
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query deck cards: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	cardCounts := make(map[int]int)
+	for rows.Next() {
+		var cardID, totalQty int
+		if err := rows.Scan(&cardID, &totalQty); err != nil {
+			return nil, fmt.Errorf("failed to scan deck card: %w", err)
+		}
+		cardCounts[cardID] = totalQty
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deck cards: %w", err)
+	}
+
+	return cardCounts, nil
 }
