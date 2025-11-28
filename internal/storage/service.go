@@ -1161,61 +1161,32 @@ func (s *Service) GetRecentCollectionChanges(ctx context.Context, limit int) ([]
 }
 
 // GetSetCompletion calculates set completion percentages.
-// Uses set_cards table (populated by Scryfall fetcher) and joins with sets table for names.
+// Uses SetCardRepository for data access and CollectionRepository for owned cards.
 func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion, error) {
-	// Query all sets and their card counts by rarity from the set_cards table
-	// Join with sets table to get the set name
-	query := `
-		SELECT
-			sc.set_code,
-			COALESCE(st.name, UPPER(sc.set_code)) as set_name,
-			sc.rarity,
-			COUNT(*) as total
-		FROM set_cards sc
-		LEFT JOIN sets st ON sc.set_code = st.code
-		GROUP BY sc.set_code, sc.rarity
-		ORDER BY sc.set_code, sc.rarity
-	`
-
-	conn := s.db.Conn()
-	rows, err := conn.QueryContext(ctx, query)
+	// Get set/rarity card counts from repository
+	rarityCounts, err := s.setCard.GetSetRarityCounts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query card sets: %w", err)
+		return nil, fmt.Errorf("failed to get set rarity counts: %w", err)
 	}
-	defer func() {
-		//nolint:errcheck // Ignore error on cleanup
-		_ = rows.Close()
-	}()
 
 	// Build set data structure
 	setData := make(map[string]*models.SetCompletion)
-	for rows.Next() {
-		var setCode, setName, rarity string
-		var total int
-
-		if err := rows.Scan(&setCode, &setName, &rarity, &total); err != nil {
-			return nil, fmt.Errorf("failed to scan set data: %w", err)
-		}
-
+	for _, rc := range rarityCounts {
 		// Initialize set if not exists
-		if _, exists := setData[setCode]; !exists {
-			setData[setCode] = &models.SetCompletion{
-				SetCode:         setCode,
-				SetName:         setName,
+		if _, exists := setData[rc.SetCode]; !exists {
+			setData[rc.SetCode] = &models.SetCompletion{
+				SetCode:         rc.SetCode,
+				SetName:         rc.SetName,
 				RarityBreakdown: make(map[string]*models.RarityCompletion),
 			}
 		}
 
 		// Add rarity breakdown
-		setData[setCode].RarityBreakdown[rarity] = &models.RarityCompletion{
-			Rarity: rarity,
-			Total:  total,
+		setData[rc.SetCode].RarityBreakdown[rc.Rarity] = &models.RarityCompletion{
+			Rarity: rc.Rarity,
+			Total:  rc.Total,
 		}
-		setData[setCode].TotalCards += total
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating set data: %w", err)
+		setData[rc.SetCode].TotalCards += rc.Total
 	}
 
 	// Get owned cards from collection
@@ -1224,49 +1195,29 @@ func (s *Service) GetSetCompletion(ctx context.Context) ([]*models.SetCompletion
 		return nil, fmt.Errorf("failed to get collection: %w", err)
 	}
 
-	// Query card arena IDs with their sets and rarities from set_cards
-	cardQuery := `
-		SELECT arena_id, set_code, rarity
-		FROM set_cards
-	`
-
-	cardRows, err := conn.QueryContext(ctx, cardQuery)
+	// Get all card set info from repository
+	cardInfos, err := s.setCard.GetAllCardSetInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query cards: %w", err)
+		return nil, fmt.Errorf("failed to get card set info: %w", err)
 	}
-	defer func() {
-		//nolint:errcheck // Ignore error on cleanup
-		_ = cardRows.Close()
-	}()
 
 	// Count owned cards per set and rarity
-	for cardRows.Next() {
-		var arenaIDStr string
-		var setCode, rarity string
-
-		if err := cardRows.Scan(&arenaIDStr, &setCode, &rarity); err != nil {
-			return nil, fmt.Errorf("failed to scan card: %w", err)
-		}
-
+	for _, card := range cardInfos {
 		// Convert arena_id from string to int for collection lookup
 		var arenaID int
-		if _, err := fmt.Sscanf(arenaIDStr, "%d", &arenaID); err != nil {
+		if _, err := fmt.Sscanf(card.ArenaID, "%d", &arenaID); err != nil {
 			continue // Skip cards with invalid arena IDs
 		}
 
 		// Check if player owns this card
 		if quantity, owned := collection[arenaID]; owned && quantity > 0 {
-			if set, exists := setData[setCode]; exists {
+			if set, exists := setData[card.SetCode]; exists {
 				set.OwnedCards++
-				if rarityData, rarityExists := set.RarityBreakdown[rarity]; rarityExists {
+				if rarityData, rarityExists := set.RarityBreakdown[card.Rarity]; rarityExists {
 					rarityData.Owned++
 				}
 			}
 		}
-	}
-
-	if err = cardRows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating cards: %w", err)
 	}
 
 	// Calculate percentages

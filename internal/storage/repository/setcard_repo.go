@@ -23,6 +23,21 @@ type StaleCard struct {
 	LastUpdated string
 }
 
+// SetRarityCount represents card counts for a set and rarity.
+type SetRarityCount struct {
+	SetCode string
+	SetName string
+	Rarity  string
+	Total   int
+}
+
+// CardSetInfo represents the set/rarity info for a card.
+type CardSetInfo struct {
+	ArenaID string
+	SetCode string
+	Rarity  string
+}
+
 // SetCardRepository provides methods for managing set cards cached from Scryfall.
 type SetCardRepository interface {
 	// SaveCard saves a set card to the database.
@@ -56,6 +71,13 @@ type SetCardRepository interface {
 
 	// GetStaleCards returns cards with stale metadata, ordered by oldest first.
 	GetStaleCards(ctx context.Context, staleAgeSeconds, limit int) ([]*StaleCard, error)
+
+	// Set completion methods
+	// GetSetRarityCounts returns card counts grouped by set and rarity, with set names.
+	GetSetRarityCounts(ctx context.Context) ([]*SetRarityCount, error)
+
+	// GetAllCardSetInfo returns arena_id, set_code, and rarity for all cards.
+	GetAllCardSetInfo(ctx context.Context) ([]*CardSetInfo, error)
 }
 
 type setCardRepository struct {
@@ -516,4 +538,61 @@ func (r *setCardRepository) GetStaleCards(ctx context.Context, staleAgeSeconds, 
 	}
 
 	return cards, rows.Err()
+}
+
+// GetSetRarityCounts returns card counts grouped by set and rarity, with set names.
+func (r *setCardRepository) GetSetRarityCounts(ctx context.Context) ([]*SetRarityCount, error) {
+	query := `
+		SELECT
+			sc.set_code,
+			COALESCE(st.name, UPPER(sc.set_code)) as set_name,
+			sc.rarity,
+			COUNT(*) as total
+		FROM set_cards sc
+		LEFT JOIN sets st ON sc.set_code = st.code
+		GROUP BY sc.set_code, sc.rarity
+		ORDER BY sc.set_code, sc.rarity
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var counts []*SetRarityCount
+	for rows.Next() {
+		count := &SetRarityCount{}
+		if err := rows.Scan(&count.SetCode, &count.SetName, &count.Rarity, &count.Total); err != nil {
+			return nil, err
+		}
+		counts = append(counts, count)
+	}
+
+	return counts, rows.Err()
+}
+
+// GetAllCardSetInfo returns arena_id, set_code, and rarity for all cards.
+func (r *setCardRepository) GetAllCardSetInfo(ctx context.Context) ([]*CardSetInfo, error) {
+	query := `
+		SELECT arena_id, set_code, rarity
+		FROM set_cards
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var cardInfos []*CardSetInfo
+	for rows.Next() {
+		card := &CardSetInfo{}
+		if err := rows.Scan(&card.ArenaID, &card.SetCode, &card.Rarity); err != nil {
+			return nil, err
+		}
+		cardInfos = append(cardInfos, card)
+	}
+
+	return cardInfos, rows.Err()
 }

@@ -40,6 +40,15 @@ func setupSetCardTestDB(t *testing.T) *sql.DB {
 		);
 		CREATE INDEX IF NOT EXISTS idx_set_cards_arena_id ON set_cards(arena_id);
 		CREATE INDEX IF NOT EXISTS idx_set_cards_set_code ON set_cards(set_code);
+
+		CREATE TABLE IF NOT EXISTS sets (
+			code TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			released_at TEXT,
+			card_count INTEGER,
+			set_type TEXT,
+			icon_svg_uri TEXT
+		);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -258,5 +267,202 @@ func TestSetCardRepository_GetStaleCards_EmptyDB(t *testing.T) {
 
 	if len(staleCards) != 0 {
 		t.Errorf("expected 0 stale cards, got %d", len(staleCards))
+	}
+}
+
+func TestSetCardRepository_GetSetRarityCounts(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert set metadata
+	_, err := db.ExecContext(ctx, `INSERT INTO sets (code, name) VALUES ('ONE', 'Phyrexia: All Will Be One')`)
+	if err != nil {
+		t.Fatalf("failed to insert set: %v", err)
+	}
+
+	// Insert cards with different rarities
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "ONE", ArenaID: "12345", Name: "Common Card 1", Types: []string{"Creature"}, Colors: []string{"W"}, Rarity: "common", FetchedAt: now},
+		{SetCode: "ONE", ArenaID: "12346", Name: "Common Card 2", Types: []string{"Creature"}, Colors: []string{"U"}, Rarity: "common", FetchedAt: now},
+		{SetCode: "ONE", ArenaID: "12347", Name: "Uncommon Card", Types: []string{"Creature"}, Colors: []string{"B"}, Rarity: "uncommon", FetchedAt: now},
+		{SetCode: "ONE", ArenaID: "12348", Name: "Rare Card", Types: []string{"Creature"}, Colors: []string{"R"}, Rarity: "rare", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	// Get set rarity counts
+	counts, err := repo.GetSetRarityCounts(ctx)
+	if err != nil {
+		t.Fatalf("failed to get set rarity counts: %v", err)
+	}
+
+	// Should have 3 entries (common, uncommon, rare for ONE)
+	if len(counts) != 3 {
+		t.Errorf("expected 3 rarity counts, got %d", len(counts))
+	}
+
+	// Check set name is populated from sets table
+	for _, c := range counts {
+		if c.SetCode == "ONE" && c.SetName != "Phyrexia: All Will Be One" {
+			t.Errorf("expected set name 'Phyrexia: All Will Be One', got '%s'", c.SetName)
+		}
+	}
+
+	// Find and verify common count
+	for _, c := range counts {
+		if c.SetCode == "ONE" && c.Rarity == "common" {
+			if c.Total != 2 {
+				t.Errorf("expected 2 common cards, got %d", c.Total)
+			}
+		}
+	}
+}
+
+func TestSetCardRepository_GetSetRarityCounts_NoSetMetadata(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert card WITHOUT set metadata - should fall back to uppercase set code
+	now := time.Now()
+	card := &models.SetCard{
+		SetCode:   "xyz",
+		ArenaID:   "12345",
+		Name:      "Test Card",
+		Types:     []string{"Creature"},
+		Colors:    []string{"W"},
+		Rarity:    "common",
+		FetchedAt: now,
+	}
+	if err := repo.SaveCard(ctx, card); err != nil {
+		t.Fatalf("failed to save card: %v", err)
+	}
+
+	counts, err := repo.GetSetRarityCounts(ctx)
+	if err != nil {
+		t.Fatalf("failed to get set rarity counts: %v", err)
+	}
+
+	if len(counts) != 1 {
+		t.Errorf("expected 1 rarity count, got %d", len(counts))
+	}
+
+	// Set name should fall back to uppercase set code
+	if counts[0].SetName != "XYZ" {
+		t.Errorf("expected set name 'XYZ' (fallback), got '%s'", counts[0].SetName)
+	}
+}
+
+func TestSetCardRepository_GetAllCardSetInfo(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert cards
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "ONE", ArenaID: "12345", Name: "Card 1", Types: []string{"Creature"}, Colors: []string{"W"}, Rarity: "common", FetchedAt: now},
+		{SetCode: "ONE", ArenaID: "12346", Name: "Card 2", Types: []string{"Creature"}, Colors: []string{"U"}, Rarity: "uncommon", FetchedAt: now},
+		{SetCode: "MOM", ArenaID: "12347", Name: "Card 3", Types: []string{"Creature"}, Colors: []string{"B"}, Rarity: "rare", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	// Get all card set info
+	infos, err := repo.GetAllCardSetInfo(ctx)
+	if err != nil {
+		t.Fatalf("failed to get card set info: %v", err)
+	}
+
+	if len(infos) != 3 {
+		t.Errorf("expected 3 card infos, got %d", len(infos))
+	}
+
+	// Verify data is correctly mapped
+	foundCard := false
+	for _, info := range infos {
+		if info.ArenaID == "12345" {
+			foundCard = true
+			if info.SetCode != "ONE" {
+				t.Errorf("expected set code ONE, got %s", info.SetCode)
+			}
+			if info.Rarity != "common" {
+				t.Errorf("expected rarity common, got %s", info.Rarity)
+			}
+		}
+	}
+
+	if !foundCard {
+		t.Error("card with arena_id 12345 not found")
+	}
+}
+
+func TestSetCardRepository_GetSetRarityCounts_EmptyDB(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	counts, err := repo.GetSetRarityCounts(ctx)
+	if err != nil {
+		t.Fatalf("failed to get set rarity counts from empty DB: %v", err)
+	}
+
+	if len(counts) != 0 {
+		t.Errorf("expected 0 counts, got %d", len(counts))
+	}
+}
+
+func TestSetCardRepository_GetAllCardSetInfo_EmptyDB(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	infos, err := repo.GetAllCardSetInfo(ctx)
+	if err != nil {
+		t.Fatalf("failed to get card set info from empty DB: %v", err)
+	}
+
+	if len(infos) != 0 {
+		t.Errorf("expected 0 card infos, got %d", len(infos))
 	}
 }
