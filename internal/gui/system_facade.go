@@ -95,10 +95,10 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	)
 
 	// Initialize CardService for card metadata with caching
-	// Disable DB to avoid schema conflicts - we use storage.SetCardRepo instead
+	// DB is disabled to avoid schema conflicts - we use storage.SetCardRepo instead
 	cardServiceConfig := cards.DefaultServiceConfig()
 	cardServiceConfig.EnableDB = false
-	cardService, err := cards.NewService(s.services.Storage.GetDB(), cardServiceConfig)
+	cardService, err := cards.NewService(nil, cardServiceConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize card service: %w", err)
 	}

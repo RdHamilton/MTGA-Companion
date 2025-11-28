@@ -618,8 +618,12 @@ func (d *DraftFacade) PredictDraftWinRate(ctx context.Context, sessionID string)
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// Create prediction service
-	predictionService := prediction.NewService(d.services.Storage.GetDB())
+	// Create prediction service using storage repositories
+	predictionService := prediction.NewService(
+		d.services.Storage.DraftRepo(),
+		d.services.Storage.DraftRatingsRepo(),
+		d.services.Storage.SetCardRepo(),
+	)
 
 	// Calculate prediction
 	pred, err := predictionService.PredictSessionWinRate(ctx, sessionID)
@@ -636,8 +640,12 @@ func (d *DraftFacade) GetDraftWinRatePrediction(ctx context.Context, sessionID s
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// Create prediction service
-	predictionService := prediction.NewService(d.services.Storage.GetDB())
+	// Create prediction service using storage repositories
+	predictionService := prediction.NewService(
+		d.services.Storage.DraftRepo(),
+		d.services.Storage.DraftRatingsRepo(),
+		d.services.Storage.SetCardRepo(),
+	)
 
 	// Get stored prediction
 	pred, err := predictionService.GetSessionPrediction(sessionID)

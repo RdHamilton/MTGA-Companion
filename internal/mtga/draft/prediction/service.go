@@ -2,15 +2,12 @@ package prediction
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
-
-// Note: database/sql is still used in NewService to create repositories
 
 // Service handles win rate prediction for draft decks
 type Service struct {
@@ -19,12 +16,12 @@ type Service struct {
 	setCardRepo repository.SetCardRepository
 }
 
-// NewService creates a new prediction service
-func NewService(db *sql.DB) *Service {
+// NewService creates a new prediction service with the required repositories.
+func NewService(draftRepo repository.DraftRepository, ratingsRepo repository.DraftRatingsRepository, setCardRepo repository.SetCardRepository) *Service {
 	return &Service{
-		draftRepo:   repository.NewDraftRepository(db),
-		ratingsRepo: repository.NewDraftRatingsRepository(db),
-		setCardRepo: repository.NewSetCardRepository(db),
+		draftRepo:   draftRepo,
+		ratingsRepo: ratingsRepo,
+		setCardRepo: setCardRepo,
 	}
 }
 
