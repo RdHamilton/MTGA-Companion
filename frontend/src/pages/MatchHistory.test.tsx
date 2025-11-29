@@ -263,6 +263,32 @@ describe('MatchHistory', () => {
       });
     });
 
+    it('should normalize format with underscore suffix', async () => {
+      const match = createMockMatch({ Format: 'QuickDraft_TLA_20251127' });
+      mockWailsApp.GetMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('QuickDraft')).toBeInTheDocument();
+      });
+      // Should NOT show the full format with date suffix
+      expect(screen.queryByText('QuickDraft_TLA_20251127')).not.toBeInTheDocument();
+    });
+
+    it('should normalize event name with underscore suffix', async () => {
+      const match = createMockMatch({ EventName: 'PremierDraft_MKM_20241120' });
+      mockWailsApp.GetMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('PremierDraft')).toBeInTheDocument();
+      });
+      // Should NOT show the full event name with date suffix
+      expect(screen.queryByText('PremierDraft_MKM_20241120')).not.toBeInTheDocument();
+    });
+
     it('should display match count', async () => {
       const matches = Array.from({ length: 5 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
