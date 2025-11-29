@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-11-29
+
+### Added
+
+**ML-Powered Recommendations (Complete)**
+- **Machine Learning Engine** - Intelligent card recommendations using trained ML models (#576, #577, #578)
+- **Personal Play Style Learning** - Adapts recommendations based on deck building history and preferences
+- **Meta-Aware Suggestions** - Incorporates tournament data and metagame trends into scoring
+- **Hybrid Scoring System** - Combines ML predictions with rule-based analysis for optimal results
+- **Recommendation Feedback Collection** - Records acceptance/rejection to improve future recommendations (#575)
+- **Deck Performance Tracking** - Historical match data for ML training (#573)
+- **Deck Archetype Classification** - Automatic archetype detection for decks and draft pools (#574)
+
+**Ollama LLM Integration**
+- **Local LLM Support** - Optional Ollama integration for natural language explanations (#579-#584)
+- **Automatic Model Pull** - App automatically downloads required models if not present
+- **Configurable Model Selection** - Choose from qwen3:8b, llama3.2, mistral, or any Ollama model
+- **ML/AI Settings UI** - New settings section for configuring Ollama and ML features (#585)
+- **Explanation Generator** - Natural language explanations for why cards are recommended (#586)
+- **Template Fallback** - Works without Ollama using template-based explanations
+
+**Metagame Dashboard**
+- **Live Meta Data** - Real-time metagame data from MTGGoldfish and MTGTop8 (#587)
+- **Archetype Tier Lists** - View Tier 1-4 archetypes with meta share percentages
+- **Archetype Detail View** - Click archetypes to see detailed stats, trends, and tier explanations (#681)
+- **Tournament Performance** - Track Top 8 placements and tournament wins per archetype
+- **Trend Analysis** - See which archetypes are trending up, down, or stable
+- **Multi-Format Support** - Standard, Historic, Explorer, Pioneer, and Modern
+- **Recent Tournaments** - View recent tournament results with top decks
+
+**Draft Enhancements**
+- **Enhanced Synergy Scoring** - Improved draft prediction with better synergy detection (#639)
+- **Color Pair Archetypes** - Automatic archetype detection based on top color pairs (#632)
+- **Card Type Categorization** - Set guide uses card types for better organization (#633)
+- **Keyword Extraction** - Sophisticated keyword analysis for card recommendations (#634)
+
+**WebSocket Improvements**
+- **Selective Event Subscription** - Subscribe only to events you need for better performance (#631)
+- **Configurable CORS** - WebSocket CORS settings for production deployments (#630)
+
+**E2E Testing**
+- **Page-Specific E2E Tests** - Comprehensive Playwright tests for all pages (#679)
+- **Charts Tests** - E2E tests for chart components
+- **Collection Tests** - E2E tests for collection page
+- **Decks Tests** - E2E tests for deck management
+- **Draft Tests** - E2E tests for draft functionality
+- **Match History Tests** - E2E tests for match history
+- **Meta Tests** - E2E tests for metagame dashboard
+- **Settings Tests** - E2E tests for settings page
+
+### Fixed
+
+- **Meta Page Data Loading** - Fixed MTGGoldfish HTML parsing for updated site structure (#680)
+- **RWMutex Deadlock** - Fixed fatal panic in RefreshAll method due to incorrect mutex usage (#681)
+- **Flaky Format Selection Test** - Fixed intermittent test failure in Meta page tests (#681)
+
+### Changed
+
+- **Settings Navigation** - Updated navigation to include ML/AI settings section
+- **Card Recommendations** - Enhanced with ML-powered scoring alongside rule-based analysis
+
+### Technical
+
+**Code Quality**
+- **Frontend Test Coverage**: 1485+ tests passing
+- **Go Tests**: All passing
+- **Linter**: 0 issues (golangci-lint)
+
+**New Packages**
+- `internal/ml/` - Machine learning engine with model, pipeline, and meta-weighting
+- `internal/llm/` - Ollama client and explanation generator
+- `internal/archetype/` - Deck archetype classification system
+- `internal/feedback/` - Recommendation feedback service
+- `internal/meta/` - Metagame data aggregation from multiple sources
+
+### Documentation
+
+- **README Updates** - Added ML features, Ollama setup guide, and metagame dashboard docs
+- **Changelog** - Complete v1.4.0 changelog entry
+
 ## [1.3.1] - 2025-11-28
 
 ### Added
