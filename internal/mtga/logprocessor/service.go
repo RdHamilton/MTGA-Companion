@@ -235,6 +235,20 @@ func (s *Service) processDecks(ctx context.Context, entries []*logreader.LogEntr
 		} else {
 			log.Printf("✓ Stored %d/%d deck(s)", storedCount, len(deckLibrary.Decks))
 
+			// Clean up stale arena decks that are no longer in the log
+			currentDeckIDs := make([]string, 0, len(deckLibrary.Decks))
+			for deckID := range deckLibrary.Decks {
+				currentDeckIDs = append(currentDeckIDs, deckID)
+			}
+			deletedCount, cleanupErr := s.storage.CleanupStaleArenaDecks(ctx, currentDeckIDs)
+			if cleanupErr != nil {
+				log.Printf("Warning: Failed to cleanup stale arena decks: %v", cleanupErr)
+			} else if deletedCount > 0 {
+				log.Printf("✓ Removed %d stale arena deck(s)", deletedCount)
+			} else {
+				log.Printf("[CleanupArenaDecks] No stale decks to remove (checked %d current deck IDs)", len(currentDeckIDs))
+			}
+
 			// Infer deck IDs for matches after storing decks
 			inferredCount, err := s.storage.InferDeckIDsForMatches(ctx)
 			if err != nil {

@@ -24,39 +24,12 @@ func TestParseDecks(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name: "courses with deck data",
+			name: "DeckUpsertDeckV2 with deck data",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"Courses": []interface{}{
-						map[string]interface{}{
-							"CourseId": "course-1",
-							"CourseDeckSummary": map[string]interface{}{
-								"DeckId":      "deck-1",
-								"Name":        "Test Deck",
-								"Description": "Decks/Test/TestDeck",
-								"Attributes": []interface{}{
-									map[string]interface{}{
-										"name":  "Format",
-										"value": "Standard",
-									},
-									map[string]interface{}{
-										"name":  "LastPlayed",
-										"value": "\"2024-06-21T09:35:17.8958228-04:00\"",
-									},
-								},
-							},
-							"CourseDeck": map[string]interface{}{
-								"MainDeck": []interface{}{
-									map[string]interface{}{
-										"cardId":   float64(12345),
-										"quantity": float64(4),
-									},
-								},
-								"Sideboard": []interface{}{},
-							},
-						},
-					},
+					"id":      "123",
+					"request": `{"Summary":{"DeckId":"deck-1","Name":"Test Deck","Description":"Decks/Test/TestDeck","Attributes":[{"name":"Format","value":"Standard"},{"name":"LastPlayed","value":"\"2024-06-21T09:35:17.8958228-04:00\""}]},"Deck":{"MainDeck":[{"cardId":12345,"quantity":4}],"Sideboard":[]}}`,
 				},
 			},
 			want: &DeckLibrary{
@@ -74,85 +47,46 @@ func TestParseDecks(t *testing.T) {
 			},
 		},
 		{
-			name: "courses with multiple decks",
-			entry: &LogEntry{
-				IsJSON: true,
-				JSON: map[string]interface{}{
-					"Courses": []interface{}{
-						map[string]interface{}{
-							"CourseId": "course-1",
-							"CourseDeckSummary": map[string]interface{}{
-								"DeckId": "deck-1",
-								"Name":   "Explorer Deck",
-								"Attributes": []interface{}{
-									map[string]interface{}{
-										"name":  "Format",
-										"value": "Explorer",
-									},
-								},
-							},
-							"CourseDeck": map[string]interface{}{
-								"MainDeck":  []interface{}{},
-								"Sideboard": []interface{}{},
-							},
-						},
-						map[string]interface{}{
-							"CourseId": "course-2",
-							"CourseDeckSummary": map[string]interface{}{
-								"DeckId": "deck-2",
-								"Name":   "Historic Deck",
-								"Attributes": []interface{}{
-									map[string]interface{}{
-										"name":  "Format",
-										"value": "Historic",
-									},
-								},
-							},
-							"CourseDeck": map[string]interface{}{
-								"MainDeck":  []interface{}{},
-								"Sideboard": []interface{}{},
-							},
-						},
-					},
-				},
-			},
+			name:  "multiple DeckUpsertDeckV2 entries",
+			entry: nil, // Will be handled with multiple entries
 			want: &DeckLibrary{
 				Decks: map[string]*PlayerDeck{
 					"deck-1": {
-						DeckID: "deck-1",
-						Name:   "Explorer Deck",
-						Format: "Explorer",
+						DeckID:    "deck-1",
+						Name:      "Explorer Deck",
+						Format:    "Explorer",
+						MainDeck:  []DeckCard{},
+						Sideboard: []DeckCard{},
 					},
 					"deck-2": {
-						DeckID: "deck-2",
-						Name:   "Historic Deck",
-						Format: "Historic",
+						DeckID:    "deck-2",
+						Name:      "Historic Deck",
+						Format:    "Historic",
+						MainDeck:  []DeckCard{},
+						Sideboard: []DeckCard{},
 					},
 				},
 				TotalDecks: 2,
 			},
 		},
 		{
-			name: "empty courses list",
+			name: "empty request field",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"Courses": []interface{}{},
+					"id":      "123",
+					"request": "",
 				},
 			},
 			wantNil: true,
 		},
 		{
-			name: "courses without CourseDeckSummary",
+			name: "request without Summary",
 			entry: &LogEntry{
 				IsJSON: true,
 				JSON: map[string]interface{}{
-					"Courses": []interface{}{
-						map[string]interface{}{
-							"CourseId": "course-1",
-							// Missing CourseDeckSummary
-						},
-					},
+					"id":      "123",
+					"request": `{"Deck":{"MainDeck":[]}}`,
 				},
 			},
 			wantNil: true,
@@ -161,7 +95,30 @@ func TestParseDecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			entries := []*LogEntry{tt.entry}
+			var entries []*LogEntry
+
+			// Handle the multiple entries test case
+			if tt.name == "multiple DeckUpsertDeckV2 entries" {
+				entries = []*LogEntry{
+					{
+						IsJSON: true,
+						JSON: map[string]interface{}{
+							"id":      "123",
+							"request": `{"Summary":{"DeckId":"deck-1","Name":"Explorer Deck","Attributes":[{"name":"Format","value":"Explorer"}]},"Deck":{"MainDeck":[],"Sideboard":[]}}`,
+						},
+					},
+					{
+						IsJSON: true,
+						JSON: map[string]interface{}{
+							"id":      "124",
+							"request": `{"Summary":{"DeckId":"deck-2","Name":"Historic Deck","Attributes":[{"name":"Format","value":"Historic"}]},"Deck":{"MainDeck":[],"Sideboard":[]}}`,
+						},
+					},
+				}
+			} else {
+				entries = []*LogEntry{tt.entry}
+			}
+
 			got, err := ParseDecks(entries)
 			if err != nil {
 				t.Errorf("ParseDecks() error = %v", err)
@@ -218,8 +175,9 @@ func TestParseDecks_FromLogFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "test_player.log")
 
-	// Create test log data with Courses (EventGetCoursesV2 format)
-	testData := `[UnityCrossThreadLogger]{"Courses":[{"CourseId":"course-1","CourseDeckSummary":{"DeckId":"deck-1","Name":"Test Deck","Attributes":[{"name":"Format","value":"Standard"}]},"CourseDeck":{"MainDeck":[{"cardId":12345,"quantity":4}],"Sideboard":[]}}]}
+	// Create test log data with DeckUpsertDeckV2 format
+	// Note: The request field is a JSON string, so we need to escape the inner quotes
+	testData := `[UnityCrossThreadLogger]{"id":"123","request":"{\"Summary\":{\"DeckId\":\"deck-1\",\"Name\":\"Test Deck\",\"Attributes\":[{\"name\":\"Format\",\"value\":\"Standard\"}]},\"Deck\":{\"MainDeck\":[{\"cardId\":12345,\"quantity\":4}],\"Sideboard\":[]}}"}
 `
 	if err := os.WriteFile(logPath, []byte(testData), 0o644); err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)

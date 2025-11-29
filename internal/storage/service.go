@@ -1056,6 +1056,17 @@ func (s *Service) ListDecks(ctx context.Context) ([]*models.Deck, error) {
 	return s.decks.List(ctx, s.currentAccountID)
 }
 
+// CleanupStaleArenaDecks removes arena-sourced decks that are no longer present in MTGA logs.
+// It deletes all "arena" source decks for the current account EXCEPT those in the provided ID list.
+// Returns the number of decks deleted.
+func (s *Service) CleanupStaleArenaDecks(ctx context.Context, currentDeckIDs []string) (int, error) {
+	accountID := s.currentAccountID
+	if accountID == 0 {
+		accountID = 1
+	}
+	return s.decks.DeleteBySourceExcluding(ctx, accountID, "arena", currentDeckIDs)
+}
+
 // InferDeckIDsForMatches attempts to link matches to decks based on timestamp proximity.
 // This is a best-effort approach since MTGA logs don't include deck IDs in match events.
 // It links each match without a deck_id to the deck with the closest lastPlayed timestamp.

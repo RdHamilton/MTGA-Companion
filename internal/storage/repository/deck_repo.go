@@ -45,6 +45,10 @@ type DeckRepository interface {
 	// Delete deletes a deck by its ID.
 	Delete(ctx context.Context, id string) error
 
+	// DeleteBySourceExcluding deletes all decks with the specified source that are NOT in the exclusion list.
+	// Returns the number of decks deleted.
+	DeleteBySourceExcluding(ctx context.Context, accountID int, source string, excludeIDs []string) (int, error)
+
 	// UpdatePerformance updates deck performance metrics after a match.
 	UpdatePerformance(ctx context.Context, deckID string, matchWon bool, gamesWon, gamesLost int) error
 
@@ -273,6 +277,45 @@ func (r *deckRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// DeleteBySourceExcluding deletes all decks with the specified source that are NOT in the exclusion list.
+// This is used to clean up stale arena decks that are no longer present in MTGA logs.
+func (r *deckRepository) DeleteBySourceExcluding(ctx context.Context, accountID int, source string, excludeIDs []string) (int, error) {
+	if len(excludeIDs) == 0 {
+		// No exclusions - delete all decks with this source
+		query := `DELETE FROM decks WHERE account_id = ? AND source = ?`
+		result, err := r.db.ExecContext(ctx, query, accountID, source)
+		if err != nil {
+			return 0, fmt.Errorf("failed to delete decks by source: %w", err)
+		}
+		affected, _ := result.RowsAffected()
+		return int(affected), nil
+	}
+
+	// Build query with exclusion list using placeholders
+	// SQLite doesn't support arrays, so we build a parameterized IN clause
+	placeholders := make([]string, len(excludeIDs))
+	args := make([]interface{}, 0, len(excludeIDs)+2)
+	args = append(args, accountID, source)
+
+	for i, id := range excludeIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(
+		`DELETE FROM decks WHERE account_id = ? AND source = ? AND id NOT IN (%s)`,
+		joinStrings(placeholders, ", "),
+	)
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete decks by source excluding: %w", err)
+	}
+
+	affected, _ := result.RowsAffected()
+	return int(affected), nil
 }
 
 // AddCard adds a card to a deck.

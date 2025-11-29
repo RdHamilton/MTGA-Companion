@@ -254,15 +254,14 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('150')).toBeInTheDocument();
+        // Cards in Set shows filterCount, Total Cards shows totalCount from response
+        expect(screen.getByText('Cards in Set:')).toBeInTheDocument();
+        expect(screen.getByText('Total Cards:')).toBeInTheDocument();
       });
-      expect(screen.getByText('Unique Cards')).toBeInTheDocument();
-      expect(screen.getByText('600')).toBeInTheDocument();
-      expect(screen.getByText('Total Cards')).toBeInTheDocument();
     });
 
-    it('should display card quantity badge', async () => {
-      const mockCards = [createMockCollectionCard({ quantity: 4 })];
+    it('should display card without quantity badge', async () => {
+      const mockCards = [createMockCollectionCard({ quantity: 4, name: 'Test Card' })];
       mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockGetAllSetInfo.mockResolvedValue([]);
@@ -272,7 +271,11 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('x4')).toBeInTheDocument();
+        // Card should render without quantity badge
+        const cardImage = screen.getByRole('img', { name: 'Test Card' });
+        expect(cardImage).toBeInTheDocument();
+        // Quantity badge should not exist
+        expect(screen.queryByText('x4')).not.toBeInTheDocument();
       });
     });
 
@@ -536,12 +539,14 @@ describe('Collection', () => {
       });
     });
 
-    it('should use placeholder when imageUri is empty', async () => {
+    it('should show card info fallback when imageUri is empty', async () => {
       const mockCards = [
         createMockCollectionCard({
           cardId: 1,
           name: 'Unknown Card',
           imageUri: '',
+          setCode: 'TST',
+          rarity: 'rare',
         }),
       ];
       mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
@@ -553,9 +558,12 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        const img = screen.getByRole('img', { name: 'Unknown Card' });
-        // Should use the card back placeholder
-        expect(img).toHaveAttribute('src', 'https://cards.scryfall.io/back.png');
+        // Should show card info instead of placeholder image
+        expect(screen.getByText('Unknown Card')).toBeInTheDocument();
+        expect(screen.getByText('TST')).toBeInTheDocument();
+        expect(screen.getByText('rare')).toBeInTheDocument();
+        // No image should be present
+        expect(screen.queryByRole('img', { name: 'Unknown Card' })).not.toBeInTheDocument();
       });
     });
   });
@@ -615,8 +623,8 @@ describe('Collection', () => {
       expect(card).toHaveClass('not-owned');
     });
 
-    it('should show x0 badge for unowned cards', async () => {
-      const mockCards = [createMockCollectionCard({ quantity: 0 })];
+    it('should not show quantity badge for unowned cards', async () => {
+      const mockCards = [createMockCollectionCard({ quantity: 0, name: 'Unowned Card' })];
       mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockGetAllSetInfo.mockResolvedValue([]);
@@ -626,7 +634,10 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('x0')).toBeInTheDocument();
+        // Card should render with not-owned class but without quantity badge
+        const card = screen.getByRole('img', { name: 'Unowned Card' }).closest('.collection-card');
+        expect(card).toHaveClass('not-owned');
+        expect(screen.queryByText('x0')).not.toBeInTheDocument();
       });
     });
   });

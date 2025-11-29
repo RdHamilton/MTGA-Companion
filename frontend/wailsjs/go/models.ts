@@ -3183,12 +3183,75 @@ export namespace pickquality {
 
 export namespace prediction {
 	
+	export class SynergyScore {
+	    card_a: string;
+	    card_b: string;
+	    synergy_type: string;
+	    score: number;
+	    reason: string;
+	    weight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SynergyScore(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.card_a = source["card_a"];
+	        this.card_b = source["card_b"];
+	        this.synergy_type = source["synergy_type"];
+	        this.score = source["score"];
+	        this.reason = source["reason"];
+	        this.weight = source["weight"];
+	    }
+	}
+	export class SynergyResult {
+	    overall_score: number;
+	    synergy_pairs: SynergyScore[];
+	    tribal_synergies: number;
+	    mech_synergies: number;
+	    color_synergies: number;
+	    top_synergies: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SynergyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.overall_score = source["overall_score"];
+	        this.synergy_pairs = this.convertValues(source["synergy_pairs"], SynergyScore);
+	        this.tribal_synergies = source["tribal_synergies"];
+	        this.mech_synergies = source["mech_synergies"];
+	        this.color_synergies = source["color_synergies"];
+	        this.top_synergies = source["top_synergies"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PredictionFactors {
 	    deck_average_gihwr: number;
 	    color_adjustment: number;
 	    curve_score: number;
 	    bomb_bonus: number;
 	    synergy_score: number;
+	    synergy_details?: SynergyResult;
 	    baseline_win_rate: number;
 	    explanation: string;
 	    card_breakdown: Record<string, number>;
@@ -3210,6 +3273,7 @@ export namespace prediction {
 	        this.curve_score = source["curve_score"];
 	        this.bomb_bonus = source["bomb_bonus"];
 	        this.synergy_score = source["synergy_score"];
+	        this.synergy_details = this.convertValues(source["synergy_details"], SynergyResult);
 	        this.baseline_win_rate = source["baseline_win_rate"];
 	        this.explanation = source["explanation"];
 	        this.card_breakdown = source["card_breakdown"];
@@ -3220,6 +3284,24 @@ export namespace prediction {
 	        this.low_performers = source["low_performers"];
 	        this.confidence_level = source["confidence_level"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class DeckPrediction {
 	    PredictedWinRate: number;
@@ -3259,6 +3341,8 @@ export namespace prediction {
 		    return a;
 		}
 	}
+	
+	
 
 }
 

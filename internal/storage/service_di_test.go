@@ -542,3 +542,7 @@ func (m *mockDeckRepository) GetCards(_ context.Context, _ string) ([]*models.De
 func (m *mockDeckRepository) GetBySource(_ context.Context, _ int, _ string) ([]*models.Deck, error) {
 	return nil, nil
 }
+
+func (m *mockDeckRepository) DeleteBySourceExcluding(_ context.Context, _ int, _ string, _ []string) (int, error) {
+	return 0, nil
+}
