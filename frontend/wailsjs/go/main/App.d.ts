@@ -135,6 +135,8 @@ export function GetMatchGames(arg1:string):Promise<Array<models.Game>>;
 
 export function GetMatches(arg1:models.StatsFilter):Promise<Array<models.Match>>;
 
+export function GetMetaDashboard(arg1:string):Promise<gui.MetaDashboardResponse>;
+
 export function GetMissingCards(arg1:string,arg2:number,arg3:number):Promise<models.MissingCardsAnalysis>;
 
 export function GetMissingCardsForDeck(arg1:string):Promise<gui.MissingCardsForDeckResponse>;
@@ -185,6 +187,10 @@ export function GetStatsByFormat(arg1:models.StatsFilter):Promise<Record<string,
 
 export function GetStatsUpdatedEvent():Promise<gui.StatsUpdatedEvent>;
 
+export function GetSupportedFormats():Promise<Array<string>>;
+
+export function GetTierArchetypes(arg1:string,arg2:number):Promise<Array<gui.ArchetypeInfo>>;
+
 export function GetTrendAnalysis(arg1:time.Time,arg2:time.Time,arg3:string,arg4:Array<string>):Promise<storage.TrendAnalysis>;
 
 export function ImportDeck(arg1:gui.ImportDeckRequest):Promise<gui.ImportDeckResponse>;
@@ -212,6 +218,8 @@ export function RecordRecommendation(arg1:gui.RecordRecommendationRequest):Promi
 export function RecordRecommendationAction(arg1:gui.RecordActionRequest):Promise<void>;
 
 export function RecordRecommendationOutcome(arg1:gui.RecordOutcomeRequest):Promise<void>;
+
+export function RefreshMetaData(arg1:string):Promise<gui.MetaDashboardResponse>;
 
 export function RefreshSetCards(arg1:string):Promise<number>;
 

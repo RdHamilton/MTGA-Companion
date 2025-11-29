@@ -82,6 +82,27 @@ export const mockWailsApp = {
   GetCollectionStats: vi.fn(() => Promise.resolve({} as any)),
   GetSetCompletion: vi.fn(() => Promise.resolve([] as any[])),
   GetRecentCollectionChanges: vi.fn(() => Promise.resolve([] as any[])),
+  // Meta methods
+  GetMetaDashboard: vi.fn(() => Promise.resolve({
+    format: 'standard',
+    archetypes: [],
+    tournaments: [],
+    totalArchetypes: 0,
+    lastUpdated: new Date().toISOString(),
+    sources: ['mtggoldfish', 'mtgtop8'],
+    error: '',
+  } as any)),
+  RefreshMetaData: vi.fn(() => Promise.resolve({
+    format: 'standard',
+    archetypes: [],
+    tournaments: [],
+    totalArchetypes: 0,
+    lastUpdated: new Date().toISOString(),
+    sources: ['mtggoldfish', 'mtgtop8'],
+    error: '',
+  } as any)),
+  GetSupportedFormats: vi.fn(() => Promise.resolve(['standard', 'historic', 'explorer', 'pioneer', 'modern'])),
+  GetTierArchetypes: vi.fn(() => Promise.resolve([] as any[])),
   // ML/LLM methods
   CheckOllamaStatus: vi.fn(() => Promise.resolve({
     available: true,

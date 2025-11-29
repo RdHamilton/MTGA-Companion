@@ -190,6 +190,32 @@ export namespace gui {
 		}
 	}
 	
+	export class ArchetypeInfo {
+	    name: string;
+	    colors: string[];
+	    metaShare: number;
+	    tournamentTop8s: number;
+	    tournamentWins: number;
+	    tier: number;
+	    confidenceScore: number;
+	    trendDirection: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchetypeInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.colors = source["colors"];
+	        this.metaShare = source["metaShare"];
+	        this.tournamentTop8s = source["tournamentTop8s"];
+	        this.tournamentWins = source["tournamentWins"];
+	        this.tier = source["tier"];
+	        this.confidenceScore = source["confidenceScore"];
+	        this.trendDirection = source["trendDirection"];
+	    }
+	}
 	export class CardRatingWithTier {
 	    name: string;
 	    color: string;
@@ -1350,6 +1376,88 @@ export namespace gui {
 		}
 	}
 	
+	export class TournamentInfo {
+	    name: string;
+	    date: time.Time;
+	    players: number;
+	    format: string;
+	    topDecks: string[];
+	    sourceUrl?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TournamentInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.date = this.convertValues(source["date"], time.Time);
+	        this.players = source["players"];
+	        this.format = source["format"];
+	        this.topDecks = source["topDecks"];
+	        this.sourceUrl = source["sourceUrl"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MetaDashboardResponse {
+	    format: string;
+	    archetypes: ArchetypeInfo[];
+	    tournaments?: TournamentInfo[];
+	    totalArchetypes: number;
+	    lastUpdated: time.Time;
+	    sources: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MetaDashboardResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.archetypes = this.convertValues(source["archetypes"], ArchetypeInfo);
+	        this.tournaments = this.convertValues(source["tournaments"], TournamentInfo);
+	        this.totalArchetypes = source["totalArchetypes"];
+	        this.lastUpdated = this.convertValues(source["lastUpdated"], time.Time);
+	        this.sources = source["sources"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class MissingCard {
 	    cardId: number;
 	    arenaId: number;
@@ -1769,6 +1877,7 @@ export namespace gui {
 	        this.games = source["games"];
 	    }
 	}
+	
 	
 	
 
