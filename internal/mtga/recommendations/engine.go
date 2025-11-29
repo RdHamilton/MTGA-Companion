@@ -311,8 +311,7 @@ func analyzeDeck(deck *DeckContext) *DeckAnalysis {
 			nonLandCount += deckCard.Quantity
 		}
 
-		// Extract keywords (basic implementation)
-		// TODO: More sophisticated keyword extraction
+		// Extract keywords using sophisticated extraction
 		if card.OracleText != nil {
 			extractKeywords(*card.OracleText, analysis.Keywords, deckCard.Quantity)
 		}
@@ -860,25 +859,352 @@ func extractKeywords(text string, keywords map[string]int, quantity int) {
 	}
 }
 
-// extractKeywordsFromText extracts keywords from card text.
+// KeywordCategory represents the type of keyword extracted.
+type KeywordCategory string
+
+const (
+	CategoryCombat     KeywordCategory = "combat"
+	CategoryAbility    KeywordCategory = "ability"
+	CategoryMechanic   KeywordCategory = "mechanic"
+	CategoryTheme      KeywordCategory = "theme"
+	CategoryTrigger    KeywordCategory = "trigger"
+	CategoryActivated  KeywordCategory = "activated"
+	CategoryProtection KeywordCategory = "protection"
+)
+
+// KeywordInfo contains information about an extracted keyword.
+type KeywordInfo struct {
+	Keyword  string
+	Category KeywordCategory
+	Weight   float64 // How important this keyword is for synergy (0.0-1.0)
+}
+
+// keywordDictionary maps keywords/patterns to their category and weight.
+var keywordDictionary = map[string]KeywordInfo{
+	// Combat keywords (high synergy weight)
+	"flying":        {Keyword: "flying", Category: CategoryCombat, Weight: 0.8},
+	"first strike":  {Keyword: "first strike", Category: CategoryCombat, Weight: 0.7},
+	"double strike": {Keyword: "double strike", Category: CategoryCombat, Weight: 0.9},
+	"deathtouch":    {Keyword: "deathtouch", Category: CategoryCombat, Weight: 0.8},
+	"haste":         {Keyword: "haste", Category: CategoryCombat, Weight: 0.6},
+	"lifelink":      {Keyword: "lifelink", Category: CategoryCombat, Weight: 0.7},
+	"menace":        {Keyword: "menace", Category: CategoryCombat, Weight: 0.7},
+	"reach":         {Keyword: "reach", Category: CategoryCombat, Weight: 0.5},
+	"trample":       {Keyword: "trample", Category: CategoryCombat, Weight: 0.7},
+	"vigilance":     {Keyword: "vigilance", Category: CategoryCombat, Weight: 0.6},
+
+	// Protection/evasion keywords
+	"hexproof":       {Keyword: "hexproof", Category: CategoryProtection, Weight: 0.8},
+	"indestructible": {Keyword: "indestructible", Category: CategoryProtection, Weight: 0.9},
+	"ward":           {Keyword: "ward", Category: CategoryProtection, Weight: 0.7},
+	"shroud":         {Keyword: "shroud", Category: CategoryProtection, Weight: 0.7},
+	"protection":     {Keyword: "protection", Category: CategoryProtection, Weight: 0.7},
+
+	// Static ability keywords
+	"flash":    {Keyword: "flash", Category: CategoryAbility, Weight: 0.6},
+	"defender": {Keyword: "defender", Category: CategoryAbility, Weight: 0.3},
+	"prowess":  {Keyword: "prowess", Category: CategoryAbility, Weight: 0.8},
+	"convoke":  {Keyword: "convoke", Category: CategoryAbility, Weight: 0.7},
+
+	// Set mechanics
+	"flashback": {Keyword: "flashback", Category: CategoryMechanic, Weight: 0.8},
+	"kicker":    {Keyword: "kicker", Category: CategoryMechanic, Weight: 0.6},
+	"adventure": {Keyword: "adventure", Category: CategoryMechanic, Weight: 0.7},
+	"transform": {Keyword: "transform", Category: CategoryMechanic, Weight: 0.6},
+	"disturb":   {Keyword: "disturb", Category: CategoryMechanic, Weight: 0.7},
+	"exploit":   {Keyword: "exploit", Category: CategoryMechanic, Weight: 0.8},
+	"escape":    {Keyword: "escape", Category: CategoryMechanic, Weight: 0.8},
+	"madness":   {Keyword: "madness", Category: CategoryMechanic, Weight: 0.7},
+	"cycling":   {Keyword: "cycling", Category: CategoryMechanic, Weight: 0.6},
+	"cascade":   {Keyword: "cascade", Category: CategoryMechanic, Weight: 0.9},
+	"mutate":    {Keyword: "mutate", Category: CategoryMechanic, Weight: 0.8},
+	"foretell":  {Keyword: "foretell", Category: CategoryMechanic, Weight: 0.7},
+	"learn":     {Keyword: "learn", Category: CategoryMechanic, Weight: 0.6},
+	"ninjutsu":  {Keyword: "ninjutsu", Category: CategoryMechanic, Weight: 0.8},
+	"channel":   {Keyword: "channel", Category: CategoryMechanic, Weight: 0.6},
+	"bargain":   {Keyword: "bargain", Category: CategoryMechanic, Weight: 0.7},
+	"craft":     {Keyword: "craft", Category: CategoryMechanic, Weight: 0.7},
+	"descend":   {Keyword: "descend", Category: CategoryMechanic, Weight: 0.7},
+	"threshold": {Keyword: "threshold", Category: CategoryMechanic, Weight: 0.7},
+	"delirium":  {Keyword: "delirium", Category: CategoryMechanic, Weight: 0.7},
+	"affinity":  {Keyword: "affinity", Category: CategoryMechanic, Weight: 0.8},
+	"modular":   {Keyword: "modular", Category: CategoryMechanic, Weight: 0.7},
+	"equip":     {Keyword: "equip", Category: CategoryMechanic, Weight: 0.6},
+	"crew":      {Keyword: "crew", Category: CategoryMechanic, Weight: 0.7},
+	"offspring": {Keyword: "offspring", Category: CategoryMechanic, Weight: 0.7},
+	"valiant":   {Keyword: "valiant", Category: CategoryMechanic, Weight: 0.7},
+}
+
+// themePatterns are regex-like patterns for identifying card themes.
+var themePatterns = []struct {
+	pattern  string
+	keyword  string
+	category KeywordCategory
+	weight   float64
+}{
+	// Token generation
+	{"create a token", "tokens", CategoryTheme, 0.9},
+	{"create a.*token", "tokens", CategoryTheme, 0.9},
+	{"creates a token", "tokens", CategoryTheme, 0.9},
+	{"create two", "tokens", CategoryTheme, 0.9},
+	{"create three", "tokens", CategoryTheme, 0.9},
+
+	// Counter themes
+	{"+1/+1 counter", "+1/+1 counters", CategoryTheme, 0.9},
+	{"put a counter", "counters", CategoryTheme, 0.7},
+	{"put counters", "counters", CategoryTheme, 0.7},
+	{"-1/-1 counter", "-1/-1 counters", CategoryTheme, 0.8},
+	{"loyalty counter", "planeswalkers", CategoryTheme, 0.7},
+	{"charge counter", "artifacts", CategoryTheme, 0.6},
+
+	// Graveyard themes
+	{"from your graveyard", "graveyard", CategoryTheme, 0.9},
+	{"from a graveyard", "graveyard", CategoryTheme, 0.9},
+	{"in your graveyard", "graveyard", CategoryTheme, 0.8},
+	{"return.*from.*graveyard", "graveyard", CategoryTheme, 0.9},
+	{"mill", "mill", CategoryTheme, 0.8},
+	{"self-mill", "mill", CategoryTheme, 0.9},
+
+	// Sacrifice themes
+	{"sacrifice a", "sacrifice", CategoryTheme, 0.9},
+	{"sacrifice another", "sacrifice", CategoryTheme, 0.9},
+	{"sacrificed", "sacrifice", CategoryTheme, 0.8},
+	{"when.*dies", "death triggers", CategoryTheme, 0.8},
+	{"whenever.*dies", "death triggers", CategoryTheme, 0.8},
+
+	// Draw/card advantage
+	{"draw a card", "card draw", CategoryTheme, 0.7},
+	{"draw cards", "card draw", CategoryTheme, 0.8},
+	{"draw two", "card draw", CategoryTheme, 0.8},
+	{"draw three", "card draw", CategoryTheme, 0.9},
+	{"scry", "scry", CategoryTheme, 0.6},
+	{"surveil", "surveil", CategoryTheme, 0.7},
+
+	// Life themes
+	{"gain life", "lifegain", CategoryTheme, 0.7},
+	{"gains life", "lifegain", CategoryTheme, 0.7},
+	{"whenever you gain life", "lifegain payoff", CategoryTheme, 0.9},
+	{"lose life", "drain", CategoryTheme, 0.7},
+	{"pay life", "pay life", CategoryTheme, 0.6},
+
+	// Combat triggers
+	{"deals combat damage", "combat damage", CategoryTheme, 0.8},
+	{"whenever.*attacks", "attack triggers", CategoryTheme, 0.8},
+	{"whenever.*blocks", "block triggers", CategoryTheme, 0.7},
+	{"can't be blocked", "evasion", CategoryTheme, 0.8},
+
+	// Enters triggers
+	{"when.*enters", "enters triggers", CategoryTrigger, 0.8},
+	{"when.*enters the battlefield", "ETB", CategoryTrigger, 0.9},
+	{"whenever.*enters", "enters triggers", CategoryTrigger, 0.8},
+
+	// Cast triggers
+	{"whenever you cast", "cast triggers", CategoryTrigger, 0.8},
+	{"when you cast", "cast triggers", CategoryTrigger, 0.8},
+
+	// Upkeep/beginning triggers
+	{"at the beginning of", "upkeep triggers", CategoryTrigger, 0.7},
+	{"at the beginning of your upkeep", "upkeep", CategoryTrigger, 0.7},
+	{"at the beginning of your end step", "end step", CategoryTrigger, 0.7},
+
+	// Activated abilities
+	{"{t}:", "tap abilities", CategoryActivated, 0.7},
+	{"{t},", "tap abilities", CategoryActivated, 0.7},
+	{"tap:", "tap abilities", CategoryActivated, 0.7},
+
+	// Spell themes
+	{"instant or sorcery", "spells matter", CategoryTheme, 0.8},
+	{"noncreature spell", "spells matter", CategoryTheme, 0.8},
+
+	// Artifact/enchantment themes
+	{"artifact you control", "artifacts matter", CategoryTheme, 0.8},
+	{"enchantment you control", "enchantments matter", CategoryTheme, 0.8},
+	{"aura", "auras", CategoryTheme, 0.7},
+	{"equipment", "equipment", CategoryTheme, 0.7},
+
+	// Power/toughness manipulation
+	{"gets +", "pump", CategoryTheme, 0.6},
+	{"get +", "pump", CategoryTheme, 0.6},
+	{"target creature gets", "pump", CategoryTheme, 0.6},
+
+	// Removal
+	{"destroy target", "removal", CategoryTheme, 0.8},
+	{"exile target", "removal", CategoryTheme, 0.8},
+	{"deals.*damage to", "damage", CategoryTheme, 0.7},
+	{"fight", "fight", CategoryTheme, 0.7},
+	{"bite", "fight", CategoryTheme, 0.7},
+}
+
+// extractKeywordsFromText extracts keywords from card text using sophisticated pattern matching.
 func extractKeywordsFromText(text string) map[string]bool {
 	keywords := make(map[string]bool)
+	lowerText := strings.ToLower(text)
 
-	// Common Magic keywords to look for
-	commonKeywords := []string{
-		"Flying", "First strike", "Double strike", "Deathtouch", "Haste",
-		"Hexproof", "Indestructible", "Lifelink", "Menace", "Reach",
-		"Trample", "Vigilance", "Ward", "Flash", "Defender",
+	// Extract keywords from dictionary
+	for key, info := range keywordDictionary {
+		if strings.Contains(lowerText, key) {
+			keywords[info.Keyword] = true
+		}
 	}
 
-	lowerText := strings.ToLower(text)
-	for _, keyword := range commonKeywords {
-		if strings.Contains(lowerText, strings.ToLower(keyword)) {
-			keywords[keyword] = true
+	// Extract theme patterns
+	for _, pattern := range themePatterns {
+		if containsPattern(lowerText, pattern.pattern) {
+			keywords[pattern.keyword] = true
 		}
 	}
 
 	return keywords
+}
+
+// ExtractKeywordsWithInfo extracts keywords with full information including category and weight.
+// This is useful for more sophisticated synergy calculations.
+func ExtractKeywordsWithInfo(text string) []KeywordInfo {
+	var result []KeywordInfo
+	seen := make(map[string]bool)
+	lowerText := strings.ToLower(text)
+
+	// Extract keywords from dictionary
+	for key, info := range keywordDictionary {
+		if strings.Contains(lowerText, key) && !seen[info.Keyword] {
+			result = append(result, info)
+			seen[info.Keyword] = true
+		}
+	}
+
+	// Extract theme patterns
+	for _, pattern := range themePatterns {
+		if containsPattern(lowerText, pattern.pattern) && !seen[pattern.keyword] {
+			result = append(result, KeywordInfo{
+				Keyword:  pattern.keyword,
+				Category: pattern.category,
+				Weight:   pattern.weight,
+			})
+			seen[pattern.keyword] = true
+		}
+	}
+
+	return result
+}
+
+// GetKeywordWeight returns the synergy weight for a keyword.
+// Higher weight means the keyword is more important for synergy calculations.
+func GetKeywordWeight(keyword string) float64 {
+	lowerKeyword := strings.ToLower(keyword)
+
+	// Check dictionary first
+	if info, ok := keywordDictionary[lowerKeyword]; ok {
+		return info.Weight
+	}
+
+	// Check theme patterns
+	for _, pattern := range themePatterns {
+		if pattern.keyword == keyword {
+			return pattern.weight
+		}
+	}
+
+	// Default weight for unknown keywords
+	return 0.5
+}
+
+// GetKeywordCategory returns the category for a keyword.
+func GetKeywordCategory(keyword string) KeywordCategory {
+	lowerKeyword := strings.ToLower(keyword)
+
+	// Check dictionary first
+	if info, ok := keywordDictionary[lowerKeyword]; ok {
+		return info.Category
+	}
+
+	// Check theme patterns
+	for _, pattern := range themePatterns {
+		if pattern.keyword == keyword {
+			return pattern.category
+		}
+	}
+
+	// Default category
+	return CategoryAbility
+}
+
+// containsPattern performs simple pattern matching.
+// Supports basic patterns like "create a.*token" where .* matches any characters.
+func containsPattern(text, pattern string) bool {
+	// Handle simple patterns without wildcards
+	if !strings.Contains(pattern, ".*") {
+		return strings.Contains(text, pattern)
+	}
+
+	// Handle .* wildcard (matches any characters)
+	parts := strings.Split(pattern, ".*")
+	if len(parts) != 2 {
+		// For patterns with multiple wildcards, fall back to simple contains
+		return strings.Contains(text, parts[0])
+	}
+
+	// Find first part, then check if second part exists after it
+	idx := strings.Index(text, parts[0])
+	if idx == -1 {
+		return false
+	}
+
+	// Check if second part exists after the first part
+	remaining := text[idx+len(parts[0]):]
+	return strings.Contains(remaining, parts[1])
+}
+
+// CalculateKeywordSynergy calculates synergy score between two cards based on shared keywords.
+// Returns a score from 0.0 to 1.0.
+func CalculateKeywordSynergy(card1Keywords, card2Keywords []KeywordInfo) float64 {
+	if len(card1Keywords) == 0 || len(card2Keywords) == 0 {
+		return 0.0
+	}
+
+	// Build lookup for card1 keywords by category
+	card1ByCategory := make(map[KeywordCategory][]KeywordInfo)
+	for _, kw := range card1Keywords {
+		card1ByCategory[kw.Category] = append(card1ByCategory[kw.Category], kw)
+	}
+
+	totalSynergy := 0.0
+	matchCount := 0
+
+	for _, kw2 := range card2Keywords {
+		// Check for exact keyword match
+		for _, kw1 := range card1Keywords {
+			if kw1.Keyword == kw2.Keyword {
+				// Exact match - use average of weights
+				totalSynergy += (kw1.Weight + kw2.Weight) / 2
+				matchCount++
+			}
+		}
+
+		// Check for same category match (weaker synergy)
+		if categoryKws, ok := card1ByCategory[kw2.Category]; ok {
+			for _, kw1 := range categoryKws {
+				if kw1.Keyword != kw2.Keyword {
+					// Same category but different keyword - partial synergy
+					totalSynergy += (kw1.Weight + kw2.Weight) / 4
+					matchCount++
+				}
+			}
+		}
+	}
+
+	if matchCount == 0 {
+		return 0.0
+	}
+
+	// Normalize by the number of possible matches
+	maxMatches := len(card1Keywords) * len(card2Keywords)
+	normalized := totalSynergy / float64(maxMatches)
+
+	// Clamp to 0.0-1.0
+	if normalized > 1.0 {
+		return 1.0
+	}
+	return normalized
 }
 
 // extractCreatureTypes extracts creature types from type line and adds to the map.
