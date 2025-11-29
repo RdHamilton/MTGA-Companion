@@ -14,6 +14,7 @@ type PredictionFactors struct {
 	CurveScore        float64            `json:"curve_score"`        // Quality of mana curve (0-1)
 	BombBonus         float64            `json:"bomb_bonus"`         // Bonus from premium cards
 	SynergyScore      float64            `json:"synergy_score"`      // Card synergy rating (0-1)
+	SynergyDetails    *SynergyResult     `json:"synergy_details"`    // Detailed synergy breakdown
 	BaselineWinRate   float64            `json:"baseline_win_rate"`  // Format average (0.50)
 	Explanation       string             `json:"explanation"`        // Human-readable summary
 	CardBreakdown     map[string]float64 `json:"card_breakdown"`     // Card name -> GIHWR
@@ -122,15 +123,19 @@ func PredictWinRate(cards []Card) (*DeckPrediction, error) {
 	// 4. Bomb bonus
 	factors.BombBonus = float64(bombCount) * 0.01 // +1% per bomb
 
-	// 5. Synergy score (placeholder - can be enhanced later)
-	factors.SynergyScore = 0.5 // Neutral for now
+	// 5. Synergy score - calculate using the synergy engine
+	cardData := ConvertCardsToCardData(cards)
+	synergyResult := CalculateSynergy(cardData)
+	factors.SynergyScore = synergyResult.OverallScore
+	factors.SynergyDetails = synergyResult
 
 	// Calculate final prediction
-	// Formula: baseline + (average_gihwr - 0.50) + color_adj + curve_bonus + bomb_bonus
+	// Formula: baseline + (average_gihwr - 0.50) + color_adj + curve_bonus + bomb_bonus + synergy_bonus
 	deckQualityDelta := factors.DeckAverageGIHWR - baselineWinRate
-	curveBonus := (factors.CurveScore - 0.5) * 0.05 // Max +/-2.5% from curve
+	curveBonus := (factors.CurveScore - 0.5) * 0.05     // Max +/-2.5% from curve
+	synergyBonus := (factors.SynergyScore - 0.5) * 0.04 // Max +/-2% from synergy
 
-	predictedWinRate := baselineWinRate + deckQualityDelta + factors.ColorAdjustment + curveBonus + factors.BombBonus
+	predictedWinRate := baselineWinRate + deckQualityDelta + factors.ColorAdjustment + curveBonus + factors.BombBonus + synergyBonus
 
 	// Clamp to reasonable range (30% to 70%)
 	predictedWinRate = math.Max(0.30, math.Min(0.70, predictedWinRate))
@@ -223,6 +228,16 @@ func generateExplanation(factors PredictionFactors, winRate float64) string {
 	// Bombs
 	if len(factors.HighPerformers) > 0 {
 		explanation += fmt.Sprintf(", %d premium cards", len(factors.HighPerformers))
+	}
+
+	// Synergy
+	if factors.SynergyDetails != nil {
+		totalSynergies := factors.SynergyDetails.TribalSynergies + factors.SynergyDetails.MechSynergies
+		if totalSynergies > 5 {
+			explanation += ", strong synergies"
+		} else if totalSynergies > 2 {
+			explanation += ", some synergies"
+		}
 	}
 
 	return explanation + "."
