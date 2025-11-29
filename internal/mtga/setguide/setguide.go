@@ -42,12 +42,22 @@ type CardTier struct {
 	Name     string
 	Color    string
 	Rarity   string
+	CardType string // Primary card type: "Creature", "Instant", "Sorcery", etc.
 	GIHWR    float64
 	ALSA     float64
 	ATA      float64
 	GIH      int
 	Tier     string // "S", "A", "B", "C", "D", "F"
 	Category string // "Bomb", "Removal", "Fixing", etc.
+}
+
+// TypeStats represents statistics for a card type within a set.
+type TypeStats struct {
+	Type       string  // Card type (e.g., "Creature", "Instant")
+	Count      int     // Number of cards of this type
+	Percentage float64 // Percentage of set (0-100)
+	AvgGIHWR   float64 // Average GIHWR for this type
+	TopCards   []CardTier
 }
 
 // SetOverview provides high-level set information.
@@ -59,6 +69,12 @@ type SetOverview struct {
 	TopCommons   []CardTier
 	TopUncommons []CardTier
 	KeyRemoval   []CardTier
+	TypeStats    []TypeStats // Card type distribution and statistics
+	TopCreatures []CardTier  // Best creatures in set
+	TopInstants  []CardTier  // Best instants (often removal/tricks)
+	TopSorceries []CardTier  // Best sorceries
+	TopArtifacts []CardTier  // Best artifacts
+	TopEnchants  []CardTier  // Best enchantments
 }
 
 // NewSetGuide creates a new set guide.
@@ -176,6 +192,14 @@ func (sg *SetGuide) GetTierList(setCode string, opts TierListOptions) ([]CardTie
 			continue
 		}
 
+		// Extract primary card type
+		cardType := getPrimaryCardType(cardData.Types)
+
+		// Filter by card type if specified
+		if opts.CardType != "" && !stringContainsIgnoreCase(cardType, opts.CardType) {
+			continue
+		}
+
 		// Get rating for "ALL" colors
 		rating, ok := cardData.DeckColors["ALL"]
 		if !ok {
@@ -186,12 +210,13 @@ func (sg *SetGuide) GetTierList(setCode string, opts TierListOptions) ([]CardTie
 			Name:     cardData.Name,
 			Color:    colorString(cardData.Colors),
 			Rarity:   cardData.Rarity,
+			CardType: cardType,
 			GIHWR:    rating.GIHWR,
 			ALSA:     rating.ALSA,
 			ATA:      rating.ATA,
 			GIH:      rating.GIH,
 			Tier:     calculateTier(rating.GIHWR),
-			Category: categorizeCard(cardData.Name, rating.GIHWR),
+			Category: categorizeCard(cardData.Name, cardType, rating.GIHWR),
 		}
 
 		tiers = append(tiers, tier)
@@ -235,6 +260,40 @@ func (sg *SetGuide) GetSetOverview(setCode string) (*SetOverview, error) {
 		Limit:  10,
 	})
 	overview.TopUncommons = uncommons
+
+	// Get top cards by type
+	creatures, _ := sg.GetTierList(setCode, TierListOptions{
+		CardType: "Creature",
+		Limit:    10,
+	})
+	overview.TopCreatures = creatures
+
+	instants, _ := sg.GetTierList(setCode, TierListOptions{
+		CardType: "Instant",
+		Limit:    10,
+	})
+	overview.TopInstants = instants
+
+	sorceries, _ := sg.GetTierList(setCode, TierListOptions{
+		CardType: "Sorcery",
+		Limit:    10,
+	})
+	overview.TopSorceries = sorceries
+
+	artifacts, _ := sg.GetTierList(setCode, TierListOptions{
+		CardType: "Artifact",
+		Limit:    10,
+	})
+	overview.TopArtifacts = artifacts
+
+	enchantments, _ := sg.GetTierList(setCode, TierListOptions{
+		CardType: "Enchantment",
+		Limit:    10,
+	})
+	overview.TopEnchants = enchantments
+
+	// Calculate type statistics
+	overview.TypeStats = sg.calculateTypeStats(setCode, setFile)
 
 	// Get top color pairs and create archetypes
 	var colorPairs []struct {
@@ -280,9 +339,10 @@ func (sg *SetGuide) GetColorRatings(setCode string) (map[string]float64, error) 
 
 // TierListOptions configures tier list generation.
 type TierListOptions struct {
-	Rarity string // Filter by rarity ("common", "uncommon", "rare", "mythic")
-	Color  string // Filter by color ("W", "U", "B", "R", "G")
-	Limit  int    // Limit number of results
+	Rarity   string // Filter by rarity ("common", "uncommon", "rare", "mythic")
+	Color    string // Filter by color ("W", "U", "B", "R", "G")
+	CardType string // Filter by card type ("Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Planeswalker")
+	Limit    int    // Limit number of results
 }
 
 // Cache management
@@ -367,19 +427,64 @@ func calculateTier(gihwr float64) string {
 	}
 }
 
-func categorizeCard(name string, gihwr float64) string {
-	// Simple categorization based on name patterns
-	// TODO: Use card types for better categorization
+func categorizeCard(name, cardType string, gihwr float64) string {
+	// Categorization using card type and name patterns
 	nameLower := name
-	if contains([]string{"Murder", "Destroy", "Exile", "Kill", "Strike", "Bolt"}, nameLower) {
+
+	// Check for removal patterns
+	if stringContainsIgnoreCase(name, "Murder") ||
+		stringContainsIgnoreCase(name, "Destroy") ||
+		stringContainsIgnoreCase(name, "Exile") ||
+		stringContainsIgnoreCase(name, "Kill") ||
+		stringContainsIgnoreCase(name, "Strike") ||
+		stringContainsIgnoreCase(name, "Bolt") {
 		return "Removal"
 	}
+
+	// Instants and sorceries are often removal or tricks
+	if cardType == "Instant" {
+		if gihwr >= 0.55 {
+			return "Removal/Trick"
+		}
+		return "Trick"
+	}
+
+	if cardType == "Sorcery" {
+		if gihwr >= 0.55 {
+			return "Removal/Sweeper"
+		}
+		return "Utility"
+	}
+
+	// High win rate cards are bombs
 	if gihwr >= 0.60 { // GIHWR is decimal, so 0.60 = 60%
 		return "Bomb"
 	}
-	if contains([]string{"Evolving", "Wilds", "Terramorphic"}, nameLower) {
+
+	// Lands with name patterns are fixing
+	if cardType == "Land" ||
+		contains([]string{"Evolving", "Wilds", "Terramorphic"}, nameLower) {
 		return "Fixing"
 	}
+
+	// Artifacts can be ramp or utility
+	if cardType == "Artifact" {
+		return "Artifact"
+	}
+
+	// Enchantments are usually utility
+	if cardType == "Enchantment" {
+		return "Enchantment"
+	}
+
+	// Creatures are the default
+	if cardType == "Creature" {
+		if gihwr >= 0.57 {
+			return "Premium Creature"
+		}
+		return "Creature"
+	}
+
 	return "Playable"
 }
 
@@ -784,4 +889,144 @@ func generateStrategyDescription(guildName, style string, winRate float64) strin
 	default:
 		return fmt.Sprintf("%s archetype. Win rate: %s.", guildName, winRateStr)
 	}
+}
+
+// getPrimaryCardType extracts the primary card type from the type line.
+// MTG cards can have multiple types (e.g., "Artifact Creature"), this returns the primary one.
+func getPrimaryCardType(types []string) string {
+	if len(types) == 0 {
+		return "Unknown"
+	}
+
+	// Priority order for primary type determination
+	// Check for specific types first
+	for _, t := range types {
+		switch t {
+		case "Creature":
+			return "Creature"
+		case "Planeswalker":
+			return "Planeswalker"
+		}
+	}
+
+	for _, t := range types {
+		switch t {
+		case "Instant":
+			return "Instant"
+		case "Sorcery":
+			return "Sorcery"
+		}
+	}
+
+	for _, t := range types {
+		switch t {
+		case "Artifact":
+			return "Artifact"
+		case "Enchantment":
+			return "Enchantment"
+		case "Land":
+			return "Land"
+		}
+	}
+
+	// Return first type if no match
+	return types[0]
+}
+
+// stringContainsIgnoreCase checks if haystack contains needle (case-insensitive).
+func stringContainsIgnoreCase(haystack, needle string) bool {
+	if len(needle) == 0 {
+		return true
+	}
+	if len(haystack) < len(needle) {
+		return false
+	}
+
+	// Convert both to lowercase for comparison
+	haystackLower := toLowerSimple(haystack)
+	needleLower := toLowerSimple(needle)
+
+	for i := 0; i <= len(haystackLower)-len(needleLower); i++ {
+		if haystackLower[i:i+len(needleLower)] == needleLower {
+			return true
+		}
+	}
+	return false
+}
+
+// toLowerSimple converts a string to lowercase (ASCII only for performance).
+func toLowerSimple(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			result[i] = c + 32
+		} else {
+			result[i] = c
+		}
+	}
+	return string(result)
+}
+
+// calculateTypeStats computes statistics for each card type in the set.
+func (sg *SetGuide) calculateTypeStats(setCode string, setFile *seventeenlands.SetFile) []TypeStats {
+	// Map to accumulate stats per type
+	typeData := make(map[string]struct {
+		count     int
+		totalGIHR float64
+	})
+
+	totalCards := 0
+
+	for _, cardData := range setFile.CardRatings {
+		cardType := getPrimaryCardType(cardData.Types)
+
+		// Get rating
+		rating, ok := cardData.DeckColors["ALL"]
+		if !ok {
+			continue
+		}
+
+		totalCards++
+
+		data := typeData[cardType]
+		data.count++
+		data.totalGIHR += rating.GIHWR
+		typeData[cardType] = data
+	}
+
+	// Convert to slice and calculate averages
+	var stats []TypeStats
+	for typeName, data := range typeData {
+		avgGIHWR := 0.0
+		if data.count > 0 {
+			avgGIHWR = data.totalGIHR / float64(data.count)
+		}
+
+		percentage := 0.0
+		if totalCards > 0 {
+			percentage = (float64(data.count) / float64(totalCards)) * 100
+		}
+
+		// Get top cards for this type
+		topCards, _ := sg.GetTierList(setCode, TierListOptions{
+			CardType: typeName,
+			Limit:    5,
+		})
+
+		stats = append(stats, TypeStats{
+			Type:       typeName,
+			Count:      data.count,
+			Percentage: percentage,
+			AvgGIHWR:   avgGIHWR,
+			TopCards:   topCards,
+		})
+	}
+
+	// Sort by count (most common types first)
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Count > stats[j].Count
+	})
+
+	return stats
 }

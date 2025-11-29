@@ -323,3 +323,295 @@ func TestDetermineArchetypeStyle(t *testing.T) {
 		t.Errorf("Expected Aggro style for low CMC RW deck, got %s", style)
 	}
 }
+
+func TestGetPrimaryCardType(t *testing.T) {
+	tests := []struct {
+		name     string
+		types    []string
+		expected string
+	}{
+		{"empty", []string{}, "Unknown"},
+		{"creature only", []string{"Creature"}, "Creature"},
+		{"artifact creature", []string{"Artifact", "Creature"}, "Creature"},
+		{"instant", []string{"Instant"}, "Instant"},
+		{"sorcery", []string{"Sorcery"}, "Sorcery"},
+		{"artifact", []string{"Artifact"}, "Artifact"},
+		{"enchantment", []string{"Enchantment"}, "Enchantment"},
+		{"land", []string{"Land"}, "Land"},
+		{"planeswalker", []string{"Planeswalker"}, "Planeswalker"},
+		{"enchantment creature", []string{"Enchantment", "Creature"}, "Creature"},
+		{"legendary creature", []string{"Legendary", "Creature"}, "Creature"},
+		{"artifact land", []string{"Artifact", "Land"}, "Artifact"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getPrimaryCardType(tt.types)
+			if got != tt.expected {
+				t.Errorf("getPrimaryCardType(%v) = %s, want %s", tt.types, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStringContainsIgnoreCase(t *testing.T) {
+	tests := []struct {
+		haystack string
+		needle   string
+		expected bool
+	}{
+		{"Hello World", "world", true},
+		{"Hello World", "WORLD", true},
+		{"Hello World", "hello", true},
+		{"Hello World", "xyz", false},
+		{"Creature", "Creature", true},
+		{"Artifact Creature", "creature", true},
+		{"", "test", false},
+		{"test", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.haystack+"/"+tt.needle, func(t *testing.T) {
+			got := stringContainsIgnoreCase(tt.haystack, tt.needle)
+			if got != tt.expected {
+				t.Errorf("stringContainsIgnoreCase(%q, %q) = %v, want %v", tt.haystack, tt.needle, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCategorizeCardWithType(t *testing.T) {
+	tests := []struct {
+		name     string
+		cardName string
+		cardType string
+		gihwr    float64
+		expected string
+	}{
+		{"high winrate creature", "Big Dragon", "Creature", 0.65, "Bomb"},
+		{"premium creature", "Good Knight", "Creature", 0.58, "Premium Creature"},
+		{"regular creature", "Goblin Piker", "Creature", 0.50, "Creature"},
+		{"high winrate instant", "Lightning Strike", "Instant", 0.56, "Removal"},
+		{"regular instant", "Unsummon", "Instant", 0.52, "Trick"},
+		{"high winrate sorcery", "Wrath of God", "Sorcery", 0.58, "Removal/Sweeper"},
+		{"regular sorcery", "Divination", "Sorcery", 0.50, "Utility"},
+		{"removal by name", "Murder", "Instant", 0.55, "Removal"},
+		{"land", "Forest", "Land", 0.50, "Fixing"},
+		{"artifact", "Sol Ring", "Artifact", 0.50, "Artifact"},
+		{"enchantment", "Pacifism", "Enchantment", 0.50, "Enchantment"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := categorizeCard(tt.cardName, tt.cardType, tt.gihwr)
+			if got != tt.expected {
+				t.Errorf("categorizeCard(%q, %q, %v) = %s, want %s", tt.cardName, tt.cardType, tt.gihwr, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToLowerSimple(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"HELLO", "hello"},
+		{"Hello World", "hello world"},
+		{"already lower", "already lower"},
+		{"MiXeD CaSe", "mixed case"},
+		{"123ABC", "123abc"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := toLowerSimple(tt.input)
+			if got != tt.expected {
+				t.Errorf("toLowerSimple(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetTierListWithCardTypeFilter(t *testing.T) {
+	sg := NewSetGuide(nil, "")
+
+	// Manually add a set file with typed cards
+	sg.setFiles["TEST"] = &seventeenlands.SetFile{
+		CardRatings: map[string]*seventeenlands.CardRatingData{
+			"1": {
+				Name:   "Big Creature",
+				Colors: []string{"G"},
+				Types:  []string{"Creature"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.58, GIH: 100},
+				},
+			},
+			"2": {
+				Name:   "Lightning Bolt",
+				Colors: []string{"R"},
+				Types:  []string{"Instant"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.60, GIH: 100},
+				},
+			},
+			"3": {
+				Name:   "Divination",
+				Colors: []string{"U"},
+				Types:  []string{"Sorcery"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.52, GIH: 100},
+				},
+			},
+			"4": {
+				Name:   "Sol Ring",
+				Colors: []string{},
+				Types:  []string{"Artifact"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.70, GIH: 100},
+				},
+			},
+		},
+	}
+
+	// Test filtering by Creature
+	creatures, err := sg.GetTierList("TEST", TierListOptions{CardType: "Creature"})
+	if err != nil {
+		t.Fatalf("GetTierList returned error: %v", err)
+	}
+	if len(creatures) != 1 {
+		t.Errorf("Expected 1 creature, got %d", len(creatures))
+	}
+	if len(creatures) > 0 && creatures[0].Name != "Big Creature" {
+		t.Errorf("Expected Big Creature, got %s", creatures[0].Name)
+	}
+
+	// Test filtering by Instant
+	instants, err := sg.GetTierList("TEST", TierListOptions{CardType: "Instant"})
+	if err != nil {
+		t.Fatalf("GetTierList returned error: %v", err)
+	}
+	if len(instants) != 1 {
+		t.Errorf("Expected 1 instant, got %d", len(instants))
+	}
+
+	// Test filtering by Artifact
+	artifacts, err := sg.GetTierList("TEST", TierListOptions{CardType: "Artifact"})
+	if err != nil {
+		t.Fatalf("GetTierList returned error: %v", err)
+	}
+	if len(artifacts) != 1 {
+		t.Errorf("Expected 1 artifact, got %d", len(artifacts))
+	}
+}
+
+func TestCalculateTypeStats(t *testing.T) {
+	sg := NewSetGuide(nil, "")
+
+	// Manually add a set file with typed cards
+	sg.setFiles["TEST"] = &seventeenlands.SetFile{
+		CardRatings: map[string]*seventeenlands.CardRatingData{
+			"1": {
+				Name:  "Creature 1",
+				Types: []string{"Creature"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.55, GIH: 100},
+				},
+			},
+			"2": {
+				Name:  "Creature 2",
+				Types: []string{"Creature"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.50, GIH: 100},
+				},
+			},
+			"3": {
+				Name:  "Instant 1",
+				Types: []string{"Instant"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.60, GIH: 100},
+				},
+			},
+		},
+	}
+
+	stats := sg.calculateTypeStats("TEST", sg.setFiles["TEST"])
+
+	if len(stats) != 2 {
+		t.Errorf("Expected 2 type stats (Creature, Instant), got %d", len(stats))
+	}
+
+	// Find creature stats
+	var creatureStats *TypeStats
+	for i := range stats {
+		if stats[i].Type == "Creature" {
+			creatureStats = &stats[i]
+			break
+		}
+	}
+
+	if creatureStats == nil {
+		t.Fatal("Expected to find Creature type stats")
+	}
+
+	if creatureStats.Count != 2 {
+		t.Errorf("Expected 2 creatures, got %d", creatureStats.Count)
+	}
+
+	// Average GIHWR should be (0.55 + 0.50) / 2 = 0.525
+	expectedAvg := 0.525
+	if creatureStats.AvgGIHWR != expectedAvg {
+		t.Errorf("Expected avg GIHWR %f, got %f", expectedAvg, creatureStats.AvgGIHWR)
+	}
+}
+
+func TestGetSetOverviewWithTypeData(t *testing.T) {
+	sg := NewSetGuide(nil, "")
+
+	// Manually add a set file with typed cards
+	sg.setFiles["TEST"] = &seventeenlands.SetFile{
+		CardRatings: map[string]*seventeenlands.CardRatingData{
+			"1": {
+				Name:   "Best Creature",
+				Colors: []string{"G"},
+				Rarity: "common",
+				Types:  []string{"Creature"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.65, GIH: 100},
+				},
+			},
+			"2": {
+				Name:   "Good Instant",
+				Colors: []string{"R"},
+				Rarity: "common",
+				Types:  []string{"Instant"},
+				DeckColors: map[string]*seventeenlands.DeckColorRatings{
+					"ALL": {GIHWR: 0.60, GIH: 100},
+				},
+			},
+		},
+		ColorRatings: map[string]float64{
+			"GR": 0.55,
+		},
+	}
+
+	overview, err := sg.GetSetOverview("TEST")
+	if err != nil {
+		t.Fatalf("GetSetOverview returned error: %v", err)
+	}
+
+	// Check that type-based lists are populated
+	if len(overview.TopCreatures) == 0 {
+		t.Error("Expected TopCreatures to be populated")
+	}
+
+	if len(overview.TopInstants) == 0 {
+		t.Error("Expected TopInstants to be populated")
+	}
+
+	// Check that TypeStats is populated
+	if len(overview.TypeStats) == 0 {
+		t.Error("Expected TypeStats to be populated")
+	}
+}
