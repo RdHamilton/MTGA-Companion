@@ -14,6 +14,7 @@ export default function Meta() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedArchetype, setSelectedArchetype] = useState<gui.ArchetypeInfo | null>(null);
 
   // Load supported formats on mount
   useEffect(() => {
@@ -219,7 +220,14 @@ export default function Meta() {
                       <div className="no-archetypes">No archetypes in this tier</div>
                     ) : (
                       archetypes.map((arch, idx) => (
-                        <div key={`${arch.name}-${idx}`} className="archetype-card">
+                        <div
+                          key={`${arch.name}-${idx}`}
+                          className="archetype-card"
+                          onClick={() => setSelectedArchetype(arch)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && setSelectedArchetype(arch)}
+                        >
                           <div className="archetype-header">
                             <span className="archetype-name">{arch.name}</span>
                             {getColorBadge(arch.colors)}
@@ -250,6 +258,7 @@ export default function Meta() {
                               </div>
                             )}
                           </div>
+                          <span className="archetype-arrow">→</span>
                         </div>
                       ))
                     )}
@@ -313,6 +322,110 @@ export default function Meta() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Archetype Detail Panel */}
+      {selectedArchetype && (
+        <div className="archetype-detail-overlay" onClick={() => setSelectedArchetype(null)}>
+          <div className="archetype-detail-panel" onClick={(e) => e.stopPropagation()}>
+            <button className="close-button" onClick={() => setSelectedArchetype(null)}>
+              ×
+            </button>
+
+            <div className="detail-header">
+              <h2>{selectedArchetype.name}</h2>
+              <div className="detail-badges">
+                {getTierLabel(selectedArchetype.tier)}
+                {getColorBadge(selectedArchetype.colors)}
+                {getTrendIcon(selectedArchetype.trendDirection)}
+              </div>
+            </div>
+
+            <div className="detail-stats-grid">
+              <div className="detail-stat-card">
+                <div className="detail-stat-icon">📊</div>
+                <div className="detail-stat-value">{selectedArchetype.metaShare > 0 ? `${selectedArchetype.metaShare.toFixed(1)}%` : 'N/A'}</div>
+                <div className="detail-stat-label">Meta Share</div>
+                <div className="detail-stat-description">
+                  {selectedArchetype.metaShare >= 10 ? 'Dominant force in the meta' :
+                   selectedArchetype.metaShare >= 5 ? 'Popular and competitive choice' :
+                   selectedArchetype.metaShare >= 2 ? 'Solid meta presence' :
+                   selectedArchetype.metaShare > 0 ? 'Niche but viable' : 'No meta data available'}
+                </div>
+              </div>
+
+              <div className="detail-stat-card">
+                <div className="detail-stat-icon">🏆</div>
+                <div className="detail-stat-value">{selectedArchetype.tournamentTop8s || 0}</div>
+                <div className="detail-stat-label">Tournament Top 8s</div>
+                <div className="detail-stat-description">
+                  {selectedArchetype.tournamentTop8s >= 20 ? 'Proven tournament powerhouse' :
+                   selectedArchetype.tournamentTop8s >= 10 ? 'Consistent tournament performer' :
+                   selectedArchetype.tournamentTop8s >= 5 ? 'Regular top 8 finisher' :
+                   selectedArchetype.tournamentTop8s > 0 ? 'Some tournament success' : 'Limited tournament data'}
+                </div>
+              </div>
+
+              <div className="detail-stat-card">
+                <div className="detail-stat-icon">🥇</div>
+                <div className="detail-stat-value">{selectedArchetype.tournamentWins || 0}</div>
+                <div className="detail-stat-label">Tournament Wins</div>
+                <div className="detail-stat-description">
+                  {selectedArchetype.tournamentWins >= 5 ? 'Multiple tournament champion' :
+                   selectedArchetype.tournamentWins >= 2 ? 'Tournament winner' :
+                   selectedArchetype.tournamentWins === 1 ? 'Has taken down a tournament' : 'No recorded wins yet'}
+                </div>
+              </div>
+
+              <div className="detail-stat-card">
+                <div className="detail-stat-icon">📈</div>
+                <div className="detail-stat-value">
+                  {selectedArchetype.confidenceScore > 0 ? `${Math.round(selectedArchetype.confidenceScore * 100)}%` : 'N/A'}
+                </div>
+                <div className="detail-stat-label">Data Confidence</div>
+                <div className="detail-stat-description">
+                  {selectedArchetype.confidenceScore >= 0.8 ? 'Very reliable data from multiple sources' :
+                   selectedArchetype.confidenceScore >= 0.5 ? 'Good data confidence' :
+                   selectedArchetype.confidenceScore > 0 ? 'Limited data available' : 'Confidence data unavailable'}
+                </div>
+              </div>
+            </div>
+
+            <div className="detail-trend-section">
+              <h3>Trend Analysis</h3>
+              <div className="trend-indicator">
+                {selectedArchetype.trendDirection === 'up' && (
+                  <>
+                    <span className="trend-arrow trend-up">↗</span>
+                    <span>This archetype is <strong>trending upward</strong> in the meta. Consider learning it now!</span>
+                  </>
+                )}
+                {selectedArchetype.trendDirection === 'down' && (
+                  <>
+                    <span className="trend-arrow trend-down">↘</span>
+                    <span>This archetype is <strong>trending downward</strong>. The meta may be adjusting against it.</span>
+                  </>
+                )}
+                {(!selectedArchetype.trendDirection || selectedArchetype.trendDirection === 'stable') && (
+                  <>
+                    <span className="trend-arrow trend-stable">→</span>
+                    <span>This archetype has been <strong>stable</strong> in the meta recently.</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="detail-tier-explanation">
+              <h3>Tier Ranking</h3>
+              <p>
+                {selectedArchetype.tier === 1 && 'Tier 1 decks are the most competitive and popular choices in the format. These decks consistently perform well and are often the decks to beat.'}
+                {selectedArchetype.tier === 2 && 'Tier 2 decks are strong contenders that can win tournaments but may have some weaknesses against Tier 1 strategies.'}
+                {selectedArchetype.tier === 3 && 'Tier 3 decks are viable options that can catch opponents off-guard but may struggle against the most popular decks.'}
+                {selectedArchetype.tier >= 4 && 'Lower tier decks are fringe options that may be fun to play but are not considered competitively optimal.'}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
