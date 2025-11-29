@@ -236,7 +236,7 @@ func (sg *SetGuide) GetSetOverview(setCode string) (*SetOverview, error) {
 	})
 	overview.TopUncommons = uncommons
 
-	// Get top color pairs
+	// Get top color pairs and create archetypes
 	var colorPairs []struct {
 		Colors  string
 		WinRate float64
@@ -253,7 +253,9 @@ func (sg *SetGuide) GetSetOverview(setCode string) (*SetOverview, error) {
 		return colorPairs[i].WinRate > colorPairs[j].WinRate
 	})
 
-	// TODO: Add archetypes based on top color pairs
+	// Generate archetypes from top color pairs
+	topArchetypes := sg.generateArchetypesFromColorPairs(setCode, colorPairs, setFile)
+	overview.TopArchetype = topArchetypes
 
 	return overview, nil
 }
@@ -411,4 +413,375 @@ func setCodeToName(code string) string {
 		return name
 	}
 	return code
+}
+
+// guildNames maps two-color combinations to their guild names.
+var guildNames = map[string]string{
+	"WU": "Azorius",
+	"UW": "Azorius",
+	"UB": "Dimir",
+	"BU": "Dimir",
+	"BR": "Rakdos",
+	"RB": "Rakdos",
+	"RG": "Gruul",
+	"GR": "Gruul",
+	"GW": "Selesnya",
+	"WG": "Selesnya",
+	"WB": "Orzhov",
+	"BW": "Orzhov",
+	"UR": "Izzet",
+	"RU": "Izzet",
+	"BG": "Golgari",
+	"GB": "Golgari",
+	"RW": "Boros",
+	"WR": "Boros",
+	"GU": "Simic",
+	"UG": "Simic",
+}
+
+// generateArchetypesFromColorPairs creates Archetype objects from the top color pairs.
+func (sg *SetGuide) generateArchetypesFromColorPairs(
+	setCode string,
+	colorPairs []struct {
+		Colors  string
+		WinRate float64
+	},
+	setFile *seventeenlands.SetFile,
+) []Archetype {
+	// Take top 5 color pairs (or fewer if not available)
+	limit := 5
+	if len(colorPairs) < limit {
+		limit = len(colorPairs)
+	}
+
+	archetypes := make([]Archetype, 0, limit)
+	for i := 0; i < limit; i++ {
+		cp := colorPairs[i]
+		archetype := sg.createArchetypeFromColorPair(cp.Colors, cp.WinRate, setFile)
+		archetypes = append(archetypes, archetype)
+	}
+
+	// Store in cache for GetArchetypes method
+	sg.archetypes[setCode] = archetypes
+
+	return archetypes
+}
+
+// createArchetypeFromColorPair creates an Archetype from a color pair and its win rate.
+func (sg *SetGuide) createArchetypeFromColorPair(
+	colors string,
+	winRate float64,
+	setFile *seventeenlands.SetFile,
+) Archetype {
+	// Get guild name
+	guildName := guildNames[colors]
+	if guildName == "" {
+		guildName = colors
+	}
+
+	// Split colors into individual color letters
+	colorList := make([]string, 0, len(colors))
+	for _, c := range colors {
+		colorList = append(colorList, string(c))
+	}
+
+	// Find key cards for this color pair
+	keyCards := sg.findKeyCardsForColors(colorList, setFile)
+
+	// Determine archetype style based on card analysis
+	style := sg.determineArchetypeStyle(colorList, setFile)
+
+	// Create archetype name (e.g., "Azorius Tempo" or just "Azorius" if no style)
+	name := guildName
+	if style != "" {
+		name = guildName + " " + style
+	}
+
+	// Determine curve preference based on style
+	curve := determineCurveFromStyle(style)
+
+	// Generate strategy description
+	strategy := generateStrategyDescription(guildName, style, winRate)
+
+	return Archetype{
+		Name:     name,
+		Colors:   colorList,
+		Strategy: strategy,
+		KeyCards: keyCards,
+		Curve:    curve,
+		WinRate:  winRate,
+	}
+}
+
+// findKeyCardsForColors finds the top-performing cards in the given colors.
+func (sg *SetGuide) findKeyCardsForColors(colors []string, setFile *seventeenlands.SetFile) []string {
+	type cardScore struct {
+		name  string
+		gihwr float64
+	}
+
+	var candidates []cardScore
+
+	// Build color pair key for deck-specific ratings (e.g., "WU")
+	colorPairKey := ""
+	if len(colors) >= 2 {
+		colorPairKey = colors[0] + colors[1]
+	}
+
+	for name, data := range setFile.CardRatings {
+		// Check if card is in one of the archetype colors
+		cardColors := data.Colors
+		isInColors := false
+
+		// Colorless cards fit any archetype
+		if len(cardColors) == 0 {
+			isInColors = true
+		} else {
+			// Check if any of the card's colors match archetype colors
+			for _, cardColor := range cardColors {
+				for _, c := range colors {
+					if cardColor == c {
+						isInColors = true
+						break
+					}
+				}
+				if isInColors {
+					break
+				}
+			}
+
+			// Also include gold cards that match both archetype colors
+			if !isInColors && len(cardColors) >= 2 && len(colors) >= 2 {
+				hasFirst := false
+				hasSecond := false
+				for _, cc := range cardColors {
+					if cc == colors[0] {
+						hasFirst = true
+					}
+					if cc == colors[1] {
+						hasSecond = true
+					}
+				}
+				if hasFirst && hasSecond {
+					isInColors = true
+				}
+			}
+		}
+
+		if !isInColors {
+			continue
+		}
+
+		// Get ratings - prefer color pair specific, fall back to "ALL"
+		var ratings *seventeenlands.DeckColorRatings
+		if colorPairKey != "" && data.DeckColors != nil {
+			ratings = data.DeckColors[colorPairKey]
+		}
+		if ratings == nil && data.DeckColors != nil {
+			ratings = data.DeckColors["ALL"]
+		}
+		if ratings == nil {
+			continue
+		}
+
+		// Only consider cards with meaningful data
+		if ratings.GIH < 50 || ratings.GIHWR == 0 {
+			continue
+		}
+
+		candidates = append(candidates, cardScore{
+			name:  name,
+			gihwr: ratings.GIHWR,
+		})
+	}
+
+	// Sort by win rate
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].gihwr > candidates[j].gihwr
+	})
+
+	// Take top 5 cards
+	limit := 5
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+
+	keyCards := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		keyCards = append(keyCards, candidates[i].name)
+	}
+
+	return keyCards
+}
+
+// determineArchetypeStyle analyzes cards to determine the archetype's play style.
+func (sg *SetGuide) determineArchetypeStyle(colors []string, setFile *seventeenlands.SetFile) string {
+	var totalCMC float64
+	var cardCount int
+
+	for _, data := range setFile.CardRatings {
+		// Check if card is in archetype colors
+		cardColors := data.Colors
+		isInColors := false
+
+		// Colorless cards fit any archetype
+		if len(cardColors) == 0 {
+			isInColors = true
+		} else {
+			for _, cardColor := range cardColors {
+				for _, c := range colors {
+					if cardColor == c {
+						isInColors = true
+						break
+					}
+				}
+				if isInColors {
+					break
+				}
+			}
+		}
+
+		if !isInColors {
+			continue
+		}
+
+		cardCount++
+
+		// Use actual CMC if available, otherwise estimate from colors
+		if data.CMC > 0 {
+			totalCMC += data.CMC
+		} else if len(data.Colors) > 0 {
+			totalCMC += estimateCMCForColor(data.Colors[0])
+		} else {
+			totalCMC += 3.0 // Default for colorless
+		}
+	}
+
+	if cardCount == 0 {
+		return ""
+	}
+
+	avgCMC := totalCMC / float64(cardCount)
+
+	// Determine style based on color tendencies and estimated CMC
+	return classifyStyleFromColors(colors, avgCMC)
+}
+
+// estimateCMCForColor provides a rough CMC estimate based on color tendencies.
+func estimateCMCForColor(color string) float64 {
+	// Color tendencies for average CMC
+	switch color {
+	case "W":
+		return 2.5 // White tends toward weenies
+	case "U":
+		return 3.0 // Blue is medium
+	case "B":
+		return 3.0 // Black is medium
+	case "R":
+		return 2.5 // Red is aggressive
+	case "G":
+		return 3.5 // Green tends toward bigger creatures
+	default:
+		return 3.0 // Colorless/multicolor average
+	}
+}
+
+// classifyStyleFromColors determines archetype style based on colors and CMC.
+func classifyStyleFromColors(colors []string, avgCMC float64) string {
+	hasW := containsColor(colors, "W")
+	hasU := containsColor(colors, "U")
+	hasB := containsColor(colors, "B")
+	hasR := containsColor(colors, "R")
+	hasG := containsColor(colors, "G")
+
+	// Aggressive combinations
+	if (hasR && hasW) || (hasR && hasB) {
+		if avgCMC < 2.8 {
+			return "Aggro"
+		}
+	}
+
+	// Control combinations
+	if (hasU && hasW) || (hasU && hasB) {
+		if avgCMC > 3.2 {
+			return "Control"
+		}
+		return "Tempo"
+	}
+
+	// Midrange combinations
+	if hasG {
+		if hasB {
+			return "Midrange"
+		}
+		if hasW {
+			return "Go-Wide"
+		}
+		if hasR {
+			return "Stompy"
+		}
+	}
+
+	// Spells-matter
+	if hasU && hasR {
+		return "Spells"
+	}
+
+	// Default based on CMC
+	if avgCMC < 2.8 {
+		return "Aggro"
+	} else if avgCMC > 3.2 {
+		return "Control"
+	}
+	return "Midrange"
+}
+
+// containsColor checks if a color list contains a specific color.
+func containsColor(colors []string, target string) bool {
+	for _, c := range colors {
+		if c == target {
+			return true
+		}
+	}
+	return false
+}
+
+// determineCurveFromStyle returns the recommended curve based on archetype style.
+func determineCurveFromStyle(style string) string {
+	switch style {
+	case "Aggro":
+		return "Low (1-3)"
+	case "Tempo", "Spells":
+		return "Low-Medium (2-3)"
+	case "Midrange", "Go-Wide", "Stompy":
+		return "Medium (3-4)"
+	case "Control":
+		return "High (4+)"
+	default:
+		return "Medium (3-4)"
+	}
+}
+
+// generateStrategyDescription creates a strategy description for the archetype.
+func generateStrategyDescription(guildName, style string, winRate float64) string {
+	winRateStr := fmt.Sprintf("%.1f%%", winRate*100)
+
+	switch style {
+	case "Aggro":
+		return fmt.Sprintf("%s focuses on aggressive early plays. Win rate: %s. Prioritize low-cost creatures and removal.", guildName, winRateStr)
+	case "Tempo":
+		return fmt.Sprintf("%s balances threats with interaction. Win rate: %s. Look for efficient creatures and cheap counterspells/removal.", guildName, winRateStr)
+	case "Control":
+		return fmt.Sprintf("%s aims to control the board and win late. Win rate: %s. Prioritize removal, card draw, and finishers.", guildName, winRateStr)
+	case "Midrange":
+		return fmt.Sprintf("%s plays efficient threats on curve. Win rate: %s. Value 2-for-1s and resilient creatures.", guildName, winRateStr)
+	case "Go-Wide":
+		return fmt.Sprintf("%s builds a wide board of creatures. Win rate: %s. Prioritize token makers and anthems.", guildName, winRateStr)
+	case "Stompy":
+		return fmt.Sprintf("%s plays the biggest creatures. Win rate: %s. Prioritize ramp and large threats.", guildName, winRateStr)
+	case "Spells":
+		return fmt.Sprintf("%s leverages instants and sorceries. Win rate: %s. Look for spell payoffs and cantrips.", guildName, winRateStr)
+	default:
+		return fmt.Sprintf("%s archetype. Win rate: %s.", guildName, winRateStr)
+	}
 }
