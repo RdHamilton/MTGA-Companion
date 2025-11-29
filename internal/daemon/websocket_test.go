@@ -518,3 +518,353 @@ func TestWebSocketServer_CheckOrigin_Wildcard(t *testing.T) {
 		t.Error("Expected wildcard to allow any origin")
 	}
 }
+
+// Tests for ClientSubscription
+
+func TestNewClientSubscription(t *testing.T) {
+	sub := NewClientSubscription()
+
+	if sub == nil {
+		t.Fatal("NewClientSubscription returned nil")
+	}
+
+	if !sub.subscribeAll {
+		t.Error("Expected subscribeAll to be true by default")
+	}
+
+	if sub.subscriptions == nil {
+		t.Error("Expected subscriptions map to be initialized")
+	}
+}
+
+func TestClientSubscription_IsSubscribed_Default(t *testing.T) {
+	sub := NewClientSubscription()
+
+	// Default should be subscribed to all
+	if !sub.IsSubscribed("stats:updated") {
+		t.Error("Expected to be subscribed to all events by default")
+	}
+
+	if !sub.IsSubscribed("draft:updated") {
+		t.Error("Expected to be subscribed to all events by default")
+	}
+
+	if !sub.IsSubscribed("any:event") {
+		t.Error("Expected to be subscribed to all events by default")
+	}
+}
+
+func TestClientSubscription_Subscribe(t *testing.T) {
+	sub := NewClientSubscription()
+
+	// Subscribe to specific events
+	sub.Subscribe([]string{"stats:updated", "draft:updated"})
+
+	// Should no longer be subscribed to all
+	if sub.subscribeAll {
+		t.Error("Expected subscribeAll to be false after explicit subscription")
+	}
+
+	// Should be subscribed to specified events
+	if !sub.IsSubscribed("stats:updated") {
+		t.Error("Expected to be subscribed to stats:updated")
+	}
+
+	if !sub.IsSubscribed("draft:updated") {
+		t.Error("Expected to be subscribed to draft:updated")
+	}
+
+	// Should not be subscribed to other events
+	if sub.IsSubscribed("deck:updated") {
+		t.Error("Expected not to be subscribed to deck:updated")
+	}
+}
+
+func TestClientSubscription_Unsubscribe(t *testing.T) {
+	sub := NewClientSubscription()
+
+	// Subscribe to some events first
+	sub.Subscribe([]string{"stats:updated", "draft:updated", "deck:updated"})
+
+	// Unsubscribe from one
+	sub.Unsubscribe([]string{"draft:updated"})
+
+	// Should still be subscribed to others
+	if !sub.IsSubscribed("stats:updated") {
+		t.Error("Expected to still be subscribed to stats:updated")
+	}
+
+	if !sub.IsSubscribed("deck:updated") {
+		t.Error("Expected to still be subscribed to deck:updated")
+	}
+
+	// Should no longer be subscribed to unsubscribed event
+	if sub.IsSubscribed("draft:updated") {
+		t.Error("Expected not to be subscribed to draft:updated after unsubscribe")
+	}
+}
+
+func TestClientSubscription_SubscribeAll(t *testing.T) {
+	sub := NewClientSubscription()
+
+	// First subscribe to specific events
+	sub.Subscribe([]string{"stats:updated"})
+
+	// Then re-enable subscribe all
+	sub.SubscribeAll()
+
+	// Should be subscribed to all events again
+	if !sub.IsSubscribed("any:event") {
+		t.Error("Expected to be subscribed to all events after SubscribeAll")
+	}
+}
+
+func TestClientSubscription_GetSubscriptions_All(t *testing.T) {
+	sub := NewClientSubscription()
+
+	subs := sub.GetSubscriptions()
+
+	if len(subs) != 1 || subs[0] != "*" {
+		t.Errorf("Expected [*] for subscribeAll, got %v", subs)
+	}
+}
+
+func TestClientSubscription_GetSubscriptions_Specific(t *testing.T) {
+	sub := NewClientSubscription()
+	sub.Subscribe([]string{"stats:updated", "draft:updated"})
+
+	subs := sub.GetSubscriptions()
+
+	if len(subs) != 2 {
+		t.Errorf("Expected 2 subscriptions, got %d", len(subs))
+	}
+
+	// Check both events are present (order not guaranteed)
+	found := map[string]bool{}
+	for _, s := range subs {
+		found[s] = true
+	}
+
+	if !found["stats:updated"] {
+		t.Error("Expected stats:updated in subscriptions")
+	}
+
+	if !found["draft:updated"] {
+		t.Error("Expected draft:updated in subscriptions")
+	}
+}
+
+func TestExtractEventTypes_Array(t *testing.T) {
+	events := []interface{}{"stats:updated", "draft:updated", "deck:updated"}
+
+	result := extractEventTypes(events)
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 events, got %d", len(result))
+	}
+
+	expected := map[string]bool{
+		"stats:updated": true,
+		"draft:updated": true,
+		"deck:updated":  true,
+	}
+
+	for _, e := range result {
+		if !expected[e] {
+			t.Errorf("Unexpected event type: %s", e)
+		}
+	}
+}
+
+func TestExtractEventTypes_SingleString(t *testing.T) {
+	events := "stats:updated"
+
+	result := extractEventTypes(events)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 event, got %d", len(result))
+	}
+
+	if result[0] != "stats:updated" {
+		t.Errorf("Expected stats:updated, got %s", result[0])
+	}
+}
+
+func TestExtractEventTypes_Nil(t *testing.T) {
+	result := extractEventTypes(nil)
+
+	if result != nil {
+		t.Errorf("Expected nil for nil input, got %v", result)
+	}
+}
+
+func TestExtractEventTypes_MixedArray(t *testing.T) {
+	// Array with non-string elements should only return strings
+	events := []interface{}{"stats:updated", 123, "draft:updated", true}
+
+	result := extractEventTypes(events)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 string events, got %d", len(result))
+	}
+}
+
+func TestWebSocketServer_Subscribe(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	// Create test HTTP server
+	httpServer := httptest.NewServer(http.HandlerFunc(server.handleWebSocket))
+	defer httpServer.Close()
+
+	// Convert http:// to ws://
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http")
+
+	// Connect
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Read welcome message
+	var welcome Event
+	if err := conn.ReadJSON(&welcome); err != nil {
+		t.Fatalf("Failed to read welcome: %v", err)
+	}
+
+	// Verify default subscriptions
+	if welcome.Data["subscriptions"] == nil {
+		t.Error("Expected subscriptions in welcome message")
+	}
+
+	// Send subscribe message
+	subscribe := map[string]interface{}{
+		"type":   "subscribe",
+		"events": []string{"stats:updated", "draft:updated"},
+	}
+	if err := conn.WriteJSON(subscribe); err != nil {
+		t.Fatalf("Failed to send subscribe: %v", err)
+	}
+
+	// Read subscription confirmation
+	var ack Event
+	if err := conn.ReadJSON(&ack); err != nil {
+		t.Fatalf("Failed to read subscription ack: %v", err)
+	}
+
+	if ack.Type != "subscription:updated" {
+		t.Errorf("Expected subscription:updated, got %s", ack.Type)
+	}
+
+	if ack.Data["action"] != "subscribe" {
+		t.Errorf("Expected action subscribe, got %v", ack.Data["action"])
+	}
+}
+
+func TestWebSocketServer_Unsubscribe(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	// Create test HTTP server
+	httpServer := httptest.NewServer(http.HandlerFunc(server.handleWebSocket))
+	defer httpServer.Close()
+
+	// Convert http:// to ws://
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http")
+
+	// Connect
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Read welcome message
+	var welcome Event
+	if err := conn.ReadJSON(&welcome); err != nil {
+		t.Fatalf("Failed to read welcome: %v", err)
+	}
+
+	// First subscribe to some events
+	subscribe := map[string]interface{}{
+		"type":   "subscribe",
+		"events": []string{"stats:updated", "draft:updated", "deck:updated"},
+	}
+	if err := conn.WriteJSON(subscribe); err != nil {
+		t.Fatalf("Failed to send subscribe: %v", err)
+	}
+
+	// Read subscription confirmation
+	var subAck Event
+	if err := conn.ReadJSON(&subAck); err != nil {
+		t.Fatalf("Failed to read subscription ack: %v", err)
+	}
+
+	// Now unsubscribe from one event
+	unsubscribe := map[string]interface{}{
+		"type":   "unsubscribe",
+		"events": []string{"draft:updated"},
+	}
+	if err := conn.WriteJSON(unsubscribe); err != nil {
+		t.Fatalf("Failed to send unsubscribe: %v", err)
+	}
+
+	// Read unsubscription confirmation
+	var unsubAck Event
+	if err := conn.ReadJSON(&unsubAck); err != nil {
+		t.Fatalf("Failed to read unsubscription ack: %v", err)
+	}
+
+	if unsubAck.Type != "subscription:updated" {
+		t.Errorf("Expected subscription:updated, got %s", unsubAck.Type)
+	}
+
+	if unsubAck.Data["action"] != "unsubscribe" {
+		t.Errorf("Expected action unsubscribe, got %v", unsubAck.Data["action"])
+	}
+}
+
+func TestWebSocketServer_GetSubscriptions(t *testing.T) {
+	server := NewWebSocketServer(9999)
+
+	// Create test HTTP server
+	httpServer := httptest.NewServer(http.HandlerFunc(server.handleWebSocket))
+	defer httpServer.Close()
+
+	// Convert http:// to ws://
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http")
+
+	// Connect
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Read welcome message
+	var welcome Event
+	if err := conn.ReadJSON(&welcome); err != nil {
+		t.Fatalf("Failed to read welcome: %v", err)
+	}
+
+	// Request current subscriptions
+	getSubscriptions := map[string]interface{}{
+		"type": "get_subscriptions",
+	}
+	if err := conn.WriteJSON(getSubscriptions); err != nil {
+		t.Fatalf("Failed to send get_subscriptions: %v", err)
+	}
+
+	// Read response
+	var response Event
+	if err := conn.ReadJSON(&response); err != nil {
+		t.Fatalf("Failed to read subscription list: %v", err)
+	}
+
+	if response.Type != "subscription:list" {
+		t.Errorf("Expected subscription:list, got %s", response.Type)
+	}
+
+	if response.Data["subscriptions"] == nil {
+		t.Error("Expected subscriptions in response")
+	}
+}

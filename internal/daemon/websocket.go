@@ -18,10 +18,87 @@ type Event struct {
 	Timestamp time.Time              `json:"timestamp"`
 }
 
+// ClientSubscription tracks event subscriptions for a WebSocket client.
+type ClientSubscription struct {
+	subscriptions map[string]bool
+	subscribeAll  bool // If true, client receives all events (default behavior)
+	mu            sync.RWMutex
+}
+
+// NewClientSubscription creates a new client subscription with default "subscribe to all" behavior.
+func NewClientSubscription() *ClientSubscription {
+	return &ClientSubscription{
+		subscriptions: make(map[string]bool),
+		subscribeAll:  true, // Default: receive all events for backwards compatibility
+	}
+}
+
+// Subscribe adds event types to the subscription list.
+// If this is the first explicit subscription, disables "subscribe all" mode.
+func (cs *ClientSubscription) Subscribe(eventTypes []string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	// First explicit subscription disables "subscribe all" mode
+	if cs.subscribeAll && len(eventTypes) > 0 {
+		cs.subscribeAll = false
+	}
+
+	for _, eventType := range eventTypes {
+		cs.subscriptions[eventType] = true
+	}
+}
+
+// Unsubscribe removes event types from the subscription list.
+func (cs *ClientSubscription) Unsubscribe(eventTypes []string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	for _, eventType := range eventTypes {
+		delete(cs.subscriptions, eventType)
+	}
+}
+
+// SubscribeAll enables receiving all events.
+func (cs *ClientSubscription) SubscribeAll() {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.subscribeAll = true
+}
+
+// IsSubscribed checks if the client should receive the given event type.
+func (cs *ClientSubscription) IsSubscribed(eventType string) bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	// If subscribed to all, always return true
+	if cs.subscribeAll {
+		return true
+	}
+
+	return cs.subscriptions[eventType]
+}
+
+// GetSubscriptions returns a copy of current subscriptions.
+func (cs *ClientSubscription) GetSubscriptions() []string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	if cs.subscribeAll {
+		return []string{"*"}
+	}
+
+	result := make([]string, 0, len(cs.subscriptions))
+	for eventType := range cs.subscriptions {
+		result = append(result, eventType)
+	}
+	return result
+}
+
 // WebSocketServer manages WebSocket connections and event broadcasting.
 type WebSocketServer struct {
 	port       int
-	clients    map[*websocket.Conn]bool
+	clients    map[*websocket.Conn]*ClientSubscription
 	clientsMu  sync.RWMutex
 	broadcast  chan Event
 	upgrader   websocket.Upgrader
@@ -39,7 +116,7 @@ func NewWebSocketServer(port int) *WebSocketServer {
 func NewWebSocketServerWithCORS(port int, corsConfig CORSConfig) *WebSocketServer {
 	s := &WebSocketServer{
 		port:       port,
-		clients:    make(map[*websocket.Conn]bool),
+		clients:    make(map[*websocket.Conn]*ClientSubscription),
 		broadcast:  make(chan Event, 100),
 		corsConfig: corsConfig,
 	}
@@ -122,7 +199,7 @@ func (s *WebSocketServer) Stop() error {
 			log.Printf("Error closing client connection: %v", err)
 		}
 	}
-	s.clients = make(map[*websocket.Conn]bool)
+	s.clients = make(map[*websocket.Conn]*ClientSubscription)
 	s.clientsMu.Unlock()
 
 	// Close broadcast channel
@@ -161,18 +238,20 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Register client
+	// Register client with default subscription (all events)
+	subscription := NewClientSubscription()
 	s.clientsMu.Lock()
-	s.clients[conn] = true
+	s.clients[conn] = subscription
 	s.clientsMu.Unlock()
 
 	log.Printf("Client connected (total: %d)", s.ClientCount())
 
-	// Send welcome message
+	// Send welcome message with subscription info
 	welcome := Event{
 		Type: "daemon:connected",
 		Data: map[string]interface{}{
-			"message": "Connected to MTGA Companion daemon",
+			"message":       "Connected to MTGA Companion daemon",
+			"subscriptions": subscription.GetSubscriptions(),
 		},
 		Timestamp: time.Now(),
 	}
@@ -226,8 +305,94 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 				return
 			}
 		case "subscribe":
-			// TODO: Implement selective event subscription
-			log.Printf("Client subscribed to events: %v", msg["events"])
+			// Get the client's subscription
+			s.clientsMu.RLock()
+			subscription := s.clients[conn]
+			s.clientsMu.RUnlock()
+
+			if subscription == nil {
+				log.Printf("Error: subscription not found for client")
+				continue
+			}
+
+			// Extract event types from message
+			eventTypes := extractEventTypes(msg["events"])
+			if len(eventTypes) == 0 {
+				// If no events specified, subscribe to all
+				subscription.SubscribeAll()
+				log.Printf("Client subscribed to all events")
+			} else {
+				subscription.Subscribe(eventTypes)
+				log.Printf("Client subscribed to events: %v", eventTypes)
+			}
+
+			// Send confirmation
+			ack := Event{
+				Type: "subscription:updated",
+				Data: map[string]interface{}{
+					"action":        "subscribe",
+					"subscriptions": subscription.GetSubscriptions(),
+				},
+				Timestamp: time.Now(),
+			}
+			if err := conn.WriteJSON(ack); err != nil {
+				log.Printf("Error sending subscription acknowledgment: %v", err)
+				return
+			}
+		case "unsubscribe":
+			// Get the client's subscription
+			s.clientsMu.RLock()
+			subscription := s.clients[conn]
+			s.clientsMu.RUnlock()
+
+			if subscription == nil {
+				log.Printf("Error: subscription not found for client")
+				continue
+			}
+
+			// Extract event types from message
+			eventTypes := extractEventTypes(msg["events"])
+			if len(eventTypes) > 0 {
+				subscription.Unsubscribe(eventTypes)
+				log.Printf("Client unsubscribed from events: %v", eventTypes)
+			}
+
+			// Send confirmation
+			ack := Event{
+				Type: "subscription:updated",
+				Data: map[string]interface{}{
+					"action":        "unsubscribe",
+					"subscriptions": subscription.GetSubscriptions(),
+				},
+				Timestamp: time.Now(),
+			}
+			if err := conn.WriteJSON(ack); err != nil {
+				log.Printf("Error sending unsubscription acknowledgment: %v", err)
+				return
+			}
+		case "get_subscriptions":
+			// Get the client's subscription
+			s.clientsMu.RLock()
+			subscription := s.clients[conn]
+			s.clientsMu.RUnlock()
+
+			if subscription == nil {
+				log.Printf("Error: subscription not found for client")
+				continue
+			}
+
+			// Send current subscriptions
+			response := Event{
+				Type: "subscription:list",
+				Data: map[string]interface{}{
+					"subscriptions": subscription.GetSubscriptions(),
+				},
+				Timestamp: time.Now(),
+			}
+			if err := conn.WriteJSON(response); err != nil {
+				log.Printf("Error sending subscription list: %v", err)
+				return
+			}
 		case "replay_logs":
 			// Extract clear_data parameter (default to false)
 			clearData := false
@@ -388,28 +553,74 @@ func (s *WebSocketServer) handleClient(conn *websocket.Conn) {
 	}
 }
 
-// handleBroadcasts handles broadcasting events to all clients.
+// handleBroadcasts handles broadcasting events to subscribed clients.
 func (s *WebSocketServer) handleBroadcasts() {
 	for event := range s.broadcast {
 		log.Printf("handleBroadcasts: Processing event %s for %d client(s)", event.Type, len(s.clients))
 		s.clientsMu.RLock()
-		clientCount := 0
-		for client := range s.clients {
+		sentCount := 0
+		skippedCount := 0
+		clientsToRemove := make([]*websocket.Conn, 0)
+
+		for client, subscription := range s.clients {
+			// Check if client is subscribed to this event type
+			if !subscription.IsSubscribed(event.Type) {
+				skippedCount++
+				continue
+			}
+
 			if err := client.WriteJSON(event); err != nil {
 				log.Printf("Error broadcasting %s to client: %v", event.Type, err)
 				if err := client.Close(); err != nil {
 					log.Printf("Error closing client after broadcast error: %v", err)
 				}
-				s.clientsMu.Lock()
-				delete(s.clients, client)
-				s.clientsMu.Unlock()
+				clientsToRemove = append(clientsToRemove, client)
 			} else {
-				clientCount++
+				sentCount++
 			}
 		}
 		s.clientsMu.RUnlock()
-		log.Printf("handleBroadcasts: Successfully sent %s to %d client(s)", event.Type, clientCount)
+
+		// Remove failed clients
+		if len(clientsToRemove) > 0 {
+			s.clientsMu.Lock()
+			for _, client := range clientsToRemove {
+				delete(s.clients, client)
+			}
+			s.clientsMu.Unlock()
+		}
+
+		if skippedCount > 0 {
+			log.Printf("handleBroadcasts: Sent %s to %d client(s), skipped %d (not subscribed)", event.Type, sentCount, skippedCount)
+		} else {
+			log.Printf("handleBroadcasts: Successfully sent %s to %d client(s)", event.Type, sentCount)
+		}
 	}
+}
+
+// extractEventTypes extracts a slice of event type strings from a message field.
+func extractEventTypes(events interface{}) []string {
+	if events == nil {
+		return nil
+	}
+
+	// Handle array of strings
+	if arr, ok := events.([]interface{}); ok {
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if str, ok := item.(string); ok {
+				result = append(result, str)
+			}
+		}
+		return result
+	}
+
+	// Handle single string
+	if str, ok := events.(string); ok {
+		return []string{str}
+	}
+
+	return nil
 }
 
 // handleStatus handles HTTP status requests.
