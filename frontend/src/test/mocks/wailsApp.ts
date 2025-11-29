@@ -75,6 +75,7 @@ export const mockWailsApp = {
   DeleteDeck: vi.fn(() => Promise.resolve()),
   ListDecks: vi.fn(() => Promise.resolve([] as any)),
   GetRecommendations: vi.fn(() => Promise.resolve({} as any)),
+  ExplainRecommendation: vi.fn(() => Promise.resolve({ explanation: 'This card is recommended because...', error: '' } as any)),
   ExportDeckToFile: vi.fn(() => Promise.resolve()),
   // Collection methods
   GetCollection: vi.fn(() => Promise.resolve({ cards: [], totalCount: 0, filterCount: 0 } as any)),

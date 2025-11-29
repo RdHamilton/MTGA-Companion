@@ -17,6 +17,7 @@ import {
 import { models, gui } from '../../wailsjs/go/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
+import RecommendationCard from '../components/RecommendationCard';
 import './DeckBuilder.css';
 
 export default function DeckBuilder() {
@@ -464,28 +465,12 @@ export default function DeckBuilder() {
             ) : (
               <div className="recommendations-list">
                 {recommendations.map((rec) => (
-                  <div key={rec.cardID} className="recommendation-card">
-                    {rec.imageURI && (
-                      <img src={rec.imageURI} alt={rec.name} className="rec-card-image" />
-                    )}
-                    <div className="rec-card-info">
-                      <div className="rec-card-name">{rec.name}</div>
-                      <div className="rec-card-type">{rec.typeLine}</div>
-                      {rec.manaCost && <div className="rec-card-mana">{rec.manaCost}</div>}
-                      <div className="rec-score">
-                        Score: {(rec.score * 100).toFixed(0)}% | Confidence: {(rec.confidence * 100).toFixed(0)}%
-                      </div>
-                      <div className="rec-reasoning">{rec.reasoning}</div>
-                    </div>
-                    <div className="rec-card-actions">
-                      <button
-                        className="add-rec-button"
-                        onClick={() => handleAddCard(rec.cardID, 1, 'main')}
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  </div>
+                  <RecommendationCard
+                    key={rec.cardID}
+                    recommendation={rec}
+                    deckID={deck.ID}
+                    onAddCard={handleAddCard}
+                  />
                 ))}
               </div>
             )}
