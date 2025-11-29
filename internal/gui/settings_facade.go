@@ -25,6 +25,16 @@ type AppSettings struct {
 	Theme             string `json:"theme"`
 	DaemonPort        int    `json:"daemonPort"`
 	DaemonMode        string `json:"daemonMode"`
+
+	// ML/LLM Settings
+	MLEnabled           bool    `json:"mlEnabled"`
+	LLMEnabled          bool    `json:"llmEnabled"`
+	OllamaEndpoint      string  `json:"ollamaEndpoint"`
+	OllamaModel         string  `json:"ollamaModel"`
+	MetaGoldfishEnabled bool    `json:"metaGoldfishEnabled"`
+	MetaTop8Enabled     bool    `json:"metaTop8Enabled"`
+	MetaWeight          float64 `json:"metaWeight"`
+	PersonalWeight      float64 `json:"personalWeight"`
 }
 
 // GetAllSettings retrieves all settings as an AppSettings struct.
@@ -37,12 +47,20 @@ func (s *SettingsFacade) GetAllSettings(ctx context.Context) (*AppSettings, erro
 
 	settings := &AppSettings{
 		// Defaults
-		AutoRefresh:       false,
-		RefreshInterval:   30,
-		ShowNotifications: true,
-		Theme:             "dark",
-		DaemonPort:        9999,
-		DaemonMode:        "standalone",
+		AutoRefresh:         false,
+		RefreshInterval:     30,
+		ShowNotifications:   true,
+		Theme:               "dark",
+		DaemonPort:          9999,
+		DaemonMode:          "standalone",
+		MLEnabled:           true,
+		LLMEnabled:          false,
+		OllamaEndpoint:      "http://localhost:11434",
+		OllamaModel:         "qwen3:8b",
+		MetaGoldfishEnabled: true,
+		MetaTop8Enabled:     true,
+		MetaWeight:          0.3,
+		PersonalWeight:      0.2,
 	}
 
 	// Get each setting, using defaults if not found (errors are intentionally ignored)
@@ -52,6 +70,14 @@ func (s *SettingsFacade) GetAllSettings(ctx context.Context) (*AppSettings, erro
 	_ = repo.GetTyped(ctx, "theme", &settings.Theme)
 	_ = repo.GetTyped(ctx, "daemonPort", &settings.DaemonPort)
 	_ = repo.GetTyped(ctx, "daemonMode", &settings.DaemonMode)
+	_ = repo.GetTyped(ctx, "mlEnabled", &settings.MLEnabled)
+	_ = repo.GetTyped(ctx, "llmEnabled", &settings.LLMEnabled)
+	_ = repo.GetTyped(ctx, "ollamaEndpoint", &settings.OllamaEndpoint)
+	_ = repo.GetTyped(ctx, "ollamaModel", &settings.OllamaModel)
+	_ = repo.GetTyped(ctx, "metaGoldfishEnabled", &settings.MetaGoldfishEnabled)
+	_ = repo.GetTyped(ctx, "metaTop8Enabled", &settings.MetaTop8Enabled)
+	_ = repo.GetTyped(ctx, "metaWeight", &settings.MetaWeight)
+	_ = repo.GetTyped(ctx, "personalWeight", &settings.PersonalWeight)
 
 	return settings, nil
 }
@@ -65,12 +91,20 @@ func (s *SettingsFacade) SaveAllSettings(ctx context.Context, settings *AppSetti
 	repo := s.services.Storage.SettingsRepo()
 
 	settingsMap := map[string]interface{}{
-		"autoRefresh":       settings.AutoRefresh,
-		"refreshInterval":   settings.RefreshInterval,
-		"showNotifications": settings.ShowNotifications,
-		"theme":             settings.Theme,
-		"daemonPort":        settings.DaemonPort,
-		"daemonMode":        settings.DaemonMode,
+		"autoRefresh":         settings.AutoRefresh,
+		"refreshInterval":     settings.RefreshInterval,
+		"showNotifications":   settings.ShowNotifications,
+		"theme":               settings.Theme,
+		"daemonPort":          settings.DaemonPort,
+		"daemonMode":          settings.DaemonMode,
+		"mlEnabled":           settings.MLEnabled,
+		"llmEnabled":          settings.LLMEnabled,
+		"ollamaEndpoint":      settings.OllamaEndpoint,
+		"ollamaModel":         settings.OllamaModel,
+		"metaGoldfishEnabled": settings.MetaGoldfishEnabled,
+		"metaTop8Enabled":     settings.MetaTop8Enabled,
+		"metaWeight":          settings.MetaWeight,
+		"personalWeight":      settings.PersonalWeight,
 	}
 
 	if err := repo.SetMany(ctx, settingsMap); err != nil {

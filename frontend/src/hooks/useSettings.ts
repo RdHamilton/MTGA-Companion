@@ -9,6 +9,16 @@ interface SettingsState {
   theme: string;
   daemonPort: number;
   daemonMode: string;
+  // ML/LLM Settings
+  mlEnabled: boolean;
+  llmEnabled: boolean;
+  ollamaEndpoint: string;
+  ollamaModel: string;
+  metaGoldfishEnabled: boolean;
+  metaTop8Enabled: boolean;
+  metaWeight: number;
+  personalWeight: number;
+  // State
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -19,6 +29,16 @@ interface UseSettingsReturn extends SettingsState {
   setRefreshInterval: (value: number) => void;
   setShowNotifications: (value: boolean) => void;
   setTheme: (value: string) => void;
+  // ML/LLM Settings setters
+  setMLEnabled: (value: boolean) => void;
+  setLLMEnabled: (value: boolean) => void;
+  setOllamaEndpoint: (value: string) => void;
+  setOllamaModel: (value: string) => void;
+  setMetaGoldfishEnabled: (value: boolean) => void;
+  setMetaTop8Enabled: (value: boolean) => void;
+  setMetaWeight: (value: number) => void;
+  setPersonalWeight: (value: number) => void;
+  // Actions
   saveSettings: () => Promise<boolean>;
   resetToDefaults: () => void;
   reloadSettings: () => Promise<void>;
@@ -31,6 +51,15 @@ const defaultSettings: Omit<SettingsState, 'isLoading' | 'isSaving' | 'error'> =
   theme: 'dark',
   daemonPort: 9999,
   daemonMode: 'standalone',
+  // ML/LLM defaults
+  mlEnabled: true,
+  llmEnabled: false,
+  ollamaEndpoint: 'http://localhost:11434',
+  ollamaModel: 'qwen3:8b',
+  metaGoldfishEnabled: true,
+  metaTop8Enabled: true,
+  metaWeight: 0.3,
+  personalWeight: 0.2,
 };
 
 export function useSettings(): UseSettingsReturn {
@@ -54,6 +83,15 @@ export function useSettings(): UseSettingsReturn {
           theme: backendSettings.theme ?? defaultSettings.theme,
           daemonPort: backendSettings.daemonPort ?? defaultSettings.daemonPort,
           daemonMode: backendSettings.daemonMode ?? defaultSettings.daemonMode,
+          // ML/LLM settings
+          mlEnabled: backendSettings.mlEnabled ?? defaultSettings.mlEnabled,
+          llmEnabled: backendSettings.llmEnabled ?? defaultSettings.llmEnabled,
+          ollamaEndpoint: backendSettings.ollamaEndpoint ?? defaultSettings.ollamaEndpoint,
+          ollamaModel: backendSettings.ollamaModel ?? defaultSettings.ollamaModel,
+          metaGoldfishEnabled: backendSettings.metaGoldfishEnabled ?? defaultSettings.metaGoldfishEnabled,
+          metaTop8Enabled: backendSettings.metaTop8Enabled ?? defaultSettings.metaTop8Enabled,
+          metaWeight: backendSettings.metaWeight ?? defaultSettings.metaWeight,
+          personalWeight: backendSettings.personalWeight ?? defaultSettings.personalWeight,
           isLoading: false,
           isSaving: false,
           error: null,
@@ -90,6 +128,39 @@ export function useSettings(): UseSettingsReturn {
     setSettings((prev) => ({ ...prev, theme: value }));
   }, []);
 
+  // ML/LLM setters
+  const setMLEnabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, mlEnabled: value }));
+  }, []);
+
+  const setLLMEnabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, llmEnabled: value }));
+  }, []);
+
+  const setOllamaEndpoint = useCallback((value: string) => {
+    setSettings((prev) => ({ ...prev, ollamaEndpoint: value }));
+  }, []);
+
+  const setOllamaModel = useCallback((value: string) => {
+    setSettings((prev) => ({ ...prev, ollamaModel: value }));
+  }, []);
+
+  const setMetaGoldfishEnabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, metaGoldfishEnabled: value }));
+  }, []);
+
+  const setMetaTop8Enabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, metaTop8Enabled: value }));
+  }, []);
+
+  const setMetaWeight = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, metaWeight: value }));
+  }, []);
+
+  const setPersonalWeight = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, personalWeight: value }));
+  }, []);
+
   // Save settings to backend
   const saveSettings = useCallback(async (): Promise<boolean> => {
     try {
@@ -101,6 +172,15 @@ export function useSettings(): UseSettingsReturn {
         theme: settings.theme,
         daemonPort: settings.daemonPort,
         daemonMode: settings.daemonMode,
+        // ML/LLM settings
+        mlEnabled: settings.mlEnabled,
+        llmEnabled: settings.llmEnabled,
+        ollamaEndpoint: settings.ollamaEndpoint,
+        ollamaModel: settings.ollamaModel,
+        metaGoldfishEnabled: settings.metaGoldfishEnabled,
+        metaTop8Enabled: settings.metaTop8Enabled,
+        metaWeight: settings.metaWeight,
+        personalWeight: settings.personalWeight,
       };
       await SaveAllSettings(settingsToSave);
       setSettings((prev) => ({ ...prev, isSaving: false }));
@@ -130,6 +210,16 @@ export function useSettings(): UseSettingsReturn {
     setRefreshInterval,
     setShowNotifications,
     setTheme,
+    // ML/LLM setters
+    setMLEnabled,
+    setLLMEnabled,
+    setOllamaEndpoint,
+    setOllamaModel,
+    setMetaGoldfishEnabled,
+    setMetaTop8Enabled,
+    setMetaWeight,
+    setPersonalWeight,
+    // Actions
     saveSettings,
     resetToDefaults,
     reloadSettings: loadSettings,

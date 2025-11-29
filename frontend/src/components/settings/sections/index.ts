@@ -27,3 +27,6 @@ export { DataManagementSection } from './DataManagementSection';
 export type { DataManagementSectionProps } from './DataManagementSection';
 
 export { AppearanceSection } from './AppearanceSection';
+
+export { MLSettingsSection } from './MLSettingsSection';
+export type { MLSettingsSectionProps } from './MLSettingsSection';

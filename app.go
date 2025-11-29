@@ -36,6 +36,7 @@ type App struct {
 	collectionFacade *gui.CollectionFacade
 	settingsFacade   *gui.SettingsFacade
 	feedbackFacade   *gui.FeedbackFacade
+	llmFacade        *gui.LLMFacade
 
 	// Shared services used by facades
 	services *gui.Services
@@ -64,6 +65,7 @@ func NewApp() *App {
 		collectionFacade: gui.NewCollectionFacade(services),
 		settingsFacade:   gui.NewSettingsFacade(services),
 		feedbackFacade:   gui.NewFeedbackFacade(services),
+		llmFacade:        gui.NewLLMFacade(services),
 	}
 }
 
@@ -769,4 +771,28 @@ func (a *App) GetFeedbackDashboardMetrics() (*gui.DashboardMetricsResponse, erro
 // ExportMLTrainingData exports feedback data for ML training.
 func (a *App) ExportMLTrainingData(limit int) (*gui.MLTrainingDataExport, error) {
 	return a.feedbackFacade.ExportMLTrainingData(a.ctx, limit)
+}
+
+// ========================================
+// LLM Methods (LLMFacade)
+// ========================================
+
+// CheckOllamaStatus checks if Ollama is available and returns its status.
+func (a *App) CheckOllamaStatus(endpoint, model string) (*gui.OllamaStatus, error) {
+	return a.llmFacade.CheckOllamaStatus(a.ctx, endpoint, model)
+}
+
+// GetAvailableOllamaModels returns a list of available Ollama models.
+func (a *App) GetAvailableOllamaModels(endpoint string) ([]gui.OllamaModel, error) {
+	return a.llmFacade.GetAvailableModels(a.ctx, endpoint)
+}
+
+// PullOllamaModel pulls a model from Ollama.
+func (a *App) PullOllamaModel(endpoint, model string) error {
+	return a.llmFacade.PullModel(a.ctx, endpoint, model)
+}
+
+// TestLLMGeneration tests LLM generation with a simple prompt.
+func (a *App) TestLLMGeneration(endpoint, model string) (string, error) {
+	return a.llmFacade.TestLLMGeneration(a.ctx, endpoint, model)
 }
