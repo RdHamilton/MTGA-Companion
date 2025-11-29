@@ -54,6 +54,27 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 - **Real-Time Updates**: Live draft updates via `draft:updated` events
 - **Set Symbol Display**: Card displays now show set symbols/icons
 
+### ML-Powered Recommendations (v1.4)
+- **Machine Learning Engine**: Intelligent card recommendations using trained ML models
+- **Personal Play Style Learning**: Adapts recommendations based on your deck building history and preferences
+- **Meta-Aware Suggestions**: Incorporates tournament data and metagame trends into recommendations
+- **Ollama Integration**: Optional local LLM support for natural language explanations of recommendations
+- **Feedback Collection**: Records your card acceptance/rejection to improve future recommendations
+- **Hybrid Scoring**: Combines ML predictions with rule-based analysis for best results
+
+### Metagame Dashboard (v1.4)
+- **Live Meta Data**: Real-time metagame data from MTGGoldfish and MTGTop8
+- **Archetype Tier Lists**: View Tier 1-4 archetypes with meta share and tournament performance
+- **Archetype Detail View**: Click any archetype for detailed stats, trend analysis, and tier explanations
+- **Format Support**: Standard, Historic, Explorer, Pioneer, and Modern formats
+- **Tournament Tracking**: Recent tournament results with top decks and winner information
+
+### Draft Enhancements (v1.4)
+- **Enhanced Synergy Scoring**: Improved draft prediction with better synergy detection
+- **Color Pair Archetypes**: Automatic archetype detection based on top color pairs in your draft
+- **Card Type Categorization**: Set guide uses card types for better organization
+- **Keyword Extraction**: Sophisticated keyword analysis for card recommendations
+
 ### Settings Improvements (v1.3)
 - **Collapsible Accordion Navigation**: Organized settings into collapsible sections
 - **URL Hash Navigation**: Direct links to settings sections (e.g., `#connection`, `#17lands`)
@@ -84,6 +105,55 @@ A modern desktop companion application for Magic: The Gathering Arena (MTGA). Tr
 
 - **MTG Arena** must be installed and configured to enable detailed logging
 - **Go 1.21+** (for building from source)
+- **Ollama** (optional) - For AI-powered natural language explanations
+
+## Ollama Setup (Optional)
+
+MTGA Companion can use [Ollama](https://ollama.ai/) to provide natural language explanations for card recommendations. This feature is completely optional - the app works fully without it.
+
+### Installing Ollama
+
+**macOS**:
+```bash
+brew install ollama
+# Or download from https://ollama.ai/download
+```
+
+**Windows**:
+Download the installer from https://ollama.ai/download
+
+**Linux**:
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+### Starting Ollama
+
+```bash
+# Start Ollama server (runs on port 11434 by default)
+ollama serve
+```
+
+### Configuring in MTGA Companion
+
+1. Open MTGA Companion
+2. Go to **Settings** → **ML/AI Settings**
+3. Enable **Ollama Integration**
+4. Configure:
+   - **Ollama URL**: `http://localhost:11434` (default)
+   - **Model**: `qwen3:8b` (recommended) or any compatible model
+5. Click **Test Connection** to verify
+
+The app will automatically pull the model if it's not already downloaded.
+
+### Supported Models
+
+Any Ollama model works, but these are recommended:
+- `qwen3:8b` - Default, good balance of quality and speed
+- `llama3.2:3b` - Faster, smaller, good for older hardware
+- `mistral:7b` - Alternative with different response style
+
+**Note**: Without Ollama, MTGA Companion uses template-based explanations which work well for most use cases.
 
 ## Enabling Detailed Logging in MTG Arena
 
@@ -307,13 +377,15 @@ The application will:
 - **Match History**: View and filter all your matches
 - **Draft**: Real-time draft assistant with recommendations, synergy detection, and format insights
 - **Decks**: Deck library with builder, import/export, and AI recommendations (v1.3)
+- **Collection**: Browse and track your card collection (v1.3.1)
+- **Meta**: Metagame dashboard with archetype tier lists and tournament data (v1.4)
 - **Charts**: Visualize your performance data
   - Win Rate Trend: Performance over time
   - Deck Performance: Win rates by deck
   - Rank Progression: Track your ladder climbing
   - Format Distribution: Play patterns across formats
   - Result Breakdown: Detailed statistics
-- **Settings**: Configure database path and other options
+- **Settings**: Configure database path, ML settings, and Ollama integration
 
 ### Real-Time Updates
 
