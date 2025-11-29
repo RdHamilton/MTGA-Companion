@@ -7,6 +7,7 @@ import {
   DataRecoverySection,
   ReplayToolSection,
   SeventeenLandsSection,
+  MLSettingsSection,
   AboutSection,
 } from '../components/settings/sections';
 import { SettingsAccordion } from '../components/settings/SettingsAccordion';
@@ -33,13 +34,32 @@ const Settings = () => {
     refreshInterval,
     showNotifications,
     theme,
+    // ML/LLM Settings
+    mlEnabled,
+    llmEnabled,
+    ollamaEndpoint,
+    ollamaModel,
+    metaGoldfishEnabled,
+    metaTop8Enabled,
+    metaWeight,
+    personalWeight,
+    // State
     isLoading: isLoadingSettings,
     isSaving,
     error: settingsError,
+    // Setters
     setAutoRefresh,
     setRefreshInterval,
     setShowNotifications,
     setTheme,
+    setMLEnabled,
+    setLLMEnabled,
+    setOllamaEndpoint,
+    setOllamaModel,
+    setMetaGoldfishEnabled,
+    setMetaTop8Enabled,
+    setMetaWeight,
+    setPersonalWeight,
     saveSettings,
     resetToDefaults,
   } = useSettings();
@@ -217,6 +237,31 @@ const Settings = () => {
           />
         ),
       },
+      {
+        id: 'ml-recommendations',
+        label: 'ML / AI',
+        icon: '🤖',
+        content: (
+          <MLSettingsSection
+            mlEnabled={mlEnabled}
+            onMLEnabledChange={setMLEnabled}
+            llmEnabled={llmEnabled}
+            onLLMEnabledChange={setLLMEnabled}
+            ollamaEndpoint={ollamaEndpoint}
+            onOllamaEndpointChange={setOllamaEndpoint}
+            ollamaModel={ollamaModel}
+            onOllamaModelChange={setOllamaModel}
+            metaGoldfishEnabled={metaGoldfishEnabled}
+            onMetaGoldfishEnabledChange={setMetaGoldfishEnabled}
+            metaTop8Enabled={metaTop8Enabled}
+            onMetaTop8EnabledChange={setMetaTop8Enabled}
+            metaWeight={metaWeight}
+            onMetaWeightChange={setMetaWeight}
+            personalWeight={personalWeight}
+            onPersonalWeightChange={setPersonalWeight}
+          />
+        ),
+      },
     ];
 
     // Add Developer Tools section if developer mode is enabled
@@ -300,6 +345,23 @@ const Settings = () => {
     handleRefreshSetCards,
     handleRecalculateGrades,
     handleClearDatasetCache,
+    // ML settings
+    mlEnabled,
+    setMLEnabled,
+    llmEnabled,
+    setLLMEnabled,
+    ollamaEndpoint,
+    setOllamaEndpoint,
+    ollamaModel,
+    setOllamaModel,
+    metaGoldfishEnabled,
+    setMetaGoldfishEnabled,
+    metaTop8Enabled,
+    setMetaTop8Enabled,
+    metaWeight,
+    setMetaWeight,
+    personalWeight,
+    setPersonalWeight,
     isDeveloperMode,
     replayToolActive,
     replayToolPaused,

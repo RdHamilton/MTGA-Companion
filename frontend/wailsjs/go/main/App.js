@@ -18,6 +18,18 @@ export function CalculateDraftGrade(arg1) {
   return window['go']['main']['App']['CalculateDraftGrade'](arg1);
 }
 
+export function CheckOllamaStatus(arg1, arg2) {
+  return window['go']['main']['App']['CheckOllamaStatus'](arg1, arg2);
+}
+
+export function ClassifyDeckArchetype(arg1) {
+  return window['go']['main']['App']['ClassifyDeckArchetype'](arg1);
+}
+
+export function ClassifyDraftPoolArchetype(arg1) {
+  return window['go']['main']['App']['ClassifyDraftPoolArchetype'](arg1);
+}
+
 export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
@@ -48,6 +60,10 @@ export function ExportDeck(arg1) {
 
 export function ExportDeckToFile(arg1) {
   return window['go']['main']['App']['ExportDeckToFile'](arg1);
+}
+
+export function ExportMLTrainingData(arg1) {
+  return window['go']['main']['App']['ExportMLTrainingData'](arg1);
 }
 
 export function ExportToCSV() {
@@ -92,6 +108,10 @@ export function GetAppVersion() {
 
 export function GetArchetypeCards(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetArchetypeCards'](arg1, arg2, arg3);
+}
+
+export function GetAvailableOllamaModels(arg1) {
+  return window['go']['main']['App']['GetAvailableOllamaModels'](arg1);
 }
 
 export function GetCardByArenaID(arg1) {
@@ -210,6 +230,10 @@ export function GetDraftWinRatePrediction(arg1) {
   return window['go']['main']['App']['GetDraftWinRatePrediction'](arg1);
 }
 
+export function GetFeedbackDashboardMetrics() {
+  return window['go']['main']['App']['GetFeedbackDashboardMetrics']();
+}
+
 export function GetFormatInsights(arg1, arg2) {
   return window['go']['main']['App']['GetFormatInsights'](arg1, arg2);
 }
@@ -272,6 +296,10 @@ export function GetRankUpdatedEvent() {
 
 export function GetRecentCollectionChanges(arg1) {
   return window['go']['main']['App']['GetRecentCollectionChanges'](arg1);
+}
+
+export function GetRecommendationStats(arg1) {
+  return window['go']['main']['App']['GetRecommendationStats'](arg1);
 }
 
 export function GetRecommendations(arg1) {
@@ -354,12 +382,28 @@ export function PredictDraftWinRate(arg1) {
   return window['go']['main']['App']['PredictDraftWinRate'](arg1);
 }
 
+export function PullOllamaModel(arg1, arg2) {
+  return window['go']['main']['App']['PullOllamaModel'](arg1, arg2);
+}
+
 export function RecalculateAllDraftGrades() {
   return window['go']['main']['App']['RecalculateAllDraftGrades']();
 }
 
 export function ReconnectToDaemon() {
   return window['go']['main']['App']['ReconnectToDaemon']();
+}
+
+export function RecordRecommendation(arg1) {
+  return window['go']['main']['App']['RecordRecommendation'](arg1);
+}
+
+export function RecordRecommendationAction(arg1) {
+  return window['go']['main']['App']['RecordRecommendationAction'](arg1);
+}
+
+export function RecordRecommendationOutcome(arg1) {
+  return window['go']['main']['App']['RecordRecommendationOutcome'](arg1);
 }
 
 export function RefreshSetCards(arg1) {
@@ -432,6 +476,10 @@ export function SwitchToDaemonMode() {
 
 export function SwitchToStandaloneMode() {
   return window['go']['main']['App']['SwitchToStandaloneMode']();
+}
+
+export function TestLLMGeneration(arg1, arg2) {
+  return window['go']['main']['App']['TestLLMGeneration'](arg1, arg2);
 }
 
 export function TriggerReplayLogs(arg1) {

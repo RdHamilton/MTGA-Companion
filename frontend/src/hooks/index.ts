@@ -19,3 +19,6 @@ export { useSettingsAccordion } from './useSettingsAccordion';
 export type { AccordionSection, UseSettingsAccordionOptions } from './useSettingsAccordion';
 
 export { useSettings } from './useSettings';
+
+export { useMLSettings } from './useMLSettings';
+export type { UseMLSettingsProps, UseMLSettingsReturn } from './useMLSettings';

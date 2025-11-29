@@ -81,6 +81,36 @@ export const mockWailsApp = {
   GetCollectionStats: vi.fn(() => Promise.resolve({} as any)),
   GetSetCompletion: vi.fn(() => Promise.resolve([] as any[])),
   GetRecentCollectionChanges: vi.fn(() => Promise.resolve([] as any[])),
+  // ML/LLM methods
+  CheckOllamaStatus: vi.fn(() => Promise.resolve({
+    available: true,
+    version: '0.1.0',
+    modelReady: true,
+    modelName: 'qwen3:8b',
+    modelsLoaded: ['qwen3:8b'],
+    error: '',
+  } as any)),
+  GetAvailableOllamaModels: vi.fn(() => Promise.resolve([{ name: 'qwen3:8b', size: 0 }] as any[])),
+  PullOllamaModel: vi.fn(() => Promise.resolve()),
+  TestLLMGeneration: vi.fn(() => Promise.resolve('Hello from Ollama!')),
+  // Settings methods
+  GetAllSettings: vi.fn(() => Promise.resolve({
+    autoRefresh: false,
+    refreshInterval: 30,
+    showNotifications: true,
+    theme: 'dark',
+    daemonPort: 9999,
+    daemonMode: 'standalone',
+    mlEnabled: true,
+    llmEnabled: false,
+    ollamaEndpoint: 'http://localhost:11434',
+    ollamaModel: 'qwen3:8b',
+    metaGoldfishEnabled: true,
+    metaTop8Enabled: true,
+    metaWeight: 0.3,
+    personalWeight: 0.2,
+  } as any)),
+  SaveAllSettings: vi.fn(() => Promise.resolve()),
 };
 
 export function resetMocks() {

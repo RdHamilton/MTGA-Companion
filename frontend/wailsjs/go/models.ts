@@ -40,6 +40,14 @@ export namespace gui {
 	    theme: string;
 	    daemonPort: number;
 	    daemonMode: string;
+	    mlEnabled: boolean;
+	    llmEnabled: boolean;
+	    ollamaEndpoint: string;
+	    ollamaModel: string;
+	    metaGoldfishEnabled: boolean;
+	    metaTop8Enabled: boolean;
+	    metaWeight: number;
+	    personalWeight: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -53,8 +61,135 @@ export namespace gui {
 	        this.theme = source["theme"];
 	        this.daemonPort = source["daemonPort"];
 	        this.daemonMode = source["daemonMode"];
+	        this.mlEnabled = source["mlEnabled"];
+	        this.llmEnabled = source["llmEnabled"];
+	        this.ollamaEndpoint = source["ollamaEndpoint"];
+	        this.ollamaModel = source["ollamaModel"];
+	        this.metaGoldfishEnabled = source["metaGoldfishEnabled"];
+	        this.metaTop8Enabled = source["metaTop8Enabled"];
+	        this.metaWeight = source["metaWeight"];
+	        this.personalWeight = source["personalWeight"];
 	    }
 	}
+	export class DeckArchetypeAnalysis {
+	    colorCounts: Record<string, number>;
+	    colorlessCount: number;
+	    goldCount: number;
+	    creatureCount: number;
+	    instantCount: number;
+	    sorceryCount: number;
+	    artifactCount: number;
+	    enchantmentCount: number;
+	    planeswalkerCount: number;
+	    landCount: number;
+	    manaCurve: Record<number, number>;
+	    avgCMC: number;
+	    rareCounts: Record<string, number>;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckArchetypeAnalysis(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colorCounts = source["colorCounts"];
+	        this.colorlessCount = source["colorlessCount"];
+	        this.goldCount = source["goldCount"];
+	        this.creatureCount = source["creatureCount"];
+	        this.instantCount = source["instantCount"];
+	        this.sorceryCount = source["sorceryCount"];
+	        this.artifactCount = source["artifactCount"];
+	        this.enchantmentCount = source["enchantmentCount"];
+	        this.planeswalkerCount = source["planeswalkerCount"];
+	        this.landCount = source["landCount"];
+	        this.manaCurve = source["manaCurve"];
+	        this.avgCMC = source["avgCMC"];
+	        this.rareCounts = source["rareCounts"];
+	    }
+	}
+	export class ArchetypeIndicatorInfo {
+	    cardID: number;
+	    cardName: string;
+	    weight: number;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchetypeIndicatorInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardID = source["cardID"];
+	        this.cardName = source["cardName"];
+	        this.weight = source["weight"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class ColorPairInfo {
+	    colors: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorPairInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colors = source["colors"];
+	        this.name = source["name"];
+	    }
+	}
+	export class ArchetypeClassificationResult {
+	    primaryArchetype: string;
+	    secondaryArchetype?: string;
+	    confidence: number;
+	    confidencePercent: number;
+	    colorIdentity: string;
+	    dominantColors: string[];
+	    colorPair?: ColorPairInfo;
+	    signatureCards: number[];
+	    indicators: ArchetypeIndicatorInfo[];
+	    totalCards: number;
+	    analysis?: DeckArchetypeAnalysis;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchetypeClassificationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.primaryArchetype = source["primaryArchetype"];
+	        this.secondaryArchetype = source["secondaryArchetype"];
+	        this.confidence = source["confidence"];
+	        this.confidencePercent = source["confidencePercent"];
+	        this.colorIdentity = source["colorIdentity"];
+	        this.dominantColors = source["dominantColors"];
+	        this.colorPair = this.convertValues(source["colorPair"], ColorPairInfo);
+	        this.signatureCards = source["signatureCards"];
+	        this.indicators = this.convertValues(source["indicators"], ArchetypeIndicatorInfo);
+	        this.totalCards = source["totalCards"];
+	        this.analysis = this.convertValues(source["analysis"], DeckArchetypeAnalysis);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class CardRatingWithTier {
 	    name: string;
 	    color: string;
@@ -413,6 +548,7 @@ export namespace gui {
 	        this.cardsAdded = source["cardsAdded"];
 	    }
 	}
+	
 	export class ColorStats {
 	    white: number;
 	    blue: number;
@@ -493,6 +629,91 @@ export namespace gui {
 	        this.details = source["details"];
 	    }
 	}
+	export class PeriodMetrics {
+	    total: number;
+	    acceptanceRate: number;
+	    acceptancePercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PeriodMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.acceptanceRate = source["acceptanceRate"];
+	        this.acceptancePercent = source["acceptancePercent"];
+	    }
+	}
+	export class TypeMetrics {
+	    total: number;
+	    acceptanceRate: number;
+	    acceptancePercent: number;
+	    winRateOnAccepted?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TypeMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.acceptanceRate = source["acceptanceRate"];
+	        this.acceptancePercent = source["acceptancePercent"];
+	        this.winRateOnAccepted = source["winRateOnAccepted"];
+	    }
+	}
+	export class DashboardMetricsResponse {
+	    totalRecommendations: number;
+	    acceptanceRate: number;
+	    acceptancePercent: number;
+	    rejectionRate: number;
+	    rejectionPercent: number;
+	    winRateOnAccepted?: number;
+	    winRateOnRejected?: number;
+	    winRateDifference?: number;
+	    byType: Record<string, TypeMetrics>;
+	    last7Days?: PeriodMetrics;
+	    last30Days?: PeriodMetrics;
+	
+	    static createFrom(source: any = {}) {
+	        return new DashboardMetricsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRecommendations = source["totalRecommendations"];
+	        this.acceptanceRate = source["acceptanceRate"];
+	        this.acceptancePercent = source["acceptancePercent"];
+	        this.rejectionRate = source["rejectionRate"];
+	        this.rejectionPercent = source["rejectionPercent"];
+	        this.winRateOnAccepted = source["winRateOnAccepted"];
+	        this.winRateOnRejected = source["winRateOnRejected"];
+	        this.winRateDifference = source["winRateDifference"];
+	        this.byType = this.convertValues(source["byType"], TypeMetrics, true);
+	        this.last7Days = this.convertValues(source["last7Days"], PeriodMetrics);
+	        this.last30Days = this.convertValues(source["last30Days"], PeriodMetrics);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class DeckLibraryFilter {
 	    format?: string;
 	    source?: string;
@@ -1012,6 +1233,123 @@ export namespace gui {
 	        this.error = source["error"];
 	    }
 	}
+	export class RecommendationContextData {
+	    deckID?: string;
+	    draftEventID?: string;
+	    format?: string;
+	    setCode?: string;
+	    deckCardCount: number;
+	    deckColorIdentity?: string;
+	    packNumber?: number;
+	    pickNumber?: number;
+	    availableCards?: number[];
+	    currentArchetype?: string;
+	    recommendedCards?: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RecommendationContextData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckID = source["deckID"];
+	        this.draftEventID = source["draftEventID"];
+	        this.format = source["format"];
+	        this.setCode = source["setCode"];
+	        this.deckCardCount = source["deckCardCount"];
+	        this.deckColorIdentity = source["deckColorIdentity"];
+	        this.packNumber = source["packNumber"];
+	        this.pickNumber = source["pickNumber"];
+	        this.availableCards = source["availableCards"];
+	        this.currentArchetype = source["currentArchetype"];
+	        this.recommendedCards = source["recommendedCards"];
+	    }
+	}
+	export class MLTrainingEntry {
+	    recommendationType: string;
+	    recommendedCardID?: number;
+	    recommendedArchetype?: string;
+	    context?: RecommendationContextData;
+	    action: string;
+	    alternateChoiceID?: number;
+	    outcomeResult?: string;
+	    recommendationScore?: number;
+	    recommendationRank?: number;
+	    recommendedAt: string;
+	    respondedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MLTrainingEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendationType = source["recommendationType"];
+	        this.recommendedCardID = source["recommendedCardID"];
+	        this.recommendedArchetype = source["recommendedArchetype"];
+	        this.context = this.convertValues(source["context"], RecommendationContextData);
+	        this.action = source["action"];
+	        this.alternateChoiceID = source["alternateChoiceID"];
+	        this.outcomeResult = source["outcomeResult"];
+	        this.recommendationScore = source["recommendationScore"];
+	        this.recommendationRank = source["recommendationRank"];
+	        this.recommendedAt = source["recommendedAt"];
+	        this.respondedAt = source["respondedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MLTrainingDataExport {
+	    data: MLTrainingEntry[];
+	    totalCount: number;
+	    exportedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MLTrainingDataExport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.data = this.convertValues(source["data"], MLTrainingEntry);
+	        this.totalCount = source["totalCount"];
+	        this.exportedAt = source["exportedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class MissingCard {
 	    cardId: number;
 	    arenaId: number;
@@ -1152,6 +1490,43 @@ export namespace gui {
 		    return a;
 		}
 	}
+	export class OllamaModel {
+	    name: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OllamaModel(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.size = source["size"];
+	    }
+	}
+	export class OllamaStatus {
+	    available: boolean;
+	    version?: string;
+	    modelReady: boolean;
+	    modelName: string;
+	    modelsLoaded?: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OllamaStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.version = source["version"];
+	        this.modelReady = source["modelReady"];
+	        this.modelName = source["modelName"];
+	        this.modelsLoaded = source["modelsLoaded"];
+	        this.error = source["error"];
+	    }
+	}
+	
 	export class QuestUpdatedEvent {
 	    completed: number;
 	    count: number;
@@ -1180,6 +1555,123 @@ export namespace gui {
 	        this.format = source["format"];
 	        this.tier = source["tier"];
 	        this.step = source["step"];
+	    }
+	}
+	
+	export class RecommendationStatsResponse {
+	    totalRecommendations: number;
+	    acceptedCount: number;
+	    rejectedCount: number;
+	    ignoredCount: number;
+	    alternateCount: number;
+	    acceptanceRate: number;
+	    acceptancePercent: number;
+	    winRateOnAccepted?: number;
+	    winRateOnRejected?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecommendationStatsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRecommendations = source["totalRecommendations"];
+	        this.acceptedCount = source["acceptedCount"];
+	        this.rejectedCount = source["rejectedCount"];
+	        this.ignoredCount = source["ignoredCount"];
+	        this.alternateCount = source["alternateCount"];
+	        this.acceptanceRate = source["acceptanceRate"];
+	        this.acceptancePercent = source["acceptancePercent"];
+	        this.winRateOnAccepted = source["winRateOnAccepted"];
+	        this.winRateOnRejected = source["winRateOnRejected"];
+	    }
+	}
+	export class RecordActionRequest {
+	    recommendationID: string;
+	    action: string;
+	    alternateChoiceID?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecordActionRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendationID = source["recommendationID"];
+	        this.action = source["action"];
+	        this.alternateChoiceID = source["alternateChoiceID"];
+	    }
+	}
+	export class RecordOutcomeRequest {
+	    recommendationID: string;
+	    matchID: string;
+	    result: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecordOutcomeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendationID = source["recommendationID"];
+	        this.matchID = source["matchID"];
+	        this.result = source["result"];
+	    }
+	}
+	export class RecordRecommendationRequest {
+	    recommendationType: string;
+	    recommendedCardID?: number;
+	    recommendedArchetype?: string;
+	    context?: RecommendationContextData;
+	    score?: number;
+	    rank?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecordRecommendationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendationType = source["recommendationType"];
+	        this.recommendedCardID = source["recommendedCardID"];
+	        this.recommendedArchetype = source["recommendedArchetype"];
+	        this.context = this.convertValues(source["context"], RecommendationContextData);
+	        this.score = source["score"];
+	        this.rank = source["rank"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RecordRecommendationResponse {
+	    recommendationID: string;
+	    success: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecordRecommendationResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recommendationID = source["recommendationID"];
+	        this.success = source["success"];
+	        this.error = source["error"];
 	    }
 	}
 	export class ReplayDraftDetectedEvent {
@@ -1277,6 +1769,7 @@ export namespace gui {
 	        this.games = source["games"];
 	    }
 	}
+	
 	
 
 }
