@@ -59,21 +59,33 @@ func TestDefaultGoldfishConfig(t *testing.T) {
 func TestGoldfishClient_GetMeta(t *testing.T) {
 	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return mock HTML with archetype data
+		// Return mock HTML with archetype data (current MTGGoldfish format)
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Mono Red Aggro</span>
-			<span class="archetype-tile-statistic">15.5%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'>
+			<a href="/archetype/mono-red">Mono Red Aggro</a>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Azorius Control</span>
-			<span class="archetype-tile-statistic">12.3%</span>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>15.5%</div>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Golgari Midrange</span>
-			<span class="archetype-tile-statistic">8.7%</span>
+		</div>
+		<div class='archetype-tile' id='2'>
+		<div class='archetype-tile-title'>
+			<a href="/archetype/azorius">Azorius Control</a>
+		</div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>12.3%</div>
+		</div>
+		</div>
+		<div class='archetype-tile' id='3'>
+		<div class='archetype-tile-title'>
+			<a href="/archetype/golgari">Golgari Midrange</a>
+		</div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>8.7%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -132,17 +144,23 @@ func TestGoldfishClient_GetTopDecks(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Deck One</span>
-			<span class="archetype-tile-statistic">20.0%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/deck1">Deck One</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>20.0%</div>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Deck Two</span>
-			<span class="archetype-tile-statistic">15.0%</span>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Deck Three</span>
-			<span class="archetype-tile-statistic">10.0%</span>
+		<div class='archetype-tile' id='2'>
+		<div class='archetype-tile-title'><a href="/archetype/deck2">Deck Two</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>15.0%</div>
+		</div>
+		</div>
+		<div class='archetype-tile' id='3'>
+		<div class='archetype-tile-title'><a href="/archetype/deck3">Deck Three</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>10.0%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -176,13 +194,17 @@ func TestGoldfishClient_GetDeckByArchetype(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Mono Red Aggro</span>
-			<span class="archetype-tile-statistic">15.0%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/mono-red">Mono Red Aggro</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>15.0%</div>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Azorius Control</span>
-			<span class="archetype-tile-statistic">10.0%</span>
+		</div>
+		<div class='archetype-tile' id='2'>
+		<div class='archetype-tile-title'><a href="/archetype/azorius">Azorius Control</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>10.0%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -225,9 +247,11 @@ func TestGoldfishClient_GetMetaShare(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Test Deck</span>
-			<span class="archetype-tile-statistic">25.5%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/test">Test Deck</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>25.5%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -263,9 +287,11 @@ func TestGoldfishClient_Cache(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Cached Deck</span>
-			<span class="archetype-tile-statistic">10.0%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/cached">Cached Deck</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>10.0%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -309,9 +335,11 @@ func TestGoldfishClient_ClearCache(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Test</span>
-			<span class="archetype-tile-statistic">10.0%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/test">Test</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>10.0%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -357,9 +385,11 @@ func TestGoldfishClient_RefreshMeta(t *testing.T) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Refreshed Deck</span>
-			<span class="archetype-tile-statistic">10.0%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/refresh">Refreshed Deck</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>10.0%</div>
+		</div>
 		</div>
 		</body>
 		</html>
@@ -527,5 +557,117 @@ func TestGoldfishClient_GetCacheStatus_NotCached(t *testing.T) {
 	}
 	if !expiresAt.IsZero() {
 		t.Error("expected zero time for nonexistent cache entry")
+	}
+}
+
+func TestGoldfishClient_ParseMetaPageCurrentFormat(t *testing.T) {
+	// Test with actual current MTGGoldfish HTML structure (as of 2024)
+	client := NewGoldfishClient(nil)
+
+	// This HTML matches the real MTGGoldfish structure with single quotes
+	html := `
+<div class='archetype-tile' id='28086'>
+<div class='archetype-tile-image'>
+<div aria-label='Image of Kaito' class='card-tile' role='img'>
+</div>
+</div>
+<div class='archetype-tile-description-wrapper'>
+<div class='archetype-tile-description'>
+<div class='archetype-tile-title'>
+<span class='deck-price-online'>
+<a href="/archetype/standard-dimir-midrange-woe#online">Dimir Midrange</a>
+</span>
+</div>
+</div>
+<div class='archetype-tile-statistics'>
+<div class='archetype-tile-statistics-left'>
+<div class='archetype-tile-statistic metagame-percentage'>
+<div class='archetype-tile-statistic-name'>META%</div>
+<div class='archetype-tile-statistic-value'>
+21.3%
+<span class='archetype-tile-statistic-value-extra-data'>(385)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class='archetype-tile' id='28249'>
+<div class='archetype-tile-description-wrapper'>
+<div class='archetype-tile-description'>
+<div class='archetype-tile-title'>
+<span class='deck-price-online'>
+<a href="/archetype/standard-simic-aggro-woe#online">Simic Aggro</a>
+</span>
+</div>
+</div>
+<div class='archetype-tile-statistics'>
+<div class='archetype-tile-statistics-left'>
+<div class='archetype-tile-statistic metagame-percentage'>
+<div class='archetype-tile-statistic-name'>META%</div>
+<div class='archetype-tile-statistic-value'>
+11.2%
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class='archetype-tile' id='28080'>
+<div class='archetype-tile-description-wrapper'>
+<div class='archetype-tile-description'>
+<div class='archetype-tile-title'>
+<span class='deck-price-online'>
+<a href="/archetype/standard-jeskai-control-woe#online">Jeskai Control</a>
+</span>
+</div>
+</div>
+<div class='archetype-tile-statistics'>
+<div class='archetype-tile-statistics-left'>
+<div class='archetype-tile-statistic metagame-percentage'>
+<div class='archetype-tile-statistic-value'>
+8.5%
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+`
+
+	meta := client.parseMetaPage(html, "standard")
+
+	if meta == nil {
+		t.Fatal("Expected meta to not be nil")
+	}
+
+	if meta.Format != "standard" {
+		t.Errorf("Expected format 'standard', got '%s'", meta.Format)
+	}
+
+	if len(meta.Decks) == 0 {
+		t.Fatal("Expected at least one deck to be parsed from current HTML format")
+	}
+
+	t.Logf("Parsed %d decks from current format HTML", len(meta.Decks))
+	for _, deck := range meta.Decks {
+		t.Logf("  - %s: %.1f%%", deck.Name, deck.MetaShare)
+	}
+
+	// Verify we got the expected decks
+	expectedDecks := map[string]float64{
+		"Dimir Midrange": 21.3,
+		"Simic Aggro":    11.2,
+		"Jeskai Control": 8.5,
+	}
+
+	for _, deck := range meta.Decks {
+		if expectedShare, ok := expectedDecks[deck.Name]; ok {
+			if deck.MetaShare != expectedShare {
+				t.Errorf("Expected %s meta share %.1f, got %.1f", deck.Name, expectedShare, deck.MetaShare)
+			}
+		}
 	}
 }
