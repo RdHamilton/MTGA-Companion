@@ -828,7 +828,20 @@ func (r *matchRepository) GetStatsByDeck(ctx context.Context, filter models.Stat
 		where += " AND m.timestamp <= ?"
 		args = append(args, *filter.EndDate)
 	}
-	if filter.Format != nil {
+	// Format filters (support both single and multiple)
+	if len(filter.Formats) > 0 {
+		// Multiple formats with OR logic
+		placeholders := ""
+		for i, format := range filter.Formats {
+			if i > 0 {
+				placeholders += ", "
+			}
+			placeholders += "?"
+			args = append(args, format)
+		}
+		where += fmt.Sprintf(" AND m.format IN (%s)", placeholders)
+	} else if filter.Format != nil {
+		// Single format (backward compatibility)
 		where += " AND m.format = ?"
 		args = append(args, *filter.Format)
 	}
