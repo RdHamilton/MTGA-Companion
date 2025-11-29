@@ -15,6 +15,56 @@ interface FormatStats {
 
 const COLORS = ['#4a9eff', '#7dff7d', '#ff7d7d', '#ffaa00', '#aa00ff', '#00ffaa', '#ff00aa'];
 
+// Normalize format name to extract base format (e.g., "QuickDraft_TLA_20251127" -> "QuickDraft")
+const normalizeFormat = (format: string): string => {
+  if (!format) return format;
+  const underscoreIndex = format.indexOf('_');
+  if (underscoreIndex !== -1) {
+    return format.substring(0, underscoreIndex);
+  }
+  return format;
+};
+
+// Aggregate stats for formats with the same normalized name
+const aggregateFormatStats = (statsArray: FormatStats[]): FormatStats[] => {
+  const aggregated = new Map<string, models.Statistics>();
+
+  for (const item of statsArray) {
+    const normalizedFormat = normalizeFormat(item.format);
+    const existing = aggregated.get(normalizedFormat);
+
+    if (existing) {
+      // Aggregate stats
+      existing.TotalMatches += item.stats.TotalMatches;
+      existing.MatchesWon += item.stats.MatchesWon;
+      existing.MatchesLost += item.stats.MatchesLost;
+      existing.TotalGames += item.stats.TotalGames;
+      existing.GamesWon += item.stats.GamesWon;
+      existing.GamesLost += item.stats.GamesLost;
+      // Recalculate win rates
+      existing.WinRate = existing.TotalMatches > 0 ? existing.MatchesWon / existing.TotalMatches : 0;
+      existing.GameWinRate = existing.TotalGames > 0 ? existing.GamesWon / existing.TotalGames : 0;
+    } else {
+      // Create a copy of the stats object
+      aggregated.set(normalizedFormat, new models.Statistics({
+        TotalMatches: item.stats.TotalMatches,
+        MatchesWon: item.stats.MatchesWon,
+        MatchesLost: item.stats.MatchesLost,
+        TotalGames: item.stats.TotalGames,
+        GamesWon: item.stats.GamesWon,
+        GamesLost: item.stats.GamesLost,
+        WinRate: item.stats.WinRate,
+        GameWinRate: item.stats.GameWinRate,
+      }));
+    }
+  }
+
+  return Array.from(aggregated.entries()).map(([format, stats]) => ({
+    format,
+    stats,
+  }));
+};
+
 const FormatDistribution = () => {
   const { filters, updateFilters } = useAppContext();
   const { dateRange, customStartDate, customEndDate, chartType, sortBy, sortDirection } = filters.formatDistribution;
@@ -75,7 +125,10 @@ const FormatDistribution = () => {
         stats
       }));
 
-      setFormatStats(statsArray);
+      // Aggregate stats by normalized format name (e.g., combine all QuickDraft_* into QuickDraft)
+      const aggregatedStats = aggregateFormatStats(statsArray);
+
+      setFormatStats(aggregatedStats);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load format statistics');
       console.error('Error loading format stats:', err);

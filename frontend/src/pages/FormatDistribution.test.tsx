@@ -213,6 +213,43 @@ describe('FormatDistribution', () => {
         expect(screen.getByText('20W - 5L')).toBeInTheDocument();
       });
     });
+
+    it('should aggregate formats with underscore suffixes', async () => {
+      // Two QuickDraft formats from different sets should be combined
+      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+        'QuickDraft_TLA_20251127': createMockStatistics({ TotalMatches: 8, MatchesWon: 5, MatchesLost: 3 }),
+        'QuickDraft_MKM_20241120': createMockStatistics({ TotalMatches: 12, MatchesWon: 7, MatchesLost: 5 }),
+        Play: createMockStatistics({ TotalMatches: 10, MatchesWon: 6, MatchesLost: 4 }),
+      });
+
+      renderWithProvider(<FormatDistribution />);
+
+      await waitFor(() => {
+        // Should show normalized format name "QuickDraft" (not the full names with suffixes)
+        expect(screen.getByText('QuickDraft')).toBeInTheDocument();
+      });
+      // Should NOT show the full format names with date suffixes
+      expect(screen.queryByText('QuickDraft_TLA_20251127')).not.toBeInTheDocument();
+      expect(screen.queryByText('QuickDraft_MKM_20241120')).not.toBeInTheDocument();
+      // Should show Play as is (no underscore)
+      expect(screen.getByText('Play')).toBeInTheDocument();
+    });
+
+    it('should combine stats when aggregating formats', async () => {
+      // Two PremierDraft formats should have their wins/losses combined
+      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+        'PremierDraft_TLA_20251127': createMockStatistics({ TotalMatches: 5, MatchesWon: 3, MatchesLost: 2 }),
+        'PremierDraft_MKM_20241120': createMockStatistics({ TotalMatches: 5, MatchesWon: 2, MatchesLost: 3 }),
+      });
+
+      renderWithProvider(<FormatDistribution />);
+
+      await waitFor(() => {
+        expect(screen.getByText('PremierDraft')).toBeInTheDocument();
+      });
+      // Combined: 10 matches total, 5W - 5L
+      expect(screen.getByText('5W - 5L')).toBeInTheDocument();
+    });
   });
 
   describe('Filters', () => {
