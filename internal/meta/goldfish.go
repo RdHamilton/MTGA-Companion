@@ -237,20 +237,34 @@ func (c *GoldfishClient) parseMetaPage(html, format string) *FormatMeta {
 	}
 
 	// Parse archetype tiles from the page
-	// MTGGoldfish uses a specific structure for archetype tiles
-	// <div class="archetype-tile">
-	//   <span class="archetype-tile-title">Deck Name</span>
-	//   <span class="archetype-tile-statistic">XX.X%</span>
+	// MTGGoldfish structure (as of 2024):
+	// <div class='archetype-tile' id='28086'>
+	//   <div class='archetype-tile-title'>
+	//     <a href="/archetype/...">Deck Name</a>
+	//   </div>
+	//   <div class='archetype-tile-statistic metagame-percentage'>
+	//     <div class='archetype-tile-statistic-value'>
+	//       21.3%
+	//     </div>
+	//   </div>
 	// </div>
 
-	// Regex patterns for parsing
-	archetypePattern := regexp.MustCompile(`(?s)<div[^>]*class="[^"]*archetype-tile[^"]*"[^>]*>.*?<span[^>]*class="[^"]*archetype-tile-title[^"]*"[^>]*>([^<]+)</span>.*?<span[^>]*class="[^"]*archetype-tile-statistic[^"]*"[^>]*>([^<]+)</span>`)
+	// Primary pattern: matches archetype tiles with deck name in anchor and percentage in statistic-value
+	// Uses ['\"] to handle both single and double quotes
+	archetypePattern := regexp.MustCompile(`(?s)<div[^>]*class=['\"][^'\"]*archetype-tile[^'\"]*['\"][^>]*>.*?<div[^>]*class=['\"][^'\"]*archetype-tile-title[^'\"]*['\"][^>]*>.*?<a[^>]*>([^<]+)</a>.*?<div[^>]*class=['\"][^'\"]*archetype-tile-statistic-value[^'\"]*['\"][^>]*>\s*(\d+\.?\d*)%`)
+
+	// Fallback: match from metagame-percentage section directly
+	fallbackPattern := regexp.MustCompile(`(?s)<div[^>]*class=['\"][^'\"]*archetype-tile-title[^'\"]*['\"][^>]*>.*?<a[^>]*href=['\"][^'\"]*['\"][^>]*>([^<]+)</a>.*?<div[^>]*class=['\"][^'\"]*metagame-percentage[^'\"]*['\"][^>]*>.*?<div[^>]*class=['\"][^'\"]*archetype-tile-statistic-value[^'\"]*['\"][^>]*>\s*(\d+\.?\d*)%`)
 
 	// Also try to match the metagame table format
 	tablePattern := regexp.MustCompile(`(?s)<tr[^>]*>.*?<a[^>]*href="/archetype/([^"#]+)[^"]*"[^>]*>([^<]+)</a>.*?<td[^>]*>(\d+\.?\d*)%</td>`)
 
 	// Try archetype tiles first
 	matches := archetypePattern.FindAllStringSubmatch(html, -1)
+	if len(matches) == 0 {
+		// Try fallback pattern
+		matches = fallbackPattern.FindAllStringSubmatch(html, -1)
+	}
 	if len(matches) == 0 {
 		// Fall back to table format
 		matches = tablePattern.FindAllStringSubmatch(html, -1)

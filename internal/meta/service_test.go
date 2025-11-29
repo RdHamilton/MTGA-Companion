@@ -13,17 +13,23 @@ func createTestServers() (*httptest.Server, *httptest.Server) {
 		html := `
 		<html>
 		<body>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Mono Red Aggro</span>
-			<span class="archetype-tile-statistic">15.5%</span>
+		<div class='archetype-tile' id='1'>
+		<div class='archetype-tile-title'><a href="/archetype/mono-red">Mono Red Aggro</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>15.5%</div>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Azorius Control</span>
-			<span class="archetype-tile-statistic">12.3%</span>
 		</div>
-		<div class="archetype-tile">
-			<span class="archetype-tile-title">Golgari Midrange</span>
-			<span class="archetype-tile-statistic">3.7%</span>
+		<div class='archetype-tile' id='2'>
+		<div class='archetype-tile-title'><a href="/archetype/azorius">Azorius Control</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>12.3%</div>
+		</div>
+		</div>
+		<div class='archetype-tile' id='3'>
+		<div class='archetype-tile-title'><a href="/archetype/golgari">Golgari Midrange</a></div>
+		<div class='archetype-tile-statistic metagame-percentage'>
+			<div class='archetype-tile-statistic-value'>3.7%</div>
+		</div>
 		</div>
 		</body>
 		</html>
