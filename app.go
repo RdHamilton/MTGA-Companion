@@ -9,6 +9,7 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
+	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
@@ -37,6 +38,7 @@ type App struct {
 	settingsFacade   *gui.SettingsFacade
 	feedbackFacade   *gui.FeedbackFacade
 	llmFacade        *gui.LLMFacade
+	metaFacade       *gui.MetaFacade
 
 	// Shared services used by facades
 	services *gui.Services
@@ -44,10 +46,14 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	// Initialize meta service
+	metaService := meta.NewService(nil)
+
 	// Initialize shared services
 	services := &gui.Services{
 		DaemonPort:   9999, // Default daemon port for IPC connection
 		DraftMetrics: metrics.NewDraftMetrics(),
+		MetaService:  metaService,
 	}
 
 	// Create system facade first (it contains the event dispatcher)
@@ -66,6 +72,7 @@ func NewApp() *App {
 		settingsFacade:   gui.NewSettingsFacade(services),
 		feedbackFacade:   gui.NewFeedbackFacade(services),
 		llmFacade:        gui.NewLLMFacade(services),
+		metaFacade:       gui.NewMetaFacade(metaService),
 	}
 }
 
@@ -795,4 +802,28 @@ func (a *App) PullOllamaModel(endpoint, model string) error {
 // TestLLMGeneration tests LLM generation with a simple prompt.
 func (a *App) TestLLMGeneration(endpoint, model string) (string, error) {
 	return a.llmFacade.TestLLMGeneration(a.ctx, endpoint, model)
+}
+
+// ========================================
+// Meta Methods (MetaFacade)
+// ========================================
+
+// GetMetaDashboard returns meta information for the dashboard.
+func (a *App) GetMetaDashboard(format string) (*gui.MetaDashboardResponse, error) {
+	return a.metaFacade.GetMetaDashboard(a.ctx, format)
+}
+
+// RefreshMetaData forces a refresh of meta data for a format.
+func (a *App) RefreshMetaData(format string) (*gui.MetaDashboardResponse, error) {
+	return a.metaFacade.RefreshMetaData(a.ctx, format)
+}
+
+// GetSupportedFormats returns the list of supported formats.
+func (a *App) GetSupportedFormats() []string {
+	return a.metaFacade.GetSupportedFormats()
+}
+
+// GetTierArchetypes returns archetypes for a specific tier.
+func (a *App) GetTierArchetypes(format string, tier int) ([]*gui.ArchetypeInfo, error) {
+	return a.metaFacade.GetTierArchetypes(a.ctx, format, tier)
 }

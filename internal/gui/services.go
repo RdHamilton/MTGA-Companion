@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
+	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
@@ -43,6 +44,9 @@ type Services struct {
 
 	// Performance metrics
 	DraftMetrics *metrics.DraftMetrics
+
+	// Meta service
+	MetaService *meta.Service
 
 	// Daemon mode flag
 	DaemonMode bool

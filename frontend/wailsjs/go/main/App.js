@@ -250,6 +250,10 @@ export function GetMatches(arg1) {
   return window['go']['main']['App']['GetMatches'](arg1);
 }
 
+export function GetMetaDashboard(arg1) {
+  return window['go']['main']['App']['GetMetaDashboard'](arg1);
+}
+
 export function GetMissingCards(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetMissingCards'](arg1, arg2, arg3);
 }
@@ -350,6 +354,14 @@ export function GetStatsUpdatedEvent() {
   return window['go']['main']['App']['GetStatsUpdatedEvent']();
 }
 
+export function GetSupportedFormats() {
+  return window['go']['main']['App']['GetSupportedFormats']();
+}
+
+export function GetTierArchetypes(arg1, arg2) {
+  return window['go']['main']['App']['GetTierArchetypes'](arg1, arg2);
+}
+
 export function GetTrendAnalysis(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetTrendAnalysis'](arg1, arg2, arg3, arg4);
 }
@@ -404,6 +416,10 @@ export function RecordRecommendationAction(arg1) {
 
 export function RecordRecommendationOutcome(arg1) {
   return window['go']['main']['App']['RecordRecommendationOutcome'](arg1);
+}
+
+export function RefreshMetaData(arg1) {
+  return window['go']['main']['App']['RefreshMetaData'](arg1);
 }
 
 export function RefreshSetCards(arg1) {

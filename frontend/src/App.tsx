@@ -13,6 +13,7 @@ import Draft from './pages/Draft';
 import Decks from './pages/Decks';
 import DeckBuilder from './pages/DeckBuilder';
 import Collection from './pages/Collection';
+import Meta from './pages/Meta';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import { EventsOn } from '../wailsjs/runtime/runtime';
@@ -132,6 +133,7 @@ function App() {
           <Route path="/deck-builder/:deckID" element={<DeckBuilder />} />
           <Route path="/deck-builder/draft/:draftEventID" element={<DeckBuilder />} />
           <Route path="/collection" element={<Collection />} />
+          <Route path="/meta" element={<Meta />} />
           <Route path="/charts/win-rate-trend" element={<WinRateTrend />} />
           <Route path="/charts/deck-performance" element={<DeckPerformance />} />
           <Route path="/charts/rank-progression" element={<RankProgression />} />
