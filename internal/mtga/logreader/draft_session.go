@@ -56,8 +56,13 @@ func ParseDraftSessionEvent(entry *LogEntry) (*DraftSessionEvent, error) {
 	}
 
 	// Check for BotDraftDraftStatus (Quick Draft initial state)
-	if strings.Contains(entry.Raw, "BotDraftDraftStatus") && strings.Contains(entry.Raw, "<==") {
-		return parseDraftStatus(entry)
+	// The JSON line has CurrentModule: BotDraft and a Payload field
+	// Note: The log format puts the header "<== BotDraftDraftStatus(...)" on one line
+	// and the JSON response on the next line, so we check the JSON directly
+	if currentModule, ok := entry.JSON["CurrentModule"]; ok && currentModule == "BotDraft" {
+		if _, hasPayload := entry.JSON["Payload"]; hasPayload {
+			return parseDraftStatus(entry)
+		}
 	}
 
 	// Check for BotDraftDraftPick (Quick Draft pick)
