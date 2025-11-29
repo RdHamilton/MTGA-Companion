@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  GetCollection,
-  GetCollectionStats,
-  GetAllSetInfo,
-} from '../../wailsjs/go/main/App';
+import { GetCollection, GetAllSetInfo } from '../../wailsjs/go/main/App';
 import { gui } from '../../wailsjs/go/models';
 import SetCompletionPanel from '../components/SetCompletion';
 import './Collection.css';
-
-// Placeholder for cards without metadata
-const CARD_BACK_PLACEHOLDER = 'https://cards.scryfall.io/back.png';
 
 // Color icon mapping
 const colorIcons: Record<string, string> = {
@@ -42,7 +35,6 @@ const ITEMS_PER_PAGE = 50;
 
 export default function Collection() {
   const [cards, setCards] = useState<gui.CollectionCard[]>([]);
-  const [stats, setStats] = useState<gui.CollectionStats | null>(null);
   const [sets, setSets] = useState<gui.SetInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,15 +91,6 @@ export default function Collection() {
     }
   }, [debouncedSearchTerm, filters.setCode, filters.rarity, filters.colors, filters.ownedOnly, filters.sortBy, filters.sortDesc, currentPage]);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const collectionStats = await GetCollectionStats();
-      setStats(collectionStats);
-    } catch (err) {
-      console.error('Failed to load collection stats:', err);
-    }
-  }, []);
-
   const loadSets = useCallback(async () => {
     try {
       const setInfo = await GetAllSetInfo();
@@ -123,7 +106,6 @@ export default function Collection() {
       if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).go) {
         clearInterval(checkWailsReady);
         loadCollection();
-        loadStats();
         loadSets();
       }
     }, 100);
@@ -197,18 +179,17 @@ export default function Collection() {
       <div className="collection-header">
         <div className="header-title">
           <h1>Collection</h1>
-          {stats && (
-            <div className="collection-stats-summary">
-              <span className="stat-item">
-                <span className="stat-value">{stats.totalUniqueCards}</span>
-                <span className="stat-label">Unique Cards</span>
-              </span>
-              <span className="stat-item">
-                <span className="stat-value">{stats.totalCards}</span>
-                <span className="stat-label">Total Cards</span>
-              </span>
-            </div>
-          )}
+          <div className="collection-stats-summary">
+            <span className="stat-item">
+              <span className="stat-label">Cards in Set:</span>
+              <span className="stat-value">{filterCount}</span>
+            </span>
+            <span className="stat-separator">|</span>
+            <span className="stat-item">
+              <span className="stat-label">Total Cards:</span>
+              <span className="stat-value">{totalCount}</span>
+            </span>
+          </div>
         </div>
         <button
           className="set-completion-button"
@@ -288,8 +269,8 @@ export default function Collection() {
 
         <div className="filter-row secondary">
           {/* Color Filters */}
-          <div className="filter-group color-filters">
-            <span className="filter-label">Colors:</span>
+          <span className="filter-label">Colors:</span>
+          <div className="color-buttons">
             {['W', 'U', 'B', 'R', 'G'].map((color) => (
               <button
                 key={color}
@@ -303,16 +284,14 @@ export default function Collection() {
           </div>
 
           {/* Owned Only Toggle */}
-          <div className="filter-group">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={filters.ownedOnly}
-                onChange={(e) => handleFilterChange('ownedOnly', e.target.checked)}
-              />
-              Owned only
-            </label>
-          </div>
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={filters.ownedOnly}
+              onChange={(e) => handleFilterChange('ownedOnly', e.target.checked)}
+            />
+            Owned only
+          </label>
 
           {/* Result Count */}
           <div className="filter-results">
@@ -343,26 +322,52 @@ export default function Collection() {
         <>
           <div className="card-grid">
             {cards.map((card) => {
-              const imageUrl = card.imageUri || CARD_BACK_PLACEHOLDER;
+              // Check if we have a real card image (not the card back placeholder)
+              const isCardBackPlaceholder = card.imageUri?.includes('back.png');
+              const hasImage = card.imageUri && card.imageUri !== '' && !isCardBackPlaceholder;
               return (
                 <div
                   key={`${card.cardId}-${card.setCode}`}
-                  className={`collection-card ${card.quantity === 0 ? 'not-owned' : ''}`}
+                  className={`collection-card ${card.quantity === 0 ? 'not-owned' : ''} ${!hasImage ? 'no-image' : ''}`}
                 >
-                  <img
-                    src={imageUrl}
-                    alt={card.name || `Card #${card.arenaId}`}
-                    style={{ width: '100%', borderRadius: '12px' }}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      if (target.src !== CARD_BACK_PLACEHOLDER) {
-                        target.src = CARD_BACK_PLACEHOLDER;
-                      }
-                    }}
-                  />
-                  <div className="card-quantity-badge" style={{ backgroundColor: rarityColors[card.rarity?.toLowerCase()] || '#333' }}>
-                    x{card.quantity}
-                  </div>
+                  {hasImage ? (
+                    <img
+                      src={card.imageUri}
+                      alt={card.name || `Card #${card.arenaId}`}
+                      style={{ width: '100%', borderRadius: '12px' }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        // Hide broken image and show fallback info
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.card-info-fallback')) {
+                          parent.classList.add('no-image');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="card-info-fallback">
+                      <div className="card-fallback-name">{card.name || 'Unknown Card'}</div>
+                      {card.setCode ? (
+                        <div className="card-fallback-set">{card.setCode.toUpperCase()}</div>
+                      ) : (
+                        <div className="card-fallback-hint">
+                          Card #{card.arenaId}
+                          <br />
+                          <span className="download-hint">Download set in Settings</span>
+                        </div>
+                      )}
+                      {card.manaCost && <div className="card-fallback-mana">{card.manaCost}</div>}
+                      {card.rarity && (
+                        <div
+                          className="card-fallback-rarity"
+                          style={{ color: rarityColors[card.rarity.toLowerCase()] || '#888' }}
+                        >
+                          {card.rarity}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

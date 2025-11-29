@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -89,36 +90,85 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get collection: %v", err)}
 	}
 
-	// Get card metadata for all cards in collection
-	cardIDs := make([]int, 0, len(collection))
-	for cardID := range collection {
-		cardIDs = append(cardIDs, cardID)
-	}
+	// Track which cards we've already added
+	addedCards := make(map[int]bool)
+	collectionCards := make([]*CollectionCard, 0)
 
-	// Get card metadata from local database only (SetCardRepo) for fast loading.
-	// Skip CardService API calls as they are too slow for large collections.
-	// Cards without local metadata will still display with Scryfall image URLs from frontend.
-	cardMetadataFromSetRepo := make(map[int]*models.SetCard)
+	// If filtering by set and not owned only, get all cards from downloaded set(s)
+	if filter != nil && !filter.OwnedOnly {
+		var setCards []*models.SetCard
 
-	for _, cardID := range cardIDs {
-		arenaID := fmt.Sprintf("%d", cardID)
-		card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
-		if err == nil && card != nil {
-			cardMetadataFromSetRepo[cardID] = card
+		if filter.SetCode != "" {
+			// Get cards from specific set
+			setCards, err = c.services.Storage.SetCardRepo().GetCardsBySet(ctx, filter.SetCode)
+			if err != nil {
+				return nil, &AppError{Message: fmt.Sprintf("Failed to get set cards: %v", err)}
+			}
+		} else {
+			// Get all cards from all downloaded sets
+			setCodes, err := c.services.Storage.SetCardRepo().GetCachedSets(ctx)
+			if err != nil {
+				return nil, &AppError{Message: fmt.Sprintf("Failed to get sets: %v", err)}
+			}
+			for _, setCode := range setCodes {
+				cards, err := c.services.Storage.SetCardRepo().GetCardsBySet(ctx, setCode)
+				if err == nil {
+					setCards = append(setCards, cards...)
+				}
+			}
+		}
+
+		// Build cards from set data with collection quantities
+		for _, meta := range setCards {
+			arenaID, _ := strconv.Atoi(meta.ArenaID)
+			if arenaID == 0 {
+				continue // Skip cards without arena IDs
+			}
+
+			quantity := collection[arenaID] // Will be 0 if not owned
+
+			card := &CollectionCard{
+				CardID:    arenaID,
+				ArenaID:   arenaID,
+				Quantity:  quantity,
+				Name:      meta.Name,
+				SetCode:   meta.SetCode,
+				Rarity:    meta.Rarity,
+				ManaCost:  meta.ManaCost,
+				CMC:       float64(meta.CMC),
+				TypeLine:  strings.Join(meta.Types, " "),
+				Colors:    meta.Colors,
+				ImageURI:  meta.ImageURL,
+				Power:     meta.Power,
+				Toughness: meta.Toughness,
+			}
+
+			if card.ImageURI == "" {
+				card.ImageURI = "https://cards.scryfall.io/back.png"
+			}
+
+			collectionCards = append(collectionCards, card)
+			addedCards[arenaID] = true
 		}
 	}
 
-	// Build collection cards with metadata
-	collectionCards := make([]*CollectionCard, 0, len(collection))
+	// Add owned cards that aren't already in the list (either all owned cards if ownedOnly,
+	// or just cards from sets we don't have downloaded)
 	for cardID, quantity := range collection {
+		if addedCards[cardID] {
+			continue
+		}
+
 		card := &CollectionCard{
 			CardID:   cardID,
 			ArenaID:  cardID,
 			Quantity: quantity,
 		}
 
-		// Use SetCardRepo metadata (local database)
-		if meta, ok := cardMetadataFromSetRepo[cardID]; ok {
+		// Try to get metadata from SetCardRepo
+		arenaID := fmt.Sprintf("%d", cardID)
+		meta, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+		if err == nil && meta != nil {
 			card.Name = meta.Name
 			card.SetCode = meta.SetCode
 			card.Rarity = meta.Rarity
@@ -127,7 +177,6 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			card.TypeLine = strings.Join(meta.Types, " ")
 			card.Colors = meta.Colors
 			card.ImageURI = meta.ImageURL
-
 			if meta.Power != "" {
 				card.Power = meta.Power
 			}
@@ -136,8 +185,6 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			}
 		}
 
-		// If no image URI from database, use card back placeholder
-		// The Scryfall API redirect URLs don't work reliably in WebView
 		if card.ImageURI == "" {
 			card.ImageURI = "https://cards.scryfall.io/back.png"
 		}

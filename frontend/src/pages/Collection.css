@@ -94,9 +94,9 @@
 
 .stat-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .stat-value {
@@ -106,10 +106,14 @@
 }
 
 .stat-label {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-separator {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin: 0 0.5rem;
 }
 
 .set-completion-button {
@@ -149,6 +153,11 @@
 }
 
 .filter-row.secondary {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -211,8 +220,10 @@
 }
 
 /* Color Filters */
-.color-filters {
+.color-buttons {
   display: flex;
+  flex-direction: row;
+  align-items: center;
   gap: 0.25rem;
 }
 
@@ -298,6 +309,69 @@
 .collection-card.not-owned {
   opacity: 0.5;
   filter: grayscale(0.5);
+}
+
+.collection-card.no-image {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card Info Fallback for cards without images */
+.card-info-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  gap: 0.5rem;
+  height: 100%;
+}
+
+.card-fallback-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  word-wrap: break-word;
+  line-height: 1.3;
+}
+
+.card-fallback-set {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.card-fallback-mana {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: monospace;
+}
+
+.card-fallback-rarity {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.card-fallback-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.download-hint {
+  font-size: 0.625rem;
+  color: #4a9eff;
+  font-style: italic;
 }
 
 .card-image-container {

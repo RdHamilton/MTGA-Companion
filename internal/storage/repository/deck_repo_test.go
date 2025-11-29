@@ -1576,3 +1576,280 @@ func TestDeckRepository_GetByFilters(t *testing.T) {
 		}
 	}
 }
+
+func TestDeckRepository_DeleteBySourceExcluding(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create multiple arena decks and one constructed deck
+	decks := []*models.Deck{
+		{
+			ID:            "arena-deck-1",
+			AccountID:     1,
+			Name:          "Arena Deck 1",
+			Format:        "Standard",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "arena-deck-2",
+			AccountID:     1,
+			Name:          "Arena Deck 2",
+			Format:        "Historic",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "arena-deck-3",
+			AccountID:     1,
+			Name:          "Arena Deck 3",
+			Format:        "Standard",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "constructed-deck-1",
+			AccountID:     1,
+			Name:          "Constructed Deck",
+			Format:        "Standard",
+			Source:        "constructed",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+	}
+
+	for _, d := range decks {
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	// Delete arena decks except arena-deck-1 and arena-deck-2
+	excludeIDs := []string{"arena-deck-1", "arena-deck-2"}
+	deletedCount, err := repo.DeleteBySourceExcluding(ctx, 1, "arena", excludeIDs)
+	if err != nil {
+		t.Fatalf("failed to delete by source excluding: %v", err)
+	}
+
+	// Should have deleted 1 deck (arena-deck-3)
+	if deletedCount != 1 {
+		t.Errorf("expected 1 deck deleted, got %d", deletedCount)
+	}
+
+	// Verify arena-deck-1 and arena-deck-2 still exist
+	deck1, err := repo.GetByID(ctx, "arena-deck-1")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck1 == nil {
+		t.Error("expected arena-deck-1 to still exist")
+	}
+
+	deck2, err := repo.GetByID(ctx, "arena-deck-2")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck2 == nil {
+		t.Error("expected arena-deck-2 to still exist")
+	}
+
+	// Verify arena-deck-3 was deleted
+	deck3, err := repo.GetByID(ctx, "arena-deck-3")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck3 != nil {
+		t.Error("expected arena-deck-3 to be deleted")
+	}
+
+	// Verify constructed-deck-1 was NOT deleted (different source)
+	constructedDeck, err := repo.GetByID(ctx, "constructed-deck-1")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if constructedDeck == nil {
+		t.Error("expected constructed-deck-1 to still exist (different source)")
+	}
+}
+
+func TestDeckRepository_DeleteBySourceExcluding_EmptyExclusions(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create arena decks
+	decks := []*models.Deck{
+		{
+			ID:            "arena-deck-1",
+			AccountID:     1,
+			Name:          "Arena Deck 1",
+			Format:        "Standard",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "arena-deck-2",
+			AccountID:     1,
+			Name:          "Arena Deck 2",
+			Format:        "Historic",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+	}
+
+	for _, d := range decks {
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	// Delete all arena decks (empty exclusion list)
+	deletedCount, err := repo.DeleteBySourceExcluding(ctx, 1, "arena", []string{})
+	if err != nil {
+		t.Fatalf("failed to delete by source excluding: %v", err)
+	}
+
+	// Should have deleted 2 decks
+	if deletedCount != 2 {
+		t.Errorf("expected 2 decks deleted, got %d", deletedCount)
+	}
+
+	// Verify all arena decks are deleted
+	deck1, err := repo.GetByID(ctx, "arena-deck-1")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck1 != nil {
+		t.Error("expected arena-deck-1 to be deleted")
+	}
+
+	deck2, err := repo.GetByID(ctx, "arena-deck-2")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck2 != nil {
+		t.Error("expected arena-deck-2 to be deleted")
+	}
+}
+
+func TestDeckRepository_DeleteBySourceExcluding_DifferentAccounts(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create a second account
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO accounts (id, name, is_default, created_at, updated_at)
+		VALUES (2, 'Second Account', 0, ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("failed to create second account: %v", err)
+	}
+
+	// Create arena decks for both accounts
+	decks := []*models.Deck{
+		{
+			ID:            "arena-deck-account1",
+			AccountID:     1,
+			Name:          "Arena Deck Account 1",
+			Format:        "Standard",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+		{
+			ID:            "arena-deck-account2",
+			AccountID:     2,
+			Name:          "Arena Deck Account 2",
+			Format:        "Standard",
+			Source:        "arena",
+			MatchesPlayed: 0,
+			MatchesWon:    0,
+			GamesPlayed:   0,
+			GamesWon:      0,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		},
+	}
+
+	for _, d := range decks {
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("failed to create deck: %v", err)
+		}
+	}
+
+	// Delete arena decks only for account 1
+	deletedCount, err := repo.DeleteBySourceExcluding(ctx, 1, "arena", []string{})
+	if err != nil {
+		t.Fatalf("failed to delete by source excluding: %v", err)
+	}
+
+	// Should have deleted 1 deck (only account 1's deck)
+	if deletedCount != 1 {
+		t.Errorf("expected 1 deck deleted, got %d", deletedCount)
+	}
+
+	// Verify account 1's deck is deleted
+	deck1, err := repo.GetByID(ctx, "arena-deck-account1")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck1 != nil {
+		t.Error("expected arena-deck-account1 to be deleted")
+	}
+
+	// Verify account 2's deck still exists
+	deck2, err := repo.GetByID(ctx, "arena-deck-account2")
+	if err != nil {
+		t.Fatalf("failed to get deck: %v", err)
+	}
+	if deck2 == nil {
+		t.Error("expected arena-deck-account2 to still exist (different account)")
+	}
+}
