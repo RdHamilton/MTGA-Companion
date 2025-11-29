@@ -230,7 +230,7 @@ export function MLSettingsSection(props: MLSettingsSectionProps) {
                     loading={isTestingLLM}
                     loadingText="Testing..."
                     onClick={handleTestLLM}
-                    variant="secondary"
+                    variant="default"
                     disabled={!ollamaStatus?.available || !ollamaStatus?.modelReady}
                   >
                     Test Generation
