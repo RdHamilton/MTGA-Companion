@@ -224,11 +224,18 @@
   border-radius: 6px;
   padding: 12px;
   border: 1px solid var(--border-color, #3a3d46);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
 }
 
 .archetype-card:hover {
   border-color: var(--accent-color, #6b7fd4);
+  background: var(--card-bg, #2a2d36);
+}
+
+.archetype-card:focus {
+  outline: 2px solid var(--accent-color, #6b7fd4);
+  outline-offset: 2px;
 }
 
 .archetype-header {
@@ -429,6 +436,192 @@
   background: var(--accent-hover, #7b8fe4);
 }
 
+/* Archetype Detail Panel */
+.archetype-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.archetype-detail-panel {
+  background: var(--card-bg, #2a2d36);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  border: 1px solid var(--border-color, #3a3d46);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.close-button:hover {
+  color: var(--text-primary, #fff);
+  background: var(--card-bg-dark, #1e2128);
+}
+
+.detail-header {
+  margin-bottom: 24px;
+  padding-right: 40px;
+}
+
+.detail-header h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.5rem;
+  color: var(--text-primary, #fff);
+}
+
+.detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.detail-stat-card {
+  background: var(--card-bg-dark, #1e2128);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--border-color, #3a3d46);
+}
+
+.detail-stat-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.detail-stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin-bottom: 4px;
+}
+
+.detail-stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a0a0a0);
+  margin-bottom: 8px;
+}
+
+.detail-stat-description {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #666);
+  line-height: 1.4;
+}
+
+.detail-trend-section {
+  background: var(--card-bg-dark, #1e2128);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color, #3a3d46);
+}
+
+.detail-trend-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: var(--text-primary, #fff);
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.trend-arrow {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.trend-arrow.trend-up {
+  color: var(--success-color, #4caf50);
+}
+
+.trend-arrow.trend-down {
+  color: var(--error-color, #f44336);
+}
+
+.trend-arrow.trend-stable {
+  color: var(--text-secondary, #a0a0a0);
+}
+
+.detail-tier-explanation {
+  background: var(--card-bg-dark, #1e2128);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid var(--border-color, #3a3d46);
+}
+
+.detail-tier-explanation h3 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: var(--text-primary, #fff);
+}
+
+.detail-tier-explanation p {
+  margin: 0;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .meta-header {
@@ -449,6 +642,19 @@
   }
 
   .tournament-list {
+    grid-template-columns: 1fr;
+  }
+
+  .archetype-detail-overlay {
+    padding: 16px;
+  }
+
+  .archetype-detail-panel {
+    padding: 16px;
+    max-height: 85vh;
+  }
+
+  .detail-stats-grid {
     grid-template-columns: 1fr;
   }
 }

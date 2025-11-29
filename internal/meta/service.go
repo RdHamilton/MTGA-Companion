@@ -360,17 +360,13 @@ func (s *Service) GetRecentTournaments(ctx context.Context, format string, limit
 
 // RefreshAll forces a refresh of all meta data for a format.
 func (s *Service) RefreshAll(ctx context.Context, format string) (*AggregatedMeta, error) {
+	// Clear caches under write lock
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Clear caches
 	s.goldfishClient.ClearCache()
 	s.top8Client.ClearCache()
+	s.mu.Unlock()
 
-	// Re-read lock for GetAggregatedMeta
-	s.mu.RUnlock()
-	defer s.mu.RLock()
-
+	// Now call GetAggregatedMeta which handles its own locking
 	return s.GetAggregatedMeta(ctx, format)
 }
 

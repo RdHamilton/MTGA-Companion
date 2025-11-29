@@ -320,9 +320,13 @@ describe('Meta', () => {
 
       renderMeta();
 
+      // Wait for initial load to complete
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
+
+      // Clear the mock to track only the new call
+      mockGetMetaDashboard.mockClear();
 
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: 'historic' } });
@@ -520,6 +524,298 @@ describe('Meta', () => {
         const link = screen.getByText('View Details →');
         expect(link).toHaveAttribute('target', '_blank');
         expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      });
+    });
+
+    it('archetype cards are accessible with role button and tabIndex', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      // Check for role="button" on archetype cards
+      const buttons = screen.getAllByRole('button');
+      // Should have at least the archetype cards plus refresh button
+      expect(buttons.length).toBeGreaterThan(1);
+    });
+  });
+
+  describe('archetype detail view', () => {
+    it('opens detail panel when clicking on an archetype card', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      // Click on the archetype card
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      expect(archetypeCard).toBeInTheDocument();
+      fireEvent.click(archetypeCard!);
+
+      // Check that the detail panel opens
+      await waitFor(() => {
+        // The detail header should now show the archetype name in an h2
+        expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+      });
+    });
+
+    it('shows meta share in detail panel', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Meta Share')).toBeInTheDocument();
+        expect(screen.getByText('15.5%')).toBeInTheDocument();
+      });
+    });
+
+    it('shows tournament top 8s in detail panel', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Tournament Top 8s')).toBeInTheDocument();
+        expect(screen.getByText('12')).toBeInTheDocument();
+      });
+    });
+
+    it('shows tournament wins in detail panel', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Tournament Wins')).toBeInTheDocument();
+      });
+    });
+
+    it('shows data confidence in detail panel', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Data Confidence')).toBeInTheDocument();
+        expect(screen.getByText('95%')).toBeInTheDocument();
+      });
+    });
+
+    it('shows trend analysis section', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Trend Analysis')).toBeInTheDocument();
+        expect(screen.getByText(/trending upward/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows tier explanation section', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Tier Ranking')).toBeInTheDocument();
+        expect(screen.getByText(/Tier 1 decks are the most competitive/i)).toBeInTheDocument();
+      });
+    });
+
+    it('closes detail panel when clicking close button', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+      });
+
+      // Click the close button
+      const closeButton = screen.getByText('×');
+      fireEvent.click(closeButton);
+
+      // Panel should close - the h2 heading in detail panel should be gone
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { level: 2, name: 'Mono Red Aggro' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('closes detail panel when clicking overlay', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+      });
+
+      // Click the overlay (background)
+      const overlay = document.querySelector('.archetype-detail-overlay');
+      fireEvent.click(overlay!);
+
+      // Panel should close
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { level: 2, name: 'Mono Red Aggro' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not close panel when clicking inside panel', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+      });
+
+      // Click inside the panel
+      const panel = document.querySelector('.archetype-detail-panel');
+      fireEvent.click(panel!);
+
+      // Panel should still be open
+      expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+    });
+
+    it('opens detail panel with keyboard Enter key', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const archetypeCard = screen.getByText('Mono Red Aggro').closest('.archetype-card');
+      fireEvent.keyDown(archetypeCard!, { key: 'Enter' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 2, name: 'Mono Red Aggro' })).toBeInTheDocument();
+      });
+    });
+
+    it('shows different trend message for down trend', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Golgari Midrange')).toBeInTheDocument();
+      });
+
+      // Click on Golgari Midrange which has down trend
+      const archetypeCard = screen.getByText('Golgari Midrange').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText(/trending downward/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows different trend message for stable trend', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Azorius Control')).toBeInTheDocument();
+      });
+
+      // Click on Azorius Control which has stable trend
+      const archetypeCard = screen.getByText('Azorius Control').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText(/stable/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows tier 2 explanation for tier 2 decks', async () => {
+      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderMeta();
+
+      await waitFor(() => {
+        expect(screen.getByText('Golgari Midrange')).toBeInTheDocument();
+      });
+
+      // Click on Golgari Midrange which is tier 2
+      const archetypeCard = screen.getByText('Golgari Midrange').closest('.archetype-card');
+      fireEvent.click(archetypeCard!);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Tier 2 decks are strong contenders/i)).toBeInTheDocument();
       });
     });
   });
