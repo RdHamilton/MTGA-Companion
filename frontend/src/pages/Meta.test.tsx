@@ -320,9 +320,13 @@ describe('Meta', () => {
 
       renderMeta();
 
+      // Wait for initial load to complete
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
+
+      // Clear the mock to track only the new call
+      mockGetMetaDashboard.mockClear();
 
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: 'historic' } });

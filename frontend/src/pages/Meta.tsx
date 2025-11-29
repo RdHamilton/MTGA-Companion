@@ -258,7 +258,6 @@ export default function Meta() {
                               </div>
                             )}
                           </div>
-                          <span className="archetype-arrow">→</span>
                         </div>
                       ))
                     )}
