@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -91,26 +92,38 @@ func NewAnalyzerForFormat(service *storage.Service, draftFormat string) *Analyze
 	return NewAnalyzer(service, strategy)
 }
 
+// NormalizeDraftFormat extracts the base format from a full event name.
+// e.g., "QuickDraft_TLA_20251127" -> "QuickDraft"
+func NormalizeDraftFormat(draftFormat string) string {
+	if idx := strings.Index(draftFormat, "_"); idx != -1 {
+		return draftFormat[:idx]
+	}
+	return draftFormat
+}
+
 // AnalyzeFormat generates insights for a specific format.
 func (a *Analyzer) AnalyzeFormat(ctx context.Context, setCode, draftFormat string) (*FormatInsights, error) {
+	// Normalize the draft format to handle both "QuickDraft" and "QuickDraft_TLA_20251127"
+	normalizedFormat := NormalizeDraftFormat(draftFormat)
+
 	// Get card and color ratings from database
-	cardRatings, _, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, draftFormat)
+	cardRatings, _, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, normalizedFormat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get card ratings: %w", err)
 	}
 
-	colorRatings, _, err := a.service.DraftRatingsRepo().GetColorRatings(ctx, setCode, draftFormat)
+	colorRatings, _, err := a.service.DraftRatingsRepo().GetColorRatings(ctx, setCode, normalizedFormat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get color ratings: %w", err)
 	}
 
 	if len(cardRatings) == 0 {
-		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, draftFormat)
+		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, normalizedFormat)
 	}
 
 	insights := &FormatInsights{
 		SetCode:     setCode,
-		DraftFormat: draftFormat,
+		DraftFormat: normalizedFormat,
 	}
 
 	// Use strategy to analyze format-specific insights
@@ -180,14 +193,17 @@ type ArchetypeCards struct {
 // GetArchetypeCards returns top cards for a specific color combination.
 // colors parameter should be a color combination like "W", "UB", "WUR", etc.
 func (a *Analyzer) GetArchetypeCards(ctx context.Context, setCode, draftFormat, colors string) (*ArchetypeCards, error) {
+	// Normalize the draft format to handle both "QuickDraft" and "QuickDraft_TLA_20251127"
+	normalizedFormat := NormalizeDraftFormat(draftFormat)
+
 	// Get card ratings from database
-	cardRatings, _, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, draftFormat)
+	cardRatings, _, err := a.service.DraftRatingsRepo().GetCardRatings(ctx, setCode, normalizedFormat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get card ratings: %w", err)
 	}
 
 	if len(cardRatings) == 0 {
-		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, draftFormat)
+		return nil, fmt.Errorf("no card ratings available for %s/%s", setCode, normalizedFormat)
 	}
 
 	// Use strategy to filter cards by color combination

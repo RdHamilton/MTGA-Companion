@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 )
@@ -47,8 +48,17 @@ type InsightsStrategy interface {
 }
 
 // StrategyFactory creates the appropriate insights strategy based on draft format.
+// Handles both short format names (e.g., "QuickDraft") and full event names
+// (e.g., "QuickDraft_TLA_20251127").
 func StrategyFactory(ctx context.Context, draftFormat string) InsightsStrategy {
-	switch draftFormat {
+	// Normalize the format by extracting the prefix before any underscore
+	// This handles both "QuickDraft" and "QuickDraft_TLA_20251127"
+	normalizedFormat := draftFormat
+	if idx := strings.Index(draftFormat, "_"); idx != -1 {
+		normalizedFormat = draftFormat[:idx]
+	}
+
+	switch normalizedFormat {
 	case "PremierDraft":
 		return NewPremierDraftStrategy()
 	case "QuickDraft":

@@ -23,6 +23,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     const [refreshing, setRefreshing] = useState(false);
 
     // Filters
+    const [searchTerm, setSearchTerm] = useState('');
     const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
     const [selectedRarities, setSelectedRarities] = useState<Set<string>>(new Set());
     const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['S', 'A', 'B', 'C', 'D', 'F']));
@@ -134,6 +135,11 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
     // Filter and sort ratings
     const filteredRatings = ratings
         .filter(rating => {
+            // Search filter - filter by card name
+            if (searchTerm && !rating.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+                return false;
+            }
+
             // Picked cards filter
             if (showPickedOnly) {
                 const isPicked = rating.mtga_id ? pickedCardIds.has(String(rating.mtga_id)) : false;
@@ -252,6 +258,27 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
 
             {/* Filters */}
             <div className="tier-list-filters">
+                {/* Search Input */}
+                <div className="filter-group search-group">
+                    <label>Search:</label>
+                    <input
+                        type="text"
+                        className="search-input"
+                        placeholder="Search by card name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    {searchTerm && (
+                        <button
+                            className="clear-search-btn"
+                            onClick={() => setSearchTerm('')}
+                            title="Clear search"
+                        >
+                            X
+                        </button>
+                    )}
+                </div>
+
                 {/* Picked Cards Filter */}
                 <div className="filter-group">
                     <label className="checkbox-label">
