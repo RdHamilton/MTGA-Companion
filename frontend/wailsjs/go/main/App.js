@@ -14,6 +14,10 @@ export function AnalyzeSessionPickQuality(arg1) {
   return window['go']['main']['App']['AnalyzeSessionPickQuality'](arg1);
 }
 
+export function ApplySuggestedDeck(arg1, arg2) {
+  return window['go']['main']['App']['ApplySuggestedDeck'](arg1, arg2);
+}
+
 export function CalculateDraftGrade(arg1) {
   return window['go']['main']['App']['CalculateDraftGrade'](arg1);
 }
@@ -64,6 +68,10 @@ export function ExportDeckToFile(arg1) {
 
 export function ExportMLTrainingData(arg1) {
   return window['go']['main']['App']['ExportMLTrainingData'](arg1);
+}
+
+export function ExportSuggestedDeck(arg1, arg2) {
+  return window['go']['main']['App']['ExportSuggestedDeck'](arg1, arg2);
 }
 
 export function ExportToCSV() {
@@ -488,6 +496,10 @@ export function StopPoller() {
 
 export function StopReplay() {
   return window['go']['main']['App']['StopReplay']();
+}
+
+export function SuggestDecks(arg1) {
+  return window['go']['main']['App']['SuggestDecks'](arg1);
 }
 
 export function SwitchToDaemonMode() {

@@ -2243,3 +2243,401 @@ func (d *DeckFacade) ClassifyDraftPoolArchetype(ctx context.Context, draftEventI
 	log.Printf("Classified draft pool %s as %s (%.0f%% confidence)", draftEventID, result.PrimaryArchetype, result.Confidence*100)
 	return response, nil
 }
+
+// SuggestDecksResponse wraps the recommendations response for the frontend.
+type SuggestDecksResponse struct {
+	Suggestions  []*SuggestedDeckResponse  `json:"suggestions"`
+	TotalCombos  int                       `json:"totalCombos"`
+	ViableCombos int                       `json:"viableCombos"`
+	BestCombo    *ColorCombinationResponse `json:"bestCombo,omitempty"`
+	Error        string                    `json:"error,omitempty"`
+}
+
+// ColorCombinationResponse represents a color combination for the frontend.
+type ColorCombinationResponse struct {
+	Colors []string `json:"colors"`
+	Name   string   `json:"name"`
+}
+
+// SuggestedDeckResponse represents a suggested deck for the frontend.
+type SuggestedDeckResponse struct {
+	ColorCombo ColorCombinationResponse        `json:"colorCombo"`
+	Spells     []*SuggestedCardResponse        `json:"spells"`
+	Lands      []*SuggestedLandResponse        `json:"lands"`
+	TotalCards int                             `json:"totalCards"`
+	Score      float64                         `json:"score"`
+	Viability  string                          `json:"viability"`
+	Analysis   *DeckSuggestionAnalysisResponse `json:"analysis"`
+}
+
+// SuggestedCardResponse represents a suggested card for the frontend.
+type SuggestedCardResponse struct {
+	CardID    int      `json:"cardID"`
+	Name      string   `json:"name"`
+	TypeLine  string   `json:"typeLine"`
+	ManaCost  string   `json:"manaCost,omitempty"`
+	ImageURI  string   `json:"imageURI,omitempty"`
+	CMC       int      `json:"cmc"`
+	Colors    []string `json:"colors"`
+	Rarity    string   `json:"rarity,omitempty"`
+	Score     float64  `json:"score"`
+	Reasoning string   `json:"reasoning"`
+}
+
+// SuggestedLandResponse represents a suggested land for the frontend.
+type SuggestedLandResponse struct {
+	CardID   int    `json:"cardID"`
+	Name     string `json:"name"`
+	Quantity int    `json:"quantity"`
+	Color    string `json:"color"`
+}
+
+// DeckSuggestionAnalysisResponse provides deck composition details for the frontend.
+type DeckSuggestionAnalysisResponse struct {
+	CreatureCount     int            `json:"creatureCount"`
+	SpellCount        int            `json:"spellCount"`
+	AverageCMC        float64        `json:"averageCMC"`
+	ManaCurve         map[int]int    `json:"manaCurve"`
+	ColorDistribution map[string]int `json:"colorDistribution"`
+	TopCards          []string       `json:"topCards"`
+	Synergies         []string       `json:"synergies"`
+	PlayableCount     int            `json:"playableCount"`
+}
+
+// SuggestDecks generates all viable deck suggestions for a draft pool.
+func (d *DeckFacade) SuggestDecks(ctx context.Context, draftEventID string) (*SuggestDecksResponse, error) {
+	log.Printf("[SuggestDecks] Called with draftEventID=%s", draftEventID)
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get the draft session for set code and format
+	session, err := d.services.Storage.DraftRepo().GetSession(ctx, draftEventID)
+	if err != nil {
+		return &SuggestDecksResponse{
+			Error: fmt.Sprintf("Failed to get draft session: %v", err),
+		}, nil
+	}
+	if session == nil {
+		return &SuggestDecksResponse{
+			Error: "Draft session not found",
+		}, nil
+	}
+
+	// Extract set code from EventName (e.g., "QuickDraft_BLB_20250101" -> "BLB")
+	var setCode, draftFormat string
+	eventParts := strings.Split(session.EventName, "_")
+	if len(eventParts) >= 2 {
+		setCode = eventParts[1]
+		if strings.HasPrefix(session.EventName, "PremierDraft") {
+			draftFormat = "PremierDraft"
+		} else if strings.HasPrefix(session.EventName, "QuickDraft") {
+			draftFormat = "QuickDraft"
+		} else {
+			draftFormat = "PremierDraft"
+		}
+	}
+
+	// Get all cards from the draft session
+	draftPool, err := d.services.Storage.DeckRepo().GetDraftCards(ctx, draftEventID)
+	if err != nil {
+		return &SuggestDecksResponse{
+			Error: fmt.Sprintf("Failed to get draft pool: %v", err),
+		}, nil
+	}
+
+	if len(draftPool) == 0 {
+		return &SuggestDecksResponse{
+			Error: "No cards in draft pool",
+		}, nil
+	}
+
+	log.Printf("SuggestDecks: Draft pool has %d cards, set=%s, format=%s", len(draftPool), setCode, draftFormat)
+
+	// Create deck suggester
+	suggester := recommendations.NewDeckSuggester(
+		d.services.RecommendationEngine.(*recommendations.RuleBasedEngine),
+		d.services.CardService,
+		d.services.Storage.SetCardRepo(),
+		d.services.Storage.DraftRatingsRepo(),
+	)
+
+	// Get suggestions
+	result, err := suggester.SuggestDecks(ctx, draftPool, setCode, draftFormat)
+	if err != nil {
+		return &SuggestDecksResponse{
+			Error: fmt.Sprintf("Failed to generate suggestions: %v", err),
+		}, nil
+	}
+
+	// Check if the suggester returned an error
+	if result.Error != "" {
+		return &SuggestDecksResponse{
+			Error: result.Error,
+		}, nil
+	}
+
+	// Convert to response format
+	response := &SuggestDecksResponse{
+		Suggestions:  make([]*SuggestedDeckResponse, len(result.Suggestions)),
+		TotalCombos:  result.TotalCombos,
+		ViableCombos: result.ViableCombos,
+	}
+
+	if result.BestCombo != nil {
+		response.BestCombo = &ColorCombinationResponse{
+			Colors: result.BestCombo.Colors,
+			Name:   result.BestCombo.Name,
+		}
+	}
+
+	for i, suggestion := range result.Suggestions {
+		response.Suggestions[i] = convertSuggestedDeck(suggestion)
+	}
+
+	log.Printf("SuggestDecks: Found %d viable color combinations", len(response.Suggestions))
+	return response, nil
+}
+
+// convertSuggestedDeck converts internal suggestion to response format.
+func convertSuggestedDeck(s *recommendations.SuggestedDeck) *SuggestedDeckResponse {
+	spells := make([]*SuggestedCardResponse, len(s.Spells))
+	for i, card := range s.Spells {
+		spells[i] = &SuggestedCardResponse{
+			CardID:    card.CardID,
+			Name:      card.Name,
+			TypeLine:  card.TypeLine,
+			ManaCost:  card.ManaCost,
+			ImageURI:  card.ImageURI,
+			CMC:       card.CMC,
+			Colors:    card.Colors,
+			Rarity:    card.Rarity,
+			Score:     card.Score,
+			Reasoning: card.Reasoning,
+		}
+	}
+
+	lands := make([]*SuggestedLandResponse, len(s.Lands))
+	for i, land := range s.Lands {
+		lands[i] = &SuggestedLandResponse{
+			CardID:   land.CardID,
+			Name:     land.Name,
+			Quantity: land.Quantity,
+			Color:    land.Color,
+		}
+	}
+
+	var analysis *DeckSuggestionAnalysisResponse
+	if s.Analysis != nil {
+		analysis = &DeckSuggestionAnalysisResponse{
+			CreatureCount:     s.Analysis.CreatureCount,
+			SpellCount:        s.Analysis.SpellCount,
+			AverageCMC:        s.Analysis.AverageCMC,
+			ManaCurve:         s.Analysis.ManaCurve,
+			ColorDistribution: s.Analysis.ColorDistribution,
+			TopCards:          s.Analysis.TopCards,
+			Synergies:         s.Analysis.Synergies,
+			PlayableCount:     s.Analysis.PlayableCount,
+		}
+	}
+
+	return &SuggestedDeckResponse{
+		ColorCombo: ColorCombinationResponse{
+			Colors: s.ColorCombo.Colors,
+			Name:   s.ColorCombo.Name,
+		},
+		Spells:     spells,
+		Lands:      lands,
+		TotalCards: s.TotalCards,
+		Score:      s.Score,
+		Viability:  s.Viability,
+		Analysis:   analysis,
+	}
+}
+
+// ApplySuggestedDeck replaces the current deck with a suggested deck.
+func (d *DeckFacade) ApplySuggestedDeck(ctx context.Context, deckID string, suggestion *SuggestedDeckResponse) error {
+	if d.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	// Get the deck
+	var deck *models.Deck
+	err := storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, deckID)
+		return err
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get deck: %v", err)}
+	}
+	if deck == nil {
+		return &AppError{Message: "Deck not found"}
+	}
+
+	// Get existing cards to preserve sideboard
+	var existingCards []*models.DeckCard
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		existingCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deckID)
+		return err
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to get existing cards: %v", err)}
+	}
+
+	// Separate sideboard cards to preserve them
+	sideboardCards := make([]*models.DeckCard, 0)
+	for _, card := range existingCards {
+		if card.Board == "sideboard" {
+			sideboardCards = append(sideboardCards, card)
+		}
+	}
+
+	// Clear all cards
+	err = storage.RetryOnBusy(func() error {
+		return d.services.Storage.DeckRepo().ClearCards(ctx, deckID)
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to clear deck: %v", err)}
+	}
+
+	// Add suggested spells
+	for _, card := range suggestion.Spells {
+		deckCard := &models.DeckCard{
+			DeckID:        deckID,
+			CardID:        card.CardID,
+			Quantity:      1,
+			Board:         "main",
+			FromDraftPick: true,
+		}
+		err = storage.RetryOnBusy(func() error {
+			return d.services.Storage.DeckRepo().AddCard(ctx, deckCard)
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to add card %d to deck: %v", card.CardID, err)
+		}
+	}
+
+	// Add suggested lands
+	for _, land := range suggestion.Lands {
+		deckCard := &models.DeckCard{
+			DeckID:        deckID,
+			CardID:        land.CardID,
+			Quantity:      land.Quantity,
+			Board:         "main",
+			FromDraftPick: false,
+		}
+		err = storage.RetryOnBusy(func() error {
+			return d.services.Storage.DeckRepo().AddCard(ctx, deckCard)
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to add land %s to deck: %v", land.Name, err)
+		}
+	}
+
+	// Restore sideboard cards
+	for _, card := range sideboardCards {
+		err = storage.RetryOnBusy(func() error {
+			return d.services.Storage.DeckRepo().AddCard(ctx, card)
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to restore sideboard card %d: %v", card.CardID, err)
+		}
+	}
+
+	// Update deck modified timestamp
+	deck.ModifiedAt = time.Now()
+	err = storage.RetryOnBusy(func() error {
+		return d.services.Storage.DeckRepo().Update(ctx, deck)
+	})
+	if err != nil {
+		log.Printf("Warning: Failed to update deck modified timestamp: %v", err)
+	}
+
+	log.Printf("Applied suggested %s deck to %s", suggestion.ColorCombo.Name, deckID)
+	return nil
+}
+
+// ExportSuggestedDeck exports a suggested deck directly without saving.
+func (d *DeckFacade) ExportSuggestedDeck(ctx context.Context, suggestion *SuggestedDeckResponse, deckName string) error {
+	if d.services.DeckExporter == nil {
+		return &AppError{Message: "Deck exporter not available"}
+	}
+
+	// Build export content in Arena format
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("Deck: %s (%s)\n\n", deckName, suggestion.ColorCombo.Name))
+
+	// Add spells grouped by type
+	creatures := make([]*SuggestedCardResponse, 0)
+	nonCreatures := make([]*SuggestedCardResponse, 0)
+
+	for _, card := range suggestion.Spells {
+		if strings.Contains(strings.ToLower(card.TypeLine), "creature") {
+			creatures = append(creatures, card)
+		} else {
+			nonCreatures = append(nonCreatures, card)
+		}
+	}
+
+	// Write creatures
+	if len(creatures) > 0 {
+		content.WriteString("// Creatures\n")
+		for _, card := range creatures {
+			content.WriteString(fmt.Sprintf("1 %s\n", card.Name))
+		}
+		content.WriteString("\n")
+	}
+
+	// Write non-creatures
+	if len(nonCreatures) > 0 {
+		content.WriteString("// Spells\n")
+		for _, card := range nonCreatures {
+			content.WriteString(fmt.Sprintf("1 %s\n", card.Name))
+		}
+		content.WriteString("\n")
+	}
+
+	// Write lands
+	content.WriteString("// Lands\n")
+	for _, land := range suggestion.Lands {
+		content.WriteString(fmt.Sprintf("%d %s\n", land.Quantity, land.Name))
+	}
+
+	// Prompt user to select save location using native Wails dialog
+	defaultFilename := strings.ReplaceAll(deckName, " ", "_") + ".txt"
+	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
+		DefaultFilename: defaultFilename,
+		Title:           "Export Suggested Deck",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to show save dialog: %v", err)
+	}
+	if filePath == "" {
+		// User cancelled
+		return nil
+	}
+
+	// Save the file
+	err = os.WriteFile(filePath, []byte(content.String()), 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to save file: %v", err)
+	}
+
+	log.Printf("Exported suggested deck '%s' to %s", deckName, filepath.Base(filePath))
+
+	// Show success message
+	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
+		Type:    wailsruntime.InfoDialog,
+		Title:   "Export Successful",
+		Message: fmt.Sprintf("Deck exported successfully!\n\nSaved to: %s", filepath.Base(filePath)),
+	})
+
+	return err
+}

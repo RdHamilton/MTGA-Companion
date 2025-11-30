@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -645,6 +646,8 @@ func (r *deckRepository) GetPerformance(ctx context.Context, deckID string) (*mo
 
 // GetDraftCards retrieves all cards picked during a draft event.
 func (r *deckRepository) GetDraftCards(ctx context.Context, draftEventID string) ([]int, error) {
+	log.Printf("[GetDraftCards] Looking for picks with session_id=%s", draftEventID)
+
 	query := `
 		SELECT DISTINCT CAST(card_id AS INTEGER) as card_id_int
 		FROM draft_picks
@@ -654,6 +657,7 @@ func (r *deckRepository) GetDraftCards(ctx context.Context, draftEventID string)
 
 	rows, err := r.db.QueryContext(ctx, query, draftEventID)
 	if err != nil {
+		log.Printf("[GetDraftCards] Query error: %v", err)
 		return nil, fmt.Errorf("failed to get draft cards: %w", err)
 	}
 	defer func() {
@@ -671,6 +675,25 @@ func (r *deckRepository) GetDraftCards(ctx context.Context, draftEventID string)
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating draft cards: %w", err)
+	}
+
+	log.Printf("[GetDraftCards] Found %d cards for session_id=%s", len(cardIDs), draftEventID)
+
+	// If no cards found, log the distinct session IDs in the database for debugging
+	if len(cardIDs) == 0 {
+		var distinctSessions []string
+		sessionQuery := `SELECT DISTINCT session_id FROM draft_picks ORDER BY session_id LIMIT 10`
+		sessionRows, err := r.db.QueryContext(ctx, sessionQuery)
+		if err == nil {
+			defer func() { _ = sessionRows.Close() }()
+			for sessionRows.Next() {
+				var sid string
+				if sessionRows.Scan(&sid) == nil {
+					distinctSessions = append(distinctSessions, sid)
+				}
+			}
+		}
+		log.Printf("[GetDraftCards] No cards found. Existing session_ids in draft_picks: %v", distinctSessions)
 	}
 
 	return cardIDs, nil

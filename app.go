@@ -684,6 +684,21 @@ func (a *App) ClassifyDraftPoolArchetype(draftEventID string) (*gui.ArchetypeCla
 	return a.deckFacade.ClassifyDraftPoolArchetype(a.ctx, draftEventID)
 }
 
+// SuggestDecks analyzes a draft pool and suggests optimal deck builds
+func (a *App) SuggestDecks(draftEventID string) (*gui.SuggestDecksResponse, error) {
+	return a.deckFacade.SuggestDecks(a.ctx, draftEventID)
+}
+
+// ApplySuggestedDeck applies a suggested deck to an existing deck
+func (a *App) ApplySuggestedDeck(deckID string, suggestion *gui.SuggestedDeckResponse) error {
+	return a.deckFacade.ApplySuggestedDeck(a.ctx, deckID, suggestion)
+}
+
+// ExportSuggestedDeck exports a suggested deck to clipboard in Arena format
+func (a *App) ExportSuggestedDeck(suggestion *gui.SuggestedDeckResponse, deckName string) error {
+	return a.deckFacade.ExportSuggestedDeck(a.ctx, suggestion, deckName)
+}
+
 // ========================================
 // Collection Methods (CollectionFacade)
 // ========================================

@@ -574,6 +574,20 @@ export namespace gui {
 	        this.cardsAdded = source["cardsAdded"];
 	    }
 	}
+	export class ColorCombinationResponse {
+	    colors: string[];
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColorCombinationResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colors = source["colors"];
+	        this.name = source["name"];
+	    }
+	}
 	
 	export class ColorStats {
 	    white: number;
@@ -1049,6 +1063,32 @@ export namespace gui {
 		    }
 		    return a;
 		}
+	}
+	export class DeckSuggestionAnalysisResponse {
+	    creatureCount: number;
+	    spellCount: number;
+	    averageCMC: number;
+	    manaCurve: Record<number, number>;
+	    colorDistribution: Record<string, number>;
+	    topCards: string[];
+	    synergies: string[];
+	    playableCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckSuggestionAnalysisResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.creatureCount = source["creatureCount"];
+	        this.spellCount = source["spellCount"];
+	        this.averageCMC = source["averageCMC"];
+	        this.manaCurve = source["manaCurve"];
+	        this.colorDistribution = source["colorDistribution"];
+	        this.topCards = source["topCards"];
+	        this.synergies = source["synergies"];
+	        this.playableCount = source["playableCount"];
+	    }
 	}
 	export class DeckUpdatedEvent {
 	    count: number;
@@ -1960,6 +2000,137 @@ export namespace gui {
 	        this.games = source["games"];
 	    }
 	}
+	export class SuggestedLandResponse {
+	    cardID: number;
+	    name: string;
+	    quantity: number;
+	    color: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestedLandResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardID = source["cardID"];
+	        this.name = source["name"];
+	        this.quantity = source["quantity"];
+	        this.color = source["color"];
+	    }
+	}
+	export class SuggestedCardResponse {
+	    cardID: number;
+	    name: string;
+	    typeLine: string;
+	    manaCost?: string;
+	    imageURI?: string;
+	    cmc: number;
+	    colors: string[];
+	    rarity?: string;
+	    score: number;
+	    reasoning: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestedCardResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cardID = source["cardID"];
+	        this.name = source["name"];
+	        this.typeLine = source["typeLine"];
+	        this.manaCost = source["manaCost"];
+	        this.imageURI = source["imageURI"];
+	        this.cmc = source["cmc"];
+	        this.colors = source["colors"];
+	        this.rarity = source["rarity"];
+	        this.score = source["score"];
+	        this.reasoning = source["reasoning"];
+	    }
+	}
+	export class SuggestedDeckResponse {
+	    colorCombo: ColorCombinationResponse;
+	    spells: SuggestedCardResponse[];
+	    lands: SuggestedLandResponse[];
+	    totalCards: number;
+	    score: number;
+	    viability: string;
+	    analysis?: DeckSuggestionAnalysisResponse;
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestedDeckResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.colorCombo = this.convertValues(source["colorCombo"], ColorCombinationResponse);
+	        this.spells = this.convertValues(source["spells"], SuggestedCardResponse);
+	        this.lands = this.convertValues(source["lands"], SuggestedLandResponse);
+	        this.totalCards = source["totalCards"];
+	        this.score = source["score"];
+	        this.viability = source["viability"];
+	        this.analysis = this.convertValues(source["analysis"], DeckSuggestionAnalysisResponse);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SuggestDecksResponse {
+	    suggestions: SuggestedDeckResponse[];
+	    totalCombos: number;
+	    viableCombos: number;
+	    bestCombo?: ColorCombinationResponse;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestDecksResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.suggestions = this.convertValues(source["suggestions"], SuggestedDeckResponse);
+	        this.totalCombos = source["totalCombos"];
+	        this.viableCombos = source["viableCombos"];
+	        this.bestCombo = this.convertValues(source["bestCombo"], ColorCombinationResponse);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	
 	
 	
