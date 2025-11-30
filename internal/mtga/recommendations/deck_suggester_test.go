@@ -251,11 +251,12 @@ func TestCalculateDeckScore(t *testing.T) {
 		name          string
 		selectedCards []*scoredCard
 		analysis      *DeckSuggestionAnalysis
+		combo         ColorCombination
 		minScore      float64
 		maxScore      float64
 	}{
 		{
-			name: "High quality deck",
+			name: "High quality two-color deck",
 			selectedCards: func() []*scoredCard {
 				cards := make([]*scoredCard, 23)
 				for i := range cards {
@@ -267,6 +268,7 @@ func TestCalculateDeckScore(t *testing.T) {
 				CreatureCount: 15,
 				ManaCurve:     map[int]int{2: 5, 3: 5, 4: 4},
 			},
+			combo:    ColorCombination{Colors: []string{"W", "U"}, Name: "Azorius"},
 			minScore: 0.7,
 			maxScore: 1.0,
 		},
@@ -283,14 +285,32 @@ func TestCalculateDeckScore(t *testing.T) {
 				CreatureCount: 8,
 				ManaCurve:     map[int]int{5: 10, 6: 8},
 			},
+			combo:    ColorCombination{Colors: []string{"W", "U"}, Name: "Azorius"},
 			minScore: 0.0,
 			maxScore: 0.5,
+		},
+		{
+			name: "Three-color deck has lower score due to mana",
+			selectedCards: func() []*scoredCard {
+				cards := make([]*scoredCard, 23)
+				for i := range cards {
+					cards[i] = &scoredCard{score: 0.8}
+				}
+				return cards
+			}(),
+			analysis: &DeckSuggestionAnalysis{
+				CreatureCount: 15,
+				ManaCurve:     map[int]int{2: 5, 3: 5, 4: 4},
+			},
+			combo:    ColorCombination{Colors: []string{"W", "U", "B"}, Name: "Esper"},
+			minScore: 0.6,
+			maxScore: 0.9,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := suggester.calculateDeckScore(tt.selectedCards, tt.analysis)
+			score := suggester.calculateDeckScore(tt.selectedCards, tt.analysis, tt.combo)
 
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("expected score between %.2f and %.2f, got %.2f", tt.minScore, tt.maxScore, score)
@@ -348,19 +368,23 @@ func TestDetermineViability(t *testing.T) {
 }
 
 func TestColorCombinations(t *testing.T) {
-	// Verify we have all 15 color combinations
-	if len(allColorCombinations) != 15 {
-		t.Errorf("expected 15 color combinations, got %d", len(allColorCombinations))
+	// Verify we have all 25 color combinations (5 mono + 10 two-color + 10 three-color)
+	if len(allColorCombinations) != 25 {
+		t.Errorf("expected 25 color combinations, got %d", len(allColorCombinations))
 	}
 
 	// Check mono-color count
 	monoCount := 0
 	twoColorCount := 0
+	threeColorCount := 0
 	for _, combo := range allColorCombinations {
-		if len(combo.Colors) == 1 {
+		switch len(combo.Colors) {
+		case 1:
 			monoCount++
-		} else if len(combo.Colors) == 2 {
+		case 2:
 			twoColorCount++
+		case 3:
+			threeColorCount++
 		}
 	}
 
@@ -369,6 +393,9 @@ func TestColorCombinations(t *testing.T) {
 	}
 	if twoColorCount != 10 {
 		t.Errorf("expected 10 two-color combinations, got %d", twoColorCount)
+	}
+	if threeColorCount != 10 {
+		t.Errorf("expected 10 three-color combinations, got %d", threeColorCount)
 	}
 }
 

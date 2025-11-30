@@ -94,26 +94,38 @@ func NewDeckSuggester(
 	}
 }
 
-// All color combinations to evaluate (5 mono + 10 two-color = 15 total).
+// All color combinations to evaluate (5 mono + 10 two-color + 10 three-color = 25 total).
 var allColorCombinations = []ColorCombination{
-	// Mono-color
+	// Mono-color (5)
 	{Colors: []string{"W"}, Name: "Mono-White"},
 	{Colors: []string{"U"}, Name: "Mono-Blue"},
 	{Colors: []string{"B"}, Name: "Mono-Black"},
 	{Colors: []string{"R"}, Name: "Mono-Red"},
 	{Colors: []string{"G"}, Name: "Mono-Green"},
-	// Allied pairs
+	// Allied pairs (5)
 	{Colors: []string{"W", "U"}, Name: "Azorius"},
 	{Colors: []string{"U", "B"}, Name: "Dimir"},
 	{Colors: []string{"B", "R"}, Name: "Rakdos"},
 	{Colors: []string{"R", "G"}, Name: "Gruul"},
 	{Colors: []string{"G", "W"}, Name: "Selesnya"},
-	// Enemy pairs
+	// Enemy pairs (5)
 	{Colors: []string{"W", "B"}, Name: "Orzhov"},
 	{Colors: []string{"U", "R"}, Name: "Izzet"},
 	{Colors: []string{"B", "G"}, Name: "Golgari"},
 	{Colors: []string{"R", "W"}, Name: "Boros"},
 	{Colors: []string{"G", "U"}, Name: "Simic"},
+	// Shards - allied wedges (5)
+	{Colors: []string{"W", "U", "B"}, Name: "Esper"},
+	{Colors: []string{"U", "B", "R"}, Name: "Grixis"},
+	{Colors: []string{"B", "R", "G"}, Name: "Jund"},
+	{Colors: []string{"R", "G", "W"}, Name: "Naya"},
+	{Colors: []string{"G", "W", "U"}, Name: "Bant"},
+	// Wedges - enemy wedges (5)
+	{Colors: []string{"W", "B", "G"}, Name: "Abzan"},
+	{Colors: []string{"U", "R", "W"}, Name: "Jeskai"},
+	{Colors: []string{"B", "G", "U"}, Name: "Sultai"},
+	{Colors: []string{"R", "W", "B"}, Name: "Mardu"},
+	{Colors: []string{"G", "U", "R"}, Name: "Temur"},
 }
 
 // Basic land Arena IDs.
@@ -236,7 +248,7 @@ func (s *DeckSuggester) evaluateColorCombination(
 	analysis := s.analyzeDeckSuggestion(selectedCards, candidates)
 
 	// Calculate overall deck score
-	deckScore := s.calculateDeckScore(selectedCards, analysis)
+	deckScore := s.calculateDeckScore(selectedCards, analysis, combo)
 
 	// Determine viability status
 	viability := s.determineViability(deckScore, analysis)
@@ -564,31 +576,22 @@ func (s *DeckSuggester) distributeLands(selectedCards []*scoredCard, combo Color
 	const totalLands = 17
 
 	if totalPips == 0 {
-		// Equal distribution for mono-color or colorless-heavy decks
-		if len(combo.Colors) == 1 {
-			color := combo.Colors[0]
+		// Equal distribution for colorless-heavy decks
+		numColors := len(combo.Colors)
+		baseCount := totalLands / numColors
+		remainder := totalLands % numColors
+
+		for i, color := range combo.Colors {
 			land := basicLandsByColor[color]
+			count := baseCount
+			if i < remainder {
+				count++ // Distribute remainder to first colors
+			}
 			lands = append(lands, &SuggestedLand{
 				CardID:   land.ArenaID,
 				Name:     land.Name,
-				Quantity: totalLands,
+				Quantity: count,
 				Color:    color,
-			})
-		} else {
-			// Split evenly for two colors
-			firstLand := basicLandsByColor[combo.Colors[0]]
-			secondLand := basicLandsByColor[combo.Colors[1]]
-			lands = append(lands, &SuggestedLand{
-				CardID:   firstLand.ArenaID,
-				Name:     firstLand.Name,
-				Quantity: 9,
-				Color:    combo.Colors[0],
-			})
-			lands = append(lands, &SuggestedLand{
-				CardID:   secondLand.ArenaID,
-				Name:     secondLand.Name,
-				Quantity: 8,
-				Color:    combo.Colors[1],
 			})
 		}
 		return lands
@@ -751,19 +754,19 @@ func (s *DeckSuggester) detectSynergies(selectedCards []*scoredCard) []string {
 }
 
 // calculateDeckScore calculates the overall deck quality score.
-func (s *DeckSuggester) calculateDeckScore(selectedCards []*scoredCard, analysis *DeckSuggestionAnalysis) float64 {
+func (s *DeckSuggester) calculateDeckScore(selectedCards []*scoredCard, analysis *DeckSuggestionAnalysis, combo ColorCombination) float64 {
 	if len(selectedCards) == 0 {
 		return 0.0
 	}
 
-	// Average card quality (60% weight)
+	// Average card quality (50% weight)
 	totalScore := 0.0
 	for _, sc := range selectedCards {
 		totalScore += sc.score
 	}
 	avgCardScore := totalScore / float64(len(selectedCards))
 
-	// Creature ratio score (20% weight)
+	// Creature ratio score (15% weight)
 	// Ideal: 14-17 creatures in a 23-spell deck
 	creatureRatio := float64(analysis.CreatureCount) / 23.0
 	creatureScore := 0.0
@@ -775,7 +778,7 @@ func (s *DeckSuggester) calculateDeckScore(selectedCards []*scoredCard, analysis
 		creatureScore = 0.4
 	}
 
-	// Curve score (20% weight)
+	// Curve score (15% weight)
 	// Check if we have cards at each important CMC
 	curveScore := 0.0
 	has2Drop := analysis.ManaCurve[2] >= 3
@@ -791,8 +794,20 @@ func (s *DeckSuggester) calculateDeckScore(selectedCards []*scoredCard, analysis
 		curveScore = 0.3
 	}
 
+	// Mana consistency score (20% weight)
+	// Fewer colors = more consistent mana base
+	manaScore := 1.0
+	switch len(combo.Colors) {
+	case 1:
+		manaScore = 1.0 // Mono-color: perfect mana
+	case 2:
+		manaScore = 0.9 // Two-color: very consistent
+	case 3:
+		manaScore = 0.7 // Three-color: less consistent without fixing
+	}
+
 	// Weighted total
-	deckScore := (avgCardScore * 0.60) + (creatureScore * 0.20) + (curveScore * 0.20)
+	deckScore := (avgCardScore * 0.50) + (creatureScore * 0.15) + (curveScore * 0.15) + (manaScore * 0.20)
 
 	return deckScore
 }
