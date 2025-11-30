@@ -26,6 +26,7 @@ export const mockWailsApp = {
   GetDraftDeckMetrics: vi.fn(() => Promise.resolve({} as any)),
   GetDraftGrade: vi.fn(() => Promise.resolve(null as any)),
   GetDraftWinRatePrediction: vi.fn(() => Promise.resolve(null)),
+  GetCurrentPackWithRecommendation: vi.fn(() => Promise.resolve(null as any)),
   GetDraftPacks: vi.fn(() => Promise.resolve([] as any[])),
   GetDraftPicks: vi.fn(() => Promise.resolve([] as any[])),
   GetFormatArchetypes: vi.fn(() => Promise.resolve([] as any[])),

@@ -100,14 +100,22 @@ export const DraftGrade: React.FC<DraftGradeProps> = ({
 
   if (compact) {
     return (
-      <div
-        className="draft-grade-badge"
-        style={{ backgroundColor: gradeColor }}
-        onClick={() => setShowBreakdown(true)}
-        title={`Click to view breakdown (${grade.overall_score}/100)`}
-      >
-        {grade.overall_grade}
-      </div>
+      <>
+        <div
+          className="draft-grade-badge"
+          style={{ backgroundColor: gradeColor }}
+          onClick={() => setShowBreakdown(true)}
+          title={`Click to view breakdown (${grade.overall_score}/100)`}
+        >
+          {grade.overall_grade}
+        </div>
+        {showBreakdown && (
+          <GradeBreakdownModal
+            grade={grade}
+            onClose={() => setShowBreakdown(false)}
+          />
+        )}
+      </>
     );
   }
 

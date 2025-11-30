@@ -639,6 +639,88 @@ export namespace gui {
 	        this.totalToughness = source["totalToughness"];
 	    }
 	}
+	export class PackCardWithRating {
+	    arena_id: string;
+	    name: string;
+	    image_url: string;
+	    rarity: string;
+	    colors: string[];
+	    mana_cost: string;
+	    cmc: number;
+	    type_line: string;
+	    gihwr: number;
+	    alsa: number;
+	    tier: string;
+	    is_recommended: boolean;
+	    score: number;
+	    reasoning: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PackCardWithRating(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.arena_id = source["arena_id"];
+	        this.name = source["name"];
+	        this.image_url = source["image_url"];
+	        this.rarity = source["rarity"];
+	        this.colors = source["colors"];
+	        this.mana_cost = source["mana_cost"];
+	        this.cmc = source["cmc"];
+	        this.type_line = source["type_line"];
+	        this.gihwr = source["gihwr"];
+	        this.alsa = source["alsa"];
+	        this.tier = source["tier"];
+	        this.is_recommended = source["is_recommended"];
+	        this.score = source["score"];
+	        this.reasoning = source["reasoning"];
+	    }
+	}
+	export class CurrentPackResponse {
+	    session_id: string;
+	    pack_number: number;
+	    pick_number: number;
+	    pack_label: string;
+	    cards: PackCardWithRating[];
+	    recommended_card?: PackCardWithRating;
+	    pool_colors: string[];
+	    pool_size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CurrentPackResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.session_id = source["session_id"];
+	        this.pack_number = source["pack_number"];
+	        this.pick_number = source["pick_number"];
+	        this.pack_label = source["pack_label"];
+	        this.cards = this.convertValues(source["cards"], PackCardWithRating);
+	        this.recommended_card = this.convertValues(source["recommended_card"], PackCardWithRating);
+	        this.pool_colors = source["pool_colors"];
+	        this.pool_size = source["pool_size"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class DaemonErrorEvent {
 	    error: string;
 	    code: string;
@@ -1634,6 +1716,7 @@ export namespace gui {
 	        this.error = source["error"];
 	    }
 	}
+	
 	
 	export class QuestUpdatedEvent {
 	    completed: number;

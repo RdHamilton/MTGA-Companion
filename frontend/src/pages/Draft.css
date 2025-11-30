@@ -920,3 +920,41 @@
     background-color: #ff4444;
     color: #ffffff;
 }
+
+/* View Toggle */
+.view-toggle {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    background-color: #2d2d2d;
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.toggle-btn {
+    flex: 1;
+    background-color: transparent;
+    color: #aaaaaa;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+    color: #ffffff;
+    background-color: #3d3d3d;
+}
+
+.toggle-btn.active {
+    background-color: #4a9eff;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.toggle-btn.active:hover {
+    background-color: #5ab0ff;
+}

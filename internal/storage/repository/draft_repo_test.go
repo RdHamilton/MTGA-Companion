@@ -691,6 +691,91 @@ func TestDraftRepository_GetActiveSessions(t *testing.T) {
 	}
 }
 
+func TestDraftRepository_GetActiveSessionByIDPrefix(t *testing.T) {
+	db := setupDraftTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewDraftRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create sessions with timestamp suffixes (simulating splitCompletedDraftSessions behavior)
+	sessions := []*models.DraftSession{
+		{
+			ID:         "QuickDraft_TLA_20251127",
+			EventName:  "QuickDraft_TLA_20251127",
+			SetCode:    "TLA",
+			DraftType:  "QuickDraft",
+			StartTime:  now.Add(-2 * time.Hour),
+			Status:     "completed", // Original session completed
+			TotalPicks: 42,
+			CreatedAt:  now.Add(-2 * time.Hour),
+			UpdatedAt:  now.Add(-time.Hour),
+		},
+		{
+			ID:         "QuickDraft_TLA_20251127_1234567890",
+			EventName:  "QuickDraft_TLA_20251127",
+			SetCode:    "TLA",
+			DraftType:  "QuickDraft",
+			StartTime:  now.Add(-30 * time.Minute),
+			Status:     "in_progress", // New draft session
+			TotalPicks: 0,
+			CreatedAt:  now.Add(-30 * time.Minute),
+			UpdatedAt:  now,
+		},
+		{
+			ID:         "QuickDraft_TLA_20251127_9876543210",
+			EventName:  "QuickDraft_TLA_20251127",
+			SetCode:    "TLA",
+			DraftType:  "QuickDraft",
+			StartTime:  now.Add(-10 * time.Minute),
+			Status:     "completed", // Another completed session
+			TotalPicks: 42,
+			CreatedAt:  now.Add(-10 * time.Minute),
+			UpdatedAt:  now,
+		},
+	}
+
+	for _, s := range sessions {
+		if err := repo.CreateSession(ctx, s); err != nil {
+			t.Fatalf("failed to create session: %v", err)
+		}
+	}
+
+	// Test: Find active session by prefix
+	session, err := repo.GetActiveSessionByIDPrefix(ctx, "QuickDraft_TLA_20251127_")
+	if err != nil {
+		t.Fatalf("failed to get active session by prefix: %v", err)
+	}
+
+	if session == nil {
+		t.Fatal("expected to find an active session with prefix, got nil")
+	}
+
+	if session.ID != "QuickDraft_TLA_20251127_1234567890" {
+		t.Errorf("expected session ID 'QuickDraft_TLA_20251127_1234567890', got %s", session.ID)
+	}
+
+	if session.Status != "in_progress" {
+		t.Errorf("expected status 'in_progress', got %s", session.Status)
+	}
+
+	// Test: No active session with non-matching prefix
+	noSession, err := repo.GetActiveSessionByIDPrefix(ctx, "QuickDraft_OTHER_")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if noSession != nil {
+		t.Errorf("expected nil for non-matching prefix, got session %s", noSession.ID)
+	}
+}
+
 func TestDraftRepository_GetCompletedSessions(t *testing.T) {
 	db := setupDraftTestDB(t)
 	defer func() {
