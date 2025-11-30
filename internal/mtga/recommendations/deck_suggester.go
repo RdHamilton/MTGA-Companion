@@ -292,12 +292,13 @@ func (s *DeckSuggester) filterByColorFit(poolCards []*cards.Card, combo ColorCom
 
 // isViable checks if a color combination has enough playables.
 func (s *DeckSuggester) isViable(candidates []*cards.Card) bool {
-	// Need at least 18 playable spells
-	if len(candidates) < 18 {
+	// Need at least 15 playable spells (lowered from 18 for spell-heavy pools)
+	if len(candidates) < 15 {
 		return false
 	}
 
-	// Need at least 10 creatures
+	// Need at least 6 creatures (lowered from 10 to accommodate spell-heavy formats)
+	// Some sets have fewer creatures or more spell-based strategies
 	creatureCount := 0
 	for _, card := range candidates {
 		if containsTypeInTypeLine(card.TypeLine, "Creature") {
@@ -305,7 +306,7 @@ func (s *DeckSuggester) isViable(candidates []*cards.Card) bool {
 		}
 	}
 
-	return creatureCount >= 10
+	return creatureCount >= 6
 }
 
 // scoreCardForDeck scores a card specifically for deck building.
@@ -798,9 +799,9 @@ func (s *DeckSuggester) calculateDeckScore(selectedCards []*scoredCard, analysis
 
 // determineViability returns the viability status based on score and analysis.
 func (s *DeckSuggester) determineViability(score float64, analysis *DeckSuggestionAnalysis) string {
-	if score >= 0.7 && analysis.CreatureCount >= 13 && analysis.PlayableCount >= 25 {
+	if score >= 0.7 && analysis.CreatureCount >= 10 && analysis.PlayableCount >= 20 {
 		return "strong"
-	} else if score >= 0.5 && analysis.CreatureCount >= 10 {
+	} else if score >= 0.5 && analysis.CreatureCount >= 6 {
 		return "viable"
 	}
 	return "weak"
