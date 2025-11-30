@@ -154,6 +154,10 @@ export function GetCurrentAccount() {
   return window['go']['main']['App']['GetCurrentAccount']();
 }
 
+export function GetCurrentPackWithRecommendation(arg1) {
+  return window['go']['main']['App']['GetCurrentPackWithRecommendation'](arg1);
+}
+
 export function GetDaemonErrorEvent() {
   return window['go']['main']['App']['GetDaemonErrorEvent']();
 }

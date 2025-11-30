@@ -365,6 +365,11 @@ func (a *App) GetDraftPacks(sessionID string) ([]*models.DraftPackSession, error
 	return a.draftFacade.GetDraftPacks(a.ctx, sessionID)
 }
 
+// GetCurrentPackWithRecommendation returns the current pack with card ratings and pick recommendation
+func (a *App) GetCurrentPackWithRecommendation(sessionID string) (*gui.CurrentPackResponse, error) {
+	return a.draftFacade.GetCurrentPackWithRecommendation(a.ctx, sessionID)
+}
+
 // GetMissingCards returns missing cards analysis for a draft pack
 func (a *App) GetMissingCards(sessionID string, packNum, pickNum int) (*models.MissingCardsAnalysis, error) {
 	return a.draftFacade.GetMissingCards(a.ctx, sessionID, packNum, pickNum)

@@ -316,7 +316,7 @@ describe('DraftGrade Component', () => {
   });
 
   describe('Compact Mode', () => {
-    it('should show breakdown modal when compact badge is clicked', async () => {
+    it('should render badge in compact mode', async () => {
       const grade = createMockDraftGrade();
       mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
 
@@ -340,6 +340,54 @@ describe('DraftGrade Component', () => {
       await waitFor(() => {
         const badge = screen.getByText('B+');
         expect(badge).toHaveAttribute('title', 'Click to view breakdown (85.5/100)');
+      });
+    });
+
+    it('should open breakdown modal when compact badge is clicked', async () => {
+      const grade = createMockDraftGrade();
+      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+
+      render(<DraftGrade sessionID="test-session" compact={true} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('B+')).toBeInTheDocument();
+      });
+
+      // Click the compact badge
+      const badge = screen.getByText('B+');
+      await userEvent.click(badge);
+
+      // Modal should open
+      await waitFor(() => {
+        expect(screen.getByText('Draft Grade Breakdown')).toBeInTheDocument();
+        expect(screen.getByText('Component Scores')).toBeInTheDocument();
+      });
+    });
+
+    it('should close breakdown modal when close button is clicked in compact mode', async () => {
+      const grade = createMockDraftGrade();
+      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+
+      render(<DraftGrade sessionID="test-session" compact={true} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('B+')).toBeInTheDocument();
+      });
+
+      // Click the compact badge to open modal
+      const badge = screen.getByText('B+');
+      await userEvent.click(badge);
+
+      await waitFor(() => {
+        expect(screen.getByText('Draft Grade Breakdown')).toBeInTheDocument();
+      });
+
+      // Click close button
+      const closeButton = screen.getByRole('button', { name: '×' });
+      await userEvent.click(closeButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Draft Grade Breakdown')).not.toBeInTheDocument();
       });
     });
   });

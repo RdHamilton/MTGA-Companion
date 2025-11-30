@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
@@ -653,6 +654,174 @@ func (s *Service) processDrafts(ctx context.Context, entries []*logreader.LogEnt
 	return nil
 }
 
+// splitCompletedDraftSessions detects when new Quick Draft events arrive for an already-completed session.
+// When this happens, the new events need a unique session ID to avoid merging with the old completed draft.
+// IMPORTANT: When reprocessing the full log file, events from BOTH old and new drafts may be mixed together.
+// This function must filter out events from the old draft before assigning to the new session.
+func (s *Service) splitCompletedDraftSessions(ctx context.Context, eventGroups map[string][]*logreader.DraftSessionEvent) map[string][]*logreader.DraftSessionEvent {
+	result := make(map[string][]*logreader.DraftSessionEvent)
+
+	for groupKey, events := range eventGroups {
+		// Check if this is a UUID (Premier Draft) - those already have unique session IDs
+		if isUUID(groupKey) {
+			result[groupKey] = events
+			continue
+		}
+
+		// For EventName-based groups (Quick Draft), check if we have P0P0/P0P1 pack data
+		// indicating a fresh draft is starting. Also find the index where the new draft starts.
+		// IMPORTANT: When reprocessing log files, there may be MULTIPLE P0P0/P0P1 events with empty
+		// PickedCards - one from each draft that was started. We want the LAST one (the newest draft).
+		hasFirstPickPack := false
+		newDraftStartIdx := -1
+		for i, event := range events {
+			if event.Type == "status_updated" && len(event.DraftPack) > 0 {
+				if event.PackNumber == 0 && (event.PickNumber == 0 || event.PickNumber == 1) {
+					// A P0P0/P0P1 with empty PickedCards indicates the START of a draft
+					// We keep looking to find the LAST such event (the newest draft)
+					if len(event.PickedCards) == 0 {
+						hasFirstPickPack = true
+						newDraftStartIdx = i
+						log.Printf("[splitCompletedDraftSessions] Found draft start at event %d: P%dP%d with %d cards in pack, 0 picked cards",
+							i, event.PackNumber, event.PickNumber, len(event.DraftPack))
+						// Don't break - keep looking for later P0P0/P0P1 events (newer drafts)
+					}
+				}
+			}
+		}
+		if hasFirstPickPack {
+			log.Printf("[splitCompletedDraftSessions] Using newest draft start at index %d", newDraftStartIdx)
+		}
+
+		if !hasFirstPickPack {
+			// No first-pick pack data - check if there's an active session with timestamp suffix
+			// This handles ongoing picks for a draft that was already split into a new session
+			existingInProgressSession, lookupErr := s.storage.DraftRepo().GetActiveSessionByIDPrefix(ctx, groupKey+"_")
+			if lookupErr == nil && existingInProgressSession != nil {
+				// Route events to the existing in_progress session with timestamp suffix
+				log.Printf("[splitCompletedDraftSessions] Routing %d events to existing in_progress session %s (no P0P0/P0P1 in batch)",
+					len(events), existingInProgressSession.ID)
+				result[existingInProgressSession.ID] = events
+				continue
+			}
+			// No timestamped session, use base session ID
+			result[groupKey] = events
+			continue
+		}
+
+		// Check if the existing session with this ID is completed
+		existingSession, err := s.storage.DraftRepo().GetSession(ctx, groupKey)
+		if err != nil || existingSession == nil {
+			// No existing session, use the group key as session ID
+			result[groupKey] = events
+			continue
+		}
+
+		// Filter events to only include those from the NEW draft (starting from newDraftStartIdx)
+		// This prevents mixing old completed draft events with new draft events
+		newDraftEvents := s.filterNewDraftEvents(events, newDraftStartIdx)
+		log.Printf("[splitCompletedDraftSessions] Filtered %d events to %d new draft events for %s",
+			len(events), len(newDraftEvents), groupKey)
+
+		// Check if existing session is completed
+		if existingSession.Status == "completed" {
+			// Existing session is completed and we have P0P0/P0P1 pack data = NEW DRAFT
+			// First, check if there's already an in_progress session with this prefix
+			// (e.g., "QuickDraft_TLA_20251127_1234567890" from a previous log poll)
+			existingInProgressSession, lookupErr := s.storage.DraftRepo().GetActiveSessionByIDPrefix(ctx, groupKey+"_")
+			if lookupErr == nil && existingInProgressSession != nil {
+				// Reuse the existing in_progress session instead of creating a new one
+				log.Printf("[splitCompletedDraftSessions] Reusing existing in_progress session %s for events from %s",
+					existingInProgressSession.ID, groupKey)
+				result[existingInProgressSession.ID] = newDraftEvents
+				continue
+			}
+
+			// No existing in_progress session found, create a new one with timestamp
+			newSessionID := fmt.Sprintf("%s_%d", groupKey, time.Now().UnixNano())
+			log.Printf("[splitCompletedDraftSessions] Detected new draft starting for completed session %s, creating new session: %s",
+				groupKey, newSessionID)
+			result[newSessionID] = newDraftEvents
+			continue
+		}
+
+		// Existing session is in_progress - check if we have pack data that conflicts
+		// (e.g., P0P0 when we already have 42+ picks means a new draft is starting)
+		existingPicks, err := s.storage.DraftRepo().GetPicksBySession(ctx, groupKey)
+		if err == nil && len(existingPicks) >= existingSession.TotalPicks && existingSession.TotalPicks > 0 {
+			// Session has all expected picks, new P0P0 means a new draft
+			// First, check if there's already an in_progress session with this prefix
+			existingInProgressSession, lookupErr := s.storage.DraftRepo().GetActiveSessionByIDPrefix(ctx, groupKey+"_")
+			if lookupErr == nil && existingInProgressSession != nil {
+				// Reuse the existing in_progress session
+				log.Printf("[splitCompletedDraftSessions] Reusing existing in_progress session %s for events from full session %s",
+					existingInProgressSession.ID, groupKey)
+				result[existingInProgressSession.ID] = newDraftEvents
+				continue
+			}
+
+			newSessionID := fmt.Sprintf("%s_%d", groupKey, time.Now().UnixNano())
+			log.Printf("[splitCompletedDraftSessions] Detected new draft starting for full session %s (%d picks), creating new session: %s",
+				groupKey, len(existingPicks), newSessionID)
+			result[newSessionID] = newDraftEvents
+			continue
+		}
+
+		// Existing session is in progress and not full, merge events
+		result[groupKey] = events
+	}
+
+	return result
+}
+
+// filterNewDraftEvents filters events to only include those from a new draft starting at the given index.
+// It identifies the new draft by looking for events that have:
+// 1. P0P0/P0P1 status_updated with empty PickedCards (start of new draft)
+// 2. Picks that occur after the new draft start
+// Events from the old completed draft are excluded.
+func (s *Service) filterNewDraftEvents(events []*logreader.DraftSessionEvent, newDraftStartIdx int) []*logreader.DraftSessionEvent {
+	if newDraftStartIdx < 0 || newDraftStartIdx >= len(events) {
+		return events
+	}
+
+	// Find the starting pack/pick of the new draft
+	startEvent := events[newDraftStartIdx]
+	startPack := startEvent.PackNumber
+	startPick := startEvent.PickNumber
+
+	log.Printf("[filterNewDraftEvents] Filtering from new draft start at P%dP%d (index %d)", startPack, startPick, newDraftStartIdx)
+
+	var filtered []*logreader.DraftSessionEvent
+
+	for i, event := range events {
+		// Always include events at or after the new draft start index
+		if i >= newDraftStartIdx {
+			filtered = append(filtered, event)
+			continue
+		}
+
+		// For events before the start index, only include if they're control events
+		// (started, ended, session_info) that might apply to the new draft
+		// Don't include status_updated or pick_made events as those belong to the old draft
+		switch event.Type {
+		case "started", "session_info":
+			// These could apply to the new draft if they're near the start
+			// But to be safe, only include started events with the same context
+			filtered = append(filtered, event)
+		case "ended":
+			// Don't include ended events - they're from the old draft
+			log.Printf("[filterNewDraftEvents] Excluding old draft 'ended' event at index %d", i)
+		case "status_updated", "pick_made":
+			// These are from the old draft, exclude them
+			log.Printf("[filterNewDraftEvents] Excluding old draft '%s' event at index %d (P%dP%d)",
+				event.Type, i, event.PackNumber, event.PickNumber)
+		}
+	}
+
+	log.Printf("[filterNewDraftEvents] Filtered %d events to %d", len(events), len(filtered))
+	return filtered
+}
+
 // isUUID checks if a string looks like a UUID (e.g., "73e1c7a3-75ee-4b38-b32b-d6854e5c6c9c")
 func isUUID(s string) bool {
 	// UUID format: 8-4-4-4-12 hexadecimal characters separated by hyphens
@@ -693,6 +862,11 @@ func (s *Service) groupDraftEvents(ctx context.Context, events []*logreader.Draf
 		}
 		eventGroups[groupKey] = append(eventGroups[groupKey], event)
 	}
+
+	// Detect new drafts that need separate session IDs
+	// For Quick Drafts that reuse the same EventName, we need to detect when a NEW draft starts
+	// by checking for P0P0 pack data when the existing session is completed
+	eventGroups = s.splitCompletedDraftSessions(ctx, eventGroups)
 
 	var sessions []*draftSessionData
 
@@ -736,6 +910,12 @@ func (s *Service) groupDraftEvents(ctx context.Context, events []*logreader.Draf
 		actualEventName := eventName
 		detectedContexts := []string{} // Track all contexts seen
 
+		// For Quick Drafts (EventName-based), the group key from splitCompletedDraftSessions
+		// may have a timestamp suffix (e.g., "QuickDraft_TLA_20251127_1234567890") to distinguish
+		// new drafts from completed ones. We must preserve this session ID.
+		// For Premier Drafts (UUID-based), the session ID comes from the event directly.
+		isEventNameBasedSession := !isUUID(eventName) && strings.Contains(eventName, "Draft")
+
 		for _, event := range eventList {
 			// session_info events (from EventJoin) have complete metadata
 			if event.Type == "session_info" {
@@ -745,7 +925,9 @@ func (s *Service) groupDraftEvents(ctx context.Context, events []*logreader.Draf
 				if event.SetCode != "" {
 					setCode = event.SetCode
 				}
-				if event.SessionID != "" {
+				// Only override sessionID for Premier Drafts (UUID-based sessions)
+				// For Quick Drafts, preserve the group key from splitCompletedDraftSessions
+				if event.SessionID != "" && !isEventNameBasedSession {
 					sessionID = event.SessionID
 				}
 			}
@@ -764,8 +946,10 @@ func (s *Service) groupDraftEvents(ctx context.Context, events []*logreader.Draf
 			case "BotDraft":
 				log.Printf("[Draft Detection] Found BotDraft context - keeping type as QuickDraft")
 			}
-			// Use SessionID if available (Premier Draft)
-			if event.SessionID != "" {
+			// Only use SessionID from events for Premier Draft (UUID-based)
+			// For Quick Drafts, the group key already has the correct session ID
+			// (potentially with timestamp suffix from splitCompletedDraftSessions)
+			if event.SessionID != "" && !isEventNameBasedSession {
 				sessionID = event.SessionID
 			}
 		}

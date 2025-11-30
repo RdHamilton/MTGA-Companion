@@ -12,6 +12,7 @@ import MissingCards from '../components/MissingCards';
 import DraftStatistics from '../components/DraftStatistics';
 import PerformanceMetrics from '../components/PerformanceMetrics';
 import FormatInsights from '../components/FormatInsights';
+import CurrentPackPicker from '../components/CurrentPackPicker';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
 import './Draft.css';
 
@@ -73,6 +74,7 @@ const Draft: React.FC = () => {
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
+    const [showCurrentPack, setShowCurrentPack] = useState(true);
 
     // Refs for deduplication and debouncing
     const loadingRef = useRef<boolean>(false);
@@ -802,37 +804,68 @@ const Draft: React.FC = () => {
             </div>
 
             <div className="draft-content">
-                {/* Left: Card Grid (~25% width) */}
+                {/* Left: Card Grid / Current Pack (~25% width) */}
                 <div className="card-grid-section">
-                    <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({displayCards.length})</h2>
-                    <div className="card-grid">
-                        {displayCards.map(card => {
-                            const isPicked = pickedCardIds.has(card.ArenaID);
-                            const pick = isPicked ? state.picks.find(p => p.CardID === card.ArenaID) : null;
-                            const hasGrade = pick && pick.PickQualityGrade;
-                            const hasSynergy = !isPicked && shouldHighlightCard(card, synergyAnalysis);
-                            return (
-                                <div
-                                    key={card.ID}
-                                    className={`card-item ${isPicked ? 'picked' : ''} ${hasSynergy ? 'synergy-highlight' : ''}`}
-                                    onClick={() => handleCardHover(card)}
-                                >
-                                    {card.ImageURLSmall ? (
-                                        <img src={card.ImageURLSmall} alt={card.Name} />
-                                    ) : (
-                                        <div className="card-placeholder">{card.Name}</div>
-                                    )}
-                                    {isPicked && <div className="picked-indicator">✓</div>}
-                                    {hasSynergy && !isPicked && <div className="synergy-indicator">★</div>}
-                                    {hasGrade && (
-                                        <div className={`pick-quality-badge ${getPickQualityClass(pick!.PickQualityGrade)}`}>
-                                            {pick!.PickQualityGrade}
+                    {/* View Toggle */}
+                    {!isReplayMode && (
+                        <div className="view-toggle">
+                            <button
+                                className={`toggle-btn ${showCurrentPack ? 'active' : ''}`}
+                                onClick={() => setShowCurrentPack(true)}
+                            >
+                                Current Pack
+                            </button>
+                            <button
+                                className={`toggle-btn ${!showCurrentPack ? 'active' : ''}`}
+                                onClick={() => setShowCurrentPack(false)}
+                            >
+                                All Set Cards
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Current Pack Picker View */}
+                    {!isReplayMode && showCurrentPack && state.session && (
+                        <CurrentPackPicker
+                            sessionID={state.session.ID}
+                            onRefresh={loadActiveDraft}
+                        />
+                    )}
+
+                    {/* Set Cards Grid View */}
+                    {(isReplayMode || !showCurrentPack) && (
+                        <>
+                            <h2>{isReplayMode ? 'Picked Cards' : 'Set Cards'} ({displayCards.length})</h2>
+                            <div className="card-grid">
+                                {displayCards.map(card => {
+                                    const isPicked = pickedCardIds.has(card.ArenaID);
+                                    const pick = isPicked ? state.picks.find(p => p.CardID === card.ArenaID) : null;
+                                    const hasGrade = pick && pick.PickQualityGrade;
+                                    const hasSynergy = !isPicked && shouldHighlightCard(card, synergyAnalysis);
+                                    return (
+                                        <div
+                                            key={card.ID}
+                                            className={`card-item ${isPicked ? 'picked' : ''} ${hasSynergy ? 'synergy-highlight' : ''}`}
+                                            onClick={() => handleCardHover(card)}
+                                        >
+                                            {card.ImageURLSmall ? (
+                                                <img src={card.ImageURLSmall} alt={card.Name} />
+                                            ) : (
+                                                <div className="card-placeholder">{card.Name}</div>
+                                            )}
+                                            {isPicked && <div className="picked-indicator">✓</div>}
+                                            {hasSynergy && !isPicked && <div className="synergy-indicator">★</div>}
+                                            {hasGrade && (
+                                                <div className={`pick-quality-badge ${getPickQualityClass(pick!.PickQualityGrade)}`}>
+                                                    {pick!.PickQualityGrade}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Middle: Cards to Look For Panel */}

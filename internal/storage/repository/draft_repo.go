@@ -17,6 +17,7 @@ type DraftRepository interface {
 	CreateSession(ctx context.Context, session *models.DraftSession) error
 	GetSession(ctx context.Context, id string) (*models.DraftSession, error)
 	GetActiveSessions(ctx context.Context) ([]*models.DraftSession, error)
+	GetActiveSessionByIDPrefix(ctx context.Context, prefix string) (*models.DraftSession, error)
 	GetCompletedSessions(ctx context.Context, limit int) ([]*models.DraftSession, error)
 	UpdateSessionStatus(ctx context.Context, id string, status string, endTime *time.Time) error
 	UpdateSessionTotalPicks(ctx context.Context, id string, totalPicks int) error
@@ -223,6 +224,48 @@ func (r *draftRepository) GetActiveSessions(ctx context.Context) ([]*models.Draf
 	}
 
 	return sessions, rows.Err()
+}
+
+// GetActiveSessionByIDPrefix finds an active (in_progress) session whose ID starts with the given prefix.
+// This is used to find existing sessions created with timestamp suffixes (e.g., "QuickDraft_TLA_20251127_*").
+// Returns the most recently created session if multiple exist.
+func (r *draftRepository) GetActiveSessionByIDPrefix(ctx context.Context, prefix string) (*models.DraftSession, error) {
+	query := `
+		SELECT id, event_name, set_code, draft_type, start_time, end_time, status, total_picks, created_at, updated_at
+		FROM draft_sessions
+		WHERE status = 'in_progress' AND id LIKE ? || '%'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	row := r.db.QueryRowContext(ctx, query, prefix)
+
+	session := &models.DraftSession{}
+	var endTime sql.NullTime
+
+	err := row.Scan(
+		&session.ID,
+		&session.EventName,
+		&session.SetCode,
+		&session.DraftType,
+		&session.StartTime,
+		&endTime,
+		&session.Status,
+		&session.TotalPicks,
+		&session.CreatedAt,
+		&session.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if endTime.Valid {
+		session.EndTime = &endTime.Time
+	}
+
+	return session, nil
 }
 
 // GetCompletedSessions retrieves completed draft sessions ordered by completion date.

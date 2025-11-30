@@ -279,14 +279,25 @@ describe('Draft Component', () => {
       const session = createMockDraftSession();
       const card = createMockSetCard({ ArenaID: '12345' });
       const pick = createMockDraftPick({ CardID: '12345' });
+      const metrics = createMockDeckMetrics();
 
       mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
       mockWailsApp.GetDraftPicks.mockResolvedValue([pick]);
       mockWailsApp.GetDraftPacks.mockResolvedValue([]);
       mockWailsApp.GetSetCards.mockResolvedValue([card]);
       mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<Draft />);
+
+      // Wait for the view toggle to appear
+      await waitFor(() => {
+        expect(screen.getByText('All Set Cards')).toBeInTheDocument();
+      });
+
+      // Click "All Set Cards" to switch to grid view (default is CurrentPackPicker)
+      const allSetCardsBtn = screen.getByText('All Set Cards');
+      await userEvent.click(allSetCardsBtn);
 
       await waitFor(() => {
         const cardItems = document.querySelectorAll('.card-item.picked');

@@ -1111,3 +1111,351 @@ func (d *DraftFacade) GetArchetypeCards(ctx context.Context, setCode, draftForma
 
 	return archetypeCards, nil
 }
+
+// PackCardWithRating represents a card in the current pack with its rating info.
+type PackCardWithRating struct {
+	ArenaID       string   `json:"arena_id"`
+	Name          string   `json:"name"`
+	ImageURL      string   `json:"image_url"`
+	Rarity        string   `json:"rarity"`
+	Colors        []string `json:"colors"`
+	ManaCost      string   `json:"mana_cost"`
+	CMC           int      `json:"cmc"`
+	TypeLine      string   `json:"type_line"`
+	GIHWR         float64  `json:"gihwr"`          // Games In Hand Win Rate
+	ALSA          float64  `json:"alsa"`           // Average Last Seen At
+	Tier          string   `json:"tier"`           // S, A, B, C, D, F
+	IsRecommended bool     `json:"is_recommended"` // True if this is the recommended pick
+	Score         float64  `json:"score"`          // Recommendation score (0-1)
+	Reasoning     string   `json:"reasoning"`      // Why this card is recommended
+}
+
+// CurrentPackResponse contains the current pack with recommendations.
+type CurrentPackResponse struct {
+	SessionID       string               `json:"session_id"`
+	PackNumber      int                  `json:"pack_number"` // 0-indexed
+	PickNumber      int                  `json:"pick_number"` // 0-indexed
+	PackLabel       string               `json:"pack_label"`  // Human readable, e.g., "Pack 1, Pick 3"
+	Cards           []PackCardWithRating `json:"cards"`
+	RecommendedCard *PackCardWithRating  `json:"recommended_card"` // The top recommendation
+	PoolColors      []string             `json:"pool_colors"`      // Current color identity of pool
+	PoolSize        int                  `json:"pool_size"`        // Number of cards picked so far
+}
+
+// GetCurrentPackWithRecommendation returns the current pack cards with ratings and pick recommendation.
+func (d *DraftFacade) GetCurrentPackWithRecommendation(ctx context.Context, sessionID string) (*CurrentPackResponse, error) {
+	log.Printf("[GetCurrentPackWithRecommendation] Called for session: %s", sessionID)
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get session info
+	session, err := d.services.Storage.DraftRepo().GetSession(ctx, sessionID)
+	if err != nil {
+		log.Printf("[GetCurrentPackWithRecommendation] Failed to get session: %v", err)
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get session: %v", err)}
+	}
+	if session == nil {
+		log.Printf("[GetCurrentPackWithRecommendation] Session not found: %s", sessionID)
+		return nil, &AppError{Message: "Session not found"}
+	}
+	log.Printf("[GetCurrentPackWithRecommendation] Found session: %s, SetCode: %s, Status: %s", session.ID, session.SetCode, session.Status)
+
+	// Get all packs for this session
+	packs, err := d.services.Storage.DraftRepo().GetPacksBySession(ctx, sessionID)
+	if err != nil {
+		log.Printf("[GetCurrentPackWithRecommendation] Failed to get packs: %v", err)
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get packs: %v", err)}
+	}
+	log.Printf("[GetCurrentPackWithRecommendation] Found %d packs for session %s", len(packs), sessionID)
+	if len(packs) == 0 {
+		return nil, &AppError{Message: "No pack data available"}
+	}
+
+	// Find the latest pack (highest pack number, then highest pick number)
+	var currentPack *models.DraftPackSession
+	for _, pack := range packs {
+		if currentPack == nil {
+			currentPack = pack
+			continue
+		}
+		if pack.PackNumber > currentPack.PackNumber ||
+			(pack.PackNumber == currentPack.PackNumber && pack.PickNumber > currentPack.PickNumber) {
+			currentPack = pack
+		}
+	}
+
+	if currentPack == nil || len(currentPack.CardIDs) == 0 {
+		log.Printf("[GetCurrentPackWithRecommendation] Current pack is empty for session %s", sessionID)
+		return nil, &AppError{Message: "Current pack is empty"}
+	}
+	log.Printf("[GetCurrentPackWithRecommendation] Current pack: P%d/P%d with %d cards", currentPack.PackNumber, currentPack.PickNumber, len(currentPack.CardIDs))
+
+	// Get already picked cards for pool analysis
+	picks, err := d.services.Storage.DraftRepo().GetPicksBySession(ctx, sessionID)
+	if err != nil {
+		log.Printf("Warning: Could not get picks for session %s: %v", sessionID, err)
+		picks = []*models.DraftPickSession{}
+	}
+
+	// Analyze pool colors from picked cards
+	// Use DraftType for rating lookup (e.g., "QuickDraft") instead of EventName (e.g., "QuickDraft_TLA_20251127")
+	poolColors := d.analyzePoolColors(ctx, session.SetCode, session.DraftType, picks)
+
+	// Build response with card ratings
+	cards := make([]PackCardWithRating, 0, len(currentPack.CardIDs))
+	var bestCard *PackCardWithRating
+	bestScore := -1.0
+
+	for _, cardID := range currentPack.CardIDs {
+		cardWithRating := d.getCardWithRating(ctx, session.SetCode, session.DraftType, cardID, poolColors, len(picks))
+		if cardWithRating != nil {
+			cards = append(cards, *cardWithRating)
+
+			// Track best recommendation
+			if cardWithRating.Score > bestScore {
+				bestScore = cardWithRating.Score
+				bestCard = cardWithRating
+			}
+		} else {
+			log.Printf("[GetCurrentPackWithRecommendation] Card %s not found in set %s", cardID, session.SetCode)
+		}
+	}
+	log.Printf("[GetCurrentPackWithRecommendation] Built %d cards with ratings for session %s", len(cards), sessionID)
+
+	// Mark the recommended card
+	if bestCard != nil {
+		bestCard.IsRecommended = true
+		// Update in the cards slice too
+		for i := range cards {
+			if cards[i].ArenaID == bestCard.ArenaID {
+				cards[i].IsRecommended = true
+				break
+			}
+		}
+	}
+
+	// Sort cards by score (highest first)
+	for i := 0; i < len(cards)-1; i++ {
+		for j := i + 1; j < len(cards); j++ {
+			if cards[j].Score > cards[i].Score {
+				cards[i], cards[j] = cards[j], cards[i]
+			}
+		}
+	}
+
+	return &CurrentPackResponse{
+		SessionID:       sessionID,
+		PackNumber:      currentPack.PackNumber,
+		PickNumber:      currentPack.PickNumber,
+		PackLabel:       fmt.Sprintf("Pack %d, Pick %d", currentPack.PackNumber+1, currentPack.PickNumber+1),
+		Cards:           cards,
+		RecommendedCard: bestCard,
+		PoolColors:      poolColors,
+		PoolSize:        len(picks),
+	}, nil
+}
+
+// analyzePoolColors determines the color identity of already picked cards.
+func (d *DraftFacade) analyzePoolColors(ctx context.Context, setCode, eventName string, picks []*models.DraftPickSession) []string {
+	colorCounts := make(map[string]int)
+
+	for _, pick := range picks {
+		// Get card info from ratings
+		rating, err := d.services.Storage.DraftRatingsRepo().GetCardRatingByArenaID(ctx, setCode, eventName, pick.CardID)
+		if err != nil || rating == nil {
+			continue
+		}
+
+		// Parse colors from rating
+		colors := parseColors(rating.Color)
+		for _, c := range colors {
+			colorCounts[c]++
+		}
+	}
+
+	// Return colors with at least 2 cards (or any if pool is small)
+	threshold := 2
+	if len(picks) < 6 {
+		threshold = 1
+	}
+
+	result := []string{}
+	for color, count := range colorCounts {
+		if count >= threshold {
+			result = append(result, color)
+		}
+	}
+
+	return result
+}
+
+// getCardWithRating builds a PackCardWithRating from card ID.
+func (d *DraftFacade) getCardWithRating(ctx context.Context, setCode, eventName, cardID string, poolColors []string, poolSize int) *PackCardWithRating {
+	// Get card rating from 17Lands data
+	rating, err := d.services.Storage.DraftRatingsRepo().GetCardRatingByArenaID(ctx, setCode, eventName, cardID)
+	if err != nil || rating == nil {
+		log.Printf("Warning: No rating found for card %s", cardID)
+		return nil
+	}
+
+	// Try to get card info from SetCard repo
+	setCard, _ := d.services.Storage.SetCardRepo().GetCardByArenaID(ctx, cardID)
+
+	// Calculate tier from GIHWR (multiply by 100 as calculateTier expects percentage)
+	tier := calculateTier(rating.GIHWR * 100)
+
+	// Parse colors
+	colors := parseColors(rating.Color)
+
+	// Calculate recommendation score
+	score, reasoning := d.calculatePickScore(rating, colors, poolColors, poolSize)
+
+	card := &PackCardWithRating{
+		ArenaID:       cardID,
+		Name:          rating.Name,
+		Rarity:        rating.Rarity,
+		Colors:        colors,
+		ManaCost:      rating.Color,       // Color field contains mana cost info
+		GIHWR:         rating.GIHWR * 100, // Convert to percentage
+		ALSA:          rating.ALSA,
+		Tier:          tier,
+		IsRecommended: false,
+		Score:         score,
+		Reasoning:     reasoning,
+	}
+
+	// Add image URL and type info if we have SetCard data
+	if setCard != nil {
+		card.ImageURL = setCard.ImageURL
+		// Construct TypeLine from Types array
+		if len(setCard.Types) > 0 {
+			card.TypeLine = setCard.Types[0]
+			for i := 1; i < len(setCard.Types); i++ {
+				card.TypeLine += " " + setCard.Types[i]
+			}
+		}
+		card.CMC = setCard.CMC
+		if len(setCard.Colors) > 0 {
+			card.Colors = setCard.Colors
+		}
+		if setCard.ManaCost != "" {
+			card.ManaCost = setCard.ManaCost
+		}
+	}
+
+	return card
+}
+
+// calculatePickScore calculates recommendation score for a card (0-1).
+func (d *DraftFacade) calculatePickScore(rating *seventeenlands.CardRating, cardColors, poolColors []string, poolSize int) (float64, string) {
+	reasons := []string{}
+
+	// Factor 1: Raw card quality from GIHWR (50% weight)
+	// GIHWR typically ranges from 45% to 65%
+	qualityScore := (rating.GIHWR - 0.45) / 0.20 // Maps 45-65% to 0-1
+	if qualityScore < 0 {
+		qualityScore = 0
+	} else if qualityScore > 1 {
+		qualityScore = 1
+	}
+
+	if qualityScore >= 0.7 {
+		reasons = append(reasons, "high win rate card")
+	}
+
+	// Factor 2: Color fit (30% weight for picks 4+, 10% for early picks)
+	colorScore := 1.0 // Default: colorless or no pool colors yet
+	colorWeight := 0.10
+
+	if poolSize >= 3 && len(poolColors) > 0 {
+		colorWeight = 0.30 // After first few picks, color matters more
+
+		if len(cardColors) == 0 {
+			colorScore = 0.8 // Colorless is good but not optimal
+		} else {
+			matchingColors := 0
+			for _, cc := range cardColors {
+				for _, pc := range poolColors {
+					if cc == pc {
+						matchingColors++
+						break
+					}
+				}
+			}
+
+			if matchingColors == len(cardColors) {
+				colorScore = 1.0 // Perfect fit
+				reasons = append(reasons, "matches your colors")
+			} else if matchingColors > 0 {
+				colorScore = 0.6 // Partial fit
+				reasons = append(reasons, "partially on-color")
+			} else {
+				colorScore = 0.2 // Off-color
+				reasons = append(reasons, "off-color")
+			}
+		}
+	}
+
+	// Factor 3: Pick availability (20% weight) - ALSA indicates how late cards wheel
+	// Lower ALSA = card gets picked earlier = better
+	alsaScore := 1.0 - ((rating.ALSA - 1.0) / 13.0) // Maps 1-14 to 1-0
+	if alsaScore < 0 {
+		alsaScore = 0
+	} else if alsaScore > 1 {
+		alsaScore = 1
+	}
+
+	if alsaScore >= 0.7 {
+		reasons = append(reasons, "highly contested")
+	}
+
+	// Calculate weighted score
+	qualityWeight := 0.50
+	alsaWeight := 0.20
+	// Adjust weights to sum to 1
+	totalWeight := qualityWeight + colorWeight + alsaWeight
+	score := (qualityScore*qualityWeight + colorScore*colorWeight + alsaScore*alsaWeight) / totalWeight
+
+	// Build reasoning string
+	reasoning := ""
+	if len(reasons) > 0 {
+		reasoning = reasons[0]
+		for i := 1; i < len(reasons); i++ {
+			if i == len(reasons)-1 {
+				reasoning += " and " + reasons[i]
+			} else {
+				reasoning += ", " + reasons[i]
+			}
+		}
+		reasoning = "This card " + reasoning + "."
+	}
+
+	return score, reasoning
+}
+
+// parseColors extracts colors from a mana cost string like "{2}{W}{U}".
+func parseColors(manaCost string) []string {
+	colorSet := make(map[string]bool)
+	for _, c := range manaCost {
+		switch c {
+		case 'W':
+			colorSet["W"] = true
+		case 'U':
+			colorSet["U"] = true
+		case 'B':
+			colorSet["B"] = true
+		case 'R':
+			colorSet["R"] = true
+		case 'G':
+			colorSet["G"] = true
+		}
+	}
+
+	colors := make([]string, 0, len(colorSet))
+	for c := range colorSet {
+		colors = append(colors, c)
+	}
+	return colors
+}

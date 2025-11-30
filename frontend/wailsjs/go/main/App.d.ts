@@ -87,6 +87,8 @@ export function GetConnectionStatus():Promise<gui.ConnectionStatus>;
 
 export function GetCurrentAccount():Promise<models.Account>;
 
+export function GetCurrentPackWithRecommendation(arg1:string):Promise<gui.CurrentPackResponse>;
+
 export function GetDaemonErrorEvent():Promise<gui.DaemonErrorEvent>;
 
 export function GetDatasetSource(arg1:string,arg2:string):Promise<string>;
