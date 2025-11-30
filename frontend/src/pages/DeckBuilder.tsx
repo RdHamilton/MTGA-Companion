@@ -18,6 +18,7 @@ import { models, gui } from '../../wailsjs/go/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
+import SuggestDecksModal from '../components/SuggestDecksModal';
 import './DeckBuilder.css';
 
 export default function DeckBuilder() {
@@ -38,6 +39,7 @@ export default function DeckBuilder() {
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [addingLands, setAddingLands] = useState(false);
+  const [showSuggestDecks, setShowSuggestDecks] = useState(false);
 
   // Load deck data
   useEffect(() => {
@@ -359,6 +361,22 @@ export default function DeckBuilder() {
     }
   };
 
+  const handleDeckApplied = async () => {
+    if (!deck) return;
+
+    // Reload deck data after a suggested deck is applied
+    const deckData = await GetDeck(deck.ID);
+    if (deckData.deck) {
+      setDeck(deckData.deck);
+    }
+    setCards(deckData.cards || []);
+    setTags(deckData.tags || []);
+
+    // Reload statistics
+    const stats = await GetDeckStatistics(deck.ID);
+    setStatistics(stats);
+  };
+
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(
     cards.map((card) => [
@@ -512,8 +530,29 @@ export default function DeckBuilder() {
           <button className="action-button" title="Validate deck" onClick={handleValidateDeck}>
             ✓ Validate
           </button>
+          {deck.Source === 'draft' && deck.DraftEventID && (
+            <button
+              className="action-button suggest-decks-btn"
+              title="Generate complete deck suggestions from your draft pool"
+              onClick={() => setShowSuggestDecks(true)}
+            >
+              Suggest Decks
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Suggest Decks Modal */}
+      {deck.Source === 'draft' && deck.DraftEventID && (
+        <SuggestDecksModal
+          isOpen={showSuggestDecks}
+          onClose={() => setShowSuggestDecks(false)}
+          draftEventID={deck.DraftEventID}
+          currentDeckID={deck.ID}
+          deckName={deck.Name}
+          onDeckApplied={handleDeckApplied}
+        />
+      )}
     </div>
   );
 }
