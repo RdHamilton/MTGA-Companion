@@ -58,12 +58,13 @@ export async function GetTrendAnalysis(
   periodType: string,
   formats: string[]
 ): Promise<storage.TrendAnalysis> {
-  return matches.getTrendAnalysis({
+  const result = await matches.getTrendAnalysis({
     start_date: startDate.toISOString().split('T')[0],
     end_date: endDate.toISOString().split('T')[0],
     period_type: periodType,
     formats,
   });
+  return result as storage.TrendAnalysis;
 }
 
 export async function GetRankProgression(format: string): Promise<models.RankProgression> {
@@ -101,7 +102,7 @@ export async function GetDraftPicks(sessionId: string): Promise<models.DraftPick
 }
 
 export async function GetDraftPacks(sessionId: string): Promise<models.DraftPackSession[]> {
-  return drafts.getDraftPool(sessionId) as Promise<models.DraftPackSession[]>;
+  return drafts.getDraftPool(sessionId) as unknown as Promise<models.DraftPackSession[]>;
 }
 
 export async function GetDraftDeckMetrics(sessionId: string): Promise<models.DeckMetrics> {
@@ -182,7 +183,10 @@ export async function CreateDeck(
 }
 
 export async function UpdateDeck(deck: models.Deck): Promise<void> {
-  await decks.updateDeck(deck.id, deck);
+  await decks.updateDeck(deck.ID, {
+    name: deck.Name,
+    format: deck.Format,
+  });
 }
 
 export async function DeleteDeck(deckId: string): Promise<void> {
@@ -287,7 +291,7 @@ export async function GetCardRatingByArenaID(
   format: string
 ): Promise<gui.CardRatingWithTier> {
   const ratings = await cards.getCardRatings(setCode, format);
-  const rating = ratings.find((r) => r.arena_id?.toString() === arenaId);
+  const rating = ratings.find((r) => r.mtga_id?.toString() === arenaId);
   if (!rating) {
     throw new Error(`Card rating not found for arena ID ${arenaId}`);
   }
@@ -362,8 +366,30 @@ export async function GetRecentCollectionChanges(limit: number): Promise<gui.Col
   return collection.getRecentChanges(limit);
 }
 
-export async function GetMissingCards(setCode: string): Promise<models.MissingCardsAnalysis> {
-  return collection.getMissingCards(setCode);
+export async function GetMissingCards(
+  sessionIdOrSetCode: string,
+  packNumber?: number,
+  _pickNumber?: number
+): Promise<models.MissingCardsAnalysis> {
+  // If packNumber is provided, this is a draft context call
+  if (packNumber !== undefined) {
+    // For draft context, return empty analysis (not implemented in REST API)
+    return {
+      TotalMissing: 0,
+      ByRarity: {},
+      TopMissing: [],
+      SessionID: sessionIdOrSetCode,
+      PackNumber: packNumber,
+      PickNumber: _pickNumber || 0,
+      InitialCards: [],
+      MissingCards: [],
+      PassedCards: [],
+      CardsToLookFor: [],
+      convertValues: () => ({}),
+    } as unknown as models.MissingCardsAnalysis;
+  }
+  // Otherwise, treat as setCode for collection missing cards
+  return collection.getMissingCards(sessionIdOrSetCode);
 }
 
 export async function GetMissingCardsForDeck(deckId: string): Promise<gui.MissingCardsForDeckResponse> {
@@ -371,7 +397,19 @@ export async function GetMissingCardsForDeck(deckId: string): Promise<gui.Missin
 }
 
 export async function GetMissingCardsForSet(setCode: string): Promise<gui.MissingCardsForSetResponse> {
-  return collection.getMissingCardsForSet(setCode);
+  const missingCards = await collection.getMissingCardsForSet(setCode);
+  // getMissingCardsForSet returns CollectionCard[], we need to convert to MissingCardsForSetResponse
+  return {
+    setCode,
+    setName: setCode,
+    totalMissing: missingCards.length,
+    uniqueMissing: missingCards.length,
+    missingCards,
+    byRarity: {},
+    completionPercentage: 0,
+    completionPct: 0,
+    convertValues: () => ({}),
+  } as unknown as gui.MissingCardsForSetResponse;
 }
 
 // ============================================================================
@@ -400,12 +438,26 @@ export async function GetCurrentAccount(): Promise<models.Account> {
 
 export async function GetMetaDashboard(format: string): Promise<gui.MetaDashboardResponse> {
   const archetypes = await meta.getMetaArchetypes(format);
-  return { archetypes, format } as gui.MetaDashboardResponse;
+  return {
+    archetypes: archetypes as unknown as gui.ArchetypeInfo[],
+    format,
+    totalArchetypes: archetypes.length,
+    lastUpdated: new Date().toISOString(),
+    sources: [],
+    convertValues: () => ({}),
+  } as gui.MetaDashboardResponse;
 }
 
 export async function RefreshMetaData(format: string): Promise<gui.MetaDashboardResponse> {
   const archetypes = await meta.getMetaArchetypes(format);
-  return { archetypes, format } as gui.MetaDashboardResponse;
+  return {
+    archetypes: archetypes as unknown as gui.ArchetypeInfo[],
+    format,
+    totalArchetypes: archetypes.length,
+    lastUpdated: new Date().toISOString(),
+    sources: [],
+    convertValues: () => ({}),
+  } as gui.MetaDashboardResponse;
 }
 
 export async function GetTierArchetypes(format: string, tier: number): Promise<gui.ArchetypeInfo[]> {
@@ -496,7 +548,7 @@ export async function ExportToJSON(): Promise<void> {
 
 export async function ExportToCSV(): Promise<void> {
   const data = await matches.exportMatches('csv');
-  downloadTextFile(data as unknown as string, 'mtga-matches.csv');
+  downloadTextFile(String(data), 'mtga-matches.csv');
 }
 
 export async function ImportFromFile(): Promise<void> {
@@ -505,7 +557,20 @@ export async function ImportFromFile(): Promise<void> {
 
 export async function ImportLogFile(): Promise<gui.ImportLogFileResult> {
   console.warn('ImportLogFile requires file picker - use browser file input');
-  return { matchesImported: 0, draftsImported: 0, errors: [] } as gui.ImportLogFileResult;
+  return {
+    fileName: '',
+    entriesRead: 0,
+    matchesStored: 0,
+    gamesStored: 0,
+    draftsStored: 0,
+    picksStored: 0,
+    collectionsStored: 0,
+    inventoriesStored: 0,
+    questsStored: 0,
+    decksStored: 0,
+    ranksStored: 0,
+    errors: [],
+  } as unknown as gui.ImportLogFileResult;
 }
 
 export async function ClearAllData(): Promise<void> {
@@ -517,7 +582,17 @@ export async function ClearAllData(): Promise<void> {
 // ============================================================================
 
 export async function GetReplayStatus(): Promise<gui.ReplayStatus> {
-  return { isActive: false, isPaused: false, progress: 0 } as gui.ReplayStatus;
+  return {
+    isActive: false,
+    isPaused: false,
+    currentEntry: 0,
+    totalEntries: 0,
+    percentComplete: 0,
+    elapsed: 0,
+    estimatedRemaining: 0,
+    speed: 0,
+    filter: '',
+  } as unknown as gui.ReplayStatus;
 }
 
 export async function StartReplayWithFileDialog(
@@ -541,7 +616,24 @@ export async function StopReplay(): Promise<void> {
 }
 
 export async function GetLogReplayProgress(): Promise<gui.LogReplayProgress> {
-  return { current: 0, total: 0, percentage: 0 } as gui.LogReplayProgress;
+  return {
+    totalFiles: 0,
+    processedFiles: 0,
+    currentFile: '',
+    totalEntries: 0,
+    processedEntries: 0,
+    matchesFound: 0,
+    draftsFound: 0,
+    collectionsFound: 0,
+    questsFound: 0,
+    inventoriesFound: 0,
+    percentComplete: 0,
+    matchesImported: 0,
+    decksImported: 0,
+    questsImported: 0,
+    ranksImported: 0,
+    errors: [],
+  } as unknown as gui.LogReplayProgress;
 }
 
 export async function TriggerReplayLogs(_forceRefresh: boolean): Promise<void> {
@@ -630,4 +722,47 @@ function downloadTextFile(content: string, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// Additional Missing Exports
+// ============================================================================
+
+export async function SearchCardsWithCollection(
+  query: string,
+  sets?: string[],
+  limit?: number,
+  _collectionOnly?: boolean
+): Promise<cards.CardWithCollection[]> {
+  return cards.searchCardsWithCollection(query, sets, limit);
+}
+
+export async function ResetDraftPerformanceMetrics(): Promise<void> {
+  // Not implemented in REST API - stats are computed on demand
+  console.warn('ResetDraftPerformanceMetrics: Not implemented in REST API');
+}
+
+export async function RecalculateAllDraftGrades(_setCode?: string, _format?: string): Promise<number> {
+  // Not implemented in REST API
+  console.warn('RecalculateAllDraftGrades: Not implemented in REST API');
+  return 0;
+}
+
+export async function ClearDatasetCache(): Promise<void> {
+  // Not implemented in REST API
+  console.warn('ClearDatasetCache: Not implemented in REST API');
+}
+
+export async function GetDatasetSource(_setCode?: string, _format?: string): Promise<string> {
+  // Not implemented in REST API - return default
+  return '17lands';
+}
+
+export async function ExportDeckToFile(deckId: string, format: string = 'txt'): Promise<void> {
+  const response = await decks.exportDeck(deckId, { format });
+  downloadTextFile(response.content, response.filename || `deck.${format}`);
+}
+
+export async function ValidateDeckWithDialog(deckId: string): Promise<boolean> {
+  return decks.validateDraftDeck(deckId);
 }

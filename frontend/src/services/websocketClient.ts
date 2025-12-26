@@ -248,7 +248,7 @@ export function EventsOff(eventType: string, ...additionalEventTypes: string[]):
  *
  * This can be used for testing or local event dispatch.
  */
-export function EventsEmit(eventType: string, data: unknown): void {
+export function EventsEmit(eventType: string, data?: unknown): void {
   dispatchEvent(eventType, data);
 }
 
@@ -281,4 +281,13 @@ export function getListenerCount(eventType: string): number {
  */
 export function getRegisteredEventTypes(): string[] {
   return Array.from(eventListeners.keys());
+}
+
+/**
+ * Reload the application.
+ * In browser mode, this reloads the page.
+ * This replaces Wails WindowReloadApp.
+ */
+export function WindowReloadApp(): void {
+  window.location.reload();
 }

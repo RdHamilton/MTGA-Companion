@@ -4,6 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
+import { gui, insights } from '@/types/models';
 
 /**
  * Archetype info.
@@ -54,4 +55,34 @@ export async function identifyArchetype(
     cardIds,
     format,
   });
+}
+
+/**
+ * Get tier archetypes for a format.
+ */
+export async function getTierArchetypes(format: string, tier: number): Promise<gui.ArchetypeInfo[]> {
+  const params = new URLSearchParams({ format, tier: tier.toString() });
+  return get<gui.ArchetypeInfo[]>(`/meta/archetypes/tier?${params.toString()}`);
+}
+
+/**
+ * Get archetype cards.
+ */
+export async function getArchetypeCards(
+  format: string,
+  archetypeName: string
+): Promise<insights.ArchetypeCards> {
+  const params = new URLSearchParams({ format, archetype: archetypeName });
+  return get<insights.ArchetypeCards>(`/meta/archetypes/cards?${params.toString()}`);
+}
+
+/**
+ * Get format insights.
+ */
+export async function getFormatInsights(
+  format: string,
+  setCode: string
+): Promise<insights.FormatInsights> {
+  const params = new URLSearchParams({ format, setCode });
+  return get<insights.FormatInsights>(`/meta/insights?${params.toString()}`);
 }

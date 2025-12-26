@@ -128,6 +128,29 @@ export async function getMatchupMatrix(
 }
 
 /**
+ * Get performance metrics with optional filters.
+ */
+export async function getPerformanceMetrics(
+  filter: StatsFilterRequest = {}
+): Promise<PerformanceMetrics> {
+  return post<PerformanceMetrics>('/matches/performance', filter);
+}
+
+/**
+ * Get rank progression for a format.
+ */
+export async function getRankProgression(format: string): Promise<models.RankProgression> {
+  return get<models.RankProgression>(`/matches/rank-progression/${encodeURIComponent(format)}`);
+}
+
+/**
+ * Export matches in specified format.
+ */
+export async function exportMatches(format: 'json' | 'csv'): Promise<unknown> {
+  return get(`/matches/export?format=${format}`);
+}
+
+/**
  * Helper to convert a time value to a date string (YYYY-MM-DD).
  * Handles both Date objects and time.Time (which serializes to ISO string).
  */

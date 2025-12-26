@@ -71,3 +71,17 @@ export async function getCollectionBySet(setCode: string): Promise<CollectionCar
 export async function getCollectionByRarity(rarity: string): Promise<CollectionCard[]> {
   return getCollection({ rarity });
 }
+
+/**
+ * Get missing cards analysis for a set.
+ */
+export async function getMissingCards(setCode: string): Promise<models.MissingCardsAnalysis> {
+  return get<models.MissingCardsAnalysis>(`/collection/sets/${setCode}/missing-analysis`);
+}
+
+/**
+ * Get missing cards for a deck.
+ */
+export async function getMissingCardsForDeck(deckId: string): Promise<gui.MissingCardsForDeckResponse> {
+  return get<gui.MissingCardsForDeckResponse>(`/collection/decks/${deckId}/missing`);
+}

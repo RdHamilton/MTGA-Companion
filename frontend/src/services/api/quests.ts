@@ -44,3 +44,14 @@ export async function getDailyWins(): Promise<{ wins: number; target: number }> 
 export async function getWeeklyWins(): Promise<{ wins: number; target: number }> {
   return get<{ wins: number; target: number }>('/quests/wins/weekly');
 }
+
+/**
+ * Get quest stats for a date range.
+ */
+export async function getQuestStats(
+  startDate: string,
+  endDate: string
+): Promise<models.QuestStats> {
+  const params = new URLSearchParams({ startDate, endDate });
+  return get<models.QuestStats>(`/quests/stats?${params.toString()}`);
+}

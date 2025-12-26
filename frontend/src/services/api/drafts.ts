@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models, gui, grading, metrics, insights } from '@/types/models';
+import { models, gui, grading, metrics, insights, pickquality, prediction } from '@/types/models';
 
 // Re-export types for convenience
 export type DraftSession = models.DraftSession;
@@ -158,4 +158,129 @@ export async function getActiveDraftSessions(): Promise<DraftSession[]> {
  */
 export async function getCompletedDraftSessions(): Promise<DraftSession[]> {
   return getDraftSessions({ status: 'completed' });
+}
+
+/**
+ * Get deck metrics for a draft session.
+ */
+export async function getDraftDeckMetrics(sessionId: string): Promise<models.DeckMetrics> {
+  return get<models.DeckMetrics>(`/drafts/${sessionId}/deck-metrics`);
+}
+
+/**
+ * Get draft performance metrics.
+ */
+export async function getDraftPerformanceMetrics(): Promise<DraftStats> {
+  return get<DraftStats>('/drafts/performance-metrics');
+}
+
+/**
+ * Analyze pick quality for a session.
+ */
+export async function analyzeSessionPickQuality(sessionId: string): Promise<void> {
+  return post(`/drafts/${sessionId}/analyze-picks`);
+}
+
+/**
+ * Get pick alternatives for a specific pick.
+ */
+export async function getPickAlternatives(
+  sessionId: string,
+  packNumber: number,
+  pickNumber: number
+): Promise<pickquality.PickQuality> {
+  return get<pickquality.PickQuality>(
+    `/drafts/${sessionId}/picks/${packNumber}/${pickNumber}/alternatives`
+  );
+}
+
+/**
+ * Get draft grade for a session.
+ */
+export async function getDraftGrade(sessionId: string): Promise<DraftGrade> {
+  return get<DraftGrade>(`/drafts/${sessionId}/grade`);
+}
+
+/**
+ * Calculate draft grade for a session.
+ */
+export async function calculateDraftGrade(sessionId: string): Promise<DraftGrade> {
+  return post<DraftGrade>(`/drafts/${sessionId}/calculate-grade`);
+}
+
+/**
+ * Get current pack with recommendation.
+ */
+export async function getCurrentPackWithRecommendation(
+  sessionId: string
+): Promise<gui.CurrentPackResponse> {
+  return get<gui.CurrentPackResponse>(`/drafts/${sessionId}/current-pack`);
+}
+
+/**
+ * Get win rate prediction for a draft.
+ */
+export async function getDraftWinRatePrediction(
+  sessionId: string
+): Promise<prediction.DeckPrediction> {
+  return get<prediction.DeckPrediction>(`/drafts/${sessionId}/win-prediction`);
+}
+
+/**
+ * Get recommendations for a draft.
+ */
+export async function getRecommendations(
+  request: gui.GetRecommendationsRequest
+): Promise<gui.GetRecommendationsResponse> {
+  return post<gui.GetRecommendationsResponse>('/drafts/recommendations', request);
+}
+
+/**
+ * Record a recommendation.
+ */
+export async function recordRecommendation(
+  request: gui.RecordRecommendationRequest
+): Promise<gui.RecordRecommendationResponse> {
+  return post<gui.RecordRecommendationResponse>('/drafts/recommendations/record', request);
+}
+
+/**
+ * Record a recommendation action.
+ */
+export async function recordRecommendationAction(request: gui.RecordActionRequest): Promise<void> {
+  return post('/drafts/recommendations/action', request);
+}
+
+/**
+ * Record a recommendation outcome.
+ */
+export async function recordRecommendationOutcome(
+  request: gui.RecordOutcomeRequest
+): Promise<void> {
+  return post('/drafts/recommendations/outcome', request);
+}
+
+/**
+ * Get recommendation stats.
+ */
+export async function getRecommendationStats(): Promise<gui.RecommendationStatsResponse> {
+  return get<gui.RecommendationStatsResponse>('/drafts/recommendations/stats');
+}
+
+/**
+ * Explain a recommendation.
+ */
+export async function explainRecommendation(
+  request: gui.ExplainRecommendationRequest
+): Promise<gui.ExplainRecommendationResponse> {
+  return post<gui.ExplainRecommendationResponse>('/drafts/recommendations/explain', request);
+}
+
+/**
+ * Classify draft pool archetype.
+ */
+export async function classifyDraftPoolArchetype(
+  sessionId: string
+): Promise<gui.ArchetypeClassificationResult> {
+  return get<gui.ArchetypeClassificationResult>(`/drafts/${sessionId}/classify-archetype`);
 }
