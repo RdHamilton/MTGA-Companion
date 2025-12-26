@@ -22,8 +22,10 @@ import (
 )
 
 var (
-	port   = flag.Int("port", 8080, "API server port")
-	dbPath = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/data.db)")
+	port        = flag.Int("port", 8080, "API server port")
+	dbPath      = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/data.db)")
+	openBrowser = flag.Bool("open-browser", false, "Open browser to frontend on startup")
+	frontendURL = flag.String("frontend-url", "http://localhost:3000", "Frontend URL to open in browser")
 )
 
 func main() {
@@ -107,7 +109,9 @@ func main() {
 
 	// Create API server
 	apiConfig := &api.Config{
-		Port: *port,
+		Port:        *port,
+		OpenBrowser: *openBrowser,
+		FrontendURL: *frontendURL,
 	}
 	server := api.NewServer(apiConfig, services, facades)
 
