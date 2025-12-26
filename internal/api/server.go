@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -127,8 +128,30 @@ func (s *Server) setupMiddleware() {
 		MaxAge:           300,
 	}))
 
-	// Content-Type enforcement for POST/PUT/PATCH
-	s.router.Use(middleware.AllowContentType("application/json"))
+	// Content-Type enforcement for POST/PUT/PATCH only (not GET/DELETE/OPTIONS)
+	s.router.Use(s.jsonContentTypeMiddleware)
+}
+
+// jsonContentTypeMiddleware enforces application/json content-type for requests with bodies.
+func (s *Server) jsonContentTypeMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only check content-type for methods that typically have request bodies
+		if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
+			// Skip if there's no content
+			if r.ContentLength == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Check content-type header
+			contentType := r.Header.Get("Content-Type")
+			if contentType == "" || (contentType != "application/json" && !strings.HasPrefix(contentType, "application/json;")) {
+				http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Start starts the API server in a goroutine.

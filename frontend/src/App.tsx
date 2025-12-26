@@ -16,7 +16,7 @@ import Collection from './pages/Collection';
 import Meta from './pages/Meta';
 import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
-import { EventsOn } from '../wailsjs/runtime/runtime';
+import { EventsOn } from './services/adapter';
 import { updateReplayState } from './utils/replayState';
 import { gui } from '../wailsjs/go/models';
 import './App.css';

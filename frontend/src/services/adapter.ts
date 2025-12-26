@@ -327,7 +327,8 @@ export const systemAdapter = {
  * Subscribe to an event.
  * Uses WebSocket in REST mode, Wails EventsOn otherwise.
  */
-export function EventsOn(eventName: string, callback: (...data: unknown[]) => void): () => void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function EventsOn(eventName: string, callback: (...data: any[]) => void): () => void {
   if (useRestApi) {
     return WsEventsOn(eventName, callback);
   }
@@ -366,5 +367,146 @@ export const apiAdapter = {
   initialize: initializeServices,
   cleanup: cleanupServices,
 };
+
+// ============================================================================
+// REST API Client Factory
+// ============================================================================
+
+/**
+ * Create a REST API client that maps Wails method names to REST API calls.
+ * This is used by the Go App polyfill to redirect window.go.main.App calls.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createRestApiClient(): Record<string, (...args: any[]) => Promise<any>> {
+  return {
+    // Match methods
+    GetMatches: (filter: models.StatsFilter) => matchesAdapter.getMatches(filter),
+    GetStats: (filter: models.StatsFilter) => matchesAdapter.getStats(filter),
+    GetSupportedFormats: () => matchesAdapter.getFormats(),
+    GetMatchGames: (matchId: string) => matchesAdapter.getMatchGames(matchId),
+
+    // Draft methods
+    GetActiveDraftSessions: () => draftsAdapter.getActiveDraftSessions(),
+    GetCompletedDraftSessions: () => draftsAdapter.getCompletedDraftSessions(),
+    GetDraftSession: (sessionId: string) => draftsAdapter.getDraftSession(sessionId),
+    GetDraftPicks: (sessionId: string) => draftsAdapter.getDraftPicks(sessionId),
+    GetDraftPacks: (sessionId: string) => api.drafts.getDraftPool(sessionId),
+
+    // Deck methods
+    ListDecks: () => decksAdapter.getDecks(),
+    GetDecks: () => decksAdapter.getDecks(),
+    GetDeck: (deckId: string) => decksAdapter.getDeck(deckId),
+    CreateDeck: (name: string, format: string, source: string, draftEventId?: string) =>
+      api.decks.createDeck({ name, format, source, draft_event_id: draftEventId }),
+    DeleteDeck: (deckId: string) => decksAdapter.deleteDeck(deckId),
+    ImportDeck: (req: gui.ImportDeckRequest) => decksAdapter.importDeck(req),
+    ExportDeck: (req: gui.ExportDeckRequest) => decksAdapter.exportDeck(req),
+    SuggestDecks: (draftEventId: string) => decksAdapter.suggestDecks(draftEventId),
+
+    // Collection methods
+    GetCollection: (filter?: gui.CollectionFilter) => collectionAdapter.getCollection(filter),
+    GetCollectionStats: () => collectionAdapter.getCollectionStats(),
+    GetSetCompletion: () => collectionAdapter.getSetCompletion(),
+
+    // System methods
+    GetConnectionStatus: () => systemAdapter.getConnectionStatus(),
+
+    // Card methods (use REST API directly)
+    GetSetCards: async (setCode: string) => {
+      return api.cards.getSetCards(setCode);
+    },
+    GetCardByArenaID: async (arenaId: number) => {
+      return api.cards.getCardByArenaId(arenaId);
+    },
+    GetAllSetInfo: async () => {
+      return api.cards.getAllSetInfo();
+    },
+    GetCardRatings: async (setCode: string, draftFormat: string) => {
+      return api.cards.getCardRatings(setCode, draftFormat);
+    },
+    SearchCards: async (query: string) => {
+      return api.cards.searchCards({ query });
+    },
+
+    // Quest methods (use REST API directly)
+    GetActiveQuests: async () => {
+      const response = await api.quests.getActiveQuests();
+      return response;
+    },
+    GetQuestHistory: async (startDate?: string, endDate?: string, limit?: number) => {
+      const response = await api.quests.getQuestHistory(startDate, endDate, limit);
+      return response;
+    },
+    GetCurrentAccount: async () => {
+      // Return a default account since this isn't implemented yet
+      return { displayName: 'Player', accountID: '' };
+    },
+
+    // Stats methods
+    GetTrendAnalysis: async (startDate: Date, endDate: Date, periodType: string, formats: string[]) => {
+      return api.matches.getTrendAnalysis({
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        period_type: periodType,
+        formats,
+      });
+    },
+    GetStatsByDeck: async (_filter: models.StatsFilter) => {
+      // The REST API returns aggregate stats, not by-deck - return empty for now
+      return {};
+    },
+    GetStatsByFormat: async (filter: models.StatsFilter) => {
+      return api.matches.getFormatDistribution(api.matches.statsFilterToRequest(filter));
+    },
+    GetRankProgressionTimeline: async (format: string, _startDate?: Date, _endDate?: Date, _periodType?: string) => {
+      // Not implemented in REST API yet
+      return { timeline: [], format };
+    },
+
+    // Meta methods
+    GetMetaDashboard: async (format: string) => {
+      const response = await api.meta.getMetaArchetypes(format);
+      return { archetypes: response, format };
+    },
+    RefreshMetaData: async (format: string) => {
+      const response = await api.meta.getMetaArchetypes(format);
+      return { archetypes: response, format };
+    },
+
+    // Draft analysis methods (stubs - not fully implemented in REST API)
+    AnalyzeSessionPickQuality: async () => Promise.resolve(),
+    GetPickAlternatives: async () => null,
+    GetDraftGrade: async () => null,
+    CalculateDraftGrade: async () => null,
+    GetCurrentPackWithRecommendation: async () => null,
+
+    // Replay methods (stubs - handled differently in REST API mode)
+    PauseReplay: async () => ({ status: 'ok' }),
+    ResumeReplay: async () => ({ status: 'ok' }),
+    StopReplay: async () => ({ status: 'ok' }),
+    GetReplayStatus: async () => ({ isActive: false, isPaused: false }),
+
+    // Settings methods
+    GetAllSettings: async () => {
+      const response = await api.settings.getSettings();
+      return response;
+    },
+    SaveAllSettings: async (settings: gui.AppSettings) => {
+      await api.settings.updateSettings(settings);
+    },
+    GetSetting: async (key: string) => {
+      const response = await api.settings.getSetting(key);
+      return response;
+    },
+    SetSetting: async (key: string, value: unknown) => {
+      await api.settings.updateSetting(key, value);
+    },
+
+    // Format methods
+    GetFormats: async () => {
+      return matchesAdapter.getFormats();
+    },
+  };
+}
 
 export default apiAdapter;
