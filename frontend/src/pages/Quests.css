@@ -311,6 +311,27 @@ tr.quest-rerolled td {
   color: #888888;
 }
 
+/* Filter input */
+.filter-input {
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  min-width: 150px;
+  transition: border-color 0.2s;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.filter-input::placeholder {
+  color: #888888;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .quest-stats-summary {

@@ -21,6 +21,10 @@ const Quests = () => {
   const [customEndDate, setCustomEndDate] = useState('');
   const [historyLimit] = useState(50);
 
+  // Table filters
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'incomplete' | 'rerolled'>('all');
+  const [typeFilter, setTypeFilter] = useState('');
+
   // Pagination for history
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -217,9 +221,32 @@ const Quests = () => {
     return formatted || 'Quest';
   };
 
-  // Paginate history
-  const totalPages = Math.ceil(questHistory.length / pageSize);
-  const paginatedHistory = questHistory.slice((page - 1) * pageSize, page * pageSize);
+  // Filter history
+  const filteredHistory = questHistory.filter((quest) => {
+    // Status filter
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'completed' && !quest.completed) return false;
+      if (statusFilter === 'incomplete' && (quest.completed || quest.rerolled)) return false;
+      if (statusFilter === 'rerolled' && !quest.rerolled) return false;
+    }
+
+    // Type filter (search in quest type)
+    if (typeFilter) {
+      const formattedType = formatQuestType(quest.quest_type).toLowerCase();
+      if (!formattedType.includes(typeFilter.toLowerCase())) return false;
+    }
+
+    return true;
+  });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, typeFilter]);
+
+  // Paginate filtered history
+  const totalPages = Math.ceil(filteredHistory.length / pageSize);
+  const paginatedHistory = filteredHistory.slice((page - 1) * pageSize, page * pageSize);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -416,6 +443,30 @@ const Quests = () => {
                     </div>
                   </>
                 )}
+
+                <div className="filter-group">
+                  <label className="filter-label">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'completed' | 'incomplete' | 'rerolled')}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="incomplete">Incomplete</option>
+                    <option value="rerolled">Rerolled</option>
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Quest Type</label>
+                  <input
+                    type="text"
+                    placeholder="Search quests..."
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="filter-input"
+                  />
+                </div>
               </div>
             </div>
 
@@ -426,6 +477,13 @@ const Quests = () => {
                 message="No completed quests found for the selected time period."
                 helpText="Try adjusting the date range or complete some quests to see your history here."
               />
+            ) : filteredHistory.length === 0 ? (
+              <EmptyState
+                icon="🔍"
+                title="No matching quests"
+                message="No quests match your current filters."
+                helpText="Try adjusting your status or type filters to see more results."
+              />
             ) : (
               <>
                 <div className="quest-history-table-container">
@@ -433,32 +491,32 @@ const Quests = () => {
                     <thead>
                       <tr>
                         <th>
-                          <Tooltip content="Quest type or description">
+                          <Tooltip content="Quest type or description" position="bottom">
                             <span>Type</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Quest goal and progress">
+                          <Tooltip content="Quest goal and progress" position="bottom">
                             <span>Progress</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Quest completion status">
+                          <Tooltip content="Quest completion status" position="bottom">
                             <span>Status</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="When the quest was assigned">
+                          <Tooltip content="When the quest was assigned" position="bottom">
                             <span>Assigned</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="When the quest was completed">
+                          <Tooltip content="When the quest was completed" position="bottom">
                             <span>Completed</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Time taken to complete">
+                          <Tooltip content="Time taken to complete" position="bottom">
                             <span>Duration</span>
                           </Tooltip>
                         </th>
