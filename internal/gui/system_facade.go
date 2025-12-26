@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -39,8 +37,8 @@ type SystemFacade struct {
 func NewSystemFacade(services *Services) *SystemFacade {
 	dispatcher := events.NewEventDispatcher()
 
-	// Register Wails observer for frontend events
-	dispatcher.Register(events.NewWailsObserver())
+	// Note: WebSocketObserver is registered by the API server when running in hybrid mode.
+	// The LoggingObserver can be added for debugging if needed.
 
 	return &SystemFacade{
 		services:        services,
@@ -740,10 +738,11 @@ func (s *SystemFacade) TriggerReplayLogs(ctx context.Context, clearData bool) er
 	return nil
 }
 
-// StartReplayWithFileDialog opens a file dialog and starts replay with the selected file.
+// StartReplayWithFiles starts replay with the specified file paths.
 // Only works in daemon mode.
-func (s *SystemFacade) StartReplayWithFileDialog(ctx context.Context, speed float64, filterType string, pauseOnDraft bool) error {
-	log.Printf("[StartReplayWithFileDialog] Called with speed=%.1fx, filter=%s, pauseOnDraft=%v", speed, filterType, pauseOnDraft)
+func (s *SystemFacade) StartReplayWithFiles(ctx context.Context, filePaths []string, speed float64, filterType string, pauseOnDraft bool) error {
+	log.Printf("[StartReplayWithFiles] Called with %d files, speed=%.1fx, filter=%s, pauseOnDraft=%v",
+		len(filePaths), speed, filterType, pauseOnDraft)
 
 	// Check if connected to daemon
 	s.ipcClientMu.Lock()
@@ -754,24 +753,12 @@ func (s *SystemFacade) StartReplayWithFileDialog(ctx context.Context, speed floa
 		return &AppError{Message: "Replay feature requires daemon mode. Please start the daemon service."}
 	}
 
-	// Open file dialog to select multiple log files
-	filePaths, err := wailsruntime.OpenMultipleFilesDialog(ctx, wailsruntime.OpenDialogOptions{
-		Title: "Select MTGA Log File(s) for Replay",
-		Filters: []wailsruntime.FileFilter{
-			{DisplayName: "MTGA Log Files (*.log)", Pattern: "*.log"},
-			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
-		},
-	})
-	if err != nil {
-		return &AppError{Message: fmt.Sprintf("Failed to open file dialog: %v", err)}
-	}
-
-	// User cancelled or selected no files
+	// No files provided
 	if len(filePaths) == 0 {
-		return nil
+		return &AppError{Message: "No file paths provided"}
 	}
 
-	log.Printf("[StartReplayWithFileDialog] Selected %d file(s)", len(filePaths))
+	log.Printf("[StartReplayWithFiles] Processing %d file(s)", len(filePaths))
 
 	// Send start_replay command via IPC
 	message := map[string]interface{}{
@@ -782,17 +769,17 @@ func (s *SystemFacade) StartReplayWithFileDialog(ctx context.Context, speed floa
 		"pause_on_draft": pauseOnDraft,
 	}
 
-	log.Printf("[StartReplayWithFileDialog] Sending IPC message: %+v", message)
+	log.Printf("[StartReplayWithFiles] Sending IPC message: %+v", message)
 	s.ipcClientMu.Lock()
-	err = s.services.IPCClient.Send(message)
+	err := s.services.IPCClient.Send(message)
 	s.ipcClientMu.Unlock()
 
 	if err != nil {
-		log.Printf("[StartReplayWithFileDialog] ERROR: Failed to send: %v", err)
+		log.Printf("[StartReplayWithFiles] ERROR: Failed to send: %v", err)
 		return &AppError{Message: fmt.Sprintf("Failed to send start replay command to daemon: %v", err)}
 	}
 
-	log.Printf("[StartReplayWithFileDialog] Successfully sent start_replay command to daemon")
+	log.Printf("[StartReplayWithFiles] Successfully sent start_replay command to daemon")
 	return nil
 }
 
