@@ -19,7 +19,6 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "wailsjs/*": ["./wailsjs/*"],
       "@/*": ["./src/*"]
     },
 
@@ -30,5 +29,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "wailsjs"]
+  "include": ["src"]
 }

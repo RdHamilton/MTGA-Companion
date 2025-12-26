@@ -6,7 +6,7 @@ import Settings from './Settings';
 Element.prototype.scrollIntoView = vi.fn();
 
 // Mock all Wails functions
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   GetConnectionStatus: vi.fn(),
   SetDaemonPort: vi.fn(),
   ReconnectToDaemon: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock('../../wailsjs/go/main/App', () => ({
   GetAppVersion: vi.fn(),
 }));
 
-vi.mock('../../wailsjs/runtime/runtime', () => ({
+vi.mock('@/services/websocketClient', () => ({
   EventsOn: vi.fn(() => () => {}),
   WindowReloadApp: vi.fn(),
 }));
@@ -74,7 +74,7 @@ import {
   GetAllSettings,
   SaveAllSettings,
   GetAppVersion,
-} from '../../wailsjs/go/main/App';
+} from '@/services/api/legacy';
 import { showToast } from '../components/ToastContainer';
 
 // Default mock connection status

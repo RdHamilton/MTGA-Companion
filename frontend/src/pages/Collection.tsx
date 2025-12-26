@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetCollection, GetAllSetInfo } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { GetCollection, GetAllSetInfo } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import SetCompletionPanel from '../components/SetCompletion';
 import './Collection.css';
 

@@ -8,8 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Resolve wailsjs from the root frontend directory
-      wailsjs: path.resolve(__dirname, './wailsjs'),
     },
   },
   test: {

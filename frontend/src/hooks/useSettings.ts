@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetAllSettings, SaveAllSettings } from '../../wailsjs/go/main/App';
-import type { gui } from '../../wailsjs/go/models';
+import { GetAllSettings, SaveAllSettings } from '@/services/api/legacy';
+import type { gui } from '@/types/models';
 
 interface SettingsState {
   autoRefresh: boolean;

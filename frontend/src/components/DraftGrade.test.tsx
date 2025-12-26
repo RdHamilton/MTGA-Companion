@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import { DraftGrade } from './DraftGrade';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { grading } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { grading } from '@/types/models';
 
 function createMockDraftGrade(overrides: Partial<grading.DraftGrade> = {}): grading.DraftGrade {
   return new grading.DraftGrade({

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetCardRatings, RefreshSetRatings, GetSetCards } from '../../wailsjs/go/main/App';
-import { gui, models } from '../../wailsjs/go/models';
+import { GetCardRatings, RefreshSetRatings, GetSetCards } from '@/services/api/legacy';
+import { gui, models } from '@/types/models';
 import './TierList.css';
 
 type CardRating = gui.CardRatingWithTier;

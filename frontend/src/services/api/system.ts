@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { gui } from 'wailsjs/go/models';
+import { gui } from '@/types/models';
 
 // Re-export types for convenience
 export type ConnectionStatus = gui.ConnectionStatus;

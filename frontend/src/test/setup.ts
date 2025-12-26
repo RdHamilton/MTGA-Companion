@@ -1,16 +1,14 @@
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
-import { mockWailsRuntime, mockEventEmitter } from './mocks/wailsRuntime';
-import { mockWailsApp, resetMocks } from './mocks/wailsApp';
+import { mockWailsRuntime, mockEventEmitter } from './mocks/websocketMock';
+import { mockWailsApp, resetMocks } from './mocks/apiMock';
 
-// Mock Wails runtime globally (multiple paths for different import locations)
-vi.mock('../../wailsjs/runtime/runtime', () => mockWailsRuntime);
-vi.mock('wailsjs/runtime/runtime', () => mockWailsRuntime);
+// Mock WebSocket client globally
+vi.mock('@/services/websocketClient', () => mockWailsRuntime);
 
-// Mock Wails App bindings globally (multiple paths for different import locations)
-vi.mock('../../wailsjs/go/main/App', () => mockWailsApp);
-vi.mock('wailsjs/go/main/App', () => mockWailsApp);
+// Mock API legacy bindings globally
+vi.mock('@/services/api/legacy', () => mockWailsApp);
 
 // Cleanup after each test
 afterEach(() => {

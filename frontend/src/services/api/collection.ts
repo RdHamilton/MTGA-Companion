@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { gui, models } from 'wailsjs/go/models';
+import { gui, models } from '@/types/models';
 
 // Re-export types for convenience
 export type CollectionCard = gui.CollectionCard;

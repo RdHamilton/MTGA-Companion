@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { GetMatchGames } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { GetMatchGames } from '@/services/api/legacy';
+import { models } from '@/types/models';
 import LoadingSpinner from './LoadingSpinner';
 import './MatchDetailsModal.css';
 

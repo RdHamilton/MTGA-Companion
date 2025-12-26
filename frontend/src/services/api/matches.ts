@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models } from 'wailsjs/go/models';
+import { models } from '@/types/models';
 
 // Re-export types for convenience
 export type Match = models.Match;

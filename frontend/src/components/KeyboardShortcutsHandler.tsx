@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { EventsEmit } from '../../wailsjs/runtime/runtime';
+import { EventsEmit } from '@/services/websocketClient';
 
 // Detect platform (macOS uses metaKey/Cmd, others use ctrlKey)
 const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;

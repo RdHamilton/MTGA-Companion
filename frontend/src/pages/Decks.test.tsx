@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Decks from './Decks';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { gui } from '@/types/models';
 
 // Mock useNavigate
 const mockNavigate = vi.fn();

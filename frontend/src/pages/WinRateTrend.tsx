@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { GetTrendAnalysis } from '../../wailsjs/go/main/App';
-import { storage } from '../../wailsjs/go/models';
+import { GetTrendAnalysis } from '@/services/api/legacy';
+import { storage } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';

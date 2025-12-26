@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TriggerReplayLogs } from '../../wailsjs/go/main/App';
-import { EventsOn, WindowReloadApp } from '../../wailsjs/runtime/runtime';
+import { TriggerReplayLogs } from '@/services/api/legacy';
+import { EventsOn, WindowReloadApp } from '@/services/websocketClient';
 import { showToast } from '../components/ToastContainer';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 export interface UseLogReplayReturn {
   /** Whether to clear data before replay */

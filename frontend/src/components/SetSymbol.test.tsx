@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import SetSymbol, { clearSetInfoCache } from './SetSymbol';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { gui } from '@/types/models';
 
 // Helper to create mock set info
 function createMockSetInfo(overrides: Partial<gui.SetInfo> = {}): gui.SetInfo {

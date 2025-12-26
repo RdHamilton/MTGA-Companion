@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import DraftStatistics from './DraftStatistics';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { models } from '@/types/models';
 
 function createMockDeckMetrics(overrides: Partial<models.DeckMetrics> = {}): models.DeckMetrics {
   return new models.DeckMetrics({

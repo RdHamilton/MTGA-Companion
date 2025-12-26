@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import SuggestDecksModal from './SuggestDecksModal';
 
 // Mock the Wails bindings
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   SuggestDecks: vi.fn(),
   ApplySuggestedDeck: vi.fn(),
   ExportSuggestedDeck: vi.fn(),

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 // Create hoisted mock functions
 const { mockGetCollection, mockGetCollectionStats, mockGetAllSetInfo } = vi.hoisted(() => ({
@@ -11,7 +11,7 @@ const { mockGetCollection, mockGetCollectionStats, mockGetAllSetInfo } = vi.hois
 }));
 
 // Mock the Wails App module
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   GetCollection: mockGetCollection,
   GetCollectionStats: mockGetCollectionStats,
   GetAllSetInfo: mockGetAllSetInfo,

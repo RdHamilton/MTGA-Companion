@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
-import { models, pickquality, grading, gui } from '../../wailsjs/go/models';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
+import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '@/services/api/legacy';
+import { models, pickquality, grading, gui } from '@/types/models';
+import { EventsOn } from '@/services/websocketClient';
 import { getReplayState } from '../App';
 import TierList from '../components/TierList';
 import { DraftGrade } from '../components/DraftGrade';

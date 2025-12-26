@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models, gui, grading, metrics, insights } from 'wailsjs/go/models';
+import { models, gui, grading, metrics, insights } from '@/types/models';
 
 // Re-export types for convenience
 export type DraftSession = models.DraftSession;

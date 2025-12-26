@@ -3,7 +3,7 @@
  * Implements algorithms from Issue #384
  */
 
-import { models } from '../../wailsjs/go/models';
+import { models } from '@/types/models';
 
 export interface TypeSynergy {
     type: string;

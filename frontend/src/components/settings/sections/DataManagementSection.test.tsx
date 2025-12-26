@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DataManagementSection } from './DataManagementSection';
-import { gui } from '../../../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 describe('DataManagementSection', () => {
   const defaultProps = {

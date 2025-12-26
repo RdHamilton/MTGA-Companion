@@ -3,12 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WinRatePrediction } from './WinRatePrediction';
 
 // Mock Wails functions
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   PredictDraftWinRate: vi.fn(),
   GetDraftWinRatePrediction: vi.fn(),
 }));
 
-import { PredictDraftWinRate, GetDraftWinRatePrediction } from '../../wailsjs/go/main/App';
+import { PredictDraftWinRate, GetDraftWinRatePrediction } from '@/services/api/legacy';
 
 const mockPrediction = {
   PredictedWinRate: 0.55,

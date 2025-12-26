@@ -3,11 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import RecommendationCard from './RecommendationCard';
 
 // Mock the Wails API
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   ExplainRecommendation: vi.fn(),
 }));
 
-import { ExplainRecommendation } from '../../wailsjs/go/main/App';
+import { ExplainRecommendation } from '@/services/api/legacy';
 
 const mockRecommendation = {
   cardID: 12345,

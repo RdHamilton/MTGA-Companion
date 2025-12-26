@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PredictDraftWinRate, GetDraftWinRatePrediction } from '../../wailsjs/go/main/App';
-import { prediction } from '../../wailsjs/go/models';
+import { PredictDraftWinRate, GetDraftWinRatePrediction } from '@/services/api/legacy';
+import { prediction } from '@/types/models';
 import './WinRatePrediction.css';
 
 interface WinRatePredictionProps {

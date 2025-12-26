@@ -3,8 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckList from './DeckList';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models, gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { models, gui } from '@/types/models';
 
 // Helper function to create mock deck
 function createMockDeck(overrides: Partial<models.Deck> = {}): models.Deck {

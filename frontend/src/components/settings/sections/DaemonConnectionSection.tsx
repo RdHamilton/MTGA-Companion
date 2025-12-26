@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoadingButton from '../../LoadingButton';
 import { SettingItem, SettingSelect } from '../';
-import { gui } from '../../../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 export interface DaemonConnectionSectionProps {
   connectionStatus: gui.ConnectionStatus;

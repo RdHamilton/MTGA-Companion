@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import CurrentPackPicker from './CurrentPackPicker';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { gui } from '@/types/models';
 
 function createMockPackCard(overrides: Partial<gui.PackCardWithRating> = {}): gui.PackCardWithRating {
   return new gui.PackCardWithRating({

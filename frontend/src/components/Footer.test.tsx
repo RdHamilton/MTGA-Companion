@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import Footer from './Footer';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
-import { models } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
+import { models } from '@/types/models';
 
 function createMockStatistics(overrides: Partial<models.Statistics> = {}): models.Statistics {
   return new models.Statistics({

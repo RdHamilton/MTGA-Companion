@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetDraftPerformanceMetrics, ResetDraftPerformanceMetrics } from '../../wailsjs/go/main/App';
-import { metrics } from '../../wailsjs/go/models';
+import { GetDraftPerformanceMetrics, ResetDraftPerformanceMetrics } from '@/services/api/legacy';
+import { metrics } from '@/types/models';
 import './PerformanceMetrics.css';
 
 interface PerformanceMetricsProps {

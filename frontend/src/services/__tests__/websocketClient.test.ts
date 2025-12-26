@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Unmock the websocketClient so we can test the actual implementation
+vi.unmock('@/services/websocketClient');
+
 import {
   configureWebSocket,
   getWebSocketConfig,

@@ -5,7 +5,7 @@ import {
   updateReplayState,
   resetReplayState,
 } from './replayState';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 describe('replayState', () => {
   beforeEach(() => {

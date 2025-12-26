@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { models, gui } from '../../wailsjs/go/models';
+import { models, gui } from '@/types/models';
 import { analyzeSynergies, calculateCardSynergyScore, getSynergyReason } from '../utils/synergy';
 import './CardsToLookFor.css';
 

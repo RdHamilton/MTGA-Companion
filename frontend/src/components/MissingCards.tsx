@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { GetMissingCards } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { GetMissingCards } from '@/services/api/legacy';
+import { models } from '@/types/models';
 import './MissingCards.css';
 
 interface MissingCardsProps {

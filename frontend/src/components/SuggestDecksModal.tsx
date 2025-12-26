@@ -3,8 +3,8 @@ import {
   SuggestDecks,
   ApplySuggestedDeck,
   ExportSuggestedDeck,
-} from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+} from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import DeckSuggestionCard from './DeckSuggestionCard';
 import './SuggestDecksModal.css';
 

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Footer from './Footer';
-import { GetConnectionStatus, ResumeReplay, StopReplay } from '../../wailsjs/go/main/App';
-import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
+import { GetConnectionStatus, ResumeReplay, StopReplay } from '@/services/api/legacy';
+import { EventsOn, EventsOff } from '@/services/websocketClient';
 import { getReplayState, subscribeToReplayState } from '../App';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 import './Layout.css';
 
 interface LayoutProps {

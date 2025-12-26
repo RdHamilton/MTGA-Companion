@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import MatchHistory from './MatchHistory';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
-import { models } from '../../wailsjs/go/models';
+import { models } from '@/types/models';
 
 // Helper function to create mock Match
 function createMockMatch(overrides: Partial<models.Match> = {}): models.Match {

@@ -18,7 +18,7 @@ import Settings from './pages/Settings';
 import KeyboardShortcutsHandler from './components/KeyboardShortcutsHandler';
 import { EventsOn } from './services/adapter';
 import { updateReplayState } from './utils/replayState';
-import { gui } from '../wailsjs/go/models';
+import { gui } from '@/types/models';
 import './App.css';
 
 // Re-export for backward compatibility - these are used by other components

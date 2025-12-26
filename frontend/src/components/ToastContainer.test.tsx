@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import ToastContainer from './ToastContainer';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
 // Mock the getReplayState and subscribeToReplayState functions
 const mockReplayState = {

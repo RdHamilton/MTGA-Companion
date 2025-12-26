@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetDraftDeckMetrics } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { GetDraftDeckMetrics } from '@/services/api/legacy';
+import { models } from '@/types/models';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import './DraftStatistics.css';
 

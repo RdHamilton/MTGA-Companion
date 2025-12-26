@@ -4,7 +4,7 @@
  */
 
 import { get } from '../apiClient';
-import { models } from 'wailsjs/go/models';
+import { models } from '@/types/models';
 
 /**
  * Get active quests.

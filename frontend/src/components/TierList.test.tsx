@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import TierList from './TierList';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { gui } from '@/types/models';
 
 // Helper function to create mock card rating
 function createMockCardRating(overrides: Partial<gui.CardRatingWithTier> = {}): gui.CardRatingWithTier {

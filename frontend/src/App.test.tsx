@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, act, render } from '@testing-library/react';
 import App from './App';
-import { mockWailsApp } from './test/mocks/wailsApp';
-import { mockEventEmitter } from './test/mocks/wailsRuntime';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { resetReplayState, getReplayState } from './utils/replayState';
-import { gui } from '../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 // Helper to set initial route before rendering App (which has its own Router)
 function renderAppWithRoute(route: string = '/') {

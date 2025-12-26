@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetFormatInsights, GetArchetypeCards } from '../../wailsjs/go/main/App';
-import { insights } from '../../wailsjs/go/models';
+import { GetFormatInsights, GetArchetypeCards } from '@/services/api/legacy';
+import { insights } from '@/types/models';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './FormatInsights.css';
 

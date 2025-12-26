@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListDecks, CreateDeck, DeleteDeck } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { ListDecks, CreateDeck, DeleteDeck } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import './Decks.css';
 
 export default function Decks() {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CalculateDraftGrade, GetDraftGrade } from '../../wailsjs/go/main/App';
-import { grading } from '../../wailsjs/go/models';
+import { CalculateDraftGrade, GetDraftGrade } from '@/services/api/legacy';
+import { grading } from '@/types/models';
 import './DraftGrade.css';
 
 interface DraftGradeProps {
