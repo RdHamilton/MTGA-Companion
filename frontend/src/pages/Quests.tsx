@@ -433,32 +433,32 @@ const Quests = () => {
                     <thead>
                       <tr>
                         <th>
-                          <Tooltip content="Quest type or description">
+                          <Tooltip content="Quest type or description" position="bottom">
                             <span>Type</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Quest goal and progress">
+                          <Tooltip content="Quest goal and progress" position="bottom">
                             <span>Progress</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Quest completion status">
+                          <Tooltip content="Quest completion status" position="bottom">
                             <span>Status</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="When the quest was assigned">
+                          <Tooltip content="When the quest was assigned" position="bottom">
                             <span>Assigned</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="When the quest was completed">
+                          <Tooltip content="When the quest was completed" position="bottom">
                             <span>Completed</span>
                           </Tooltip>
                         </th>
                         <th>
-                          <Tooltip content="Time taken to complete">
+                          <Tooltip content="Time taken to complete" position="bottom">
                             <span>Duration</span>
                           </Tooltip>
                         </th>
