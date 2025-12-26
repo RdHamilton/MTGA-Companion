@@ -360,6 +360,25 @@ describe('Quests', () => {
         expect(screen.getByText('45m')).toBeInTheDocument();
       });
     });
+
+    it('should display REROLLED status badge for rerolled quests', async () => {
+      const history = [
+        createMockQuest({ id: 1, completed: true, completed_at: new Date('2024-01-16T12:00:00').toISOString() }),
+        createMockQuest({ id: 2, completed: false, rerolled: true }),
+        createMockQuest({ id: 3, completed: false, rerolled: false }),
+      ];
+      mockWailsApp.GetActiveQuests.mockResolvedValue([]);
+      mockWailsApp.GetQuestHistory.mockResolvedValue(history);
+      mockWailsApp.GetCurrentAccount.mockResolvedValue(null);
+
+      renderWithProvider(<Quests />);
+
+      await waitFor(() => {
+        expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+      });
+      expect(screen.getByText('REROLLED')).toBeInTheDocument();
+      expect(screen.getByText('INCOMPLETE')).toBeInTheDocument();
+    });
   });
 
   describe('Pagination', () => {

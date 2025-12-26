@@ -289,12 +289,26 @@
   color: #ffff7d;
 }
 
+.status-badge.rerolled {
+  background-color: #3d3d3d;
+  color: #888888;
+}
+
 tr.quest-completed {
   border-left: 3px solid #7dff7d;
 }
 
 tr.quest-incomplete {
   border-left: 3px solid #ffff7d;
+}
+
+tr.quest-rerolled {
+  border-left: 3px solid #666666;
+  opacity: 0.7;
+}
+
+tr.quest-rerolled td {
+  color: #888888;
 }
 
 /* Filter input */

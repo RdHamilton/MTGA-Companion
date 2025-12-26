@@ -525,8 +525,19 @@ const Quests = () => {
                     <tbody>
                       {paginatedHistory.map((quest) => {
                         const progress = calculateProgress(quest);
+                        const getRowClass = () => {
+                          if (quest.rerolled) return 'quest-rerolled';
+                          if (quest.completed) return 'quest-completed';
+                          return 'quest-incomplete';
+                        };
+                        const getStatusBadge = () => {
+                          if (quest.rerolled) return { class: 'rerolled', text: 'REROLLED' };
+                          if (quest.completed) return { class: 'completed', text: 'COMPLETED' };
+                          return { class: 'incomplete', text: 'INCOMPLETE' };
+                        };
+                        const status = getStatusBadge();
                         return (
-                          <tr key={quest.id} className={quest.completed ? 'quest-completed' : 'quest-incomplete'}>
+                          <tr key={quest.id} className={getRowClass()}>
                             <td>{formatQuestType(quest.quest_type)}</td>
                             <td>
                               <div className="progress-cell">
@@ -540,8 +551,8 @@ const Quests = () => {
                               </div>
                             </td>
                             <td>
-                              <span className={`status-badge ${quest.completed ? 'completed' : 'incomplete'}`}>
-                                {quest.completed ? 'COMPLETED' : 'INCOMPLETE'}
+                              <span className={`status-badge ${status.class}`}>
+                                {status.text}
                               </span>
                             </td>
                             <td>{formatDate(quest.assigned_at)}</td>
