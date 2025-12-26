@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -451,4 +452,243 @@ func (e *ExportFacade) ImportLogFile(ctx context.Context) (*ImportLogFileResult,
 		DraftsStored:  result.DraftsStored,
 		PicksStored:   result.DraftPicksStored,
 	}, nil
+}
+
+// REST API friendly methods (no dialogs)
+
+// GetMatchesExportData returns matches data for export without dialog.
+func (e *ExportFacade) GetMatchesExportData(ctx context.Context, filter *models.StatsFilter) ([]*models.Match, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	var statsFilter models.StatsFilter
+	if filter != nil {
+		statsFilter = *filter
+	}
+
+	matches, err := e.services.Storage.GetMatches(ctx, statsFilter)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get matches: %v", err)}
+	}
+
+	return matches, nil
+}
+
+// GetDraftsExportData returns drafts data for export without dialog.
+func (e *ExportFacade) GetDraftsExportData(ctx context.Context, limit int) ([]*models.DraftSession, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	activeSessions, err := e.services.Storage.DraftRepo().GetActiveSessions(ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get active drafts: %v", err)}
+	}
+
+	completedSessions, err := e.services.Storage.DraftRepo().GetCompletedSessions(ctx, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get completed drafts: %v", err)}
+	}
+
+	return append(activeSessions, completedSessions...), nil
+}
+
+// CollectionExportEntry represents a card in the collection for export.
+type CollectionExportEntry struct {
+	CardID   int `json:"cardId"`
+	Quantity int `json:"quantity"`
+}
+
+// GetCollectionExportData returns collection data for export without dialog.
+func (e *ExportFacade) GetCollectionExportData(ctx context.Context) ([]*CollectionExportEntry, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	collectionMap, err := e.services.Storage.CollectionRepo().GetAll(ctx)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get collection: %v", err)}
+	}
+
+	// Convert map to slice
+	collection := make([]*CollectionExportEntry, 0, len(collectionMap))
+	for cardID, quantity := range collectionMap {
+		collection = append(collection, &CollectionExportEntry{
+			CardID:   cardID,
+			Quantity: quantity,
+		})
+	}
+
+	return collection, nil
+}
+
+// DeckExportResult represents the result of exporting a deck.
+type DeckExportResult struct {
+	DeckID   string `json:"deckID"`
+	DeckName string `json:"deckName"`
+	Format   string `json:"format"`
+	Content  string `json:"content"`
+}
+
+// GetDeckExportData returns deck data in the requested format without dialog.
+func (e *ExportFacade) GetDeckExportData(ctx context.Context, deckID, format string) (*DeckExportResult, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	deck, err := e.services.Storage.DeckRepo().GetByID(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck: %v", err)}
+	}
+
+	if deck == nil {
+		return nil, &AppError{Message: "Deck not found"}
+	}
+
+	// Export to requested format
+	var content string
+	switch format {
+	case "mtga", "arena":
+		content = export.ExportToMTGAFormat(deck)
+	case "text":
+		content = export.ExportToTextFormat(deck)
+	case "json":
+		jsonBytes, err := json.MarshalIndent(deck, "", "  ")
+		if err != nil {
+			return nil, &AppError{Message: fmt.Sprintf("Failed to export to JSON: %v", err)}
+		}
+		content = string(jsonBytes)
+	default:
+		content = export.ExportToMTGAFormat(deck)
+	}
+
+	return &DeckExportResult{
+		DeckID:   deckID,
+		DeckName: deck.Name,
+		Format:   format,
+		Content:  content,
+	}, nil
+}
+
+// ImportResult represents the result of an import operation.
+type ImportResult struct {
+	Imported int    `json:"imported"`
+	Skipped  int    `json:"skipped"`
+	Total    int    `json:"total"`
+	Message  string `json:"message"`
+}
+
+// ImportMatchesData imports matches from data without dialog.
+func (e *ExportFacade) ImportMatchesData(ctx context.Context, matches []*models.Match) (*ImportResult, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	imported := 0
+	skipped := 0
+	for _, match := range matches {
+		if err := e.services.Storage.SaveMatch(ctx, match); err != nil {
+			log.Printf("Warning: Failed to import match %s: %v", match.ID, err)
+			skipped++
+			continue
+		}
+		imported++
+	}
+
+	return &ImportResult{
+		Imported: imported,
+		Skipped:  skipped,
+		Total:    len(matches),
+		Message:  fmt.Sprintf("Imported %d/%d matches", imported, len(matches)),
+	}, nil
+}
+
+// ClearAllDataWithoutDialog clears all data without confirmation dialog.
+func (e *ExportFacade) ClearAllDataWithoutDialog(ctx context.Context) error {
+	if e.services == nil || e.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	if err := e.services.Storage.ClearAllMatches(ctx); err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to clear data: %v", err)}
+	}
+
+	log.Println("Successfully cleared all match history")
+	return nil
+}
+
+// ImportLogFileData imports log file from base64 content without dialog.
+func (e *ExportFacade) ImportLogFileData(ctx context.Context, base64Content, fileName string) (*ImportLogFileResult, error) {
+	if e.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Decode base64 content
+	content, err := base64Decode(base64Content)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to decode content: %v", err)}
+	}
+
+	// Create temp file for log reader
+	tmpFile, err := os.CreateTemp("", "mtga-log-*.log")
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to create temp file: %v", err)}
+	}
+	tmpPath := tmpFile.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+
+	if _, err := tmpFile.Write(content); err != nil {
+		_ = tmpFile.Close()
+		return nil, &AppError{Message: fmt.Sprintf("Failed to write temp file: %v", err)}
+	}
+	_ = tmpFile.Close()
+
+	// Read log file
+	reader, err := logreader.NewReader(tmpPath)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to open log file: %v", err)}
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+
+	entries, err := reader.ReadAll()
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to read log file: %v", err)}
+	}
+
+	if len(entries) == 0 {
+		return nil, &AppError{Message: "Log file contains no entries"}
+	}
+
+	// Process entries
+	logProcessor := logprocessor.NewService(e.services.Storage)
+	result, err := logProcessor.ProcessLogEntries(ctx, entries)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to process log entries: %v", err)}
+	}
+
+	if fileName == "" {
+		fileName = "imported-log.log"
+	}
+
+	return &ImportLogFileResult{
+		FileName:      fileName,
+		EntriesRead:   len(entries),
+		MatchesStored: result.MatchesStored,
+		GamesStored:   result.GamesStored,
+		DecksStored:   result.DecksStored,
+		RanksStored:   result.RanksStored,
+		QuestsStored:  result.QuestsStored,
+		DraftsStored:  result.DraftsStored,
+		PicksStored:   result.DraftPicksStored,
+	}, nil
+}
+
+// base64Decode decodes a base64 string.
+func base64Decode(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s)
 }

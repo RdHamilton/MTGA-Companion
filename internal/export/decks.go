@@ -415,3 +415,89 @@ func GenerateDeckFilename(deckName string, format DeckFormat) string {
 
 	return fmt.Sprintf("%s.%s", safeName, extension)
 }
+
+// ExportToMTGAFormat exports a deck to MTG Arena format string.
+func ExportToMTGAFormat(deck *models.Deck) string {
+	// For Deck without cards, return minimal format
+	var content strings.Builder
+	content.WriteString("Deck\n")
+	content.WriteString(fmt.Sprintf("// Name: %s\n", deck.Name))
+	content.WriteString(fmt.Sprintf("// Format: %s\n", deck.Format))
+	return content.String()
+}
+
+// ExportToTextFormat exports a deck to simple text format string.
+func ExportToTextFormat(deck *models.Deck) string {
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("=== %s ===\n", deck.Name))
+	content.WriteString(fmt.Sprintf("Format: %s\n", deck.Format))
+	if deck.Description != nil && *deck.Description != "" {
+		content.WriteString(fmt.Sprintf("Description: %s\n", *deck.Description))
+	}
+	if deck.ColorIdentity != nil && *deck.ColorIdentity != "" {
+		content.WriteString(fmt.Sprintf("Colors: %s\n", *deck.ColorIdentity))
+	}
+	return content.String()
+}
+
+// ExportDeckViewToMTGAFormat exports a DeckView to MTG Arena format string.
+func ExportDeckViewToMTGAFormat(deck *models.DeckView) string {
+	var content strings.Builder
+	content.WriteString("Deck\n")
+
+	// Main deck
+	for _, card := range deck.MainboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			content.WriteString(fmt.Sprintf("%d %s\n", card.Quantity, card.Metadata.Name))
+		} else {
+			content.WriteString(fmt.Sprintf("%d Card#%d\n", card.Quantity, card.CardID))
+		}
+	}
+
+	// Sideboard (if any)
+	if len(deck.SideboardCards) > 0 {
+		content.WriteString("\nSideboard\n")
+		for _, card := range deck.SideboardCards {
+			if card.Metadata != nil && card.Metadata.Name != "" {
+				content.WriteString(fmt.Sprintf("%d %s\n", card.Quantity, card.Metadata.Name))
+			} else {
+				content.WriteString(fmt.Sprintf("%d Card#%d\n", card.Quantity, card.CardID))
+			}
+		}
+	}
+
+	return content.String()
+}
+
+// ExportDeckViewToTextFormat exports a DeckView to simple text format string.
+func ExportDeckViewToTextFormat(deck *models.DeckView) string {
+	var content strings.Builder
+
+	// Deck header
+	content.WriteString(fmt.Sprintf("=== %s ===\n", deck.Deck.Name))
+	content.WriteString(fmt.Sprintf("Format: %s\n", deck.Deck.Format))
+	if deck.Deck.Description != nil && *deck.Deck.Description != "" {
+		content.WriteString(fmt.Sprintf("Description: %s\n", *deck.Deck.Description))
+	}
+	content.WriteString(fmt.Sprintf("Cards: %d mainboard", len(deck.MainboardCards)))
+	if len(deck.SideboardCards) > 0 {
+		content.WriteString(fmt.Sprintf(", %d sideboard", len(deck.SideboardCards)))
+	}
+	content.WriteString("\n\n")
+
+	// Main deck
+	content.WriteString("Main Deck:\n")
+	for _, card := range deck.MainboardCards {
+		content.WriteString(fmt.Sprintf("  %d %s\n", card.Quantity, formatCardInfo(card)))
+	}
+
+	// Sideboard (if any)
+	if len(deck.SideboardCards) > 0 {
+		content.WriteString("\nSideboard:\n")
+		for _, card := range deck.SideboardCards {
+			content.WriteString(fmt.Sprintf("  %d %s\n", card.Quantity, formatCardInfo(card)))
+		}
+	}
+
+	return content.String()
+}

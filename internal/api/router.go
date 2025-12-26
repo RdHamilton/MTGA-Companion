@@ -132,12 +132,23 @@ func (s *Server) setupRoutes() {
 		systemHandler := handlers.NewSystemHandler(s.systemFacade)
 		r.Route("/system", func(r chi.Router) {
 			r.Get("/status", systemHandler.GetStatus)
-			r.Get("/daemon/status", systemHandler.GetDaemonStatus)
-			r.Post("/daemon/connect", systemHandler.ConnectDaemon)
-			r.Post("/daemon/disconnect", systemHandler.DisconnectDaemon)
 			r.Get("/version", systemHandler.GetVersion)
 			r.Get("/database/path", systemHandler.GetDatabasePath)
 			r.Post("/database/path", systemHandler.SetDatabasePath)
+			// Daemon routes
+			r.Get("/daemon/status", systemHandler.GetDaemonStatus)
+			r.Post("/daemon/connect", systemHandler.ConnectDaemon)
+			r.Post("/daemon/disconnect", systemHandler.DisconnectDaemon)
+			r.Post("/daemon/port", systemHandler.SetDaemonPort)
+			r.Post("/daemon/mode/daemon", systemHandler.SwitchToDaemonMode)
+			r.Post("/daemon/mode/standalone", systemHandler.SwitchToStandaloneMode)
+			// Replay routes
+			r.Get("/replay/status", systemHandler.GetReplayStatus)
+			r.Get("/replay/progress", systemHandler.GetReplayProgress)
+			r.Post("/replay/trigger", systemHandler.TriggerReplay)
+			r.Post("/replay/pause", systemHandler.PauseReplay)
+			r.Post("/replay/resume", systemHandler.ResumeReplay)
+			r.Post("/replay/stop", systemHandler.StopReplay)
 		})
 
 		// Settings routes
@@ -157,6 +168,9 @@ func (s *Server) setupRoutes() {
 			r.Post("/collection", exportHandler.ExportCollection)
 			r.Post("/deck", exportHandler.ExportDeck)
 			r.Get("/formats", exportHandler.GetExportFormats)
+			r.Post("/import/matches", exportHandler.ImportMatches)
+			r.Post("/import/log", exportHandler.ImportLogFile)
+			r.Post("/clear", exportHandler.ClearAllData)
 		})
 
 		// Quest routes (from system facade)
@@ -174,6 +188,10 @@ func (s *Server) setupRoutes() {
 			r.Get("/archetypes", metaHandler.GetMetaArchetypes)
 			r.Get("/deck-analysis", metaHandler.GetDeckAnalysis)
 			r.Post("/identify-archetype", metaHandler.IdentifyArchetype)
+			r.Get("/dashboard", metaHandler.GetMetaDashboard)
+			r.Post("/refresh", metaHandler.RefreshMetaData)
+			r.Get("/formats", metaHandler.GetSupportedFormats)
+			r.Get("/tier", metaHandler.GetTierArchetypes)
 		})
 
 		// Feedback routes
@@ -182,6 +200,12 @@ func (s *Server) setupRoutes() {
 			r.Post("/", feedbackHandler.SubmitFeedback)
 			r.Post("/bug", feedbackHandler.SubmitBugReport)
 			r.Post("/feature", feedbackHandler.SubmitFeatureRequest)
+			r.Post("/recommendation", feedbackHandler.RecordRecommendation)
+			r.Post("/action", feedbackHandler.RecordAction)
+			r.Post("/outcome", feedbackHandler.RecordOutcome)
+			r.Get("/stats", feedbackHandler.GetRecommendationStats)
+			r.Get("/dashboard", feedbackHandler.GetDashboardMetrics)
+			r.Get("/ml-training", feedbackHandler.ExportMLTrainingData)
 		})
 
 		// LLM routes
