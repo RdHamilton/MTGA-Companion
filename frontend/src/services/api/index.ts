@@ -20,6 +20,9 @@ export * as decks from './decks';
 export * as cards from './cards';
 export * as collection from './collection';
 export * as system from './system';
+export * as quests from './quests';
+export * as meta from './meta';
+export * as settings from './settings';
 
 // Re-export commonly used types
 export type {
