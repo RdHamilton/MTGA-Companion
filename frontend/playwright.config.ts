@@ -55,13 +55,25 @@ export default defineConfig({
     },
   ],
 
-  // Start the Vite dev server with REST API mode before tests
-  webServer: {
-    command: 'VITE_USE_REST_API=true npm run dev',
-    url: 'http://localhost:5173',
-    timeout: 60 * 1000,
-    reuseExistingServer: !process.env.CI,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  // Start both servers for E2E testing
+  webServer: [
+    // Go REST API server on port 8080
+    {
+      command: 'cd .. && go run ./cmd/apiserver',
+      url: 'http://localhost:8080/health',
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    // Vite dev server on port 5173 with REST API mode
+    {
+      command: 'VITE_USE_REST_API=true npm run dev',
+      url: 'http://localhost:5173',
+      timeout: 60 * 1000,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 });
