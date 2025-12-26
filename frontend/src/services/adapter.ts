@@ -25,7 +25,6 @@ import {
   disconnect as wsDisconnect,
   EventsOn as WsEventsOn,
   EventsOff as WsEventsOff,
-  isConnected as wsIsConnected,
 } from './websocketClient';
 import { configureApi, healthCheck } from './apiClient';
 import { models, gui } from 'wailsjs/go/models';
@@ -122,7 +121,7 @@ export const matchesAdapter = {
     if (useRestApi) {
       return api.matches.getFormats();
     }
-    return WailsApp.GetFormats();
+    return WailsApp.GetSupportedFormats();
   },
 
   async getMatchGames(matchId: string): Promise<models.Game[]> {
@@ -145,11 +144,11 @@ export const draftsAdapter = {
     return WailsApp.GetActiveDraftSessions();
   },
 
-  async getCompletedDraftSessions(): Promise<models.DraftSession[]> {
+  async getCompletedDraftSessions(limit = 100): Promise<models.DraftSession[]> {
     if (useRestApi) {
       return api.drafts.getCompletedDraftSessions();
     }
-    return WailsApp.GetCompletedDraftSessions();
+    return WailsApp.GetCompletedDraftSessions(limit);
   },
 
   async getDraftSession(sessionId: string): Promise<models.DraftSession> {
@@ -183,7 +182,7 @@ export const decksAdapter = {
     if (useRestApi) {
       return api.decks.getDecks();
     }
-    return WailsApp.GetDecks();
+    return WailsApp.ListDecks();
   },
 
   async getDeck(deckId: string): Promise<gui.DeckWithCards> {
@@ -228,7 +227,7 @@ export const decksAdapter = {
 
   async exportDeck(request: gui.ExportDeckRequest): Promise<gui.ExportDeckResponse> {
     if (useRestApi) {
-      return api.decks.exportDeck(request.DeckID, { format: request.Format });
+      return api.decks.exportDeck(request.deckID, { format: request.format });
     }
     return WailsApp.ExportDeck(request);
   },
@@ -236,17 +235,23 @@ export const decksAdapter = {
   async importDeck(request: gui.ImportDeckRequest): Promise<gui.ImportDeckResponse> {
     if (useRestApi) {
       return api.decks.importDeck({
-        content: request.ImportText,
-        name: request.Name,
-        format: request.Format,
+        content: request.importText,
+        name: request.name,
+        format: request.format,
       });
     }
     return WailsApp.ImportDeck(request);
   },
 
-  async suggestDecks(sessionId: string): Promise<gui.DeckSuggestion[]> {
+  async suggestDecks(sessionId: string): Promise<gui.SuggestDecksResponse> {
     if (useRestApi) {
-      return api.decks.suggestDecks({ session_id: sessionId });
+      const suggestions = await api.decks.suggestDecks({ session_id: sessionId });
+      // Wrap in response format
+      return {
+        suggestions: suggestions,
+        totalCombos: suggestions.length,
+        viableCombos: suggestions.length,
+      } as gui.SuggestDecksResponse;
     }
     return WailsApp.SuggestDecks(sessionId);
   },
@@ -257,11 +262,25 @@ export const decksAdapter = {
 // ============================================================================
 
 export const collectionAdapter = {
-  async getCollection(filter?: api.CollectionFilter): Promise<gui.CollectionCard[]> {
+  async getCollection(filter?: gui.CollectionFilter): Promise<gui.CollectionResponse> {
     if (useRestApi) {
-      return api.collection.getCollection(filter);
+      const apiFilter: api.CollectionFilter = filter
+        ? {
+            set_code: filter.setCode,
+            rarity: filter.rarity,
+            colors: filter.colors,
+            owned_only: filter.ownedOnly,
+          }
+        : {};
+      const cards = await api.collection.getCollection(apiFilter);
+      // Create a proper CollectionResponse object
+      const response = new gui.CollectionResponse();
+      response.cards = cards;
+      response.totalCount = cards.length;
+      response.filterCount = cards.length;
+      return response;
     }
-    return WailsApp.GetCollection(filter?.set_code || '', filter?.rarity || '');
+    return WailsApp.GetCollection(filter || new gui.CollectionFilter());
   },
 
   async getCollectionStats(): Promise<gui.CollectionStats> {
@@ -271,7 +290,7 @@ export const collectionAdapter = {
     return WailsApp.GetCollectionStats();
   },
 
-  async getSetCompletion(): Promise<gui.SetCompletion[]> {
+  async getSetCompletion(): Promise<models.SetCompletion[]> {
     if (useRestApi) {
       return api.collection.getSetCompletion();
     }

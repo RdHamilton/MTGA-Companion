@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models, gui } from 'wailsjs/go/models';
+import { models } from 'wailsjs/go/models';
 
 // Re-export types for convenience
 export type Match = models.Match;
@@ -128,13 +128,36 @@ export async function getMatchupMatrix(
 }
 
 /**
+ * Helper to convert a time value to a date string (YYYY-MM-DD).
+ * Handles both Date objects and time.Time (which serializes to ISO string).
+ */
+function formatDateParam(date: unknown): string | undefined {
+  if (!date) return undefined;
+  if (typeof date === 'string') {
+    return date.split('T')[0];
+  }
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  // Handle time.Time which may have been serialized
+  const dateObj = date as { toString?: () => string };
+  if (dateObj.toString) {
+    const str = dateObj.toString();
+    if (str.includes('T')) {
+      return str.split('T')[0];
+    }
+  }
+  return undefined;
+}
+
+/**
  * Helper to convert StatsFilter model to API request format.
  */
 export function statsFilterToRequest(filter: StatsFilter): StatsFilterRequest {
   return {
     account_id: filter.AccountID,
-    start_date: filter.StartDate?.toISOString().split('T')[0],
-    end_date: filter.EndDate?.toISOString().split('T')[0],
+    start_date: formatDateParam(filter.StartDate),
+    end_date: formatDateParam(filter.EndDate),
     format: filter.Format,
     formats: filter.Formats,
     deck_format: filter.DeckFormat,

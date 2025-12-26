@@ -4,13 +4,12 @@
  */
 
 import { get, post } from '../apiClient';
-import { gui } from 'wailsjs/go/models';
+import { gui, models } from 'wailsjs/go/models';
 
 // Re-export types for convenience
 export type CollectionCard = gui.CollectionCard;
 export type CollectionStats = gui.CollectionStats;
-export type SetCompletion = gui.SetCompletion;
-export type CollectionChange = gui.CollectionChange;
+export type CollectionChangeEntry = gui.CollectionChangeEntry;
 
 /**
  * Filter for collection queries.
@@ -40,16 +39,16 @@ export async function getCollectionStats(): Promise<CollectionStats> {
 /**
  * Get set completion progress.
  */
-export async function getSetCompletion(): Promise<SetCompletion[]> {
-  return get<SetCompletion[]>('/collection/sets/completion');
+export async function getSetCompletion(): Promise<models.SetCompletion[]> {
+  return get<models.SetCompletion[]>('/collection/sets/completion');
 }
 
 /**
  * Get recent collection changes.
  */
-export async function getRecentChanges(limit?: number): Promise<CollectionChange[]> {
+export async function getRecentChanges(limit?: number): Promise<CollectionChangeEntry[]> {
   const params = limit ? `?limit=${limit}` : '';
-  return get<CollectionChange[]>(`/collection/recent${params}`);
+  return get<CollectionChangeEntry[]>(`/collection/recent${params}`);
 }
 
 /**

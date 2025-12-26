@@ -16,7 +16,7 @@ export type ExportDeckRequest = gui.ExportDeckRequest;
 export type ExportDeckResponse = gui.ExportDeckResponse;
 export type ImportDeckRequest = gui.ImportDeckRequest;
 export type ImportDeckResponse = gui.ImportDeckResponse;
-export type DeckSuggestion = gui.DeckSuggestion;
+export type SuggestedDeckResponse = gui.SuggestedDeckResponse;
 export type ArchetypeClassificationResult = gui.ArchetypeClassificationResult;
 
 /**
@@ -165,8 +165,8 @@ export async function parseDeckList(content: string): Promise<ImportDeckResponse
 /**
  * Get deck suggestions for a draft.
  */
-export async function suggestDecks(request: SuggestDecksRequest): Promise<DeckSuggestion[]> {
-  return post<DeckSuggestion[]>('/decks/suggest', request);
+export async function suggestDecks(request: SuggestDecksRequest): Promise<SuggestedDeckResponse[]> {
+  return post<SuggestedDeckResponse[]>('/decks/suggest', request);
 }
 
 /**
