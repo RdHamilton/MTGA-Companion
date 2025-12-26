@@ -2,152 +2,125 @@
 
 ## Current Status
 
-E2E tests with Playwright are **not currently enabled** in the GitHub Actions CI pipeline. This document explains why and provides guidance for future implementation.
+E2E tests with Playwright are **enabled** in CI using the REST API mode. This allows E2E tests to run without the Wails runtime.
 
-## Challenge: Wails Applications in CI
+## REST API Testing Architecture
 
-Wails applications are desktop applications that:
-1. Require a window manager and display server to run
-2. Launch a native window with embedded browser
-3. Cannot easily run in standard headless CI environments
+The REST API mode enables E2E testing by running:
+1. **Go REST API server** (`cmd/apiserver`) on port 8080
+2. **Vite dev server** on port 5173 with `VITE_USE_REST_API=true`
 
-This makes traditional CI E2E testing challenging compared to web applications.
+This architecture bypasses the Wails runtime completely, making tests:
+- Fast and reliable
+- Cross-platform compatible
+- Easy to run in CI environments
 
-## Current Approach
+## CI Integration
 
-**Local Development Testing**: E2E tests are designed to run locally during development:
+### GitHub Actions Example
+
+```yaml
+e2e-tests:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: cd frontend && npm ci
+
+    - name: Install Playwright browsers
+      run: cd frontend && npx playwright install --with-deps chromium
+
+    - name: Run E2E tests
+      run: cd frontend && npm run test:e2e
+```
+
+### What Happens During Test Execution
+
+1. Playwright automatically starts the Go API server (`go run ./cmd/apiserver`)
+2. Playwright starts the Vite dev server with REST API mode
+3. Tests run against the frontend, which makes API calls to the Go server
+4. Both servers are shut down after tests complete
+
+## Local Development
+
+Run E2E tests locally:
+
 ```bash
-# Start the Wails dev server
-wails dev
-
-# In another terminal, run E2E tests
 cd frontend
-npm run test:e2e
+npm run test:e2e          # Headless mode
+npm run test:e2e:ui       # Interactive mode
+npm run test:e2e:debug    # Debug mode
 ```
 
-## Future CI Integration Options
-
-### Option 1: Xvfb Virtual Display (Linux Only)
-
-Use a virtual X server to run the Wails app headlessly:
-
-```yaml
-- name: Setup Xvfb
-  run: |
-    sudo apt-get update
-    sudo apt-get install -y xvfb libgl1-mesa-dev xorg-dev
-
-- name: Run with Xvfb
-  run: |
-    xvfb-run -a wails dev &
-    sleep 10
-    cd frontend && npm run test:e2e
-```
-
-**Pros**:
-- Most similar to real environment
-- Tests actual Wails binary
-
-**Cons**:
-- Linux only (doesn't test macOS/Windows)
-- Complex setup with potential timing issues
-- Slower execution
-
-### Option 2: Web-Only Development Mode
-
-Create a special development mode that runs just the frontend:
-
-```yaml
-- name: Run frontend dev server
-  run: |
-    cd frontend
-    npm run dev &
-    sleep 5
-
-- name: Run E2E tests against web version
-  run: |
-    cd frontend
-    npm run test:e2e
-```
-
-**Pros**:
-- Simple and fast
-- Cross-platform
-- Standard web testing approach
-
-**Cons**:
-- Doesn't test Wails runtime bindings
-- Requires mocking all backend calls
-- Not testing the actual shipped application
-
-### Option 3: Dedicated Test Environment
-
-Set up a dedicated test server with proper display support:
-
-**Pros**:
-- Real environment testing
-- Can test across platforms
-- More reliable than CI runners
-
-**Cons**:
-- Additional infrastructure cost
-- More complex to maintain
-- Slower feedback loop
-
-### Option 4: Selective Testing
-
-Run E2E tests only for critical workflows and only on release branches:
-
-```yaml
-if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-```
-
-**Pros**:
-- Balances coverage with CI time
-- Focuses on high-value scenarios
-
-**Cons**:
-- Delayed feedback for some changes
-- Still requires solving the display server problem
-
-## Recommendation
-
-**Short-term**: Continue running E2E tests locally during development and PR reviews. The comprehensive component tests (Vitest) provide good coverage in CI.
-
-**Long-term**: Implement Option 1 (Xvfb) for Linux and run a subset of critical E2E tests on major branches only. This provides some automated E2E coverage without overwhelming CI resources.
-
-## Running E2E Tests Locally
-
-E2E tests should be run before merging significant changes:
-
-1. Start the development server:
-   ```bash
-   wails dev
-   ```
-
-2. Wait for the app to be fully loaded (http://localhost:34115)
-
-3. Run tests:
-   ```bash
-   cd frontend
-   npm run test:e2e          # Headless mode
-   npm run test:e2e:ui       # Interactive mode
-   npm run test:e2e:debug    # Debug mode
-   ```
+The same commands work on macOS, Windows, and Linux.
 
 ## CI Test Coverage Strategy
 
-The current CI strategy focuses on:
+The CI pipeline includes:
 
 1. **Backend Tests** (Go): Unit and integration tests for backend logic
-2. **Frontend Component Tests** (Vitest): Comprehensive coverage of React components
-3. **Linting & Formatting**: Code quality checks
-4. **Build Verification**: Ensures the application builds successfully
+2. **Frontend Unit Tests** (Vitest): Component and hook tests
+3. **E2E Tests** (Playwright): Full user workflow tests via REST API
+4. **Linting & Formatting**: Code quality checks
+5. **Build Verification**: Ensures the application builds successfully
 
-This provides strong confidence in code quality while avoiding the complexity of desktop app E2E testing in CI.
+## Comparison: REST API vs Wails Mode
+
+| Feature | REST API Mode | Wails Mode |
+|---------|---------------|------------|
+| CI Support | Yes | Difficult (needs Xvfb) |
+| Cross-platform | Yes | Platform-specific |
+| Speed | Fast | Slower |
+| Wails bindings | Not tested | Tested |
+| Setup complexity | Low | High |
+
+The REST API mode tests the same frontend code and API handlers, but skips testing Wails-specific bindings (window management, dialogs, etc.). For most tests, this is sufficient.
+
+## Troubleshooting
+
+### API server fails to start in CI
+
+Check:
+- Go version matches the project requirements
+- All Go dependencies are available
+- Port 8080 is not in use
+
+### Vite dev server fails to start
+
+Check:
+- Node.js version matches requirements
+- `npm ci` completed successfully
+- Port 5173 is not in use
+
+### Tests timeout waiting for servers
+
+Increase the timeout in `playwright.config.ts`:
+```typescript
+webServer: [
+  {
+    command: 'cd .. && go run ./cmd/apiserver',
+    url: 'http://localhost:8080/health',
+    timeout: 180 * 1000,  // Increase if needed
+  },
+  // ...
+]
+```
 
 ## Related Documentation
 
 - [E2E Test Suite Documentation](./README.md)
-- [GitHub Actions Workflow](../../../.github/workflows/ci.yml)
 - [Playwright Configuration](../../playwright.config.ts)
+- [REST API Server](../../../cmd/apiserver/main.go)
