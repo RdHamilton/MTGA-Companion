@@ -60,6 +60,7 @@ type ProcessResult struct {
 	RanksStored          int
 	QuestsStored         int
 	QuestsCompleted      int
+	QuestsRerolled       int // Quests marked as rerolled (disappeared without completion)
 	DraftsStored         int
 	DraftPicksStored     int
 	CollectionCardsAdded int // Cards added to collection
@@ -301,21 +302,24 @@ func (s *Service) processRankUpdates(ctx context.Context, entries []*logreader.L
 }
 
 // processQuests parses and stores quests from log entries.
+// It also detects and marks rerolled quests by comparing against current MTGA quest state.
 func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
-	quests, err := logreader.ParseQuests(entries)
+	parseResult, err := logreader.ParseQuestsDetailed(entries)
 	if err != nil {
 		log.Printf("Warning: Failed to parse quests: %v", err)
 		return err
 	}
 
-	if len(quests) == 0 {
+	if len(parseResult.Quests) == 0 && !parseResult.HasQuestResponse {
 		return nil
 	}
 
-	log.Printf("Found %d quest(s) in entries", len(quests))
+	if len(parseResult.Quests) > 0 {
+		log.Printf("Found %d quest(s) in entries", len(parseResult.Quests))
+	}
 
 	storedCount := 0
-	for _, questData := range quests {
+	for _, questData := range parseResult.Quests {
 		// Small delay between operations to avoid database lock contention
 		if storedCount > 0 && !s.dryRun {
 			time.Sleep(25 * time.Millisecond)
@@ -356,13 +360,51 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 	if storedCount > 0 {
 		result.QuestsStored = storedCount
 		if s.dryRun {
-			log.Printf("[DRY RUN] Would store %d/%d quest(s), %d completed", storedCount, len(quests), result.QuestsCompleted)
+			log.Printf("[DRY RUN] Would store %d/%d quest(s), %d completed", storedCount, len(parseResult.Quests), result.QuestsCompleted)
 		} else {
-			log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(quests))
+			log.Printf("✓ Stored %d/%d quest(s)", storedCount, len(parseResult.Quests))
+		}
+	}
+
+	// If we had a QuestGetQuests response, check for rerolled quests
+	// Any active quest in the database that's NOT in the current MTGA response was rerolled
+	if parseResult.HasQuestResponse && len(parseResult.CurrentQuestIDs) > 0 && !s.dryRun {
+		rerolledCount, err := s.markRerolledQuests(parseResult.CurrentQuestIDs, parseResult.LatestResponseTime)
+		if err != nil {
+			log.Printf("Warning: Failed to mark rerolled quests: %v", err)
+		} else if rerolledCount > 0 {
+			log.Printf("✓ Marked %d quest(s) as rerolled", rerolledCount)
+			result.QuestsRerolled = rerolledCount
 		}
 	}
 
 	return nil
+}
+
+// markRerolledQuests marks active quests that are not in the current MTGA quest list as rerolled.
+// This handles the case where a player rerolls a quest - it disappears from MTGA without being completed.
+func (s *Service) markRerolledQuests(currentQuestIDs map[string]bool, timestamp time.Time) (int, error) {
+	// Get all active (incomplete, non-rerolled) quests from the database
+	activeQuests, err := s.storage.Quests().GetActiveQuests()
+	if err != nil {
+		return 0, err
+	}
+
+	rerolledCount := 0
+	for _, quest := range activeQuests {
+		// If this active quest is NOT in the current MTGA response, it was rerolled
+		if !currentQuestIDs[quest.QuestID] {
+			// Mark as rerolled (not completed, just removed)
+			if err := s.storage.Quests().MarkRerolled(quest.QuestID, quest.AssignedAt); err != nil {
+				log.Printf("Warning: Failed to mark quest %s as rerolled: %v", quest.QuestID, err)
+			} else {
+				log.Printf("Quest %s (%s) marked as rerolled - no longer in MTGA", quest.QuestID, quest.QuestType)
+				rerolledCount++
+			}
+		}
+	}
+
+	return rerolledCount, nil
 }
 
 // processGraphState parses GraphGetGraphState events for progress tracking data.

@@ -22,6 +22,14 @@ type QuestData struct {
 	Rerolled         bool
 }
 
+// ParseQuestsResult contains the results of parsing quests from log entries.
+type ParseQuestsResult struct {
+	Quests             []*QuestData    // All parsed quests
+	HasQuestResponse   bool            // Whether we found any QuestGetQuests responses
+	CurrentQuestIDs    map[string]bool // Quest IDs present in the most recent QuestGetQuests response
+	LatestResponseTime time.Time       // Timestamp of the most recent QuestGetQuests response
+}
+
 // ParseQuests extracts quest data from log entries.
 // It looks for QuestGetQuests responses to track quest state and detect completion via disappearance.
 func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
@@ -126,6 +134,125 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 	}
 
 	return quests, nil
+}
+
+// ParseQuestsDetailed extracts quest data from log entries with detailed information
+// about the current quest state. Use this when you need to detect rerolled quests.
+func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
+	result := &ParseQuestsResult{
+		Quests:          []*QuestData{},
+		CurrentQuestIDs: make(map[string]bool),
+	}
+
+	questMap := make(map[string]*QuestData) // Track by questId to detect updates
+	var latestResponseTime time.Time
+	var latestResponseQuestIDs map[string]bool
+
+	questsFound := 0
+	responsesFound := 0
+
+	for _, entry := range entries {
+		if !entry.IsJSON {
+			continue
+		}
+
+		// Parse timestamp
+		timestamp := time.Now()
+		if entry.Timestamp != "" {
+			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
+				timestamp = parsedTime
+			}
+		}
+
+		// Check for QuestGetQuests response (contains current active quests)
+		if questsData, ok := entry.JSON["quests"]; ok {
+			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+				// This is a QuestGetQuests response
+				responsesFound++
+				result.HasQuestResponse = true
+
+				// Track which quest IDs are present in this response
+				currentQuestIDs := make(map[string]bool)
+
+				if questArray, ok := questsData.([]interface{}); ok {
+					for _, q := range questArray {
+						if questJSON, ok := q.(map[string]interface{}); ok {
+							quest := parseQuestFromMap(questJSON, timestamp)
+							if quest != nil {
+								currentQuestIDs[quest.QuestID] = true
+
+								// Update or add quest
+								if existing, exists := questMap[quest.QuestID]; exists {
+									// Update existing quest progress and last seen timestamp
+									existing.EndingProgress = quest.EndingProgress
+									existing.CanSwap = quest.CanSwap
+									existing.LastSeenAt = &timestamp
+								} else {
+									// New quest - set last seen to current timestamp
+									quest.LastSeenAt = &timestamp
+									questMap[quest.QuestID] = quest
+									questsFound++
+								}
+							}
+						}
+					}
+				}
+
+				// Track the latest response's quest IDs
+				if timestamp.After(latestResponseTime) {
+					latestResponseTime = timestamp
+					latestResponseQuestIDs = currentQuestIDs
+				}
+
+				// Check for quest disappearance (completion detection)
+				for questID, quest := range questMap {
+					if !quest.Completed && !currentQuestIDs[questID] {
+						quest.Completed = true
+						quest.CompletedAt = &timestamp
+						quest.EndingProgress = quest.Goal
+						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
+					}
+				}
+			}
+		}
+
+		// Check for "newQuests" event (newly assigned quests)
+		if newQuestsData, ok := entry.JSON["newQuests"]; ok {
+			if questArray, ok := newQuestsData.([]interface{}); ok {
+				for _, q := range questArray {
+					if questJSON, ok := q.(map[string]interface{}); ok {
+						quest := parseQuestFromMap(questJSON, timestamp)
+						if quest != nil {
+							quest.AssignedAt = timestamp
+
+							if _, exists := questMap[quest.QuestID]; !exists {
+								questMap[quest.QuestID] = quest
+								questsFound++
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	for _, quest := range questMap {
+		result.Quests = append(result.Quests, quest)
+	}
+
+	// Set the current quest IDs from the latest response
+	if latestResponseQuestIDs != nil {
+		result.CurrentQuestIDs = latestResponseQuestIDs
+		result.LatestResponseTime = latestResponseTime
+	}
+
+	if responsesFound > 0 || questsFound > 0 {
+		log.Printf("Quest parser (detailed): Found %d QuestGetQuests responses, parsed %d unique quests, %d current quest IDs",
+			responsesFound, questsFound, len(result.CurrentQuestIDs))
+	}
+
+	return result, nil
 }
 
 // parseQuestFromMap extracts quest data from a JSON map.

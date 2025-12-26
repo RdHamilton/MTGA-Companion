@@ -124,10 +124,11 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	return nil
 }
 
-// GetActiveQuests returns all incomplete quests (one per unique quest_id)
+// GetActiveQuests returns all incomplete, non-rerolled quests (one per unique quest_id)
 // Only returns quests that were last seen in a recent QuestGetQuests response (within 24 hours).
 // This prevents stale quest data from old historical log files from appearing as "active"
 // while allowing quests from the current gaming session (today) to show correctly.
+// Rerolled quests are excluded since they are no longer active in MTGA.
 func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
@@ -137,11 +138,13 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 			SELECT quest_id, MAX(created_at) as max_created
 			FROM quests
 			WHERE completed = 0
+			  AND rerolled = 0
 			  AND last_seen_at IS NOT NULL
 			  AND datetime(last_seen_at) >= datetime('now', '-24 hours')
 			GROUP BY quest_id
 		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
 		WHERE q.completed = 0
+		  AND q.rerolled = 0
 		  AND q.last_seen_at IS NOT NULL
 		  AND datetime(q.last_seen_at) >= datetime('now', '-24 hours')
 		ORDER BY q.assigned_at DESC
