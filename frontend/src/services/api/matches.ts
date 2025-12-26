@@ -1,0 +1,152 @@
+/**
+ * Matches API service.
+ * Replaces Wails match-related function bindings.
+ */
+
+import { get, post } from '../apiClient';
+import { models, gui } from 'wailsjs/go/models';
+
+// Re-export types for convenience
+export type Match = models.Match;
+export type StatsFilter = models.StatsFilter;
+export type Statistics = models.Statistics;
+export type PerformanceMetrics = models.PerformanceMetrics;
+
+/**
+ * Filter request for API calls.
+ */
+export interface StatsFilterRequest {
+  account_id?: number;
+  start_date?: string;
+  end_date?: string;
+  format?: string;
+  formats?: string[];
+  deck_format?: string;
+  deck_id?: string;
+  event_name?: string;
+  event_names?: string[];
+  opponent_name?: string;
+  opponent_id?: string;
+  result?: string;
+  rank_class?: string;
+  rank_min_class?: string;
+  rank_max_class?: string;
+  result_reason?: string;
+}
+
+/**
+ * Trend analysis request.
+ */
+export interface TrendAnalysisRequest {
+  start_date: string;
+  end_date: string;
+  period_type: string;
+  formats?: string[];
+}
+
+/**
+ * Get matches with optional filters.
+ */
+export async function getMatches(filter: StatsFilterRequest = {}): Promise<Match[]> {
+  return post<Match[]>('/matches', filter);
+}
+
+/**
+ * Get a single match by ID.
+ */
+export async function getMatch(matchId: string): Promise<Match> {
+  return get<Match>(`/matches/${matchId}`);
+}
+
+/**
+ * Get games for a specific match.
+ */
+export async function getMatchGames(matchId: string): Promise<models.Game[]> {
+  return get<models.Game[]>(`/matches/${matchId}/games`);
+}
+
+/**
+ * Get statistics with optional filters.
+ */
+export async function getStats(filter: StatsFilterRequest = {}): Promise<Statistics> {
+  return post<Statistics>('/matches/stats', filter);
+}
+
+/**
+ * Get trend analysis over time.
+ */
+export async function getTrendAnalysis(request: TrendAnalysisRequest): Promise<unknown> {
+  return post('/matches/trends', request);
+}
+
+/**
+ * Get all available match formats.
+ */
+export async function getFormats(): Promise<string[]> {
+  return get<string[]>('/matches/formats');
+}
+
+/**
+ * Get all available archetypes.
+ */
+export async function getArchetypes(): Promise<string[]> {
+  return get<string[]>('/matches/archetypes');
+}
+
+/**
+ * Get match distribution by format.
+ */
+export async function getFormatDistribution(
+  filter: StatsFilterRequest = {}
+): Promise<Record<string, Statistics>> {
+  return post<Record<string, Statistics>>('/matches/format-distribution', filter);
+}
+
+/**
+ * Get win rate trends over time.
+ */
+export async function getWinRateOverTime(request: TrendAnalysisRequest): Promise<unknown> {
+  return post('/matches/win-rate-over-time', request);
+}
+
+/**
+ * Get performance metrics by hour.
+ */
+export async function getPerformanceByHour(
+  filter: StatsFilterRequest = {}
+): Promise<PerformanceMetrics> {
+  return post<PerformanceMetrics>('/matches/performance-by-hour', filter);
+}
+
+/**
+ * Get matchup matrix (win rates against different decks).
+ */
+export async function getMatchupMatrix(
+  filter: StatsFilterRequest = {}
+): Promise<Record<string, Statistics>> {
+  return post<Record<string, Statistics>>('/matches/matchup-matrix', filter);
+}
+
+/**
+ * Helper to convert StatsFilter model to API request format.
+ */
+export function statsFilterToRequest(filter: StatsFilter): StatsFilterRequest {
+  return {
+    account_id: filter.AccountID,
+    start_date: filter.StartDate?.toISOString().split('T')[0],
+    end_date: filter.EndDate?.toISOString().split('T')[0],
+    format: filter.Format,
+    formats: filter.Formats,
+    deck_format: filter.DeckFormat,
+    deck_id: filter.DeckID,
+    event_name: filter.EventName,
+    event_names: filter.EventNames,
+    opponent_name: filter.OpponentName,
+    opponent_id: filter.OpponentID,
+    result: filter.Result,
+    rank_class: filter.RankClass,
+    rank_min_class: filter.RankMinClass,
+    rank_max_class: filter.RankMaxClass,
+    result_reason: filter.ResultReason,
+  };
+}

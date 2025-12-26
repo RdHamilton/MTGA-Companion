@@ -4,11 +4,13 @@ import { afterEach, vi } from 'vitest';
 import { mockWailsRuntime, mockEventEmitter } from './mocks/wailsRuntime';
 import { mockWailsApp, resetMocks } from './mocks/wailsApp';
 
-// Mock Wails runtime globally
+// Mock Wails runtime globally (multiple paths for different import locations)
 vi.mock('../../wailsjs/runtime/runtime', () => mockWailsRuntime);
+vi.mock('wailsjs/runtime/runtime', () => mockWailsRuntime);
 
-// Mock Wails App bindings globally
+// Mock Wails App bindings globally (multiple paths for different import locations)
 vi.mock('../../wailsjs/go/main/App', () => mockWailsApp);
+vi.mock('wailsjs/go/main/App', () => mockWailsApp);
 
 // Cleanup after each test
 afterEach(() => {
