@@ -327,7 +327,8 @@ export const systemAdapter = {
  * Subscribe to an event.
  * Uses WebSocket in REST mode, Wails EventsOn otherwise.
  */
-export function EventsOn(eventName: string, callback: (...data: unknown[]) => void): () => void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function EventsOn(eventName: string, callback: (...data: any[]) => void): () => void {
   if (useRestApi) {
     return WsEventsOn(eventName, callback);
   }
@@ -386,16 +387,17 @@ export function createRestApiClient(): Record<string, (...args: any[]) => Promis
 
     // Draft methods
     GetActiveDraftSessions: () => draftsAdapter.getActiveDraftSessions(),
-    GetCompletedDraftSessions: (limit: number) => draftsAdapter.getCompletedDraftSessions(limit),
+    GetCompletedDraftSessions: () => draftsAdapter.getCompletedDraftSessions(),
     GetDraftSession: (sessionId: string) => draftsAdapter.getDraftSession(sessionId),
     GetDraftPicks: (sessionId: string) => draftsAdapter.getDraftPicks(sessionId),
-    GetDraftPacks: (sessionId: string) => draftsAdapter.getDraftPacks(sessionId),
+    GetDraftPacks: (sessionId: string) => api.drafts.getDraftPool(sessionId),
 
     // Deck methods
-    ListDecks: () => decksAdapter.listDecks(),
+    ListDecks: () => decksAdapter.getDecks(),
+    GetDecks: () => decksAdapter.getDecks(),
     GetDeck: (deckId: string) => decksAdapter.getDeck(deckId),
     CreateDeck: (name: string, format: string, source: string, draftEventId?: string) =>
-      decksAdapter.createDeck({ name, format, source, draftEventID: draftEventId }),
+      api.decks.createDeck({ name, format, source, draft_event_id: draftEventId }),
     DeleteDeck: (deckId: string) => decksAdapter.deleteDeck(deckId),
     ImportDeck: (req: gui.ImportDeckRequest) => decksAdapter.importDeck(req),
     ExportDeck: (req: gui.ExportDeckRequest) => decksAdapter.exportDeck(req),
@@ -411,24 +413,19 @@ export function createRestApiClient(): Record<string, (...args: any[]) => Promis
 
     // Card methods (use REST API directly)
     GetSetCards: async (setCode: string) => {
-      const response = await api.cards.getSetCards(setCode);
-      return response;
+      return api.cards.getSetCards(setCode);
     },
-    GetCardByArenaID: async (arenaId: string) => {
-      const response = await api.cards.getCard(arenaId);
-      return response;
+    GetCardByArenaID: async (arenaId: number) => {
+      return api.cards.getCardByArenaId(arenaId);
     },
     GetAllSetInfo: async () => {
-      const response = await api.cards.getSets();
-      return response;
+      return api.cards.getAllSetInfo();
     },
     GetCardRatings: async (setCode: string, draftFormat: string) => {
-      const response = await api.cards.getRatings(setCode, draftFormat);
-      return response;
+      return api.cards.getCardRatings(setCode, draftFormat);
     },
-    SearchCards: async (query: string, setCodes?: string[], limit?: number) => {
-      const response = await api.cards.searchCards(query, setCodes, limit);
-      return response;
+    SearchCards: async (query: string) => {
+      return api.cards.searchCards({ query });
     },
 
     // Quest methods (use REST API directly)
@@ -447,24 +444,21 @@ export function createRestApiClient(): Record<string, (...args: any[]) => Promis
 
     // Stats methods
     GetTrendAnalysis: async (startDate: Date, endDate: Date, periodType: string, formats: string[]) => {
-      const response = await api.matches.getTrendAnalysis({
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        periodType,
+      return api.matches.getTrendAnalysis({
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        period_type: periodType,
         formats,
       });
-      return response;
     },
-    GetStatsByDeck: async (filter: models.StatsFilter) => {
-      const response = await api.matches.getStats(api.matches.statsFilterToRequest(filter));
+    GetStatsByDeck: async (_filter: models.StatsFilter) => {
       // The REST API returns aggregate stats, not by-deck - return empty for now
       return {};
     },
     GetStatsByFormat: async (filter: models.StatsFilter) => {
-      const response = await api.matches.getFormatDistribution(api.matches.statsFilterToRequest(filter));
-      return response;
+      return api.matches.getFormatDistribution(api.matches.statsFilterToRequest(filter));
     },
-    GetRankProgressionTimeline: async (format: string, startDate?: Date, endDate?: Date, periodType?: string) => {
+    GetRankProgressionTimeline: async (format: string, _startDate?: Date, _endDate?: Date, _periodType?: string) => {
       // Not implemented in REST API yet
       return { timeline: [], format };
     },
