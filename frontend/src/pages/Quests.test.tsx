@@ -891,12 +891,107 @@ describe('Quests', () => {
       renderWithProvider(<Quests />);
 
       await waitFor(() => {
-        expect(screen.getByText('Type')).toBeInTheDocument();
+        // Check for table headers (may have duplicates with filter labels)
+        const typeElements = screen.getAllByText('Type');
+        expect(typeElements.length).toBeGreaterThanOrEqual(1);
       });
-      expect(screen.getByText('Status')).toBeInTheDocument();
+      // Status appears in both filter label and table header
+      const statusElements = screen.getAllByText('Status');
+      expect(statusElements.length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Assigned')).toBeInTheDocument();
-      expect(screen.getByText('Completed')).toBeInTheDocument();
+      expect(screen.getByText('Progress')).toBeInTheDocument();
       expect(screen.getByText('Duration')).toBeInTheDocument();
+    });
+  });
+
+  describe('Quest History Filtering', () => {
+    it('should display status and type filter controls', async () => {
+      const history = [createMockQuest({ completed: true, completed_at: new Date().toISOString() })];
+      mockWailsApp.GetActiveQuests.mockResolvedValue([]);
+      mockWailsApp.GetQuestHistory.mockResolvedValue(history);
+      mockWailsApp.GetCurrentAccount.mockResolvedValue(null);
+
+      renderWithProvider(<Quests />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('All Status')).toBeInTheDocument();
+      });
+      expect(screen.getByPlaceholderText('Search quests...')).toBeInTheDocument();
+    });
+
+    it('should filter by status', async () => {
+      const history = [
+        createMockQuest({ id: 1, quest_type: 'Quest_Complete', completed: true, completed_at: new Date().toISOString() }),
+        createMockQuest({ id: 2, quest_type: 'Quest_Incomplete', completed: false, rerolled: false }),
+        createMockQuest({ id: 3, quest_type: 'Quest_Rerolled', completed: false, rerolled: true }),
+      ];
+      mockWailsApp.GetActiveQuests.mockResolvedValue([]);
+      mockWailsApp.GetQuestHistory.mockResolvedValue(history);
+      mockWailsApp.GetCurrentAccount.mockResolvedValue(null);
+
+      renderWithProvider(<Quests />);
+
+      await waitFor(() => {
+        expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+      });
+
+      // Filter to show only completed
+      const statusSelect = screen.getByDisplayValue('All Status');
+      fireEvent.change(statusSelect, { target: { value: 'completed' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+        expect(screen.queryByText('INCOMPLETE')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should filter by quest type search', async () => {
+      const history = [
+        createMockQuest({ id: 1, quest_type: 'Quests/Quest_Play_Cards', completed: true, completed_at: new Date().toISOString() }),
+        createMockQuest({ id: 2, quest_type: 'Quests/Quest_Win_Games', completed: true, completed_at: new Date().toISOString() }),
+      ];
+      mockWailsApp.GetActiveQuests.mockResolvedValue([]);
+      mockWailsApp.GetQuestHistory.mockResolvedValue(history);
+      mockWailsApp.GetCurrentAccount.mockResolvedValue(null);
+
+      renderWithProvider(<Quests />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Play Cards')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Win Games')).toBeInTheDocument();
+
+      // Filter by type
+      const typeInput = screen.getByPlaceholderText('Search quests...');
+      fireEvent.change(typeInput, { target: { value: 'play' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Play Cards')).toBeInTheDocument();
+        expect(screen.queryByText('Win Games')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should show empty state when filters return no results', async () => {
+      const history = [
+        createMockQuest({ id: 1, completed: true, completed_at: new Date().toISOString() }),
+      ];
+      mockWailsApp.GetActiveQuests.mockResolvedValue([]);
+      mockWailsApp.GetQuestHistory.mockResolvedValue(history);
+      mockWailsApp.GetCurrentAccount.mockResolvedValue(null);
+
+      renderWithProvider(<Quests />);
+
+      await waitFor(() => {
+        expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+      });
+
+      // Filter to show only incomplete (no results)
+      const statusSelect = screen.getByDisplayValue('All Status');
+      fireEvent.change(statusSelect, { target: { value: 'incomplete' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('No matching quests')).toBeInTheDocument();
+      });
     });
   });
 });
