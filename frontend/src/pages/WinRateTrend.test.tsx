@@ -352,7 +352,8 @@ describe('WinRateTrend', () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const call = mockMatches.getTrendAnalysis.mock.calls[0][0] as any;
+      const calls = mockMatches.getTrendAnalysis.mock.calls as any[][];
+      const call = calls[0][0];
       expect(call.period_type).toBe('daily'); // periodType for 7days
       expect(call.formats).toBeUndefined(); // formats for 'all' is undefined
     });
@@ -405,7 +406,8 @@ describe('WinRateTrend', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockMatches.getTrendAnalysis.mock.calls.slice(-1)[0][0] as any;
+        const calls = mockMatches.getTrendAnalysis.mock.calls as any[][];
+        const lastCall = calls.slice(-1)[0][0];
         expect(lastCall.formats).toEqual(['Ladder', 'Play']);
       });
     });

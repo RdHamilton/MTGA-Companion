@@ -1,49 +1,52 @@
 import { vi } from 'vitest';
 
 // API module mocks for the REST API service
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MockFn = (...args: any[]) => any;
+
 export const mockCards = {
-  getCardByArenaId: vi.fn(() => Promise.resolve({} as unknown)),
-  getCardRatings: vi.fn(() => Promise.resolve([] as unknown[])),
-  getSetCards: vi.fn(() => Promise.resolve([] as unknown[])),
-  getSetInfo: vi.fn(() => Promise.resolve({} as unknown)),
-  getAllSetInfo: vi.fn(() => Promise.resolve([] as unknown[])),
-  searchCards: vi.fn(() => Promise.resolve([] as unknown[])),
-  searchCardsWithCollection: vi.fn(() => Promise.resolve([] as unknown[])),
-  getColorRatings: vi.fn(() => Promise.resolve([] as unknown[])),
+  getCardByArenaId: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getCardRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getSetCards: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getSetInfo: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getAllSetInfo: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  searchCards: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  searchCardsWithCollection: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getColorRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
 };
 
 export const mockMatches = {
-  getMatches: vi.fn(() => Promise.resolve([] as unknown[])),
-  getStats: vi.fn(() => Promise.resolve({} as unknown)),
+  getMatches: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getStats: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
   getFormats: vi.fn(() => Promise.resolve(['standard', 'historic', 'explorer', 'pioneer', 'modern'])),
-  getMatchGames: vi.fn(() => Promise.resolve([] as unknown[])),
-  getMatchesBySessionId: vi.fn(() => Promise.resolve([] as unknown[])),
-  getStatsByDeck: vi.fn(() => Promise.resolve({} as unknown)),
-  getStatsByFormat: vi.fn(() => Promise.resolve({} as unknown)),
-  getTrendAnalysis: vi.fn(() => Promise.resolve({} as unknown)),
-  getRankProgression: vi.fn(() => Promise.resolve({} as unknown)),
-  getRankProgressionTimeline: vi.fn(() => Promise.resolve({} as unknown)),
-  getMatchupMatrix: vi.fn(() => Promise.resolve({} as unknown)),
-  getFormatDistribution: vi.fn(() => Promise.resolve({} as unknown)),
-  exportMatches: vi.fn(() => Promise.resolve([] as unknown[])),
-  statsFilterToRequest: vi.fn((filter: unknown) => filter),
+  getMatchGames: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getMatchesBySessionId: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getStatsByDeck: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getStatsByFormat: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getTrendAnalysis: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getRankProgression: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getRankProgressionTimeline: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getMatchupMatrix: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getFormatDistribution: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  exportMatches: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  statsFilterToRequest: vi.fn(((filter: unknown) => filter) as MockFn),
 };
 
 export const mockDecks = {
-  getDecks: vi.fn(() => Promise.resolve([] as unknown[])),
-  getDeck: vi.fn(() => Promise.resolve({} as unknown)),
-  getDecksBySource: vi.fn(() => Promise.resolve([] as unknown[])),
-  getDecksByFormat: vi.fn(() => Promise.resolve([] as unknown[])),
-  getDeckByDraftEvent: vi.fn(() => Promise.resolve({} as unknown)),
-  getDeckStatistics: vi.fn(() => Promise.resolve({} as unknown)),
-  createDeck: vi.fn(() => Promise.resolve({} as unknown)),
-  deleteDeck: vi.fn(() => Promise.resolve()),
-  addCard: vi.fn(() => Promise.resolve()),
-  removeCard: vi.fn(() => Promise.resolve()),
-  exportDeck: vi.fn(() => Promise.resolve({} as unknown)),
-  suggestDecks: vi.fn(() => Promise.resolve([] as unknown[])),
-  applySuggestedDeck: vi.fn(() => Promise.resolve()),
-  validateDraftDeck: vi.fn(() => Promise.resolve(true)),
+  getDecks: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getDeck: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getDecksBySource: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getDecksByFormat: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getDeckByDraftEvent: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getDeckStatistics: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  createDeck: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  deleteDeck: vi.fn((() => Promise.resolve()) as MockFn),
+  addCard: vi.fn((() => Promise.resolve()) as MockFn),
+  removeCard: vi.fn((() => Promise.resolve()) as MockFn),
+  exportDeck: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  suggestDecks: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  applySuggestedDeck: vi.fn((() => Promise.resolve()) as MockFn),
+  validateDraftDeck: vi.fn((() => Promise.resolve(true)) as MockFn),
 };
 
 export const mockDrafts = {
