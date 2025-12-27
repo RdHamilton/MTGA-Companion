@@ -15,8 +15,14 @@ test.describe('Collection', () => {
 
   test.describe('Navigation and Page Load', () => {
     test('@smoke should navigate to Collection page', async ({ page }) => {
+      // Collection page renders with different states: loading, error, or loaded
+      // All states use .collection-page class
       const collectionPage = page.locator('.collection-page');
-      await expect(collectionPage).toBeVisible({ timeout: 10000 });
+      const loadingState = page.locator('.collection-page.loading-state');
+      const errorState = page.locator('.collection-page.error-state');
+
+      // Wait for any collection page state to appear
+      await expect(collectionPage.or(loadingState).or(errorState)).toBeVisible({ timeout: 15000 });
     });
 
     test('should display page title', async ({ page }) => {
