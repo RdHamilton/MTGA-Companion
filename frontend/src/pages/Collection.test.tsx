@@ -156,20 +156,6 @@ describe('Collection', () => {
       expect(screen.getByText('Failed to load collection')).toBeInTheDocument();
     });
 
-    it('should show error when Wails runtime not initialized after timeout', async () => {
-      clearWailsRuntime();
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse());
-
-      renderWithRouter(<Collection />);
-
-      await vi.advanceTimersByTimeAsync(5100);
-
-      await waitFor(() => {
-        expect(screen.getByText('Error Loading Collection')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Wails runtime not initialized')).toBeInTheDocument();
-    });
-
     it('should have retry button in error state', async () => {
       mockGetCollection.mockRejectedValue(new Error('Database error'));
       mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());

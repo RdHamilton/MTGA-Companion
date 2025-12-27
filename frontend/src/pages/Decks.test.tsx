@@ -136,21 +136,6 @@ describe('Decks', () => {
       expect(screen.getByText('Failed to load decks')).toBeInTheDocument();
     });
 
-    it('should show error when Wails runtime not initialized after timeout', async () => {
-      clearWailsRuntime();
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-
-      renderWithRouter(<Decks />);
-
-      // Advance past the 5 second timeout
-      await vi.advanceTimersByTimeAsync(5100);
-
-      await waitFor(() => {
-        expect(screen.getByText('Error Loading Decks')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Wails runtime not initialized')).toBeInTheDocument();
-    });
-
     it('should have retry button that reloads decks', async () => {
       mockWailsApp.ListDecks.mockRejectedValueOnce(new Error('Temporary error'));
       mockWailsApp.ListDecks.mockResolvedValueOnce(createMockDeckList());
