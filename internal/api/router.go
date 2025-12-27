@@ -130,6 +130,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/sets", collectionHandler.GetCollectionBySets)
 			r.Get("/rarity", collectionHandler.GetCollectionByRarity)
 			r.Get("/missing/{setCode}", collectionHandler.GetMissingCards)
+			r.Get("/decks/{deckID}/missing", collectionHandler.GetMissingCardsForDeck)
 			r.Post("/search", collectionHandler.SearchCollection)
 		})
 

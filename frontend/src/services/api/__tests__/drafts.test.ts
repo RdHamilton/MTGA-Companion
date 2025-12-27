@@ -151,13 +151,13 @@ describe('drafts API', () => {
   });
 
   describe('getDraftPerformanceMetrics', () => {
-    it('should call get with correct path', async () => {
+    it('should call post with empty filter', async () => {
       const mockMetrics = { winRate: 0.6 };
-      vi.mocked(get).mockResolvedValue(mockMetrics);
+      vi.mocked(post).mockResolvedValue(mockMetrics);
 
       const result = await drafts.getDraftPerformanceMetrics();
 
-      expect(get).toHaveBeenCalledWith('/drafts/performance-metrics');
+      expect(post).toHaveBeenCalledWith('/drafts/stats', {});
       expect(result).toEqual(mockMetrics);
     });
   });
@@ -173,13 +173,17 @@ describe('drafts API', () => {
   });
 
   describe('getPickAlternatives', () => {
-    it('should call get with correct path', async () => {
+    it('should call post with correct path and params', async () => {
       const mockAlternatives = { picked: {}, alternatives: [] };
-      vi.mocked(get).mockResolvedValue(mockAlternatives);
+      vi.mocked(post).mockResolvedValue(mockAlternatives);
 
       const result = await drafts.getPickAlternatives('session-123', 1, 5);
 
-      expect(get).toHaveBeenCalledWith('/drafts/session-123/picks/1/5/alternatives');
+      expect(post).toHaveBeenCalledWith('/drafts/grade-pick', {
+        session_id: 'session-123',
+        pack_number: 1,
+        pick_number: 5,
+      });
       expect(result).toEqual(mockAlternatives);
     });
   });
@@ -191,7 +195,7 @@ describe('drafts API', () => {
 
       const result = await drafts.getDraftGrade('session-123');
 
-      expect(get).toHaveBeenCalledWith('/drafts/session-123/grade');
+      expect(get).toHaveBeenCalledWith('/drafts/session-123/analysis');
       expect(result).toEqual(mockGrade);
     });
   });
@@ -221,25 +225,27 @@ describe('drafts API', () => {
   });
 
   describe('getDraftWinRatePrediction', () => {
-    it('should call get with correct path', async () => {
+    it('should call post with correct path', async () => {
       const mockPrediction = { winRate: 0.55 };
-      vi.mocked(get).mockResolvedValue(mockPrediction);
+      vi.mocked(post).mockResolvedValue(mockPrediction);
 
       const result = await drafts.getDraftWinRatePrediction('session-123');
 
-      expect(get).toHaveBeenCalledWith('/drafts/session-123/win-prediction');
+      expect(post).toHaveBeenCalledWith('/drafts/session-123/calculate-prediction');
       expect(result).toEqual(mockPrediction);
     });
   });
 
   describe('classifyDraftPoolArchetype', () => {
-    it('should call get with correct path', async () => {
+    it('should call post with correct path and session_id', async () => {
       const mockClassification = { archetype: 'Aggro' };
-      vi.mocked(get).mockResolvedValue(mockClassification);
+      vi.mocked(post).mockResolvedValue(mockClassification);
 
       const result = await drafts.classifyDraftPoolArchetype('session-123');
 
-      expect(get).toHaveBeenCalledWith('/drafts/session-123/classify-archetype');
+      expect(post).toHaveBeenCalledWith('/decks/classify-draft-pool', {
+        session_id: 'session-123',
+      });
       expect(result).toEqual(mockClassification);
     });
   });

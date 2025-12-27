@@ -85,7 +85,7 @@ export async function getCurrentAccount(): Promise<models.Account> {
  * Clear all data.
  */
 export async function clearAllData(): Promise<void> {
-  return post('/system/clear-data');
+  return post('/export/clear');
 }
 
 /**
@@ -95,28 +95,29 @@ export async function checkOllamaStatus(
   endpoint: string,
   model: string
 ): Promise<gui.OllamaStatus> {
-  return post<gui.OllamaStatus>('/system/ollama/status', { endpoint, model });
+  return post<gui.OllamaStatus>('/llm/status', { endpoint, model });
 }
 
 /**
  * Get available Ollama models.
  */
 export async function getAvailableOllamaModels(endpoint: string): Promise<gui.OllamaModel[]> {
-  return post<gui.OllamaModel[]>('/system/ollama/models', { endpoint });
+  const params = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
+  return get<gui.OllamaModel[]>(`/llm/models${params}`);
 }
 
 /**
  * Pull an Ollama model.
  */
 export async function pullOllamaModel(endpoint: string, model: string): Promise<void> {
-  return post('/system/ollama/pull', { endpoint, model });
+  return post('/llm/models/pull', { endpoint, model });
 }
 
 /**
  * Test LLM generation.
  */
 export async function testLLMGeneration(endpoint: string, model: string): Promise<string> {
-  const result = await post<{ response: string }>('/system/ollama/test', { endpoint, model });
+  const result = await post<{ response: string }>('/llm/test', { endpoint, model });
   return result.response;
 }
 
@@ -124,5 +125,12 @@ export async function testLLMGeneration(endpoint: string, model: string): Promis
  * Export ML training data.
  */
 export async function exportMLTrainingData(limit: number): Promise<gui.MLTrainingDataExport> {
-  return post<gui.MLTrainingDataExport>('/system/ml/export', { limit });
+  return get<gui.MLTrainingDataExport>(`/feedback/ml-training?limit=${limit}`);
+}
+
+/**
+ * Get feedback dashboard metrics.
+ */
+export async function getFeedbackDashboardMetrics(): Promise<gui.DashboardMetricsResponse> {
+  return get<gui.DashboardMetricsResponse>('/feedback/dashboard');
 }
