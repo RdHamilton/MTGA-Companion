@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	port        = flag.Int("port", 8080, "API server port")
-	dbPath      = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/mtga.db)")
-	openBrowser = flag.Bool("open-browser", false, "Open browser to frontend on startup")
-	frontendURL = flag.String("frontend-url", "http://localhost:3000", "Frontend URL to open in browser")
+	port         = flag.Int("port", 8080, "API server port")
+	dbPath       = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/mtga.db)")
+	openBrowser  = flag.Bool("open-browser", false, "Open browser to frontend on startup")
+	frontendURL  = flag.String("frontend-url", "http://localhost:3000", "Frontend URL to open in browser")
+	loadFixtures = flag.String("load-fixtures", "", "Path to SQL fixtures file to load on startup")
 )
 
 func main() {
@@ -80,6 +81,15 @@ func main() {
 			log.Printf("Error closing storage service: %v", err)
 		}
 	}()
+
+	// Load fixtures if specified
+	if *loadFixtures != "" {
+		fmt.Printf("Loading fixtures from: %s\n", *loadFixtures)
+		if err := loadFixturesFromFile(db, *loadFixtures); err != nil {
+			log.Fatalf("Failed to load fixtures: %v", err)
+		}
+		fmt.Println("Fixtures loaded successfully")
+	}
 
 	// Create context
 	ctx := context.Background()
@@ -197,4 +207,20 @@ func main() {
 	}
 
 	fmt.Println("API server stopped.")
+}
+
+// loadFixturesFromFile reads and executes SQL statements from a fixture file.
+func loadFixturesFromFile(db *storage.DB, filePath string) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read fixtures file: %w", err)
+	}
+
+	// Execute the SQL statements using the underlying connection
+	_, err = db.Conn().Exec(string(content))
+	if err != nil {
+		return fmt.Errorf("failed to execute fixtures: %w", err)
+	}
+
+	return nil
 }
