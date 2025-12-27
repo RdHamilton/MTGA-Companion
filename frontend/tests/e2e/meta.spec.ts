@@ -3,23 +3,20 @@ import { test, expect } from '@playwright/test';
 /**
  * Meta Page E2E Tests
  *
- * Prerequisites:
- * - Run `wails dev` in the project root before running these tests
- * - The app should be accessible at http://localhost:34115
+ * Tests the Meta page functionality including format selection.
+ * Uses REST API backend for testing.
  */
 test.describe('Meta', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the app and wait for it to load
     await page.goto('/');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 10000 });
 
-    // Navigate to Meta page
     await page.click('a[href="/meta"]');
     await page.waitForURL('**/meta');
   });
 
   test.describe('Navigation and Page Load', () => {
-    test('should navigate to Meta page', async ({ page }) => {
+    test('@smoke should navigate to Meta page', async ({ page }) => {
       const metaPage = page.locator('.meta-page');
       await expect(metaPage).toBeVisible({ timeout: 10000 });
     });
@@ -54,7 +51,6 @@ test.describe('Meta', () => {
       const options = await formatSelect.locator('option').allTextContents();
       expect(options.length).toBeGreaterThan(0);
 
-      // Common formats should be available
       const hasStandard = options.some((opt) => opt.toLowerCase().includes('standard'));
       const hasHistoric = options.some((opt) => opt.toLowerCase().includes('historic'));
 
@@ -68,52 +64,40 @@ test.describe('Meta', () => {
       // Select a different format
       await formatSelect.selectOption({ index: 1 });
 
-      // Wait for content to update
-      await page.waitForTimeout(1000);
-
-      // Page should still be visible
+      // Wait for content to update by checking page is still visible
       const metaPage = page.locator('.meta-page');
-      await expect(metaPage).toBeVisible();
+      await expect(metaPage).toBeVisible({ timeout: 5000 });
     });
   });
 
   test.describe('Meta Content', () => {
     test('should display meta content or loading state', async ({ page }) => {
-      // Wait for loading to complete
-      await page.waitForTimeout(3000);
-
       const metaPage = page.locator('.meta-page');
-      await expect(metaPage).toBeVisible();
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
 
-      // Should have some content (decks, archetypes, or a message)
-      const hasContent = await page.locator('.meta-page').textContent();
-      expect(hasContent?.length).toBeGreaterThan(0);
+      // Should have some content
+      const content = await metaPage.textContent();
+      expect(content?.length).toBeGreaterThan(0);
     });
   });
 
   test.describe('Loading State', () => {
     test('should show loading indicator while fetching data', async ({ page }) => {
-      // Initial page load might show loading
       const metaPage = page.locator('.meta-page');
       await expect(metaPage).toBeVisible({ timeout: 10000 });
     });
 
     test('should handle refresh button click', async ({ page }) => {
       // Wait for page to load
-      await page.waitForTimeout(2000);
-
       const refreshButton = page.locator('.refresh-button');
-      await expect(refreshButton).toBeVisible();
+      await expect(refreshButton).toBeVisible({ timeout: 10000 });
 
       // Click refresh
       await refreshButton.click();
 
-      // Wait for refresh to complete
-      await page.waitForTimeout(2000);
-
-      // Page should still be visible
+      // Page should still be visible after refresh
       const metaPage = page.locator('.meta-page');
-      await expect(metaPage).toBeVisible();
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
     });
   });
 });

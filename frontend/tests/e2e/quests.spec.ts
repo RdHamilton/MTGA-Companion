@@ -3,23 +3,20 @@ import { test, expect } from '@playwright/test';
 /**
  * Quests Page E2E Tests
  *
- * Prerequisites:
- * - Run `wails dev` in the project root before running these tests
- * - The app should be accessible at http://localhost:34115
+ * Tests the Quests page functionality.
+ * Uses REST API backend for testing.
  */
 test.describe('Quests', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the app and wait for it to load
     await page.goto('/');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 10000 });
 
-    // Navigate to Quests page
     await page.click('a[href="/quests"]');
     await page.waitForURL('**/quests');
   });
 
   test.describe('Navigation and Page Load', () => {
-    test('should navigate to Quests page', async ({ page }) => {
+    test('@smoke should navigate to Quests page', async ({ page }) => {
       await expect(page.locator('h1')).toContainText('Quests');
     });
 
@@ -31,15 +28,14 @@ test.describe('Quests', () => {
 
   test.describe('Active Quests Section', () => {
     test('should display active quests section', async ({ page }) => {
-      // Wait for loading to complete
-      await Promise.race([
-        page.locator('.quests-section').first().waitFor({ state: 'visible', timeout: 10000 }),
-        page.locator('.empty-state').waitFor({ state: 'visible', timeout: 10000 }),
-      ]).catch(() => {});
+      const questsSection = page.locator('.quests-section');
+      const emptyState = page.locator('.empty-state');
 
-      // Either active quests section or empty state should be visible
-      const hasSection = await page.locator('.quests-section').first().isVisible();
-      const hasEmptyState = await page.locator('.empty-state').isVisible();
+      // Wait for either content type to appear
+      await expect(questsSection.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasSection = await questsSection.first().isVisible();
+      const hasEmptyState = await emptyState.isVisible();
 
       expect(hasSection || hasEmptyState).toBeTruthy();
     });
@@ -48,7 +44,8 @@ test.describe('Quests', () => {
   test.describe('Quest History Section', () => {
     test('should have date range filter', async ({ page }) => {
       // Wait for page to load
-      await page.waitForTimeout(1000);
+      const questsHeader = page.locator('.quests-header');
+      await expect(questsHeader).toBeVisible({ timeout: 10000 });
 
       // Check for date range select (if present)
       const dateRangeSelect = page.locator('select').first();
@@ -63,10 +60,10 @@ test.describe('Quests', () => {
 
   test.describe('Loading State', () => {
     test('should not show error state on initial load', async ({ page }) => {
-      // Wait for loading to complete
-      await page.waitForTimeout(2000);
+      // Wait for content to load
+      const content = page.locator('.quests-section, .empty-state, .quests-header');
+      await expect(content.first()).toBeVisible({ timeout: 10000 });
 
-      // Should not show error state
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
     });

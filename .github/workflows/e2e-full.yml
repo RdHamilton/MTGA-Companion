@@ -1,0 +1,128 @@
+name: E2E Full Tests
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      run_cross_browser:
+        description: 'Run cross-browser tests'
+        required: false
+        default: 'true'
+        type: boolean
+  workflow_call:
+    inputs:
+      run_cross_browser:
+        description: 'Run cross-browser tests'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-full:
+    name: E2E Full Test Suite
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: go.sum
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Install Playwright browsers
+      run: |
+        cd frontend
+        npx playwright install --with-deps
+
+    - name: Build API server
+      run: go build -o bin/apiserver ./cmd/apiserver
+
+    - name: Run full E2E tests
+      run: |
+        cd frontend
+        npm run test:e2e:full
+      env:
+        CI: true
+
+    - name: Upload full test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-full-results
+        path: |
+          frontend/playwright-report/
+          frontend/test-results/
+        retention-days: 14
+
+  e2e-cross-browser:
+    name: E2E Cross-Browser Tests
+    runs-on: macos-latest
+    timeout-minutes: 30
+    if: ${{ inputs.run_cross_browser == true || inputs.run_cross_browser == 'true' || github.event_name == 'release' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: go.sum
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Install all Playwright browsers
+      run: |
+        cd frontend
+        npx playwright install --with-deps
+
+    - name: Build API server
+      run: go build -o bin/apiserver ./cmd/apiserver
+
+    - name: Run cross-browser E2E tests
+      run: |
+        cd frontend
+        npm run test:e2e:cross-browser
+      env:
+        CI: true
+
+    - name: Upload cross-browser test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-cross-browser-results
+        path: |
+          frontend/playwright-report/
+          frontend/test-results/
+        retention-days: 14
