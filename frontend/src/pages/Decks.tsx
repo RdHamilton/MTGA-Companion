@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListDecks, CreateDeck, DeleteDeck } from '@/services/api/legacy';
+import { decks as decksApi } from '@/services/api';
 import { gui } from '@/types/models';
 import './Decks.css';
 
 export default function Decks() {
   const navigate = useNavigate();
-  const [decks, setDecks] = useState<gui.DeckListItem[]>([]);
+  const [deckList, setDeckList] = useState<gui.DeckListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -19,8 +19,8 @@ export default function Decks() {
     setLoading(true);
     setError(null);
     try {
-      const deckList = await ListDecks();
-      setDecks(deckList || []);
+      const data = await decksApi.getDecks();
+      setDeckList(data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load decks');
       console.error('Failed to load decks:', err);
@@ -40,7 +40,11 @@ export default function Decks() {
     }
 
     try {
-      const deck = await CreateDeck(newDeckName.trim(), newDeckFormat, 'manual', null);
+      const deck = await decksApi.createDeck({
+        name: newDeckName.trim(),
+        format: newDeckFormat,
+        source: 'manual',
+      });
       setShowCreateDialog(false);
       setNewDeckName('');
       navigate(`/deck-builder/${deck.ID}`);
@@ -59,7 +63,7 @@ export default function Decks() {
     if (!deckToDelete) return;
 
     try {
-      await DeleteDeck(deckToDelete.id);
+      await decksApi.deleteDeck(deckToDelete.id);
       setShowDeleteDialog(false);
       setDeckToDelete(null);
       await loadDecks();
@@ -124,7 +128,7 @@ export default function Decks() {
       {/* Header - Only show button when there are decks */}
       <div className="decks-header">
         <h1>My Decks</h1>
-        {decks.length > 0 && (
+        {deckList.length > 0 && (
           <button className="create-deck-button" onClick={() => setShowCreateDialog(true)}>
             + Create New Deck
           </button>
@@ -132,7 +136,7 @@ export default function Decks() {
       </div>
 
       {/* Decks Grid */}
-      {decks.length === 0 ? (
+      {deckList.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📦</div>
           <h2>No Decks Yet</h2>
@@ -143,7 +147,7 @@ export default function Decks() {
         </div>
       ) : (
         <div className="decks-grid">
-          {decks.map((deck) => (
+          {deckList.map((deck) => (
             <div
               key={deck.id}
               className="deck-card"

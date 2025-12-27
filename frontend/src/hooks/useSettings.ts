@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetAllSettings, SaveAllSettings } from '@/services/api/legacy';
+import { settings as settingsApi } from '@/services/api';
 import type { gui } from '@/types/models';
 
 interface SettingsState {
@@ -74,7 +74,7 @@ export function useSettings(): UseSettingsReturn {
   const loadSettings = useCallback(async () => {
     try {
       setSettings((prev) => ({ ...prev, isLoading: true, error: null }));
-      const backendSettings = await GetAllSettings();
+      const backendSettings = await settingsApi.getSettings();
       if (backendSettings) {
         setSettings({
           autoRefresh: backendSettings.autoRefresh ?? defaultSettings.autoRefresh,
@@ -182,7 +182,7 @@ export function useSettings(): UseSettingsReturn {
         metaWeight: settings.metaWeight,
         personalWeight: settings.personalWeight,
       };
-      await SaveAllSettings(settingsToSave);
+      await settingsApi.updateSettings(settingsToSave);
       setSettings((prev) => ({ ...prev, isSaving: false }));
       return true;
     } catch (err) {

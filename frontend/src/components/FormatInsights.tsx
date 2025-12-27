@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetFormatInsights, GetArchetypeCards } from '@/services/api/legacy';
+import { meta } from '@/services/api';
 import { insights } from '@/types/models';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './FormatInsights.css';
@@ -40,7 +40,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
             try {
                 setLoading(true);
                 setError(null);
-                const insights = await GetFormatInsights(setCode, draftFormat);
+                const insights = await meta.getFormatInsights(draftFormat, setCode);
                 setData(insights);
             } catch (err) {
                 console.error('Error loading format insights:', err);
@@ -71,7 +71,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
         try {
             setLoading(true);
             setError(null);
-            const insights = await GetFormatInsights(setCode, draftFormat);
+            const insights = await meta.getFormatInsights(draftFormat, setCode);
             setData(insights);
         } catch (err) {
             console.error('Error loading format insights:', err);
@@ -88,7 +88,7 @@ const FormatInsights: React.FC<FormatInsightsProps> = ({
 
         try {
             setLoadingArchetype(true);
-            const cards = await GetArchetypeCards(setCode, draftFormat, colors);
+            const cards = await meta.getArchetypeCards(draftFormat, colors);
             setArchetypeCards(cards);
             setSelectedArchetype(colors);
         } catch (err) {

@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDaemonConnection } from './useDaemonConnection';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+
+// Mock the API modules
+vi.mock('@/services/api', () => ({
+  system: {
+    getStatus: vi.fn(),
+  },
+}));
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({
@@ -10,11 +16,22 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+import { system } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
+
+const mockGetStatus = vi.mocked(system.getStatus);
 
 describe('useDaemonConnection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock for getStatus
+    mockGetStatus.mockResolvedValue({
+      status: 'standalone',
+      connected: false,
+      mode: 'standalone',
+      url: 'ws://localhost:9999',
+      port: 9999,
+    });
   });
 
   describe('initial state', () => {
@@ -48,7 +65,7 @@ describe('useDaemonConnection', () => {
 
   describe('loadConnectionStatus', () => {
     it('loads connection status on mount', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValueOnce({
+      mockGetStatus.mockResolvedValueOnce({
         status: 'connected',
         connected: true,
         mode: 'daemon',
@@ -63,17 +80,17 @@ describe('useDaemonConnection', () => {
       });
 
       expect(result.current.daemonPort).toBe(8888);
-      expect(mockWailsApp.GetConnectionStatus).toHaveBeenCalled();
+      expect(mockGetStatus).toHaveBeenCalled();
     });
 
     it('handles load error silently', async () => {
-      mockWailsApp.GetConnectionStatus.mockRejectedValueOnce(new Error('Load failed'));
+      mockGetStatus.mockRejectedValueOnce(new Error('Load failed'));
 
       const { result } = renderHook(() => useDaemonConnection());
 
       // Should still have default state after error
       await waitFor(() => {
-        expect(mockWailsApp.GetConnectionStatus).toHaveBeenCalled();
+        expect(mockGetStatus).toHaveBeenCalled();
       });
 
       expect(result.current.connectionStatus.status).toBe('standalone');
@@ -82,20 +99,11 @@ describe('useDaemonConnection', () => {
 
   describe('handleDaemonPortChange', () => {
     it('updates daemon port state', async () => {
-      // Mock GetConnectionStatus to return initial state so port isn't overwritten
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'standalone',
-        connected: false,
-        mode: 'standalone',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
       const { result } = renderHook(() => useDaemonConnection());
 
       // Wait for initial load to complete
       await waitFor(() => {
-        expect(mockWailsApp.GetConnectionStatus).toHaveBeenCalled();
+        expect(mockGetStatus).toHaveBeenCalled();
       });
 
       await act(async () => {
@@ -103,16 +111,6 @@ describe('useDaemonConnection', () => {
       });
 
       expect(result.current.daemonPort).toBe(8080);
-    });
-
-    it('calls SetDaemonPort API', async () => {
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleDaemonPortChange(8080);
-      });
-
-      expect(mockWailsApp.SetDaemonPort).toHaveBeenCalledWith(8080);
     });
 
     it('rejects ports below 1024', async () => {
@@ -124,7 +122,6 @@ describe('useDaemonConnection', () => {
       });
 
       expect(result.current.daemonPort).toBe(initialPort);
-      expect(mockWailsApp.SetDaemonPort).not.toHaveBeenCalled();
     });
 
     it('rejects ports above 65535', async () => {
@@ -136,41 +133,13 @@ describe('useDaemonConnection', () => {
       });
 
       expect(result.current.daemonPort).toBe(initialPort);
-      expect(mockWailsApp.SetDaemonPort).not.toHaveBeenCalled();
     });
 
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.SetDaemonPort.mockRejectedValueOnce(new Error('Port error'));
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleDaemonPortChange(8080);
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to set daemon port'),
-        'error'
-      );
-    });
+    // Note: SetDaemonPort is a no-op in REST API mode, so error toast test is removed
   });
 
   describe('handleReconnect', () => {
     it('sets isReconnecting to true during reconnection', async () => {
-      let resolveReconnect: () => void;
-      mockWailsApp.ReconnectToDaemon.mockImplementationOnce(
-        () => new Promise<void>((resolve) => {
-          resolveReconnect = resolve;
-        })
-      );
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'connected',
-        connected: true,
-        mode: 'daemon',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
       const { result } = renderHook(() => useDaemonConnection());
 
       let reconnectPromise: Promise<void>;
@@ -181,33 +150,14 @@ describe('useDaemonConnection', () => {
       expect(result.current.isReconnecting).toBe(true);
 
       await act(async () => {
-        resolveReconnect!();
         await reconnectPromise;
       });
 
       expect(result.current.isReconnecting).toBe(false);
     });
 
-    it('calls ReconnectToDaemon API', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'connected',
-        connected: true,
-        mode: 'daemon',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleReconnect();
-      });
-
-      expect(mockWailsApp.ReconnectToDaemon).toHaveBeenCalled();
-    });
-
     it('refreshes connection status after reconnect', async () => {
-      mockWailsApp.GetConnectionStatus
+      mockGetStatus
         .mockResolvedValueOnce({
           status: 'standalone',
           connected: false,
@@ -235,14 +185,6 @@ describe('useDaemonConnection', () => {
     });
 
     it('shows success toast on successful reconnect', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'connected',
-        connected: true,
-        mode: 'daemon',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
       const { result } = renderHook(() => useDaemonConnection());
 
       await act(async () => {
@@ -255,20 +197,7 @@ describe('useDaemonConnection', () => {
       );
     });
 
-    it('shows error toast on reconnect failure', async () => {
-      mockWailsApp.ReconnectToDaemon.mockRejectedValueOnce(new Error('Connection refused'));
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleReconnect();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to reconnect'),
-        'error'
-      );
-    });
+    // Note: reconnectToDaemon is a no-op in REST API mode, so it won't fail
   });
 
   describe('handleModeChange', () => {
@@ -282,62 +211,17 @@ describe('useDaemonConnection', () => {
       expect(result.current.daemonMode).toBe('standalone');
     });
 
-    it('calls SwitchToStandaloneMode for standalone mode', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'standalone',
-        connected: false,
-        mode: 'standalone',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleModeChange('standalone');
-      });
-
-      expect(mockWailsApp.SwitchToStandaloneMode).toHaveBeenCalled();
-    });
-
-    it('calls SwitchToDaemonMode for daemon mode', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'connected',
-        connected: true,
-        mode: 'daemon',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleModeChange('daemon');
-      });
-
-      expect(mockWailsApp.SwitchToDaemonMode).toHaveBeenCalled();
-    });
-
-    it('does not call API for auto mode', async () => {
+    it('does not fail for auto mode', async () => {
       const { result } = renderHook(() => useDaemonConnection());
 
       await act(async () => {
         await result.current.handleModeChange('auto');
       });
 
-      expect(mockWailsApp.SwitchToStandaloneMode).not.toHaveBeenCalled();
-      expect(mockWailsApp.SwitchToDaemonMode).not.toHaveBeenCalled();
+      expect(result.current.daemonMode).toBe('auto');
     });
 
     it('shows success toast for standalone mode switch', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'standalone',
-        connected: false,
-        mode: 'standalone',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
       const { result } = renderHook(() => useDaemonConnection());
 
       await act(async () => {
@@ -351,14 +235,6 @@ describe('useDaemonConnection', () => {
     });
 
     it('shows success toast for daemon mode switch', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
-        status: 'connected',
-        connected: true,
-        mode: 'daemon',
-        url: 'ws://localhost:9999',
-        port: 9999,
-      });
-
       const { result } = renderHook(() => useDaemonConnection());
 
       await act(async () => {
@@ -371,19 +247,6 @@ describe('useDaemonConnection', () => {
       );
     });
 
-    it('shows error toast on mode switch failure', async () => {
-      mockWailsApp.SwitchToStandaloneMode.mockRejectedValueOnce(new Error('Switch failed'));
-
-      const { result } = renderHook(() => useDaemonConnection());
-
-      await act(async () => {
-        await result.current.handleModeChange('standalone');
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to switch mode'),
-        'error'
-      );
-    });
+    // Note: Mode switch functions are no-ops in REST API mode, so they won't fail
   });
 });

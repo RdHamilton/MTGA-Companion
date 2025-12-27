@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { GetCardByArenaID } from '@/services/api/legacy';
+import { cards as cardsApi } from '@/services/api';
 import { models, gui } from '@/types/models';
 import SetSymbol from './SetSymbol';
 import './DeckList.css';
@@ -86,7 +86,7 @@ export default function DeckList({
 
       for (const card of cards) {
         try {
-          const metadata = await GetCardByArenaID(String(card.CardID));
+          const metadata = await cardsApi.getCardByArenaId(card.CardID);
           withMetadata.push({ deckCard: card, metadata });
         } catch (err) {
           console.error(`Failed to load metadata for card ${card.CardID}:`, err);

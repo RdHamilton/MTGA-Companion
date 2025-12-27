@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import RankProgression from './RankProgression';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 import { storage } from '@/types/models';
 
@@ -93,7 +93,7 @@ describe('RankProgression', () => {
       const loadingPromise = new Promise<{ entries: storage.RankTimelineEntry[] }>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.GetRankProgressionTimeline.mockReturnValue(loadingPromise);
+      mockMatches.getRankProgressionTimeline.mockReturnValue(loadingPromise);
 
       renderWithProvider(<RankProgression />);
 
@@ -108,7 +108,7 @@ describe('RankProgression', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockRejectedValue(new Error('Connection error'));
+      mockMatches.getRankProgressionTimeline.mockRejectedValue(new Error('Connection error'));
 
       renderWithProvider(<RankProgression />);
 
@@ -119,7 +119,7 @@ describe('RankProgression', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockRejectedValue('Unknown error');
+      mockMatches.getRankProgressionTimeline.mockRejectedValue('Unknown error');
 
       renderWithProvider(<RankProgression />);
 
@@ -131,7 +131,7 @@ describe('RankProgression', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no timeline data', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({ entries: [] });
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({ entries: [] });
 
       renderWithProvider(<RankProgression />);
 
@@ -144,7 +144,7 @@ describe('RankProgression', () => {
     });
 
     it('should show empty state with limited message when limited format selected', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({ entries: [] });
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({ entries: [] });
 
       renderWithProvider(<RankProgression />);
 
@@ -164,7 +164,7 @@ describe('RankProgression', () => {
     });
 
     it('should show empty state when API returns null', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(null);
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(null);
 
       renderWithProvider(<RankProgression />);
 
@@ -176,7 +176,7 @@ describe('RankProgression', () => {
 
   describe('Data Display', () => {
     it('should render line chart when data is available', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -186,7 +186,7 @@ describe('RankProgression', () => {
     });
 
     it('should display progression summary', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -199,7 +199,7 @@ describe('RankProgression', () => {
     });
 
     it('should display starting and current rank', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -213,7 +213,7 @@ describe('RankProgression', () => {
     });
 
     it('should display climbing direction when rank increased', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -223,7 +223,7 @@ describe('RankProgression', () => {
     });
 
     it('should display falling direction when rank decreased', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({
         entries: [
           createMockTimelineEntry({
             timestamp: new Date('2024-01-10T10:00:00').toISOString(),
@@ -248,7 +248,7 @@ describe('RankProgression', () => {
     });
 
     it('should display stable direction when rank unchanged', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({
         entries: [
           createMockTimelineEntry({
             timestamp: new Date('2024-01-10T10:00:00').toISOString(),
@@ -273,7 +273,7 @@ describe('RankProgression', () => {
     });
 
     it('should display total entries count', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -286,7 +286,7 @@ describe('RankProgression', () => {
     });
 
     it('should display rank changes count', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -298,7 +298,7 @@ describe('RankProgression', () => {
 
   describe('Detailed Timeline', () => {
     it('should display detailed timeline section', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -308,7 +308,7 @@ describe('RankProgression', () => {
     });
 
     it('should mark changed entries in timeline', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -319,7 +319,7 @@ describe('RankProgression', () => {
     });
 
     it('should display step information when available', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -333,7 +333,7 @@ describe('RankProgression', () => {
 
   describe('Filters', () => {
     it('should render format filter', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -343,7 +343,7 @@ describe('RankProgression', () => {
     });
 
     it('should render date range filter', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -353,7 +353,7 @@ describe('RankProgression', () => {
     });
 
     it('should update format when filter changes', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -372,24 +372,24 @@ describe('RankProgression', () => {
     });
 
     it('should refetch data when format changes', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(1);
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalledTimes(1);
       });
 
       const formatSelect = getSelectByLabel('Format');
       fireEvent.change(formatSelect, { target: { value: 'limited' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(2);
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalledTimes(2);
       });
     });
 
     it('should update date range when filter changes', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -406,26 +406,26 @@ describe('RankProgression', () => {
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(1);
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalledTimes(1);
       });
 
       const dateRangeSelect = getSelectByLabel('Date Range');
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(2);
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalledTimes(2);
       });
     });
   });
 
   describe('Page Header', () => {
     it('should display page title', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -435,7 +435,7 @@ describe('RankProgression', () => {
     });
 
     it('should display format note for constructed', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -447,7 +447,7 @@ describe('RankProgression', () => {
     });
 
     it('should display format note for limited', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -468,22 +468,22 @@ describe('RankProgression', () => {
 
   describe('API Calls', () => {
     it('should call GetRankProgressionTimeline with constructed format by default', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalled();
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalled();
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const call = mockWailsApp.GetRankProgressionTimeline.mock.calls[0] as any[];
+      const call = mockMatches.getRankProgressionTimeline.mock.calls[0] as any[];
       expect(call[0]).toBe('constructed');
       expect(call[3]).toBe('daily');
     });
 
     it('should call GetRankProgressionTimeline with limited format when selected', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -495,11 +495,11 @@ describe('RankProgression', () => {
       fireEvent.change(formatSelect, { target: { value: 'limited' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetRankProgressionTimeline).toHaveBeenCalledTimes(2);
+        expect(mockMatches.getRankProgressionTimeline).toHaveBeenCalledTimes(2);
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const calls = mockWailsApp.GetRankProgressionTimeline.mock.calls as any[][];
+      const calls = mockMatches.getRankProgressionTimeline.mock.calls as any[][];
       const lastCall = calls[calls.length - 1];
       expect(lastCall[0]).toBe('limited');
       expect(lastCall[3]).toBe('daily');
@@ -508,7 +508,7 @@ describe('RankProgression', () => {
 
   describe('Chart Data Transformation', () => {
     it('should transform timeline data correctly for chart', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
+      mockMatches.getRankProgressionTimeline.mockResolvedValue(createMockTimelineResponse());
 
       renderWithProvider(<RankProgression />);
 
@@ -525,7 +525,7 @@ describe('RankProgression', () => {
 
   describe('Mythic Rank Handling', () => {
     it('should handle Mythic rank correctly', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({
         entries: [
           createMockTimelineEntry({
             timestamp: new Date('2024-01-10T10:00:00').toISOString(),
@@ -552,7 +552,7 @@ describe('RankProgression', () => {
 
   describe('Edge Cases', () => {
     it('should handle entries with null rank_class', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({
         entries: [
           createMockTimelineEntry({
             rank: 'Unknown',
@@ -570,7 +570,7 @@ describe('RankProgression', () => {
     });
 
     it('should handle entries with undefined rank_level', async () => {
-      mockWailsApp.GetRankProgressionTimeline.mockResolvedValue({
+      mockMatches.getRankProgressionTimeline.mockResolvedValue({
         entries: [
           createMockTimelineEntry({
             rank: 'Gold',

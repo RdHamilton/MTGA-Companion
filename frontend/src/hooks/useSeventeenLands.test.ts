@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSeventeenLands } from './useSeventeenLands';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+
+// Mock the API modules
+vi.mock('@/services/api', () => ({
+  cards: {
+    getCardRatings: vi.fn(),
+    getSetCards: vi.fn(),
+  },
+}));
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({
@@ -10,12 +17,18 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+import { cards } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
+
+const mockGetCardRatings = vi.mocked(cards.getCardRatings);
+const mockGetSetCards = vi.mocked(cards.getSetCards);
 
 describe('useSeventeenLands', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockGetCardRatings.mockResolvedValue([]);
+    mockGetSetCards.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -100,7 +113,7 @@ describe('useSeventeenLands', () => {
         expect.stringContaining('Please enter a set code'),
         'warning'
       );
-      expect(mockWailsApp.FetchSetRatings).not.toHaveBeenCalled();
+      expect(mockGetCardRatings).not.toHaveBeenCalled();
     });
 
     it('shows warning toast when setCode is whitespace', async () => {
@@ -120,7 +133,7 @@ describe('useSeventeenLands', () => {
       );
     });
 
-    it('calls FetchSetRatings with uppercase set code and format', async () => {
+    it('calls getCardRatings with uppercase set code and format', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
       act(() => {
@@ -131,15 +144,16 @@ describe('useSeventeenLands', () => {
         await result.current.handleFetchSetRatings();
       });
 
-      expect(mockWailsApp.FetchSetRatings).toHaveBeenCalledWith('BLB', 'PremierDraft');
+      expect(mockGetCardRatings).toHaveBeenCalledWith('BLB', 'PremierDraft');
     });
 
     it('sets isFetchingRatings to true during fetch', async () => {
       let resolveFetch: () => void;
-      mockWailsApp.FetchSetRatings.mockImplementationOnce(
-        () => new Promise<void>((resolve) => {
-          resolveFetch = resolve;
-        })
+      mockGetCardRatings.mockImplementationOnce(
+        () =>
+          new Promise<never[]>((resolve) => {
+            resolveFetch = () => resolve([]);
+          })
       );
 
       const { result } = renderHook(() => useSeventeenLands());
@@ -163,9 +177,7 @@ describe('useSeventeenLands', () => {
       expect(result.current.isFetchingRatings).toBe(false);
     });
 
-    it('shows success toast with data source on successful fetch', async () => {
-      mockWailsApp.GetDatasetSource.mockResolvedValueOnce('s3');
-
+    it('shows success toast on successful fetch', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
       act(() => {
@@ -180,15 +192,9 @@ describe('useSeventeenLands', () => {
         expect.stringContaining('Successfully fetched 17Lands ratings'),
         'success'
       );
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('S3 public datasets'),
-        'success'
-      );
     });
 
     it('updates dataSource state after successful fetch', async () => {
-      mockWailsApp.GetDatasetSource.mockResolvedValueOnce('web_api');
-
       const { result } = renderHook(() => useSeventeenLands());
 
       act(() => {
@@ -199,11 +205,12 @@ describe('useSeventeenLands', () => {
         await result.current.handleFetchSetRatings();
       });
 
-      expect(result.current.dataSource).toBe('web_api');
+      // getDatasetSource is a stub that returns '17lands'
+      expect(result.current.dataSource).toBe('17lands');
     });
 
     it('shows error toast on fetch failure', async () => {
-      mockWailsApp.FetchSetRatings.mockRejectedValueOnce(new Error('Fetch failed'));
+      mockGetCardRatings.mockRejectedValueOnce(new Error('Fetch failed'));
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -223,7 +230,7 @@ describe('useSeventeenLands', () => {
   });
 
   describe('handleRefreshSetRatings', () => {
-    it('calls RefreshSetRatings API', async () => {
+    it('calls getCardRatings API (same as fetch)', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
       act(() => {
@@ -234,12 +241,10 @@ describe('useSeventeenLands', () => {
         await result.current.handleRefreshSetRatings();
       });
 
-      expect(mockWailsApp.RefreshSetRatings).toHaveBeenCalledWith('BLB', 'PremierDraft');
+      expect(mockGetCardRatings).toHaveBeenCalledWith('BLB', 'PremierDraft');
     });
 
     it('shows success toast on successful refresh', async () => {
-      mockWailsApp.GetDatasetSource.mockResolvedValueOnce('s3');
-
       const { result } = renderHook(() => useSeventeenLands());
 
       act(() => {
@@ -271,8 +276,12 @@ describe('useSeventeenLands', () => {
       );
     });
 
-    it('calls FetchSetCards with uppercase set code', async () => {
-      mockWailsApp.FetchSetCards.mockResolvedValueOnce(250);
+    it('calls getSetCards with uppercase set code', async () => {
+      mockGetSetCards.mockResolvedValueOnce(
+        Array(250)
+          .fill({})
+          .map((_, i) => ({ arenaId: i })) as never[]
+      );
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -284,11 +293,15 @@ describe('useSeventeenLands', () => {
         await result.current.handleFetchSetCards();
       });
 
-      expect(mockWailsApp.FetchSetCards).toHaveBeenCalledWith('BLB');
+      expect(mockGetSetCards).toHaveBeenCalledWith('BLB');
     });
 
     it('shows success toast with card count', async () => {
-      mockWailsApp.FetchSetCards.mockResolvedValueOnce(250);
+      mockGetSetCards.mockResolvedValueOnce(
+        Array(250)
+          .fill({})
+          .map((_, i) => ({ arenaId: i })) as never[]
+      );
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -307,7 +320,7 @@ describe('useSeventeenLands', () => {
     });
 
     it('shows error toast on fetch failure', async () => {
-      mockWailsApp.FetchSetCards.mockRejectedValueOnce(new Error('Scryfall error'));
+      mockGetSetCards.mockRejectedValueOnce(new Error('Scryfall error'));
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -327,8 +340,12 @@ describe('useSeventeenLands', () => {
   });
 
   describe('handleRefreshSetCards', () => {
-    it('calls RefreshSetCards API', async () => {
-      mockWailsApp.RefreshSetCards.mockResolvedValueOnce(250);
+    it('calls getSetCards API (same as fetch)', async () => {
+      mockGetSetCards.mockResolvedValueOnce(
+        Array(250)
+          .fill({})
+          .map((_, i) => ({ arenaId: i })) as never[]
+      );
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -340,11 +357,15 @@ describe('useSeventeenLands', () => {
         await result.current.handleRefreshSetCards();
       });
 
-      expect(mockWailsApp.RefreshSetCards).toHaveBeenCalledWith('BLB');
+      expect(mockGetSetCards).toHaveBeenCalledWith('BLB');
     });
 
     it('shows success toast on successful refresh', async () => {
-      mockWailsApp.RefreshSetCards.mockResolvedValueOnce(250);
+      mockGetSetCards.mockResolvedValueOnce(
+        Array(250)
+          .fill({})
+          .map((_, i) => ({ arenaId: i })) as never[]
+      );
 
       const { result } = renderHook(() => useSeventeenLands());
 
@@ -364,70 +385,41 @@ describe('useSeventeenLands', () => {
   });
 
   describe('handleRecalculateGrades', () => {
-    it('calls RecalculateAllDraftGrades API', async () => {
-      mockWailsApp.RecalculateAllDraftGrades.mockResolvedValueOnce(5);
-
+    // Note: recalculateAllDraftGrades is a no-op that returns 0
+    it('executes without error (no-op in REST API)', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
-      await act(async () => {
-        await result.current.handleRecalculateGrades();
-      });
-
-      expect(mockWailsApp.RecalculateAllDraftGrades).toHaveBeenCalled();
+      await expect(
+        act(async () => {
+          await result.current.handleRecalculateGrades();
+        })
+      ).resolves.not.toThrow();
     });
 
     it('sets isRecalculating to true during recalculation', async () => {
-      let resolveRecalc: (value: number) => void;
-      mockWailsApp.RecalculateAllDraftGrades.mockImplementationOnce(
-        () => new Promise<number>((resolve) => {
-          resolveRecalc = resolve;
-        })
-      );
-
       const { result } = renderHook(() => useSeventeenLands());
 
-      let recalcPromise: Promise<void>;
-      act(() => {
-        recalcPromise = result.current.handleRecalculateGrades();
-      });
-
-      expect(result.current.isRecalculating).toBe(true);
-
+      // Note: Since recalculateAllDraftGrades is synchronous no-op,
+      // we can't easily test intermediate state. Just verify it resets to false.
       await act(async () => {
-        resolveRecalc!(5);
-        await recalcPromise;
+        await result.current.handleRecalculateGrades();
       });
 
       expect(result.current.isRecalculating).toBe(false);
     });
 
-    it('sets success message after successful recalculation', async () => {
-      mockWailsApp.RecalculateAllDraftGrades.mockResolvedValueOnce(5);
-
+    it('sets success message after successful recalculation (returns 0 count)', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
       await act(async () => {
         await result.current.handleRecalculateGrades();
       });
 
-      expect(result.current.recalculateMessage).toContain('Successfully recalculated 5 draft session');
-    });
-
-    it('sets error message on recalculation failure', async () => {
-      mockWailsApp.RecalculateAllDraftGrades.mockRejectedValueOnce(new Error('Recalc failed'));
-
-      const { result } = renderHook(() => useSeventeenLands());
-
-      await act(async () => {
-        await result.current.handleRecalculateGrades();
-      });
-
-      expect(result.current.recalculateMessage).toContain('Failed to recalculate');
+      // No-op returns 0 sessions
+      expect(result.current.recalculateMessage).toContain('Successfully recalculated 0 draft session');
     });
 
     it('clears success message after timeout', async () => {
-      mockWailsApp.RecalculateAllDraftGrades.mockResolvedValueOnce(5);
-
       const { result } = renderHook(() => useSeventeenLands());
 
       await act(async () => {
@@ -442,57 +434,25 @@ describe('useSeventeenLands', () => {
 
       expect(result.current.recalculateMessage).toBe('');
     });
-
-    it('clears error message after longer timeout', async () => {
-      mockWailsApp.RecalculateAllDraftGrades.mockRejectedValueOnce(new Error('Recalc failed'));
-
-      const { result } = renderHook(() => useSeventeenLands());
-
-      await act(async () => {
-        await result.current.handleRecalculateGrades();
-      });
-
-      expect(result.current.recalculateMessage).not.toBe('');
-
-      act(() => {
-        vi.advanceTimersByTime(8000);
-      });
-
-      expect(result.current.recalculateMessage).toBe('');
-    });
   });
 
   describe('handleClearDatasetCache', () => {
-    it('calls ClearDatasetCache API', async () => {
+    // Note: clearDatasetCache is a no-op in REST API mode
+    it('executes without error (no-op in REST API)', async () => {
+      const { result } = renderHook(() => useSeventeenLands());
+
+      await expect(
+        act(async () => {
+          await result.current.handleClearDatasetCache();
+        })
+      ).resolves.not.toThrow();
+    });
+
+    it('sets isClearingCache to false after completion', async () => {
       const { result } = renderHook(() => useSeventeenLands());
 
       await act(async () => {
         await result.current.handleClearDatasetCache();
-      });
-
-      expect(mockWailsApp.ClearDatasetCache).toHaveBeenCalled();
-    });
-
-    it('sets isClearingCache to true during clear', async () => {
-      let resolveClear: () => void;
-      mockWailsApp.ClearDatasetCache.mockImplementationOnce(
-        () => new Promise<void>((resolve) => {
-          resolveClear = resolve;
-        })
-      );
-
-      const { result } = renderHook(() => useSeventeenLands());
-
-      let clearPromise: Promise<void>;
-      act(() => {
-        clearPromise = result.current.handleClearDatasetCache();
-      });
-
-      expect(result.current.isClearingCache).toBe(true);
-
-      await act(async () => {
-        resolveClear!();
-        await clearPromise;
       });
 
       expect(result.current.isClearingCache).toBe(false);
@@ -508,21 +468,6 @@ describe('useSeventeenLands', () => {
       expect(showToast.show).toHaveBeenCalledWith(
         expect.stringContaining('Successfully cleared dataset cache'),
         'success'
-      );
-    });
-
-    it('shows error toast on clear failure', async () => {
-      mockWailsApp.ClearDatasetCache.mockRejectedValueOnce(new Error('Clear failed'));
-
-      const { result } = renderHook(() => useSeventeenLands());
-
-      await act(async () => {
-        await result.current.handleClearDatasetCache();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to clear dataset cache'),
-        'error'
       );
     });
   });

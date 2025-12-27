@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import SetSymbol, { clearSetInfoCache } from './SetSymbol';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockCards } from '@/test/mocks/apiMock';
 import { gui } from '@/types/models';
 
 // Helper to create mock set info
 function createMockSetInfo(overrides: Partial<gui.SetInfo> = {}): gui.SetInfo {
-  return new gui.SetInfo({
+  return Object.assign(new gui.SetInfo({}), {
     code: 'DSK',
     name: 'Duskmourn: House of Horror',
     iconSvgUri: 'https://svgs.scryfall.io/sets/dsk.svg',
@@ -15,6 +15,11 @@ function createMockSetInfo(overrides: Partial<gui.SetInfo> = {}): gui.SetInfo {
     cardCount: 277,
     ...overrides,
   });
+}
+
+// Helper to create a list of sets
+function createMockSetList(sets: Array<Partial<gui.SetInfo>>): gui.SetInfo[] {
+  return sets.map((s) => createMockSetInfo(s));
 }
 
 describe('SetSymbol Component', () => {
@@ -31,7 +36,7 @@ describe('SetSymbol Component', () => {
   describe('Loading State', () => {
     it('should show loading state initially', () => {
       // Don't resolve the promise immediately
-      mockWailsApp.GetSetInfo.mockImplementation(() => new Promise(() => {}));
+      mockCards.getAllSetInfo.mockImplementation(() => new Promise(() => {}));
 
       render(<SetSymbol setCode="DSK" />);
 
@@ -41,7 +46,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should show set code in uppercase during loading', () => {
-      mockWailsApp.GetSetInfo.mockImplementation(() => new Promise(() => {}));
+      mockCards.getAllSetInfo.mockImplementation(() => new Promise(() => {}));
 
       render(<SetSymbol setCode="blb" />);
 
@@ -53,7 +58,7 @@ describe('SetSymbol Component', () => {
   describe('Success State', () => {
     it('should render set symbol image when data loads', async () => {
       const mockSetInfo = createMockSetInfo();
-      mockWailsApp.GetSetInfo.mockResolvedValue(mockSetInfo);
+      mockCards.getAllSetInfo.mockResolvedValue([mockSetInfo]);
 
       render(<SetSymbol setCode="DSK" />);
 
@@ -66,7 +71,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should apply correct CSS class for icon', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" />);
 
@@ -77,7 +82,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should set tooltip with set name by default', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       render(<SetSymbol setCode="DSK" />);
 
@@ -88,7 +93,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should not show tooltip when showTooltip is false', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       render(<SetSymbol setCode="DSK" showTooltip={false} />);
 
@@ -101,7 +106,7 @@ describe('SetSymbol Component', () => {
 
   describe('Error State', () => {
     it('should show text fallback when API call fails', async () => {
-      mockWailsApp.GetSetInfo.mockRejectedValue(new Error('Network error'));
+      mockCards.getAllSetInfo.mockRejectedValue(new Error('Network error'));
 
       const { container } = render(<SetSymbol setCode="DSK" />);
 
@@ -113,7 +118,8 @@ describe('SetSymbol Component', () => {
     });
 
     it('should show text fallback when set not found', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(null);
+      // Return list without the requested set
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo({ code: 'OTHER' })]);
 
       const { container } = render(<SetSymbol setCode="XXX" />);
 
@@ -125,9 +131,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should show text fallback when iconSvgUri is empty', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(
-        createMockSetInfo({ iconSvgUri: '' })
-      );
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo({ iconSvgUri: '' })]);
 
       const { container } = render(<SetSymbol setCode="DSK" />);
 
@@ -140,7 +144,7 @@ describe('SetSymbol Component', () => {
 
   describe('Size Variants', () => {
     it('should render small size (16px)', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       render(<SetSymbol setCode="DSK" size="small" />);
 
@@ -151,7 +155,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should render medium size by default (20px)', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       render(<SetSymbol setCode="DSK" />);
 
@@ -162,7 +166,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should render large size (24px)', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       render(<SetSymbol setCode="DSK" size="large" />);
 
@@ -175,7 +179,7 @@ describe('SetSymbol Component', () => {
 
   describe('Rarity Colors', () => {
     it('should apply common rarity class', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" rarity="common" />);
 
@@ -186,7 +190,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should apply uncommon rarity class', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" rarity="uncommon" />);
 
@@ -197,7 +201,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should apply rare rarity class', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" rarity="rare" />);
 
@@ -208,7 +212,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should apply mythic rarity class', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" rarity="mythic" />);
 
@@ -219,7 +223,7 @@ describe('SetSymbol Component', () => {
     });
 
     it('should not apply rarity class when rarity is not specified', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" />);
 
@@ -235,7 +239,7 @@ describe('SetSymbol Component', () => {
 
   describe('Caching', () => {
     it('should cache set info and not call API twice for same set', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { rerender } = render(<SetSymbol setCode="DSK" />);
 
@@ -249,23 +253,16 @@ describe('SetSymbol Component', () => {
       // Should still show the image (cached)
       expect(screen.getByRole('img')).toBeInTheDocument();
 
-      // GetSetInfo should only be called once due to caching
-      expect(mockWailsApp.GetSetInfo).toHaveBeenCalledTimes(1);
+      // getAllSetInfo should only be called once due to caching
+      expect(mockCards.getAllSetInfo).toHaveBeenCalledTimes(1);
     });
 
     it('should fetch new set when setCode changes', async () => {
-      const dskInfo = createMockSetInfo({ code: 'DSK', name: 'Duskmourn' });
-      const blbInfo = createMockSetInfo({
-        code: 'BLB',
-        name: 'Bloomburrow',
-        iconSvgUri: 'https://svgs.scryfall.io/sets/blb.svg',
-      });
-
-      mockWailsApp.GetSetInfo.mockImplementation((setCode?: string) => {
-        if (setCode === 'DSK') return Promise.resolve(dskInfo);
-        if (setCode === 'BLB') return Promise.resolve(blbInfo);
-        return Promise.resolve(null);
-      });
+      const allSets = createMockSetList([
+        { code: 'DSK', name: 'Duskmourn' },
+        { code: 'BLB', name: 'Bloomburrow', iconSvgUri: 'https://svgs.scryfall.io/sets/blb.svg' },
+      ]);
+      mockCards.getAllSetInfo.mockResolvedValue(allSets);
 
       const { rerender } = render(<SetSymbol setCode="DSK" />);
 
@@ -273,7 +270,8 @@ describe('SetSymbol Component', () => {
         expect(screen.getByRole('img')).toHaveAttribute('alt', 'Duskmourn');
       });
 
-      // Change to different set
+      // Clear cache and change to different set
+      clearSetInfoCache();
       rerender(<SetSymbol setCode="BLB" />);
 
       await waitFor(() => {
@@ -284,7 +282,7 @@ describe('SetSymbol Component', () => {
 
   describe('Image Error Handling', () => {
     it('should show text fallback when image fails to load', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       const { container } = render(<SetSymbol setCode="DSK" />);
 
@@ -305,13 +303,13 @@ describe('SetSymbol Component', () => {
   });
 
   describe('API Integration', () => {
-    it('should call GetSetInfo with correct set code', async () => {
-      mockWailsApp.GetSetInfo.mockResolvedValue(createMockSetInfo());
+    it('should call getAllSetInfo to fetch set data', async () => {
+      mockCards.getAllSetInfo.mockResolvedValue([createMockSetInfo({ code: 'FDN' })]);
 
       render(<SetSymbol setCode="FDN" />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetSetInfo).toHaveBeenCalledWith('FDN');
+        expect(mockCards.getAllSetInfo).toHaveBeenCalled();
       });
     });
 
@@ -319,7 +317,7 @@ describe('SetSymbol Component', () => {
       render(<SetSymbol setCode="" />);
 
       // Should not call API with empty set code
-      expect(mockWailsApp.GetSetInfo).not.toHaveBeenCalled();
+      expect(mockCards.getAllSetInfo).not.toHaveBeenCalled();
     });
   });
 });

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
@@ -341,4 +342,53 @@ func (h *MatchHandler) GetRankProgression(w http.ResponseWriter, r *http.Request
 	}
 
 	response.Success(w, progression)
+}
+
+// GetRankProgressionTimeline returns a timeline of rank progression.
+func (h *MatchHandler) GetRankProgressionTimeline(w http.ResponseWriter, r *http.Request) {
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "constructed"
+	}
+
+	// Parse date parameters
+	var startDate, endDate *time.Time
+	if startStr := r.URL.Query().Get("start_date"); startStr != "" {
+		if t, err := time.Parse(time.RFC3339, startStr); err == nil {
+			startDate = &t
+		}
+	}
+	if endStr := r.URL.Query().Get("end_date"); endStr != "" {
+		if t, err := time.Parse(time.RFC3339, endStr); err == nil {
+			endDate = &t
+		}
+	}
+
+	periodStr := r.URL.Query().Get("period")
+	if periodStr == "" {
+		periodStr = "daily"
+	}
+
+	// Convert period string to TimelinePeriod
+	var period storage.TimelinePeriod
+	switch periodStr {
+	case "all":
+		period = storage.PeriodAll
+	case "daily":
+		period = storage.PeriodDaily
+	case "weekly":
+		period = storage.PeriodWeekly
+	case "monthly":
+		period = storage.PeriodMonthly
+	default:
+		period = storage.PeriodDaily
+	}
+
+	timeline, err := h.facade.GetRankProgressionTimeline(r.Context(), format, startDate, endDate, period)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, timeline)
 }

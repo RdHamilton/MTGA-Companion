@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { GetTrendAnalysis } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { storage } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -54,8 +54,13 @@ const WinRateTrend = () => {
         formats = [format];
       }
 
-      const data = await GetTrendAnalysis(start, now, periodType, formats || []);
-      setAnalysis(data);
+      const data = await matches.getTrendAnalysis({
+        start_date: start.toISOString(),
+        end_date: now.toISOString(),
+        period_type: periodType,
+        formats: formats || undefined,
+      });
+      setAnalysis(data as storage.TrendAnalysis);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load trend data');
       console.error('Error loading trend data:', err);

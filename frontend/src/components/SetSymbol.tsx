@@ -1,7 +1,17 @@
 import { useState, useEffect, memo } from 'react';
-import { GetSetInfo } from '@/services/api/legacy';
+import { cards } from '@/services/api';
 import { gui } from '@/types/models';
 import './SetSymbol.css';
+
+// Get set info by code from the full list
+async function getSetInfo(setCode: string): Promise<gui.SetInfo> {
+  const sets = await cards.getAllSetInfo();
+  const set = sets.find((s) => s.code === setCode);
+  if (!set) {
+    throw new Error(`Set not found: ${setCode}`);
+  }
+  return set;
+}
 
 interface SetSymbolProps {
   setCode: string;
@@ -35,7 +45,7 @@ const SetSymbol = memo(({ setCode, size = 'medium', rarity, showTooltip = true }
 
       try {
         setLoading(true);
-        const info = await GetSetInfo(setCode);
+        const info = await getSetInfo(setCode);
         if (info) {
           const setInfoObj = gui.SetInfo.createFrom(info);
           setInfoCache.set(setCode, setInfoObj);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { GetStatsByDeck } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -74,7 +74,7 @@ const DeckPerformance = () => {
           }
         }
 
-        const data = await GetStatsByDeck(filter);
+        const data = await matches.getMatchupMatrix(matches.statsFilterToRequest(filter));
 
         // Convert map to array
         const statsArray: DeckStats[] = Object.entries(data || {}).map(([deckName, stats]) => ({
@@ -148,7 +148,7 @@ const DeckPerformance = () => {
           }
         }
 
-        const data = await GetStatsByDeck(filter);
+        const data = await matches.getMatchupMatrix(matches.statsFilterToRequest(filter));
 
         // Convert map to array
         const statsArray: DeckStats[] = Object.entries(data || {}).map(([deckName, stats]) => ({

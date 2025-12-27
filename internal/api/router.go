@@ -34,6 +34,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/performance-by-hour", matchHandler.GetPerformanceByHour)
 			r.Post("/matchup-matrix", matchHandler.GetMatchupMatrix)
 			r.Get("/rank-progression/{format}", matchHandler.GetRankProgression)
+			r.Get("/rank-progression-timeline", matchHandler.GetRankProgressionTimeline)
 		})
 
 		// Draft routes

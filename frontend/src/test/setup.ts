@@ -2,13 +2,13 @@ import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import { mockWailsRuntime, mockEventEmitter } from './mocks/websocketMock';
-import { mockWailsApp, resetMocks } from './mocks/apiMock';
+import { mockApi, resetMocks } from './mocks/apiMock';
 
 // Mock WebSocket client globally
 vi.mock('@/services/websocketClient', () => mockWailsRuntime);
 
-// Mock API legacy bindings globally
-vi.mock('@/services/api/legacy', () => mockWailsApp);
+// Mock the REST API modules globally
+vi.mock('@/services/api', () => mockApi);
 
 // Cleanup after each test
 afterEach(() => {
@@ -41,7 +41,7 @@ global.IntersectionObserver = class IntersectionObserver {
     return [];
   }
   unobserve() {}
-} as any;
+} as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
@@ -49,4 +49,4 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
   observe() {}
   unobserve() {}
-} as any;
+} as unknown as typeof ResizeObserver;

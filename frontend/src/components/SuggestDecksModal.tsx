@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react';
-import {
-  SuggestDecks,
-  ApplySuggestedDeck,
-  ExportSuggestedDeck,
-} from '@/services/api/legacy';
+import { decks } from '@/services/api';
+import { downloadTextFile } from '@/utils/download';
 import { gui } from '@/types/models';
 import DeckSuggestionCard from './DeckSuggestionCard';
 import './SuggestDecksModal.css';
+
+// Suggest decks from draft pool
+async function suggestDecksFromPool(sessionId: string): Promise<gui.SuggestDecksResponse> {
+  const suggestions = await decks.suggestDecks({ session_id: sessionId });
+  return {
+    suggestions,
+    totalCombos: suggestions.length,
+    viableCombos: suggestions.length,
+  } as gui.SuggestDecksResponse;
+}
+
+// Export suggested deck to file
+async function exportSuggestedDeck(suggestion: gui.SuggestedDeckResponse, deckName: string): Promise<void> {
+  const content = await decks.getSuggestedDeckExportContent(suggestion, deckName);
+  downloadTextFile(content, `${deckName || 'deck'}.txt`);
+}
 
 interface SuggestDecksModalProps {
   isOpen: boolean;
@@ -42,7 +55,7 @@ export default function SuggestDecksModal({
     setLoading(true);
     setError(null);
     try {
-      const response = await SuggestDecks(draftEventID);
+      const response = await suggestDecksFromPool(draftEventID);
       if (response.error) {
         setError(response.error);
       } else {
@@ -62,7 +75,7 @@ export default function SuggestDecksModal({
   const handleApplyDeck = async (suggestion: gui.SuggestedDeckResponse) => {
     setApplying(true);
     try {
-      await ApplySuggestedDeck(currentDeckID, suggestion);
+      await decks.applySuggestedDeck(currentDeckID, suggestion);
       onDeckApplied();
       onClose();
     } catch (err) {
@@ -76,7 +89,7 @@ export default function SuggestDecksModal({
     setExporting(true);
     try {
       const exportName = `${deckName} - ${suggestion.colorCombo.name}`;
-      await ExportSuggestedDeck(suggestion, exportName);
+      await exportSuggestedDeck(suggestion, exportName);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export deck');
     } finally {

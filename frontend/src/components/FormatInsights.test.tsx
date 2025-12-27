@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '../test/utils/testUtils';
 import userEvent from '@testing-library/user-event';
 import FormatInsights from './FormatInsights';
-import { mockWailsApp } from '../test';
+import { mockMeta } from '@/test/mocks/apiMock';
 
 describe('FormatInsights', () => {
   beforeEach(() => {
@@ -120,7 +120,7 @@ describe('FormatInsights', () => {
 
   it('should expand and load insights when header is clicked', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -130,7 +130,7 @@ describe('FormatInsights', () => {
     expect(screen.getByText(/▼/)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockWailsApp.GetFormatInsights).toHaveBeenCalledWith('BLB', 'PremierDraft');
+      expect(mockMeta.getFormatInsights).toHaveBeenCalledWith('PremierDraft', 'BLB');
     });
 
     await waitFor(() => {
@@ -140,7 +140,7 @@ describe('FormatInsights', () => {
 
   it('should display error when loading fails', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockRejectedValue(new Error('Failed to load'));
+    mockMeta.getFormatInsights.mockRejectedValue(new Error('Failed to load'));
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -153,7 +153,7 @@ describe('FormatInsights', () => {
 
   it('should display color rankings when data is loaded', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -174,7 +174,7 @@ describe('FormatInsights', () => {
 
   it('should filter color rankings by mono color', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -199,7 +199,7 @@ describe('FormatInsights', () => {
 
   it('should sort color rankings by different criteria', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -232,8 +232,8 @@ describe('FormatInsights', () => {
 
   it('should load archetype cards when archetype is clicked', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
-    mockWailsApp.GetArchetypeCards.mockResolvedValue(mockArchetypeCards);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getArchetypeCards.mockResolvedValue(mockArchetypeCards);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -254,7 +254,7 @@ describe('FormatInsights', () => {
       await user.click(wuArchetype as HTMLElement);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetArchetypeCards).toHaveBeenCalledWith('BLB', 'PremierDraft', 'WU');
+        expect(mockMeta.getArchetypeCards).toHaveBeenCalledWith('PremierDraft', 'WU');
       });
 
       await waitFor(() => {
@@ -266,8 +266,8 @@ describe('FormatInsights', () => {
 
   it('should close archetype details when close button is clicked', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
-    mockWailsApp.GetArchetypeCards.mockResolvedValue(mockArchetypeCards);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getArchetypeCards.mockResolvedValue(mockArchetypeCards);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -300,7 +300,7 @@ describe('FormatInsights', () => {
 
   it('should display format speed information', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -315,7 +315,7 @@ describe('FormatInsights', () => {
 
   it('should display color analysis', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -331,7 +331,7 @@ describe('FormatInsights', () => {
 
   it('should display top cards sections', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
@@ -352,35 +352,35 @@ describe('FormatInsights', () => {
 
   it('should refresh insights when refresh button is clicked', async () => {
     const user = userEvent.setup();
-    mockWailsApp.GetFormatInsights.mockResolvedValue(mockInsightsData);
+    mockMeta.getFormatInsights.mockResolvedValue(mockInsightsData);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
     await user.click(screen.getByText(/Archetype Performance Dashboard/));
 
     await waitFor(() => {
-      expect(mockWailsApp.GetFormatInsights).toHaveBeenCalledTimes(1);
+      expect(mockMeta.getFormatInsights).toHaveBeenCalledTimes(1);
     });
 
     const refreshButton = screen.getByText('Refresh');
     await user.click(refreshButton);
 
     await waitFor(() => {
-      expect(mockWailsApp.GetFormatInsights).toHaveBeenCalledTimes(2);
+      expect(mockMeta.getFormatInsights).toHaveBeenCalledTimes(2);
     });
   });
 
   it('should show empty message when no data and no error', async () => {
     const user = userEvent.setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockWailsApp.GetFormatInsights.mockResolvedValue(null as any);
+    mockMeta.getFormatInsights.mockResolvedValue(null as any);
 
     render(<FormatInsights setCode="BLB" draftFormat="PremierDraft" />);
 
     await user.click(screen.getByText(/Archetype Performance Dashboard/));
 
     await waitFor(() => {
-      expect(mockWailsApp.GetFormatInsights).toHaveBeenCalled();
+      expect(mockMeta.getFormatInsights).toHaveBeenCalled();
     });
 
     await waitFor(

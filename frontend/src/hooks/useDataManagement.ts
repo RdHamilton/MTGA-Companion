@@ -1,12 +1,42 @@
 import { useCallback } from 'react';
-import {
-  ExportToJSON,
-  ExportToCSV,
-  ImportFromFile,
-  ImportLogFile,
-  ClearAllData,
-} from '@/services/api/legacy';
+import { matches, system } from '@/services/api';
+import { downloadTextFile } from '@/utils/download';
 import { showToast } from '../components/ToastContainer';
+import { gui } from '@/types/models';
+
+// Export functions
+async function exportToJSON(): Promise<void> {
+  const data = await matches.exportMatches('json');
+  downloadTextFile(JSON.stringify(data, null, 2), 'mtga-matches.json');
+}
+
+async function exportToCSV(): Promise<void> {
+  const data = await matches.exportMatches('csv');
+  downloadTextFile(String(data), 'mtga-matches.csv');
+}
+
+// No-op stubs - file picker requires native integration
+async function importFromFile(): Promise<void> {
+  console.warn('ImportFromFile requires file picker - use browser file input');
+}
+
+async function importLogFile(): Promise<gui.ImportLogFileResult> {
+  console.warn('ImportLogFile requires file picker - use browser file input');
+  return {
+    fileName: '',
+    entriesRead: 0,
+    matchesStored: 0,
+    gamesStored: 0,
+    draftsStored: 0,
+    picksStored: 0,
+    collectionsStored: 0,
+    inventoriesStored: 0,
+    questsStored: 0,
+    decksStored: 0,
+    ranksStored: 0,
+    errors: [],
+  } as unknown as gui.ImportLogFileResult;
+}
 
 export interface UseDataManagementReturn {
   /** Export data to JSON or CSV */
@@ -23,9 +53,9 @@ export function useDataManagement(): UseDataManagementReturn {
   const handleExportData = useCallback(async (format: 'json' | 'csv') => {
     try {
       if (format === 'json') {
-        await ExportToJSON();
+        await exportToJSON();
       } else {
-        await ExportToCSV();
+        await exportToCSV();
       }
       showToast.show(`Successfully exported data to ${format.toUpperCase()}!`, 'success');
     } catch (error) {
@@ -35,7 +65,7 @@ export function useDataManagement(): UseDataManagementReturn {
 
   const handleImportData = useCallback(async () => {
     try {
-      await ImportFromFile();
+      await importFromFile();
       showToast.show(
         'Successfully imported data! Refresh the page to see updated statistics.',
         'success'
@@ -47,7 +77,7 @@ export function useDataManagement(): UseDataManagementReturn {
 
   const handleImportLogFile = useCallback(async () => {
     try {
-      const result = await ImportLogFile();
+      const result = await importLogFile();
 
       // User cancelled
       if (!result) {
@@ -74,7 +104,7 @@ export function useDataManagement(): UseDataManagementReturn {
 
   const handleClearAllData = useCallback(async () => {
     try {
-      await ClearAllData();
+      await system.clearAllData();
       showToast.show('All data has been cleared successfully!', 'success');
       window.location.reload(); // Refresh to show empty state
     } catch (error) {

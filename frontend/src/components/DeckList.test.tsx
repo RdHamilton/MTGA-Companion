@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckList from './DeckList';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockCards } from '@/test/mocks/apiMock';
 import { models, gui } from '@/types/models';
 
 // Helper function to create mock deck
@@ -121,6 +121,17 @@ function createMockStatistics(overrides: Partial<gui.DeckStatistics> = {}): gui.
 describe('DeckList Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock getAllSetInfo for SetSymbol component - return TST set
+    mockCards.getAllSetInfo.mockResolvedValue([
+      {
+        code: 'TST',
+        name: 'Test Set',
+        iconSvgUri: 'https://example.com/tst.svg',
+        setType: 'expansion',
+        releasedAt: '2024-01-01',
+        cardCount: 100,
+      },
+    ]);
   });
 
   describe('Loading State', () => {
@@ -129,7 +140,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
 
       // Mock GetCardByArenaID to never resolve
-      mockWailsApp.GetCardByArenaID.mockImplementation(() => new Promise(() => {}));
+      mockCards.getCardByArenaId.mockImplementation(() => new Promise(() => {}));
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -151,7 +162,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
       const mockCard = createMockSetCard();
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -167,7 +178,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
       const mockCard = createMockSetCard();
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -185,7 +196,7 @@ describe('DeckList Component', () => {
       ];
       const mockCard = createMockSetCard();
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} tags={tags} />);
 
@@ -203,7 +214,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 3, Quantity: 2, Board: 'sideboard' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -222,7 +233,7 @@ describe('DeckList Component', () => {
       ];
       const mockCard = createMockSetCard({ Name: 'Lightning Bolt', ArenaID: '12345' });
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -237,7 +248,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
       const mockCard = createMockSetCard({ ManaCost: '{2}{R}' });
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -254,10 +265,10 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 3, Board: 'main' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
-        if (arenaID === '1') return Promise.resolve(createMockSetCard({ Name: 'Bear', Types: ['Creature'], ArenaID: '1' }));
-        if (arenaID === '2') return Promise.resolve(createMockSetCard({ Name: 'Bolt', Types: ['Instant'], ArenaID: '2' }));
-        if (arenaID === '3') return Promise.resolve(createMockSetCard({ Name: 'Island', Types: ['Land'], ArenaID: '3' }));
+      mockCards.getCardByArenaId.mockImplementation((arenaID) => {
+        if (arenaID === 1) return Promise.resolve(createMockSetCard({ Name: 'Bear', Types: ['Creature'], ArenaID: '1' }));
+        if (arenaID === 2) return Promise.resolve(createMockSetCard({ Name: 'Bolt', Types: ['Instant'], ArenaID: '2' }));
+        if (arenaID === 3) return Promise.resolve(createMockSetCard({ Name: 'Island', Types: ['Land'], ArenaID: '3' }));
         return Promise.reject(new Error('Card not found'));
       });
 
@@ -276,7 +287,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 81716, Quantity: 8, Board: 'main' }), // Plains
       ];
 
-      mockWailsApp.GetCardByArenaID.mockRejectedValue(new Error('No metadata'));
+      mockCards.getCardByArenaId.mockRejectedValue(new Error('No metadata'));
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -290,7 +301,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard({ CardID: 99999 })];
 
-      mockWailsApp.GetCardByArenaID.mockRejectedValue(new Error('Card not found'));
+      mockCards.getCardByArenaId.mockRejectedValue(new Error('Card not found'));
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -306,7 +317,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
       const stats = createMockStatistics();
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} statistics={stats} />);
 
@@ -321,7 +332,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard()];
       const stats = createMockStatistics();
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} statistics={stats} />);
 
@@ -345,7 +356,7 @@ describe('DeckList Component', () => {
         },
       });
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} statistics={stats} />);
 
@@ -358,7 +369,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard()];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -377,7 +388,7 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 2, Board: 'sideboard', Quantity: 3 }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -393,11 +404,11 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 2, Board: 'sideboard' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
-        if (arenaID === '2') {
+      mockCards.getCardByArenaId.mockImplementation((arenaID) => {
+        if (arenaID === 2) {
           return Promise.resolve(createMockSetCard({ Name: 'Sideboard Card', ArenaID: '2' }));
         }
-        return Promise.resolve(createMockSetCard({ ArenaID: arenaID as string }));
+        return Promise.resolve(createMockSetCard({ ArenaID: String(arenaID) }));
       });
 
       render(<DeckList deck={deck} cards={cards} />);
@@ -432,7 +443,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard({ Board: 'main' })];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -449,7 +460,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard({ CardID: 12345, Board: 'main' })];
       const mockCard = createMockSetCard({ ArenaID: '12345', Name: 'Test Card' });
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} onRemoveCard={onRemoveCard} />);
 
@@ -469,7 +480,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard()];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -484,7 +495,7 @@ describe('DeckList Component', () => {
       const cards = [createMockDeckCard({ CardID: 12345 })];
       const mockCard = createMockSetCard({ Name: 'Test Card', ArenaID: '12345' });
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(mockCard);
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} onCardHover={onCardHover} />);
 
@@ -505,7 +516,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard({ CardID: 99999 })];
 
-      mockWailsApp.GetCardByArenaID.mockRejectedValue(new Error('Not found'));
+      mockCards.getCardByArenaId.mockRejectedValue(new Error('Not found'));
 
       render(<DeckList deck={deck} cards={cards} onCardHover={onCardHover} />);
 
@@ -537,7 +548,7 @@ describe('DeckList Component', () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard()];
 
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(createMockSetCard());
+      mockCards.getCardByArenaId.mockResolvedValue(createMockSetCard());
 
       render(<DeckList deck={deck} cards={cards} />);
 
@@ -556,10 +567,10 @@ describe('DeckList Component', () => {
         createMockDeckCard({ CardID: 3, Board: 'main' }),
       ];
 
-      mockWailsApp.GetCardByArenaID.mockImplementation((arenaID) => {
-        if (arenaID === '1') return Promise.resolve(createMockSetCard({ Name: 'Zebra', CMC: 3, Types: ['Creature'], ArenaID: '1' }));
-        if (arenaID === '2') return Promise.resolve(createMockSetCard({ Name: 'Bear', CMC: 2, Types: ['Creature'], ArenaID: '2' }));
-        if (arenaID === '3') return Promise.resolve(createMockSetCard({ Name: 'Aardvark', CMC: 2, Types: ['Creature'], ArenaID: '3' }));
+      mockCards.getCardByArenaId.mockImplementation((arenaID) => {
+        if (arenaID === 1) return Promise.resolve(createMockSetCard({ Name: 'Zebra', CMC: 3, Types: ['Creature'], ArenaID: '1' }));
+        if (arenaID === 2) return Promise.resolve(createMockSetCard({ Name: 'Bear', CMC: 2, Types: ['Creature'], ArenaID: '2' }));
+        if (arenaID === 3) return Promise.resolve(createMockSetCard({ Name: 'Aardvark', CMC: 2, Types: ['Creature'], ArenaID: '3' }));
         return Promise.reject(new Error('Card not found'));
       });
 

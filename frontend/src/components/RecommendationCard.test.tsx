@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import RecommendationCard from './RecommendationCard';
 
-// Mock the Wails API
-vi.mock('@/services/api/legacy', () => ({
-  ExplainRecommendation: vi.fn(),
+// Mock the drafts API module
+vi.mock('@/services/api', () => ({
+  drafts: {
+    explainRecommendation: vi.fn(),
+  },
 }));
 
-import { ExplainRecommendation } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 
 const mockRecommendation = {
   cardID: 12345,
@@ -37,7 +39,7 @@ const defaultProps = {
 describe('RecommendationCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(ExplainRecommendation).mockResolvedValue({
+    vi.mocked(drafts.explainRecommendation).mockResolvedValue({
       explanation: 'This card is recommended because it provides efficient removal.',
       error: '',
     });
@@ -185,7 +187,7 @@ describe('RecommendationCard', () => {
       fireEvent.click(screen.getByText('? Why'));
 
       await waitFor(() => {
-        expect(ExplainRecommendation).toHaveBeenCalledWith({
+        expect(drafts.explainRecommendation).toHaveBeenCalledWith({
           deckID: 'test-deck-id',
           cardID: 12345,
         });
@@ -193,7 +195,7 @@ describe('RecommendationCard', () => {
     });
 
     it('shows loading state while fetching explanation', async () => {
-      vi.mocked(ExplainRecommendation).mockImplementation(
+      vi.mocked(drafts.explainRecommendation).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -222,7 +224,7 @@ describe('RecommendationCard', () => {
       // Expand
       fireEvent.click(screen.getByText('? Why'));
       await waitFor(() => {
-        expect(ExplainRecommendation).toHaveBeenCalledTimes(1);
+        expect(drafts.explainRecommendation).toHaveBeenCalledTimes(1);
       });
 
       // Collapse
@@ -232,13 +234,13 @@ describe('RecommendationCard', () => {
       fireEvent.click(screen.getByText('? Why'));
 
       // Should not call API again
-      expect(ExplainRecommendation).toHaveBeenCalledTimes(1);
+      expect(drafts.explainRecommendation).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('explanation error handling', () => {
     it('displays error when API returns error', async () => {
-      vi.mocked(ExplainRecommendation).mockResolvedValueOnce({
+      vi.mocked(drafts.explainRecommendation).mockResolvedValueOnce({
         explanation: '',
         error: 'LLM not available',
       });
@@ -253,7 +255,7 @@ describe('RecommendationCard', () => {
     });
 
     it('displays error when API throws', async () => {
-      vi.mocked(ExplainRecommendation).mockRejectedValueOnce(new Error('Network error'));
+      vi.mocked(drafts.explainRecommendation).mockRejectedValueOnce(new Error('Network error'));
 
       render(<RecommendationCard {...defaultProps} />);
 
@@ -265,7 +267,7 @@ describe('RecommendationCard', () => {
     });
 
     it('falls back to reasoning when no explanation available', async () => {
-      vi.mocked(ExplainRecommendation).mockResolvedValueOnce({
+      vi.mocked(drafts.explainRecommendation).mockResolvedValueOnce({
         explanation: '',
         error: '',
       });

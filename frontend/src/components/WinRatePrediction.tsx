@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PredictDraftWinRate, GetDraftWinRatePrediction } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 import { prediction } from '@/types/models';
 import './WinRatePrediction.css';
 
@@ -26,7 +26,7 @@ export const WinRatePrediction: React.FC<WinRatePredictionProps> = ({
       try {
         setLoading(true);
         setError(null);
-        const p = await GetDraftWinRatePrediction(sessionID);
+        const p = await drafts.getDraftWinRatePrediction(sessionID);
         setPred(p);
       } catch {
         // Prediction might not exist yet - not an error
@@ -43,7 +43,7 @@ export const WinRatePrediction: React.FC<WinRatePredictionProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const p = await PredictDraftWinRate(sessionID);
+      const p = await drafts.getDraftWinRatePrediction(sessionID);
       setPred(p);
       if (onPredictionCalculated) {
         onPredictionCalculated(p);

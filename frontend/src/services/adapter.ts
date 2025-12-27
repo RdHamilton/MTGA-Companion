@@ -32,6 +32,7 @@ export function isRestApiEnabled(): boolean {
 /**
  * Enable or disable REST API mode (no-op, always REST now).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function setUseRestApi(_enabled: boolean): void {
   // No-op - always using REST API
 }
@@ -111,6 +112,7 @@ export const draftsAdapter = {
     return api.drafts.getActiveDraftSessions();
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getCompletedDraftSessions(_limit = 100): Promise<models.DraftSession[]> {
     return api.drafts.getCompletedDraftSessions();
   },

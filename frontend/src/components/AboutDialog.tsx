@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAppVersion } from '@/services/api/legacy';
+import { system } from '@/services/api';
 import './AboutDialog.css';
 
 interface AboutDialogProps {
@@ -12,8 +12,8 @@ const AboutDialog = ({ isOpen, onClose }: AboutDialogProps) => {
 
   useEffect(() => {
     if (isOpen) {
-      GetAppVersion()
-        .then((v) => setVersion(v))
+      system.getVersion()
+        .then((info) => setVersion(info.version))
         .catch(() => setVersion('Unknown'));
     }
   }, [isOpen]);

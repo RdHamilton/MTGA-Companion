@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExplainRecommendation } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 import { gui } from '@/types/models';
 import './RecommendationCard.css';
 
@@ -33,7 +33,7 @@ export default function RecommendationCard({
       setExplanationError(null);
 
       try {
-        const response = await ExplainRecommendation({
+        const response = await drafts.explainRecommendation({
           deckID,
           cardID: recommendation.cardID,
         });

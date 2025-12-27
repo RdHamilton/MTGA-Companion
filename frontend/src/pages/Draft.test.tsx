@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import Draft from './Draft';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockDrafts, mockCards } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { models, gui } from '@/types/models';
 
@@ -131,8 +131,8 @@ describe('Draft Component', () => {
 
   describe('No Active Draft State', () => {
     it('should display draft history when no active draft exists', async () => {
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([]);
-      mockWailsApp.GetCompletedDraftSessions.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([]);
+      mockDrafts.getCompletedDraftSessions.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -150,8 +150,8 @@ describe('Draft Component', () => {
         TotalPicks: 45,
       });
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([]);
-      mockWailsApp.GetCompletedDraftSessions.mockResolvedValue([completedSession]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([]);
+      mockDrafts.getCompletedDraftSessions.mockResolvedValue([completedSession]);
 
       render(<Draft />);
 
@@ -164,8 +164,8 @@ describe('Draft Component', () => {
     });
 
     it('should display empty state when no historical drafts exist', async () => {
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([]);
-      mockWailsApp.GetCompletedDraftSessions.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([]);
+      mockDrafts.getCompletedDraftSessions.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -185,11 +185,11 @@ describe('Draft Component', () => {
       const setCards = [createMockSetCard()];
       const ratings = [createMockCardRating()];
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue(packs);
-      mockWailsApp.GetSetCards.mockResolvedValue(setCards);
-      mockWailsApp.GetCardRatings.mockResolvedValue(ratings);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue(packs);
+      mockCards.getSetCards.mockResolvedValue(setCards);
+      mockCards.getCardRatings.mockResolvedValue(ratings);
 
       render(<Draft />);
 
@@ -203,7 +203,7 @@ describe('Draft Component', () => {
     });
 
     it('should display loading state while fetching draft data', () => {
-      mockWailsApp.GetActiveDraftSessions.mockImplementation(
+      mockDrafts.getActiveDraftSessions.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -220,12 +220,12 @@ describe('Draft Component', () => {
       const ratings = [createMockCardRating()];
       const mockMetrics = createMockDeckMetrics();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue(packs);
-      mockWailsApp.GetSetCards.mockResolvedValue(setCards);
-      mockWailsApp.GetCardRatings.mockResolvedValue(ratings);
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(mockMetrics);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue(packs);
+      mockCards.getSetCards.mockResolvedValue(setCards);
+      mockCards.getCardRatings.mockResolvedValue(ratings);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(mockMetrics);
 
       render(<Draft />);
 
@@ -235,8 +235,8 @@ describe('Draft Component', () => {
 
       // Update picks
       const newPick = createMockDraftPick();
-      mockWailsApp.GetDraftPicks.mockResolvedValue([newPick]);
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(mockMetrics);
+      mockDrafts.getDraftPicks.mockResolvedValue([newPick]);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(mockMetrics);
 
       // Fire draft:updated event
       mockEventEmitter.emit('draft:updated');
@@ -257,11 +257,11 @@ describe('Draft Component', () => {
         createMockDraftPick({ CardID: '22222', PackNumber: 0, PickNumber: 2 }),
       ];
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([card1, card2]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([card1, card2]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -281,12 +281,12 @@ describe('Draft Component', () => {
       const pick = createMockDraftPick({ CardID: '12345' });
       const metrics = createMockDeckMetrics();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue([pick]);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([card]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue([pick]);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([card]);
+      mockCards.getCardRatings.mockResolvedValue([]);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<Draft />);
 
@@ -314,11 +314,11 @@ describe('Draft Component', () => {
         PickQualityRank: 1,
       });
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue([pick]);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([card]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue([pick]);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([card]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -349,11 +349,11 @@ describe('Draft Component', () => {
 
       const picks = [createMockDraftPick({ CardID: '11111' })];
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([pickedCard, synergyCard]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([pickedCard, synergyCard]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -373,13 +373,13 @@ describe('Draft Component', () => {
       const picks = [createMockDraftPick()];
       const mockMetrics = createMockDeckMetrics();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([createMockSetCard()]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(mockMetrics);
-      mockWailsApp.AnalyzeSessionPickQuality.mockResolvedValue(undefined);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([createMockSetCard()]);
+      mockCards.getCardRatings.mockResolvedValue([]);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(mockMetrics);
+      mockDrafts.analyzeSessionPickQuality.mockResolvedValue(undefined);
 
       render(<Draft />);
 
@@ -391,18 +391,18 @@ describe('Draft Component', () => {
       await userEvent.click(analyzeButton);
 
       await waitFor(() => {
-        expect(mockWailsApp.AnalyzeSessionPickQuality).toHaveBeenCalledWith('test-session-1');
+        expect(mockDrafts.analyzeSessionPickQuality).toHaveBeenCalledWith('test-session-1');
       });
     });
 
     it('should disable analyze button when no picks exist', async () => {
       const session = createMockDraftSession();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue([]);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue([]);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -418,11 +418,11 @@ describe('Draft Component', () => {
       const session = createMockDraftSession();
       const card = createMockSetCard({ Name: 'Detailed Card' });
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue([]);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([card]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue([]);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([card]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -445,11 +445,11 @@ describe('Draft Component', () => {
       const session = createMockDraftSession();
       const card = createMockSetCard({ Name: 'Closable Card' });
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([session]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue([]);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([card]);
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockDrafts.getDraftPicks.mockResolvedValue([]);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([card]);
+      mockCards.getCardRatings.mockResolvedValue([]);
 
       render(<Draft />);
 
@@ -489,13 +489,13 @@ describe('Draft Component', () => {
       const card = createMockSetCard({ ArenaID: '12345' });
       const mockMetrics = createMockDeckMetrics();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([]);
-      mockWailsApp.GetCompletedDraftSessions.mockResolvedValue([completedSession]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade'));
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(mockMetrics);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([]);
+      mockDrafts.getCompletedDraftSessions.mockResolvedValue([completedSession]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getCardByArenaId.mockResolvedValue(card);
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade'));
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(mockMetrics);
 
       render(<Draft />);
 
@@ -521,13 +521,13 @@ describe('Draft Component', () => {
       const card = createMockSetCard({ ArenaID: '12345' });
       const mockMetrics = createMockDeckMetrics();
 
-      mockWailsApp.GetActiveDraftSessions.mockResolvedValue([]);
-      mockWailsApp.GetCompletedDraftSessions.mockResolvedValue([completedSession]);
-      mockWailsApp.GetDraftPicks.mockResolvedValue(picks);
-      mockWailsApp.GetDraftPacks.mockResolvedValue([]);
-      mockWailsApp.GetCardByArenaID.mockResolvedValue(card);
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade'));
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(mockMetrics);
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([]);
+      mockDrafts.getCompletedDraftSessions.mockResolvedValue([completedSession]);
+      mockDrafts.getDraftPicks.mockResolvedValue(picks);
+      mockDrafts.getDraftPool.mockResolvedValue([]);
+      mockCards.getCardByArenaId.mockResolvedValue(card);
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade'));
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(mockMetrics);
 
       render(<Draft />);
 
