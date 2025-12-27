@@ -387,6 +387,28 @@ func (h *CardHandler) GetSetInfo(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, info)
 }
 
+// GetRatingsWithEvent returns 17Lands ratings for a set with event type in path.
+func (h *CardHandler) GetRatingsWithEvent(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	eventType := chi.URLParam(r, "eventType")
+	if eventType == "" {
+		eventType = "PremierDraft"
+	}
+
+	ratings, err := h.facade.GetCardRatings(r.Context(), setCode, eventType)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, ratings)
+}
+
 // SearchWithCollectionRequest represents a search request with collection filter.
 type SearchWithCollectionRequest struct {
 	Query          string   `json:"query"`

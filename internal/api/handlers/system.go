@@ -59,6 +59,17 @@ func (h *SystemHandler) GetVersion(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// GetCurrentAccount returns the current account information.
+func (h *SystemHandler) GetCurrentAccount(w http.ResponseWriter, r *http.Request) {
+	account, err := h.facade.GetCurrentAccount(r.Context())
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, account)
+}
+
 // GetDatabasePath returns the current database path (placeholder).
 func (h *SystemHandler) GetDatabasePath(w http.ResponseWriter, _ *http.Request) {
 	response.Success(w, map[string]string{"status": "not_implemented", "message": "Database path requires facade method"})

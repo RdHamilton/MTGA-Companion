@@ -33,6 +33,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/win-rate-over-time", matchHandler.GetWinRateOverTime)
 			r.Post("/performance-by-hour", matchHandler.GetPerformanceByHour)
 			r.Post("/matchup-matrix", matchHandler.GetMatchupMatrix)
+			r.Get("/rank-progression/{format}", matchHandler.GetRankProgression)
 		})
 
 		// Draft routes
@@ -55,6 +56,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/{sessionID}/curve", draftHandler.GetDraftCurve)
 			r.Get("/{sessionID}/colors", draftHandler.GetDraftColors)
 			r.Get("/{sessionID}/current-pack", draftHandler.GetCurrentPack)
+			r.Get("/{sessionID}/deck-metrics", draftHandler.GetDraftDeckMetrics)
 			r.Post("/{sessionID}/missing-cards", draftHandler.GetMissingCards)
 			r.Post("/{sessionID}/analyze-picks", draftHandler.AnalyzePickQuality)
 			r.Post("/{sessionID}/calculate-grade", draftHandler.CalculateGrade)
@@ -107,12 +109,14 @@ func (s *Server) setupRoutes() {
 			r.Get("/name/{name}", cardHandler.GetCardByName)
 			r.Get("/sets", cardHandler.GetSets)
 			r.Get("/sets/{setCode}", cardHandler.GetSetCards)
+			r.Get("/sets/{setCode}/cards", cardHandler.GetSetCards) // Alias for frontend compatibility
 			r.Get("/sets/{setCode}/info", cardHandler.GetSetInfo)
 			r.Post("/sets/{setCode}/fetch", cardHandler.FetchSetCards)
 			r.Post("/sets/{setCode}/refresh", cardHandler.RefreshSetCards)
 			r.Get("/ratings/{setCode}", cardHandler.GetRatings)
 			r.Get("/ratings/{setCode}/colors", cardHandler.GetColorRatings)
-			r.Get("/ratings/{setCode}/{arenaID}", cardHandler.GetCardRatingByArenaID)
+			r.Get("/ratings/{setCode}/{eventType}", cardHandler.GetRatingsWithEvent) // Event type in path
+			r.Get("/ratings/{setCode}/card/{arenaID}", cardHandler.GetCardRatingByArenaID)
 			r.Post("/ratings/{setCode}/fetch", cardHandler.FetchSetRatings)
 			r.Post("/ratings/{setCode}/refresh", cardHandler.RefreshSetRatings)
 		})
@@ -121,6 +125,7 @@ func (s *Server) setupRoutes() {
 		collectionHandler := handlers.NewCollectionHandler(s.collectionFacade)
 		r.Route("/collection", func(r chi.Router) {
 			r.Get("/", collectionHandler.GetCollection)
+			r.Post("/", collectionHandler.GetCollectionPost) // POST with filter body
 			r.Get("/stats", collectionHandler.GetCollectionStats)
 			r.Get("/sets", collectionHandler.GetCollectionBySets)
 			r.Get("/rarity", collectionHandler.GetCollectionByRarity)
@@ -133,6 +138,7 @@ func (s *Server) setupRoutes() {
 		r.Route("/system", func(r chi.Router) {
 			r.Get("/status", systemHandler.GetStatus)
 			r.Get("/version", systemHandler.GetVersion)
+			r.Get("/account", systemHandler.GetCurrentAccount)
 			r.Get("/database/path", systemHandler.GetDatabasePath)
 			r.Post("/database/path", systemHandler.SetDatabasePath)
 			// Daemon routes
@@ -173,8 +179,8 @@ func (s *Server) setupRoutes() {
 			r.Post("/clear", exportHandler.ClearAllData)
 		})
 
-		// Quest routes (from system facade)
-		questHandler := handlers.NewQuestHandler(s.systemFacade)
+		// Quest routes (from match facade)
+		questHandler := handlers.NewQuestHandler(s.matchFacade)
 		r.Route("/quests", func(r chi.Router) {
 			r.Get("/active", questHandler.GetActiveQuests)
 			r.Get("/history", questHandler.GetQuestHistory)

@@ -101,34 +101,13 @@ export default function Collection() {
   }, []);
 
   useEffect(() => {
-    // Wait for Wails runtime to be ready
-    const checkWailsReady = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).go) {
-        clearInterval(checkWailsReady);
-        loadCollection();
-        loadSets();
-      }
-    }, 100);
-
-    const timeout = setTimeout(() => {
-      clearInterval(checkWailsReady);
-      if (!(window as unknown as Record<string, unknown>).go) {
-        setError('Wails runtime not initialized');
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(checkWailsReady);
-      clearTimeout(timeout);
-    };
+    loadCollection();
+    loadSets();
   }, []);
 
   // Reload collection when filters change
   useEffect(() => {
-    if ((window as unknown as Record<string, unknown>).go) {
-      loadCollection();
-    }
+    loadCollection();
   }, [loadCollection]);
 
   // Reset page when filters change

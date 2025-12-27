@@ -10,6 +10,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
 // DraftHandler handles draft-related API requests.
@@ -43,7 +44,35 @@ func (h *DraftHandler) GetDraftSessions(w http.ResponseWriter, r *http.Request) 
 		limit = 50
 	}
 
-	// Get both active and completed sessions
+	// Filter by status if provided
+	if req.Status != nil {
+		switch *req.Status {
+		case "active":
+			activeSessions, err := h.facade.GetActiveDraftSessions(r.Context())
+			if err != nil {
+				response.InternalError(w, err)
+				return
+			}
+			if activeSessions == nil {
+				activeSessions = []*models.DraftSession{}
+			}
+			response.Success(w, activeSessions)
+			return
+		case "completed":
+			completedSessions, err := h.facade.GetCompletedDraftSessions(r.Context(), limit)
+			if err != nil {
+				response.InternalError(w, err)
+				return
+			}
+			if completedSessions == nil {
+				completedSessions = []*models.DraftSession{}
+			}
+			response.Success(w, completedSessions)
+			return
+		}
+	}
+
+	// Get both active and completed sessions when no status filter
 	activeSessions, err := h.facade.GetActiveDraftSessions(r.Context())
 	if err != nil {
 		response.InternalError(w, err)
@@ -58,6 +87,9 @@ func (h *DraftHandler) GetDraftSessions(w http.ResponseWriter, r *http.Request) 
 
 	// Combine results
 	allSessions := append(activeSessions, completedSessions...)
+	if allSessions == nil {
+		allSessions = []*models.DraftSession{}
+	}
 
 	response.Success(w, allSessions)
 }
@@ -154,6 +186,23 @@ func (h *DraftHandler) GetDraftCurve(w http.ResponseWriter, r *http.Request) {
 
 // GetDraftColors returns the deck metrics for a draft session.
 func (h *DraftHandler) GetDraftColors(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+	if sessionID == "" {
+		response.BadRequest(w, errors.New("session ID is required"))
+		return
+	}
+
+	metrics, err := h.facade.GetDraftDeckMetrics(r.Context(), sessionID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, metrics)
+}
+
+// GetDraftDeckMetrics returns comprehensive deck metrics for a draft session.
+func (h *DraftHandler) GetDraftDeckMetrics(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 	if sessionID == "" {
 		response.BadRequest(w, errors.New("session ID is required"))

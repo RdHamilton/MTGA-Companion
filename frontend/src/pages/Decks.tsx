@@ -30,27 +30,7 @@ export default function Decks() {
   };
 
   useEffect(() => {
-    // Wait for Wails runtime to be ready before loading decks
-    const checkWailsReady = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).go) {
-        clearInterval(checkWailsReady);
-        loadDecks();
-      }
-    }, 100);
-
-    // Fallback timeout after 5 seconds
-    const timeout = setTimeout(() => {
-      clearInterval(checkWailsReady);
-      if (!(window as unknown as Record<string, unknown>).go) {
-        setError('Wails runtime not initialized');
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(checkWailsReady);
-      clearTimeout(timeout);
-    };
+    loadDecks();
   }, []);
 
   const handleCreateDeck = async () => {

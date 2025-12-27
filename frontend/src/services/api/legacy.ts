@@ -35,9 +35,8 @@ export async function GetStatsByFormat(filter: models.StatsFilter): Promise<Reco
   return matches.getFormatDistribution(matches.statsFilterToRequest(filter));
 }
 
-export async function GetStatsByDeck(_filter: models.StatsFilter): Promise<Record<string, models.Statistics>> {
-  // Not fully implemented in REST API
-  return {};
+export async function GetStatsByDeck(filter: models.StatsFilter): Promise<Record<string, models.Statistics>> {
+  return matches.getMatchupMatrix(matches.statsFilterToRequest(filter));
 }
 
 export async function GetMatchGames(matchId: string): Promise<models.Game[]> {

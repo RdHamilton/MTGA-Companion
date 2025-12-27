@@ -21,6 +21,7 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
@@ -517,6 +518,14 @@ func (s *SystemFacade) GetConnectionStatus() *ConnectionStatus {
 		URL:       s.getDaemonURL(),
 		Port:      s.services.DaemonPort,
 	}
+}
+
+// GetCurrentAccount returns the current account information.
+func (s *SystemFacade) GetCurrentAccount(ctx context.Context) (*models.Account, error) {
+	if s.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+	return s.services.Storage.GetCurrentAccount(ctx)
 }
 
 // getDaemonModeString returns the current daemon mode as a string.
