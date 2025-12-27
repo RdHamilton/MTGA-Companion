@@ -1,14 +1,14 @@
 # MTGA-Companion
 
-A modern desktop companion application for Magic: The Gathering Arena (MTGA). Track your matches, analyze your performance, and enhance your MTGA experience with real-time statistics and insights.
+A modern companion application for Magic: The Gathering Arena (MTGA). Track your matches, analyze your performance, and enhance your MTGA experience with real-time statistics, ML-powered recommendations, and metagame insights.
 
 ## Features
 
-### Desktop GUI
-- **Modern Interface**: Cross-platform desktop application with React UI
-- **Real-Time Updates**: Live statistics while you play MTGA
+### Modern Web UI (v1.4)
+- **Browser-Based Interface**: React SPA with REST API backend - opens in your default browser
+- **Real-Time Updates**: Live statistics via WebSocket while you play MTGA
 - **Dark Theme**: Easy on the eyes during long gaming sessions
-- **Responsive Design**: Adapts to different window sizes
+- **Responsive Design**: Works on any screen size
 
 ### Match Tracking & Analytics
 - **Match History**: View all your matches with filtering and sorting
@@ -181,33 +181,23 @@ Detailed logging allows MTG Arena to output game events and data in JSON format 
 
 ### Quick Start (Recommended)
 
-Download the latest release for your platform from the [Releases page](https://github.com/RdHamilton/MTGA-Companion/releases):
+Download the latest release from the [Releases page](https://github.com/RdHamilton/MTGA-Companion/releases):
 
-#### Windows
+#### macOS (Currently Supported)
 
-1. Download `MTGA-Companion-windows-amd64.exe`
-2. Run the executable - no installation required!
-3. **(Optional)** Create a shortcut to your desktop or taskbar
-
-**First Run**: Windows may show a security warning. Click "More info" → "Run anyway"
-
-#### macOS
-
-1. Download `MTGA-Companion.app.zip`
-2. Extract and drag `MTGA-Companion.app` to your Applications folder
+1. Download `MTGA-Companion-vX.X.X-macOS.dmg`
+2. Open the DMG and drag `MTGA Companion.app` to your Applications folder
 3. **First launch**: Right-click the app → "Open" (to bypass Gatekeeper)
-4. Grant permissions if macOS requests access to files
+4. The app will start the API server and open your default browser
 
-**Subsequent launches**: Double-click the app normally
+**What happens on launch:**
+- The app starts a local REST API server (port 8080)
+- Your default browser opens to the MTGA Companion UI
+- The app monitors MTGA logs in the background via the daemon service
 
-#### Linux
+#### Windows / Linux
 
-1. Download `MTGA-Companion-linux-amd64`
-2. Make executable and run:
-   ```bash
-   chmod +x MTGA-Companion-linux-amd64
-   ./MTGA-Companion-linux-amd64
-   ```
+Windows and Linux builds are planned for future releases. Currently, you can build from source (see below).
 
 ### Daemon Mode (Recommended)
 
@@ -287,14 +277,8 @@ If you prefer not to use daemon mode, the GUI includes an embedded log poller th
 ### Build From Source
 
 **Prerequisites**:
-- [Go 1.23+](https://go.dev/dl/)
+- [Go 1.24+](https://go.dev/dl/)
 - [Node.js 20+](https://nodejs.org/) (for frontend)
-- [Wails CLI](https://wails.io/docs/gettingstarted/installation)
-
-**Install Wails**:
-```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
-```
 
 **Clone and Build**:
 ```bash
@@ -302,21 +286,28 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 git clone https://github.com/RdHamilton/MTGA-Companion.git
 cd MTGA-Companion
 
-# Install frontend dependencies
+# Build the Go backend (API server + daemon)
+go build -o bin/mtga-companion ./cmd/mtga-companion
+go build -o bin/apiserver ./cmd/apiserver
+
+# Install and build frontend
 cd frontend
 npm install
+npm run build
 cd ..
-
-# Build with Wails
-wails build
-
-# Built app will be in build/bin/
 ```
 
 **Development Mode** (with hot reload):
 ```bash
-wails dev
+# Terminal 1: Start API server
+go run ./cmd/apiserver
+
+# Terminal 2: Start frontend dev server
+cd frontend
+npm run dev
 ```
+
+The frontend dev server runs at `http://localhost:3000` and proxies API requests to the backend at `http://localhost:8080`.
 
 ## Player.log File Locations
 
@@ -418,59 +409,70 @@ See the [CLI Commands Wiki](https://github.com/RdHamilton/MTGA-Companion/wiki/CL
 
 ```
 MTGA-Companion/
-├── main.go                  # Wails entry point
-├── app.go                   # Go backend API for frontend
-├── frontend/                # React + TypeScript frontend
+├── cmd/                     # Application entry points
+│   ├── apiserver/          # REST API server (v1.4+)
+│   └── mtga-companion/     # CLI daemon for log monitoring
+├── frontend/                # React + TypeScript SPA
 │   ├── src/
 │   │   ├── components/     # Reusable UI components
 │   │   ├── pages/          # Page components (routes)
+│   │   ├── services/api/   # REST API client modules
 │   │   ├── App.tsx         # Root component
 │   │   └── main.tsx        # Frontend entry point
-│   ├── wailsjs/            # Auto-generated Wails bindings
 │   ├── package.json
 │   └── vite.config.ts
 ├── internal/                # Private application code
-│   ├── gui/                # GUI-specific backend code
+│   ├── api/                # REST API handlers & router (v1.4+)
+│   │   ├── handlers/      # HTTP request handlers
+│   │   ├── websocket/     # WebSocket for real-time updates
+│   │   └── router.go      # API route definitions
+│   ├── gui/                # Facade layer (business logic)
+│   ├── ml/                 # Machine learning engine (v1.4+)
+│   ├── llm/                # Ollama LLM client (v1.4+)
+│   ├── meta/               # Metagame data service (v1.4+)
 │   ├── mtga/               # MTGA-specific logic
 │   │   ├── logreader/     # Log parsing
-│   │   └── draft/         # Draft overlay
+│   │   ├── draft/         # Draft overlay
+│   │   └── recommendations/ # Card recommendations
 │   └── storage/            # Database and persistence
 │       ├── models/        # Data models
 │       └── repository/    # Data access layer
-├── cmd/                     # CLI application (legacy)
-│   └── mtga-companion/
+├── docs/                    # Documentation
 ├── scripts/                 # Development scripts
 └── CLAUDE.md               # AI assistant guidance
 ```
 
 ### Development Workflow
 
-**Wails Development**:
+**Full Stack Development** (recommended):
 ```bash
-# Run in development mode with hot reload
-wails dev
+# Terminal 1: Start API server with hot reload
+go run ./cmd/apiserver
 
-# Build production version
-wails build
+# Terminal 2: Start frontend dev server
+cd frontend
+npm run dev
 
-# Generate Go ↔ TypeScript bindings (after changing app.go)
-wails generate module
+# Open browser to http://localhost:3000
 ```
 
 **Go Development** (backend):
 ```bash
-# Format, lint, and build
-./scripts/dev.sh
+# Format code
+gofumpt -w .
 
-# Run specific checks
-./scripts/dev.sh fmt       # Format code
-./scripts/dev.sh vet       # Run go vet
-./scripts/dev.sh lint      # Run golangci-lint
-./scripts/dev.sh check     # Run all checks
+# Run linter
+golangci-lint run --timeout=5m
 
 # Run tests
-./scripts/test.sh          # Run tests with race detection
-./scripts/test.sh coverage # Generate coverage report
+go test ./...
+
+# Run tests with race detection
+go test -race ./...
+
+# Build binaries
+go build -o bin/apiserver ./cmd/apiserver
+go build -o bin/mtga-companion ./cmd/mtga-companion
 ```
 
 **Frontend Development**:
@@ -479,17 +481,20 @@ wails generate module
 cd frontend
 npm install
 
-# Run frontend dev server (standalone)
+# Run frontend dev server
 npm run dev
 
 # Build frontend for production
 npm run build
 
 # Type checking
-npm run type-check
+npm run tsc
 
 # Linting
 npm run lint
+
+# Run tests
+npm run test:run
 ```
 
 ### Running Tests
@@ -535,20 +540,23 @@ Ensure you have read permissions for the MTGA log directory. Try running as admi
 
 MTGA-Companion is built with modern technologies for performance and cross-platform compatibility:
 
-### Desktop Application
+### Architecture (v1.4+)
 
-- **[Wails v2](https://wails.io/)** - Go + Web frontend framework for desktop apps
-  - Native webview (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux)
-  - No Electron overhead - smaller binary, faster startup
-  - Type-safe Go ↔ JavaScript bindings
+- **REST API + Browser SPA** - Decoupled architecture for flexibility
+  - Go REST API server with WebSocket support
+  - React SPA served via Vite or static files
+  - Opens in your default browser - no native app required
 
 ### Backend (Go)
 
-- **[Go 1.23+](https://go.dev/)** - Programming language
+- **[Go 1.24+](https://go.dev/)** - Programming language
+- **[Chi Router](https://github.com/go-chi/chi)** - Lightweight HTTP router
 - **[SQLite 3](https://www.sqlite.org/)** - Local database storage
 - **[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)** - Pure Go SQLite driver (no CGo required)
 - **[golang-migrate/migrate](https://github.com/golang-migrate/migrate)** - Database migration management
+- **[gorilla/websocket](https://github.com/gorilla/websocket)** - WebSocket implementation
 - **[fsnotify](https://github.com/fsnotify/fsnotify)** - Cross-platform file system notifications
+- **[kardianos/service](https://github.com/kardianos/service)** - Cross-platform service management
 
 ### Frontend (React + TypeScript)
 
@@ -557,15 +565,20 @@ MTGA-Companion is built with modern technologies for performance and cross-platf
 - **[React Router](https://reactrouter.com/)** - Client-side routing
 - **[Recharts](https://recharts.org/)** - Data visualization and charting library
 - **[Vite](https://vite.dev/)** - Fast build tool and dev server
+- **[Vitest](https://vitest.dev/)** - Unit testing framework
+- **[Playwright](https://playwright.dev/)** - E2E testing framework
+
+### ML/AI Features (v1.4+)
+
+- **Machine Learning Engine** - Custom ML model for card recommendations
+- **[Ollama](https://ollama.ai/)** - Local LLM integration for natural language explanations
 
 ### Data Sources
 
 - **[17Lands](https://www.17lands.com/)** - Draft statistics and card ratings
 - **[Scryfall](https://scryfall.com/)** - Card metadata and images
-
-### Legacy CLI
-
-- **[Fyne](https://fyne.io/)** - GUI framework for draft overlay (CLI mode only)
+- **[MTGGoldfish](https://www.mtggoldfish.com/)** - Metagame data
+- **[MTGTop8](https://www.mtgtop8.com/)** - Tournament results
 
 For a complete list of dependencies, see [`go.mod`](go.mod) and [`frontend/package.json`](frontend/package.json).
 

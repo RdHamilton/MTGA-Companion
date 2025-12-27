@@ -2,9 +2,13 @@
 
 ## Overview
 
-MTGA-Companion uses a service-based architecture that separates data collection from data display. This document describes the system design, component responsibilities, data flow, and extension points.
+MTGA-Companion uses a **REST API + Browser SPA** architecture (v1.4+) that decouples the backend from the frontend, enabling flexible deployment and easy testing. The system consists of three main components:
 
-## Architecture Diagram
+1. **API Server** - Go REST API with WebSocket support
+2. **Frontend SPA** - React TypeScript application running in the browser
+3. **Daemon Service** - Background log monitoring and real-time event broadcasting
+
+## Architecture Diagram (v1.4+)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -22,124 +26,98 @@ MTGA-Companion uses a service-based architecture that separates data collection 
                        │ monitors (fsnotify or polling)
                        ↓
 ┌──────────────────────────────────────────────────────────────┐
-│                    CLI Daemon (Backend)                      │
+│              CLI Daemon (cmd/mtga-companion)                 │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │                    Log Monitoring                      │ │
 │  │  ┌─────────────┐                ┌─────────────┐       │ │
 │  │  │   Poller    │────monitors───▶│ File Events │       │ │
 │  │  │  (Goroutine)│                │  (fsnotify) │       │ │
 │  │  └──────┬──────┘                └──────┬──────┘       │ │
-│  │         │                               │              │ │
 │  │         └──────────────┬────────────────┘              │ │
-│  │                        │ new entries                   │ │
 │  │                        ↓                               │ │
 │  │              ┌────────────────┐                        │ │
 │  │              │  Log Processor │                        │ │
-│  │              │                │                        │ │
 │  │              │  - Parses JSON │                        │ │
-│  │              │  - Validates   │                        │ │
 │  │              │  - Routes data │                        │ │
 │  │              └────────┬───────┘                        │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                         │ parsed data                       │
-│                         ↓                                    │
-│  ┌──────────────────────────────────────────────────────────┤
-│  │                   Data Storage                           │
-│  │  ┌─────────────────────────────────────────────────────┐ │
-│  │  │                Repository Layer                     │ │
-│  │  │  ┌───────────┐  ┌──────────┐  ┌────────────┐      │ │
-│  │  │  │  Matches  │  │  Drafts  │  │  Settings  │      │ │
-│  │  │  │Repository │  │Repository│  │ Repository │      │ │
-│  │  │  └─────┬─────┘  └─────┬────┘  └─────┬──────┘      │ │
-│  │  │        │               │             │              │ │
-│  │  │        └───────────────┴─────────────┘              │ │
-│  │  │                        │                            │ │
-│  │  │                        ↓                            │ │
-│  │  │            ┌────────────────────────┐              │ │
-│  │  │            │  SQLite Database       │              │ │
-│  │  │            │  ~/.mtga-companion/    │              │ │
-│  │  │            │  data.db               │              │ │
-│  │  │            └────────────────────────┘              │ │
-│  │  └─────────────────────────────────────────────────────┘ │
-│  └──────────────────────────────────────────────────────────┘
-│                         │ data stored                       │
-│                         ↓                                    │
-│  ┌──────────────────────────────────────────────────────────┤
-│  │                  Event Broadcasting                      │
-│  │  ┌─────────────────────────────────────────────────────┐ │
-│  │  │              WebSocket Server                       │ │
-│  │  │                                                     │ │
-│  │  │  Listen on: ws://localhost:9999                    │ │
-│  │  │                                                     │ │
-│  │  │  Events:                                            │ │
-│  │  │  - stats:updated                                    │ │
-│  │  │  - match:new                                        │ │
-│  │  │  - draft:started                                    │ │
-│  │  │  - draft:pick                                       │ │
-│  │  └─────────────────────────────────────────────────────┘ │
-│  └──────────────────────┬───────────────────────────────────┘
-└─────────────────────────┼───────────────────────────────────┘
+│  └───────────────────────┼────────────────────────────────┘ │
+│                          ↓                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              WebSocket Server (port 9999)              │ │
+│  │  Events: stats:updated, match:new, draft:pick, etc.    │ │
+│  └────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+                          │
                           │ WebSocket events
                           ↓
-         ┌────────────────────────────────┐
-         │     WebSocket Clients          │
-         │  (Any client can connect)      │
-         └────────────────┬───────────────┘
-                          │ connects
+┌──────────────────────────────────────────────────────────────┐
+│               REST API Server (cmd/apiserver)                │
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              HTTP Router (Chi)                         │ │
+│  │  GET  /api/matches      POST /api/decks               │ │
+│  │  GET  /api/drafts       GET  /api/collection          │ │
+│  │  GET  /api/stats        GET  /api/meta                │ │
+│  │  POST /api/settings     WebSocket /api/ws             │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                          │                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              Facade Layer (internal/gui/)              │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │ │
+│  │  │MatchFac. │ │DraftFac. │ │ DeckFac. │ │ MetaFac. │ │ │
+│  │  │          │ │          │ │          │ │          │ │ │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │ │
+│  │  │ CardFac. │ │ LLMFac.  │ │ Collect. │ │ Settings │ │ │
+│  │  │          │ │          │ │  Facade  │ │  Facade  │ │ │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                          │                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              Storage Layer (internal/storage/)         │ │
+│  │  Repository Pattern: Matches, Drafts, Decks, Cards,   │ │
+│  │  Collection, Settings, DraftRatings, ML Models        │ │
+│  │                          │                             │ │
+│  │              ┌────────────────────────┐               │ │
+│  │              │  SQLite Database       │               │ │
+│  │              │  ~/.mtga-companion/    │               │ │
+│  │              │  mtga.db               │               │ │
+│  │              └────────────────────────┘               │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                          │                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              ML/AI Services (v1.4+)                    │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐              │ │
+│  │  │   ML     │ │  Ollama  │ │   Meta   │              │ │
+│  │  │  Engine  │ │  Client  │ │ Service  │              │ │
+│  │  └──────────┘ └──────────┘ └──────────┘              │ │
+│  └────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+                          │
+                          │ REST API + WebSocket
                           ↓
 ┌──────────────────────────────────────────────────────────────┐
-│                    GUI (Frontend - Wails)                    │
+│                Browser (Default System Browser)              │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │                   IPC Client Layer                     │ │
-│  │  ┌─────────────────────────────────────────────────── ││ │
-│  │  │         WebSocket Connection Handler              ││ │
-│  │  │                                                    ││ │
-│  │  │  - Connect to daemon (ws://localhost:9999)        ││ │
-│  │  │  - Subscribe to events                            ││ │
-│  │  │  - Handle reconnection                            ││ │
-│  │  │  - Automatic fallback to standalone               ││ │
-│  │  └────────────────────────────────────────────────────┘│ │
-│  │                        │                               │ │
-│  │                        │ events                        │ │
-│  │                        ↓                               │ │
-│  │  ┌────────────────────────────────────────────────────┐│ │
-│  │  │              Event Handlers                        ││ │
-│  │  │                                                    ││ │
-│  │  │  - stats:updated → Refresh statistics display     ││ │
-│  │  │  - match:new → Update match history               ││ │
-│  │  │  - draft:pick → Update draft overlay              ││ │
-│  │  └──────────────────────┬─────────────────────────────┘│ │
-│  └─────────────────────────┼──────────────────────────────┘ │
-│                            │ trigger UI updates             │
-│                            ↓                                 │
-│  ┌──────────────────────────────────────────────────────────┤
-│  │                   React Frontend                         │
-│  │  ┌─────────────────────────────────────────────────────┐ │
-│  │  │                   Pages/Views                       │ │
-│  │  │  ┌──────────┐  ┌───────────┐  ┌────────────┐      │ │
-│  │  │  │  Match   │  │  Charts   │  │  Settings  │      │ │
-│  │  │  │ History  │  │  & Stats  │  │            │      │ │
-│  │  │  └──────────┘  └───────────┘  └────────────┘      │ │
-│  │  │                                                     │ │
-│  │  │  Components fetch data via:                        │ │
-│  │  │  - Go backend methods (via Wails bindings)         │ │
-│  │  │  - Real-time updates from WebSocket events         │ │
-│  │  └─────────────────────────────────────────────────────┘ │
-│  └──────────────────────────────────────────────────────────┘
-└──────────────────────────────────────────────────────────────┘
-
-Standalone Mode (Fallback):
-┌──────────────────────────────────────────────────────────────┐
-│                    GUI (Standalone Mode)                     │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │              Embedded Log Poller                       │ │
-│  │  (Same functionality as daemon, runs in GUI process)   │ │
-│  └────────────────────┬───────────────────────────────────┘ │
-│                       │                                      │
-│                       ↓                                      │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │              Direct Database Access                    │ │
-│  │  (No WebSocket, direct repository calls)               │ │
+│  │              React SPA (frontend/)                     │ │
+│  │                                                        │ │
+│  │  ┌────────────────────────────────────────────────┐   │ │
+│  │  │           API Client (services/api/)           │   │ │
+│  │  │  matches.ts  drafts.ts  decks.ts  meta.ts     │   │ │
+│  │  │  cards.ts    collection.ts  settings.ts       │   │ │
+│  │  └────────────────────────────────────────────────┘   │ │
+│  │                          │                            │ │
+│  │  ┌────────────────────────────────────────────────┐   │ │
+│  │  │           Pages & Components                   │   │ │
+│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │ │
+│  │  │  │  Match   │  │  Draft   │  │  Decks   │    │   │ │
+│  │  │  │ History  │  │ Assistant│  │  Builder │    │   │ │
+│  │  │  └──────────┘  └──────────┘  └──────────┘    │   │ │
+│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │ │
+│  │  │  │  Meta    │  │Collection│  │  Charts  │    │   │ │
+│  │  │  │Dashboard │  │  Browser │  │  & Stats │    │   │ │
+│  │  │  └──────────┘  └──────────┘  └──────────┘    │   │ │
+│  │  └────────────────────────────────────────────────┘   │ │
 │  └────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -183,39 +161,59 @@ Standalone Mode (Fallback):
 - SQLite database with migration support
 - Repositories: matches, drafts, statistics, settings
 
-### 2. GUI (Frontend Application)
+### 2. REST API Server
 
-**Location**: `main.go`, `app.go`, `frontend/`
+**Location**: `cmd/apiserver/`, `internal/api/`
 
 **Responsibilities**:
-- Connect to daemon via WebSocket
-- Display match history, statistics, charts
-- Handle user interactions and settings
-- Automatic fallback to standalone mode if daemon unavailable
-- Real-time UI updates via event listeners
+- Serve REST API endpoints for frontend
+- WebSocket endpoint for real-time updates
+- Initialize and manage all backend services
+- Open browser to frontend on startup (optional)
 
 **Key Components**:
 
-**IPC Client** (`internal/ipc/client.go`):
-- WebSocket client that connects to daemon
-- Subscribes to events (stats:updated, match:new, etc.)
-- Handles reconnection with exponential backoff
-- Detects daemon availability and falls back to standalone
+**HTTP Router** (`internal/api/router.go`):
+- Chi-based HTTP router
+- RESTful API endpoints for all features
+- CORS configuration for browser access
+- Health check endpoint
 
-**Wails Backend** (`app.go`):
-- Go backend methods callable from TypeScript frontend
-- Example: `GetMatches()`, `GetStatistics()`, `SetDaemonPort()`
-- Manages IPC client connection
-- Controls standalone poller when daemon unavailable
+**API Handlers** (`internal/api/handlers/`):
+- HTTP handlers for each domain (matches, drafts, decks, etc.)
+- Request validation and response formatting
+- Delegates to facade layer for business logic
+
+**WebSocket Handler** (`internal/api/websocket/`):
+- Real-time event broadcasting
+- Client subscription management
+- Event routing from daemon
+
+### 3. Frontend SPA (Browser Application)
+
+**Location**: `frontend/`
+
+**Responsibilities**:
+- Display match history, statistics, charts
+- Handle user interactions and settings
+- Real-time updates via WebSocket
+- All data fetched via REST API
+
+**Key Components**:
+
+**API Client Modules** (`frontend/src/services/api/`):
+- Typed REST API client modules
+- `matches.ts`, `drafts.ts`, `decks.ts`, `cards.ts`
+- `collection.ts`, `meta.ts`, `settings.ts`, `system.ts`
+- Automatic error handling and response typing
 
 **React Frontend** (`frontend/src/`):
 - TypeScript + React 18
-- Pages: Match History, Charts, Settings
+- Pages: Match History, Draft, Decks, Collection, Meta, Charts
 - Components: Layout, tables, charts, status indicators
-- Uses Wails bindings to call Go backend methods
-- Listens for WebSocket events via `EventsOn()`
+- Hooks for data fetching and real-time updates
 
-### 3. Shared Components
+### 4. Shared Components
 
 **Log Processor** (`internal/mtga/logprocessor/`):
 - Shared by both daemon and standalone GUI
@@ -291,27 +289,30 @@ Standalone Mode (Fallback):
 6. React components refresh
 ```
 
-### GUI Startup Flow
+### Application Startup Flow (v1.4+)
 
 ```
-1. GUI starts, initializes Wails backend
+1. User launches MTGA Companion app
    │
    ↓
-2. Backend attempts to connect to daemon
-   │  (ws://localhost:9999)
+2. API server starts (cmd/apiserver)
+   │  - Initializes database connection
+   │  - Initializes all facades and services
+   │  - Starts HTTP server on port 8080
    │
-   ├─ Success: Connected to daemon
-   │  │
-   │  ├─ Subscribe to WebSocket events
-   │  ├─ Load initial data from database
-   │  └─ Display "Connected" status
+   ↓
+3. Browser opens to frontend URL
+   │  (http://localhost:3000 or bundled static files)
    │
-   └─ Failure: Daemon not available
-      │
-      ├─ Log: "Daemon not available, falling back to standalone"
-      ├─ Start embedded log poller
-      ├─ Load data directly from database
-      └─ Display "Standalone Mode" status
+   ↓
+4. Frontend loads and connects to API
+   │  - Fetches initial data via REST API
+   │  - Establishes WebSocket for real-time updates
+   │
+   ↓
+5. Daemon service (if running) broadcasts events
+   │  - Log changes detected → events broadcast
+   │  - Frontend receives updates via WebSocket
 ```
 
 ## WebSocket Event Protocol
@@ -622,22 +623,23 @@ The daemon can support multiple frontend types:
 
 ### Backend (Go)
 
-- **Language**: Go 1.23+
+- **Language**: Go 1.24+
+- **HTTP Router**: Chi (lightweight, idiomatic)
 - **Database**: SQLite3 via `modernc.org/sqlite` (pure Go, no CGo)
 - **Migrations**: `golang-migrate/migrate`
 - **WebSocket**: `gorilla/websocket`
 - **File Watching**: `fsnotify/fsnotify`
 - **Service Management**: `kardianos/service`
 
-### Frontend (React + Wails)
+### Frontend (React SPA)
 
-- **Framework**: Wails v2 (Go + Web)
+- **Architecture**: REST API + Browser SPA (v1.4+)
 - **UI Library**: React 18
 - **Language**: TypeScript
 - **Build Tool**: Vite
 - **Routing**: React Router
 - **Charts**: Recharts
-- **Webview**: Native (WebKit on macOS, WebView2 on Windows)
+- **Testing**: Vitest (unit), Playwright (E2E)
 
 ### Platform Support
 
