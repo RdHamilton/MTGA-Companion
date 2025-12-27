@@ -33,7 +33,7 @@ describe('matches API', () => {
         RankMinClass: 'Silver',
         RankMaxClass: 'Platinum',
         ResultReason: 'concede',
-      } as matches.StatsFilter;
+      } as unknown as matches.StatsFilter;
 
       const result = matches.statsFilterToRequest(filter);
 
@@ -58,7 +58,7 @@ describe('matches API', () => {
     });
 
     it('should handle empty filter', () => {
-      const filter = {} as matches.StatsFilter;
+      const filter = {} as unknown as matches.StatsFilter;
       const result = matches.statsFilterToRequest(filter);
 
       expect(result).toEqual({
@@ -85,7 +85,7 @@ describe('matches API', () => {
       const filter = {
         StartDate: '2024-01-01T00:00:00.000Z' as unknown as Date,
         EndDate: '2024-01-31T23:59:59.999Z' as unknown as Date,
-      } as matches.StatsFilter;
+      } as unknown as matches.StatsFilter;
 
       const result = matches.statsFilterToRequest(filter);
 
