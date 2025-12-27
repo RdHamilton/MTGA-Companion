@@ -7,9 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2025-11-29
+## [1.4.0] - 2025-12-27
 
 ### Added
+
+**REST API Architecture**
+- **REST API + Browser Architecture** - Migrated from Wails desktop app to REST API with React SPA (#706, #707, #713)
+- **Complete API Parity** - All frontend features work through REST endpoints (#712, #716)
+- **Legacy API Removal** - Removed 767-line compatibility layer, components use REST modules directly (#711, #721)
+- **E2E Test Infrastructure** - Playwright tests run against REST API server (#708-#710, #717-#720)
+
+**Draft Assistant Enhancements**
+- **Current Pack Picker** - Shows current pack cards with tier ratings, GIHWR, and ALSA stats during draft (#686-#689)
+- **Pick Recommendations** - Highlights recommended pick with reasoning based on card ratings and pool colors
+- **Suggest Decks** - Evaluates 25 color combinations (5 mono + 10 two-color + 10 three-color) for draft decks (#687-#689)
+- **Three-Color Deck Support** - Three-color recommendations include mana consistency scoring
+- **Deck Composition Analysis** - Mana curve visualization, synergies, and deck composition stats
+- **Apply/Export Suggested Deck** - Apply suggested deck directly or export to file
+- **Draft Search Improvements** - Enhanced search and bug fixes in Draft Assistant (#684)
+
+**Quest Tracking Improvements**
+- **Quest Sync Fix** - Fixed Active Quests not updating with current MTGA quest state (#702, #704)
+- **Quest Reroll Detection** - Properly handles rerolled quests in cleanup logic (#700, #704)
+- **Quest History Filtering** - Added filtering capability to Quest History table columns (#701, #705)
+- **Tooltip Visibility Fix** - Fixed Quest History table header tooltips being hidden (#699, #703)
+
+**UI/UX Improvements**
+- **Format Normalization** - Normalized format/event display in Match History (e.g., "QuickDraft_DSK" → "Quick Draft DSK") (#686)
+- **Format Distribution Aggregation** - Aggregated format names by base name in Format Distribution stats (#686)
+- **Collection UI Improvements** - Better UI and deck parsing on Collection page (#683)
+- **Draft Card Overflow Fix** - Fixed draft card name overflow with proper CSS word-wrap (#687)
 
 **ML-Powered Recommendations (Complete)**
 - **Machine Learning Engine** - Intelligent card recommendations using trained ML models (#576, #577, #578)
@@ -59,9 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Draft Session Tracking** - Fixed draft session tracking when daemon restarts (#687)
+- **Draft Event Filtering** - Filter old draft events when processing new drafts to prevent mixing (#687)
+- **Deck Cleanup Issues** - Fixed deck cleanup and stats filtering issues (#685)
 - **Meta Page Data Loading** - Fixed MTGGoldfish HTML parsing for updated site structure (#680)
 - **RWMutex Deadlock** - Fixed fatal panic in RefreshAll method due to incorrect mutex usage (#681)
 - **Flaky Format Selection Test** - Fixed intermittent test failure in Meta page tests (#681)
+- **Archetype Color Sort** - Fixed non-deterministic color sorting in archetype classifier (#721)
 
 ### Changed
 
@@ -71,16 +102,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical
 
 **Code Quality**
-- **Frontend Test Coverage**: 1485+ tests passing
+- **Frontend Test Coverage**: 1,596+ tests passing (71 test files)
 - **Go Tests**: All passing
+- **E2E Smoke Tests**: All passing
 - **Linter**: 0 issues (golangci-lint)
 
 **New Packages**
+- `internal/api/` - REST API handlers and router for SPA architecture
 - `internal/ml/` - Machine learning engine with model, pipeline, and meta-weighting
 - `internal/llm/` - Ollama client and explanation generator
 - `internal/archetype/` - Deck archetype classification system
 - `internal/feedback/` - Recommendation feedback service
 - `internal/meta/` - Metagame data aggregation from multiple sources
+
+**Architecture Changes**
+- Migrated from Wails v2 to REST API + React SPA
+- Removed legacy API compatibility layer (767 lines)
+- Added REST API modules: cards, collection, decks, drafts, matches, meta, quests, settings, system
 
 ### Documentation
 
