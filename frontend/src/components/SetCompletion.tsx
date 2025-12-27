@@ -75,11 +75,12 @@ export default function SetCompletion({ onClose }: SetCompletionProps) {
       case 'completion':
         comparison = a.Percentage - b.Percentage;
         break;
-      case 'release':
+      case 'release': {
         const aRelease = setInfo.get(a.SetCode)?.releasedAt || '';
         const bRelease = setInfo.get(b.SetCode)?.releasedAt || '';
         comparison = aRelease.localeCompare(bRelease);
         break;
+      }
     }
     return sortDesc ? -comparison : comparison;
   });

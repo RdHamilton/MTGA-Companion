@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import AboutDialog from '../components/AboutDialog';
 import {
   DaemonConnectionSection,
@@ -148,8 +148,8 @@ const Settings = () => {
     resetToDefaults();
   };
 
-  // Build accordion items
-  const accordionItems: SettingsAccordionItem[] = useMemo(() => {
+  // Build accordion items - let React Compiler handle memoization
+  const accordionItems: SettingsAccordionItem[] = (() => {
     const items: SettingsAccordionItem[] = [
       {
         id: 'connection',
@@ -307,78 +307,7 @@ const Settings = () => {
     });
 
     return items;
-  }, [
-    connectionStatus,
-    daemonMode,
-    daemonPort,
-    isReconnecting,
-    handleDaemonPortChange,
-    handleReconnect,
-    handleModeChange,
-    autoRefresh,
-    refreshInterval,
-    showNotifications,
-    theme,
-    handleExportData,
-    handleImportData,
-    isConnected,
-    clearDataBeforeReplay,
-    setClearDataBeforeReplay,
-    isReplaying,
-    replayProgress,
-    handleImportLogFile,
-    handleReplayLogs,
-    handleClearAllData,
-    setCode,
-    setSetCode,
-    draftFormat,
-    setDraftFormat,
-    isFetchingRatings,
-    isFetchingCards,
-    isRecalculating,
-    recalculateMessage,
-    dataSource,
-    isClearingCache,
-    handleFetchSetRatings,
-    handleRefreshSetRatings,
-    handleFetchSetCards,
-    handleRefreshSetCards,
-    handleRecalculateGrades,
-    handleClearDatasetCache,
-    // ML settings
-    mlEnabled,
-    setMLEnabled,
-    llmEnabled,
-    setLLMEnabled,
-    ollamaEndpoint,
-    setOllamaEndpoint,
-    ollamaModel,
-    setOllamaModel,
-    metaGoldfishEnabled,
-    setMetaGoldfishEnabled,
-    metaTop8Enabled,
-    setMetaTop8Enabled,
-    metaWeight,
-    setMetaWeight,
-    personalWeight,
-    setPersonalWeight,
-    isDeveloperMode,
-    replayToolActive,
-    replayToolPaused,
-    replayToolProgress,
-    replaySpeed,
-    setReplaySpeed,
-    replayFilter,
-    setReplayFilter,
-    pauseOnDraft,
-    setPauseOnDraft,
-    handleStartReplayTool,
-    handlePauseReplayTool,
-    handleResumeReplayTool,
-    handleStopReplayTool,
-    handleVersionClick,
-    toggleDeveloperMode,
-  ]);
+  })();
 
   return (
     <div className="page-container">
