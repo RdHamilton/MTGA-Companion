@@ -172,7 +172,7 @@ describe('Decks', () => {
     });
 
     it('should show empty state when API returns null', async () => {
-      mockDecks.getDecks.mockResolvedValue(null);
+      mockDecks.getDecks.mockResolvedValue(null as unknown);
 
       renderWithRouter(<Decks />);
 

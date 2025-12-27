@@ -27,11 +27,6 @@ function createMockCollectionCard(overrides: Record<string, unknown> = {}): gui.
   });
 }
 
-// Helper to create mock collection - now returns array directly (REST API format)
-function createMockCollectionArray(cards: gui.CollectionCard[] = []): gui.CollectionCard[] {
-  return cards;
-}
-
 // Helper to create mock collection stats
 function createMockCollectionStats(overrides: Record<string, unknown> = {}): gui.CollectionStats {
   return new gui.CollectionStats({

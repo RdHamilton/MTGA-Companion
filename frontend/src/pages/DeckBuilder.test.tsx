@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckBuilder from './DeckBuilder';
-import { mockDecks, mockDrafts } from '@/test/mocks/apiMock';
+import { mockDecks } from '@/test/mocks/apiMock';
 import { models, gui } from '@/types/models';
 
 // Mock download utility

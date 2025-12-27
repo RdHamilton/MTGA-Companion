@@ -163,7 +163,7 @@ describe('MatchHistory', () => {
 
     it('should show filtered empty state when API returns null', async () => {
       // With default filters (dateRange='7days'), shows filtered empty state
-      mockMatches.getMatches.mockResolvedValue(null);
+      mockMatches.getMatches.mockResolvedValue(null as unknown);
 
       renderWithProvider(<MatchHistory />);
 

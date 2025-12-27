@@ -108,7 +108,8 @@ describe('useMLSettings', () => {
     });
 
     it('sets isCheckingOllama to true during check', async () => {
-      let resolveCheck: (value: unknown) => void;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveCheck: (value: any) => void;
       mockCheckOllamaStatus.mockImplementationOnce(
         () =>
           new Promise((resolve) => {
