@@ -8,9 +8,13 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('Collection', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate directly to collection page
-    await page.goto('/collection');
+    // First navigate to home to ensure app is fully loaded
+    await page.goto('/');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 10000 });
+
+    // Then navigate to collection page
+    await page.click('a.tab[href="/collection"]');
+    await page.waitForURL('**/collection');
   });
 
   test.describe('Navigation and Page Load', () => {
