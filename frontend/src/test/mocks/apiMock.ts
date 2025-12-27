@@ -132,6 +132,10 @@ export const mockSystem = {
   pullOllamaModel: vi.fn(() => Promise.resolve()),
   testLLMGeneration: vi.fn(() => Promise.resolve('Hello from Ollama!')),
   getCurrentAccount: vi.fn(),
+  resumeReplay: vi.fn(() => Promise.resolve()),
+  stopReplay: vi.fn(() => Promise.resolve()),
+  pauseReplay: vi.fn(() => Promise.resolve()),
+  connectDaemon: vi.fn(() => Promise.resolve()),
 };
 
 // Combined API mock export

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import ResultBreakdown from './ResultBreakdown';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 import { models } from '@/types/models';
 
@@ -51,7 +51,7 @@ describe('ResultBreakdown', () => {
       const loadingPromise = new Promise<models.Statistics>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.GetStats.mockReturnValue(loadingPromise);
+      mockMatches.getStats.mockReturnValue(loadingPromise);
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -66,7 +66,7 @@ describe('ResultBreakdown', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetStats.mockRejectedValue(new Error('Server error'));
+      mockMatches.getStats.mockRejectedValue(new Error('Server error'));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -77,7 +77,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.GetStats.mockRejectedValue('Unknown error');
+      mockMatches.getStats.mockRejectedValue('Unknown error');
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -89,7 +89,7 @@ describe('ResultBreakdown', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no metrics data', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(null);
+      mockMatches.getStats.mockResolvedValue(null);
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -104,7 +104,7 @@ describe('ResultBreakdown', () => {
 
   describe('Data Display', () => {
     it('should display overall performance section', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -114,7 +114,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display game-level statistics section', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -124,7 +124,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display performance analysis section', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -134,7 +134,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display win/loss breakdown section', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -144,7 +144,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display overall win rate correctly', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -154,7 +154,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display total matches', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ TotalMatches: 100 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ TotalMatches: 100 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -164,7 +164,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display matches won and lost', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ MatchesWon: 60, MatchesLost: 40 })
       );
 
@@ -176,7 +176,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display game win rate', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ GameWinRate: 0.591 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ GameWinRate: 0.591 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -186,7 +186,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display total games', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ TotalGames: 220 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ TotalGames: 220 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -196,7 +196,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display games won and lost', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ GamesWon: 130, GamesLost: 90 })
       );
 
@@ -210,7 +210,7 @@ describe('ResultBreakdown', () => {
 
   describe('Performance Analysis', () => {
     it('should calculate average games per match', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ TotalMatches: 100, TotalGames: 220 })
       );
 
@@ -222,7 +222,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should handle zero matches for average calculation', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ TotalMatches: 0, TotalGames: 0 })
       );
 
@@ -234,7 +234,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should calculate match to game win rate ratio', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ WinRate: 0.6, GameWinRate: 0.5 })
       );
 
@@ -246,7 +246,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should handle zero game win rate for ratio calculation', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ WinRate: 0.6, GameWinRate: 0 })
       );
 
@@ -261,7 +261,7 @@ describe('ResultBreakdown', () => {
 
   describe('Performance Categories', () => {
     it('should display "Excellent" for win rate >= 55%', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.55 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.55 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -271,7 +271,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display "Good" for win rate >= 50% and < 55%', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.52 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.52 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -281,7 +281,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display "Average" for win rate >= 45% and < 50%', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.47 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.47 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -291,7 +291,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display "Below Average" for win rate < 45%', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.40 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.40 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -303,7 +303,7 @@ describe('ResultBreakdown', () => {
 
   describe('Filters', () => {
     it('should render date range filter with default value', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -314,7 +314,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should render format filter with default value', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -325,7 +325,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should show custom date inputs when custom range selected', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -343,47 +343,47 @@ describe('ResultBreakdown', () => {
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStats).toHaveBeenCalled();
+        expect(mockMatches.getStats).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetStats.mock.calls.length;
+      const initialCallCount = mockMatches.getStats.mock.calls.length;
 
       const dateRangeSelect = getSelectByLabel('Date Range');
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStats.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getStats.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should refetch data when format changes', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStats).toHaveBeenCalled();
+        expect(mockMatches.getStats).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetStats.mock.calls.length;
+      const initialCallCount = mockMatches.getStats.mock.calls.length;
 
       const formatSelect = getSelectByLabel('Format');
       fireEvent.change(formatSelect, { target: { value: 'Ladder' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStats.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getStats.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
   });
 
   describe('Page Header', () => {
     it('should display page title', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -395,7 +395,7 @@ describe('ResultBreakdown', () => {
 
   describe('API Filter Parameters', () => {
     it('should pass constructed formats for constructed filter', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -408,14 +408,14 @@ describe('ResultBreakdown', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockWailsApp.GetStats.mock.calls.slice(-1)[0] as any[];
+        const lastCall = mockMatches.getStats.mock.calls.slice(-1)[0] as any[];
         const filter = lastCall[0] as models.StatsFilter;
         expect(filter.Formats).toEqual(['Ladder', 'Play']);
       });
     });
 
     it('should pass single format for specific format filter', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -428,7 +428,7 @@ describe('ResultBreakdown', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockWailsApp.GetStats.mock.calls.slice(-1)[0] as any[];
+        const lastCall = mockMatches.getStats.mock.calls.slice(-1)[0] as any[];
         const filter = lastCall[0] as models.StatsFilter;
         expect(filter.Format).toBe('Ladder');
       });
@@ -437,7 +437,7 @@ describe('ResultBreakdown', () => {
 
   describe('Win/Loss Bar Display', () => {
     it('should display win percentage in breakdown bar', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -447,7 +447,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display loss percentage in breakdown bar', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
+      mockMatches.getStats.mockResolvedValue(createMockStatistics({ WinRate: 0.6 }));
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -457,7 +457,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display matches won and lost in breakdown stats', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(
+      mockMatches.getStats.mockResolvedValue(
         createMockStatistics({ MatchesWon: 60, MatchesLost: 40 })
       );
 
@@ -472,7 +472,7 @@ describe('ResultBreakdown', () => {
 
   describe('Metric Labels', () => {
     it('should display all metric labels', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
@@ -489,7 +489,7 @@ describe('ResultBreakdown', () => {
     });
 
     it('should display analysis labels', async () => {
-      mockWailsApp.GetStats.mockResolvedValue(createMockStatistics());
+      mockMatches.getStats.mockResolvedValue(createMockStatistics());
 
       renderWithProvider(<ResultBreakdown />);
 
