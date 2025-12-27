@@ -76,7 +76,7 @@ export async function getCollectionByRarity(rarity: string): Promise<CollectionC
  * Get missing cards analysis for a set.
  */
 export async function getMissingCards(setCode: string): Promise<models.MissingCardsAnalysis> {
-  return get<models.MissingCardsAnalysis>(`/collection/sets/${setCode}/missing-analysis`);
+  return get<models.MissingCardsAnalysis>(`/collection/missing/${setCode}`);
 }
 
 /**

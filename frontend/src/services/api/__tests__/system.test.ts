@@ -116,7 +116,7 @@ describe('system API', () => {
 
       await system.clearAllData();
 
-      expect(post).toHaveBeenCalledWith('/system/clear-data');
+      expect(post).toHaveBeenCalledWith('/export/clear');
     });
   });
 
@@ -127,7 +127,7 @@ describe('system API', () => {
 
       const result = await system.checkOllamaStatus('http://localhost:11434', 'llama2');
 
-      expect(post).toHaveBeenCalledWith('/system/ollama/status', {
+      expect(post).toHaveBeenCalledWith('/llm/status', {
         endpoint: 'http://localhost:11434',
         model: 'llama2',
       });
@@ -136,15 +136,13 @@ describe('system API', () => {
   });
 
   describe('getAvailableOllamaModels', () => {
-    it('should call post with endpoint', async () => {
+    it('should call get with correct path', async () => {
       const mockModels = [{ name: 'llama2', size: 1000 }];
-      vi.mocked(post).mockResolvedValue(mockModels);
+      vi.mocked(get).mockResolvedValue(mockModels);
 
       const result = await system.getAvailableOllamaModels('http://localhost:11434');
 
-      expect(post).toHaveBeenCalledWith('/system/ollama/models', {
-        endpoint: 'http://localhost:11434',
-      });
+      expect(get).toHaveBeenCalledWith('/llm/models');
       expect(result).toEqual(mockModels);
     });
   });
@@ -155,7 +153,7 @@ describe('system API', () => {
 
       await system.pullOllamaModel('http://localhost:11434', 'llama2');
 
-      expect(post).toHaveBeenCalledWith('/system/ollama/pull', {
+      expect(post).toHaveBeenCalledWith('/llm/models/pull', {
         endpoint: 'http://localhost:11434',
         model: 'llama2',
       });
@@ -168,7 +166,7 @@ describe('system API', () => {
 
       const result = await system.testLLMGeneration('http://localhost:11434', 'llama2');
 
-      expect(post).toHaveBeenCalledWith('/system/ollama/test', {
+      expect(post).toHaveBeenCalledWith('/llm/test', {
         endpoint: 'http://localhost:11434',
         model: 'llama2',
       });
@@ -177,13 +175,13 @@ describe('system API', () => {
   });
 
   describe('exportMLTrainingData', () => {
-    it('should call post with limit', async () => {
+    it('should call get with limit in query', async () => {
       const mockData = { records: [] };
-      vi.mocked(post).mockResolvedValue(mockData);
+      vi.mocked(get).mockResolvedValue(mockData);
 
       const result = await system.exportMLTrainingData(100);
 
-      expect(post).toHaveBeenCalledWith('/system/ml/export', { limit: 100 });
+      expect(get).toHaveBeenCalledWith('/feedback/ml-training?limit=100');
       expect(result).toEqual(mockData);
     });
   });

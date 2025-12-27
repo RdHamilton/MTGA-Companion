@@ -146,3 +146,20 @@ func (h *CollectionHandler) SearchCollection(w http.ResponseWriter, r *http.Requ
 	// Redirect to GetCollection since it supports filtering
 	h.GetCollection(w, r)
 }
+
+// GetMissingCardsForDeck returns missing cards for a specific deck.
+func (h *CollectionHandler) GetMissingCardsForDeck(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	missing, err := h.facade.GetMissingCardsForDeck(r.Context(), deckID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, missing)
+}

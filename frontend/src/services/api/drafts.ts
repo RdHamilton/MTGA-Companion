@@ -171,7 +171,7 @@ export async function getDraftDeckMetrics(sessionId: string): Promise<models.Dec
  * Get draft performance metrics.
  */
 export async function getDraftPerformanceMetrics(): Promise<DraftStats> {
-  return get<DraftStats>('/drafts/performance-metrics');
+  return post<DraftStats>('/drafts/stats', {});
 }
 
 /**
@@ -189,16 +189,18 @@ export async function getPickAlternatives(
   packNumber: number,
   pickNumber: number
 ): Promise<pickquality.PickQuality> {
-  return get<pickquality.PickQuality>(
-    `/drafts/${sessionId}/picks/${packNumber}/${pickNumber}/alternatives`
-  );
+  return post<pickquality.PickQuality>('/drafts/grade-pick', {
+    session_id: sessionId,
+    pack_number: packNumber,
+    pick_number: pickNumber,
+  });
 }
 
 /**
  * Get draft grade for a session.
  */
 export async function getDraftGrade(sessionId: string): Promise<DraftGrade> {
-  return get<DraftGrade>(`/drafts/${sessionId}/grade`);
+  return get<DraftGrade>(`/drafts/${sessionId}/analysis`);
 }
 
 /**
@@ -223,7 +225,7 @@ export async function getCurrentPackWithRecommendation(
 export async function getDraftWinRatePrediction(
   sessionId: string
 ): Promise<prediction.DeckPrediction> {
-  return get<prediction.DeckPrediction>(`/drafts/${sessionId}/win-prediction`);
+  return post<prediction.DeckPrediction>(`/drafts/${sessionId}/calculate-prediction`);
 }
 
 /**
@@ -232,7 +234,7 @@ export async function getDraftWinRatePrediction(
 export async function getRecommendations(
   request: gui.GetRecommendationsRequest
 ): Promise<gui.GetRecommendationsResponse> {
-  return post<gui.GetRecommendationsResponse>('/drafts/recommendations', request);
+  return post<gui.GetRecommendationsResponse>('/decks/recommendations', request);
 }
 
 /**
@@ -241,14 +243,14 @@ export async function getRecommendations(
 export async function recordRecommendation(
   request: gui.RecordRecommendationRequest
 ): Promise<gui.RecordRecommendationResponse> {
-  return post<gui.RecordRecommendationResponse>('/drafts/recommendations/record', request);
+  return post<gui.RecordRecommendationResponse>('/feedback/recommendation', request);
 }
 
 /**
  * Record a recommendation action.
  */
 export async function recordRecommendationAction(request: gui.RecordActionRequest): Promise<void> {
-  return post('/drafts/recommendations/action', request);
+  return post('/feedback/action', request);
 }
 
 /**
@@ -257,14 +259,14 @@ export async function recordRecommendationAction(request: gui.RecordActionReques
 export async function recordRecommendationOutcome(
   request: gui.RecordOutcomeRequest
 ): Promise<void> {
-  return post('/drafts/recommendations/outcome', request);
+  return post('/feedback/outcome', request);
 }
 
 /**
  * Get recommendation stats.
  */
 export async function getRecommendationStats(): Promise<gui.RecommendationStatsResponse> {
-  return get<gui.RecommendationStatsResponse>('/drafts/recommendations/stats');
+  return get<gui.RecommendationStatsResponse>('/feedback/stats');
 }
 
 /**
@@ -273,7 +275,7 @@ export async function getRecommendationStats(): Promise<gui.RecommendationStatsR
 export async function explainRecommendation(
   request: gui.ExplainRecommendationRequest
 ): Promise<gui.ExplainRecommendationResponse> {
-  return post<gui.ExplainRecommendationResponse>('/drafts/recommendations/explain', request);
+  return post<gui.ExplainRecommendationResponse>('/decks/explain-recommendation', request);
 }
 
 /**
@@ -282,5 +284,7 @@ export async function explainRecommendation(
 export async function classifyDraftPoolArchetype(
   sessionId: string
 ): Promise<gui.ArchetypeClassificationResult> {
-  return get<gui.ArchetypeClassificationResult>(`/drafts/${sessionId}/classify-archetype`);
+  return post<gui.ArchetypeClassificationResult>('/decks/classify-draft-pool', {
+    session_id: sessionId,
+  });
 }
