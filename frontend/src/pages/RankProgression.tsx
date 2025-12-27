@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { GetRankProgressionTimeline } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { storage } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -50,7 +50,7 @@ const RankProgression = () => {
           break;
       }
 
-      const data = await GetRankProgressionTimeline(format, start, now, 'daily');
+      const data = await matches.getRankProgressionTimeline(format, start, now, 'daily');
       setTimeline(data?.entries || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load rank progression');

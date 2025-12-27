@@ -1,25 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  GetDeck,
-  AddCard,
-  RemoveCard,
-  GetDeckStatistics,
-  GetDeckByDraftEvent,
-  CreateDeck,
-  GetActiveDraftSessions,
-  GetCompletedDraftSessions,
-  GetDraftPicks,
-  GetRecommendations,
-  ExportDeckToFile,
-  ValidateDeckWithDialog,
-} from '@/services/api/legacy';
+import { decks, drafts } from '@/services/api';
+import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
 import SuggestDecksModal from '../components/SuggestDecksModal';
 import './DeckBuilder.css';
+
+// Export deck to file using native file save dialog
+async function exportDeckToFile(deckId: string, format: string = 'txt'): Promise<void> {
+  const response = await decks.exportDeck(deckId, { format });
+  downloadTextFile(response.content, response.filename || `deck.${format}`);
+}
 
 export default function DeckBuilder() {
   const { deckID } = useParams<{ deckID?: string }>();
@@ -52,10 +46,10 @@ export default function DeckBuilder() {
 
         if (deckID) {
           // Load by deck ID
-          deckData = await GetDeck(deckID);
+          deckData = await decks.getDeck(deckID);
         } else if (draftEventID) {
           // Load by draft event ID, create if doesn't exist
-          deckData = await GetDeckByDraftEvent(draftEventID);
+          deckData = await decks.getDeckByDraftEvent(draftEventID);
 
           if (!deckData || !deckData.deck) {
             // No deck exists yet - create one from draft picks
@@ -70,8 +64,8 @@ export default function DeckBuilder() {
 
               // Get draft session to get the event name for the deck
               const [activeSessions, completedSessions] = await Promise.all([
-                GetActiveDraftSessions(),
-                GetCompletedDraftSessions(100), // Get last 100 completed drafts
+                drafts.getActiveDraftSessions(),
+                drafts.getCompletedDraftSessions(),
               ]);
               const allSessions = [...activeSessions, ...completedSessions];
               const session = allSessions.find((s) => s.ID === draftEventID);
@@ -86,10 +80,15 @@ export default function DeckBuilder() {
               const deckName = `${session.EventName} Draft`;
 
               // Create deck linked to this draft event
-              const newDeck = await CreateDeck(deckName, 'limited', 'draft', draftEventID);
+              const newDeck = await decks.createDeck({
+                name: deckName,
+                format: 'limited',
+                source: 'draft',
+                draft_event_id: draftEventID,
+              });
 
               // Load the newly created deck
-              deckData = await GetDeck(newDeck.ID);
+              deckData = await decks.getDeck(newDeck.ID);
             } catch (createErr) {
               setError(createErr instanceof Error ? createErr.message : 'Failed to create deck from draft');
               setLoading(false);
@@ -116,13 +115,13 @@ export default function DeckBuilder() {
         setTags(deckData.tags || []);
 
         // Load statistics
-        const stats = await GetDeckStatistics(deckData.deck.ID);
+        const stats = await decks.getDeckStatistics(deckData.deck.ID);
         setStatistics(stats);
 
         // If this is a draft deck, get the draft card IDs
         if (deckData.deck.Source === 'draft' && deckData.deck.DraftEventID) {
           try {
-            const picks = await GetDraftPicks(deckData.deck.DraftEventID);
+            const picks = await drafts.getDraftPicks(deckData.deck.DraftEventID);
             // Extract unique card IDs from draft picks
             const uniqueCardIDs = Array.from(
               new Set(picks.map((pick) => parseInt(pick.CardID, 10)))
@@ -151,14 +150,20 @@ export default function DeckBuilder() {
   const handleAddCard = async (cardID: number, quantity: number, board: 'main' | 'sideboard') => {
     if (!deck) return;
 
-    await AddCard(deck.ID, cardID, quantity, board, deck.Source === 'draft');
+    await decks.addCard({
+      deck_id: deck.ID,
+      arena_id: cardID,
+      quantity,
+      zone: board,
+      is_sideboard: board === 'sideboard',
+    });
 
     // Reload deck data
-    const deckData = await GetDeck(deck.ID);
+    const deckData = await decks.getDeck(deck.ID);
     setCards(deckData.cards || []);
 
     // Reload statistics
-    const stats = await GetDeckStatistics(deck.ID);
+    const stats = await decks.getDeckStatistics(deck.ID);
     setStatistics(stats);
 
     // Reload recommendations after adding a card
@@ -171,14 +176,18 @@ export default function DeckBuilder() {
     if (!deck) return;
 
     try {
-      await RemoveCard(deck.ID, cardID, board);
+      await decks.removeCard({
+        deck_id: deck.ID,
+        arena_id: cardID,
+        zone: board,
+      });
 
       // Reload deck data
-      const deckData = await GetDeck(deck.ID);
+      const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
       // Reload statistics
-      const stats = await GetDeckStatistics(deck.ID);
+      const stats = await decks.getDeckStatistics(deck.ID);
       setStatistics(stats);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to remove card');
@@ -198,7 +207,7 @@ export default function DeckBuilder() {
         onlyDraftPool: deck.Source === 'draft',
       };
 
-      const response = await GetRecommendations(request);
+      const response = await drafts.getRecommendations(request);
       if (response.error) {
         console.error('Recommendations error:', response.error);
         setRecommendations([]);
@@ -312,17 +321,23 @@ export default function DeckBuilder() {
         if (count > 0 && color in basicLands) {
           const land = basicLands[color as keyof typeof basicLands];
           console.log(`Adding ${count}x ${land.name} (arena_id=${land.arenaID})`);
-          await AddCard(deck.ID, land.arenaID, count, 'main', false);
+          await decks.addCard({
+            deck_id: deck.ID,
+            arena_id: land.arenaID,
+            quantity: count,
+            zone: 'main',
+            is_sideboard: false,
+          });
         }
       }
 
       // Reload deck data
       console.log('Reloading deck data...');
-      const deckData = await GetDeck(deck.ID);
+      const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
       // Reload statistics
-      const stats = await GetDeckStatistics(deck.ID);
+      const stats = await decks.getDeckStatistics(deck.ID);
       setStatistics(stats);
 
       console.log(`Successfully added ${landsNeeded} lands!`);
@@ -342,7 +357,7 @@ export default function DeckBuilder() {
 
     try {
       // Call backend which will show native SaveFileDialog
-      await ExportDeckToFile(deck.ID);
+      await exportDeckToFile(deck.ID);
     } catch (err) {
       console.error('Error exporting deck:', err);
     }
@@ -355,7 +370,7 @@ export default function DeckBuilder() {
 
     try {
       // Call backend which will show native MessageDialog with result
-      await ValidateDeckWithDialog(deck.ID);
+      await decks.validateDraftDeck(deck.ID);
     } catch (err) {
       console.error('Error validating deck:', err);
     }
@@ -365,7 +380,7 @@ export default function DeckBuilder() {
     if (!deck) return;
 
     // Reload deck data after a suggested deck is applied
-    const deckData = await GetDeck(deck.ID);
+    const deckData = await decks.getDeck(deck.ID);
     if (deckData.deck) {
       setDeck(deckData.deck);
     }
@@ -373,7 +388,7 @@ export default function DeckBuilder() {
     setTags(deckData.tags || []);
 
     // Reload statistics
-    const stats = await GetDeckStatistics(deck.ID);
+    const stats = await decks.getDeckStatistics(deck.ID);
     setStatistics(stats);
   };
 

@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import TierList from './TierList';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockCards } from '@/test/mocks/apiMock';
 import { gui } from '@/types/models';
 
 // Helper function to create mock card rating
@@ -48,14 +48,14 @@ describe('TierList Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockWailsApp.GetCardRatings.mockResolvedValue([]);
-    mockWailsApp.GetSetCards.mockResolvedValue([]);
+    mockCards.getCardRatings.mockResolvedValue([]);
+    mockCards.getSetCards.mockResolvedValue([]);
   });
 
   describe('Loading State', () => {
     it('should display loading state initially', () => {
-      mockWailsApp.GetCardRatings.mockImplementation(() => new Promise(() => {}));
-      mockWailsApp.GetSetCards.mockImplementation(() => new Promise(() => {}));
+      mockCards.getCardRatings.mockImplementation(() => new Promise(() => {}));
+      mockCards.getSetCards.mockImplementation(() => new Promise(() => {}));
 
       render(<TierList {...defaultProps} />);
 
@@ -65,8 +65,8 @@ describe('TierList Component', () => {
 
   describe('Error State', () => {
     it('should display error message when loading fails', async () => {
-      mockWailsApp.GetCardRatings.mockRejectedValue(new Error('Failed to fetch'));
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockRejectedValue(new Error('Failed to fetch'));
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -78,8 +78,8 @@ describe('TierList Component', () => {
 
   describe('Empty State', () => {
     it('should display empty state when no ratings available', async () => {
-      mockWailsApp.GetCardRatings.mockResolvedValue([]);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue([]);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -95,8 +95,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
         createMockCardRating({ name: 'Counterspell', mtga_id: 2, tier: 'A' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -111,8 +111,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Counterspell', mtga_id: 2, tier: 'A' }),
         createMockCardRating({ name: 'Giant Growth', mtga_id: 3, tier: 'B' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -137,8 +137,8 @@ describe('TierList Component', () => {
       const cards = [
         createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -158,8 +158,8 @@ describe('TierList Component', () => {
       const cards = [
         createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -185,8 +185,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
         createMockCardRating({ name: 'Counterspell', mtga_id: 2, tier: 'A' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -220,8 +220,8 @@ describe('TierList Component', () => {
       const cards = [
         createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -244,8 +244,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Chain Lightning', mtga_id: 2, tier: 'A' }),
         createMockCardRating({ name: 'Counterspell', mtga_id: 3, tier: 'B' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -270,8 +270,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Counterspell', mtga_id: 2, tier: 'A' }),
         createMockCardRating({ name: 'Giant Growth', mtga_id: 3, tier: 'B' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -300,8 +300,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'A-Tier Card', mtga_id: 2, tier: 'A' }),
         createMockCardRating({ name: 'B-Tier Card', mtga_id: 3, tier: 'B' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -318,8 +318,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'A-Tier Card', mtga_id: 2, tier: 'A' }),
         createMockCardRating({ name: 'F-Tier Card', mtga_id: 3, tier: 'F' }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -346,8 +346,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Blue Card', mtga_id: 1, tier: 'S', color: 'U', colors: ['U'] }),
         createMockCardRating({ name: 'Red Card', mtga_id: 2, tier: 'S', color: 'R', colors: ['R'] }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -376,8 +376,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Low WR Card', mtga_id: 1, tier: 'S', ever_drawn_win_rate: 50.0 }),
         createMockCardRating({ name: 'High WR Card', mtga_id: 2, tier: 'S', ever_drawn_win_rate: 65.0 }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 
@@ -397,8 +397,8 @@ describe('TierList Component', () => {
         createMockCardRating({ name: 'Red Lightning', mtga_id: 2, tier: 'S', color: 'R', colors: ['R'] }),
         createMockCardRating({ name: 'Blue Spell', mtga_id: 3, tier: 'S', color: 'U', colors: ['U'] }),
       ];
-      mockWailsApp.GetCardRatings.mockResolvedValue(cards);
-      mockWailsApp.GetSetCards.mockResolvedValue([]);
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
 
       render(<TierList {...defaultProps} />);
 

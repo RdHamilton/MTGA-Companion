@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { GetCardByArenaID, GetAllSetInfo, SearchCardsWithCollection } from '@/services/api/legacy';
+import { cards as cardsApi } from '@/services/api';
 import { gui } from '@/types/models';
 import SetSymbol from './SetSymbol';
 import './CardSearch.css';
@@ -100,7 +100,7 @@ export default function CardSearch({
   // Load available sets for filtering (only for constructed)
   useEffect(() => {
     if (!isDraftDeck) {
-      GetAllSetInfo()
+      cardsApi.getAllSetInfo()
         .then((setInfo) => setSets(setInfo || []))
         .catch((err) => console.error('Failed to load sets:', err));
     }
@@ -117,7 +117,7 @@ export default function CardSearch({
             const cards: CardWithOwned[] = [];
             for (const cardID of draftCardIDs) {
               try {
-                const card = await GetCardByArenaID(String(cardID));
+                const card = await cardsApi.getCardByArenaId(cardID);
                 if (card) {
                   cards.push(card as CardWithOwned);
                 }
@@ -151,7 +151,7 @@ export default function CardSearch({
     setLoading(true);
     setError(null);
     try {
-      const results = await SearchCardsWithCollection(debouncedSearchTerm, selectedSets, 100, collectionOnly);
+      const results = await cardsApi.searchCardsWithCollection(debouncedSearchTerm, selectedSets, 100);
       // Results already match CardWithOwned interface
       setAllCards((results || []) as CardWithOwned[]);
     } catch (err) {

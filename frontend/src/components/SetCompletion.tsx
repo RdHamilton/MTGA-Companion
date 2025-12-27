@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetSetCompletion, GetAllSetInfo } from '@/services/api/legacy';
+import { collection, cards } from '@/services/api';
 import { models, gui } from '@/types/models';
 import './SetCompletion.css';
 
@@ -33,8 +33,8 @@ export default function SetCompletion({ onClose }: SetCompletionProps) {
       setError(null);
       try {
         const [completion, sets] = await Promise.all([
-          GetSetCompletion(),
-          GetAllSetInfo(),
+          collection.getSetCompletion(),
+          cards.getAllSetInfo(),
         ]);
         setCompletionData(completion || []);
 

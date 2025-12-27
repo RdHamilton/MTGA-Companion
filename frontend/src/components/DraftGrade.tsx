@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CalculateDraftGrade, GetDraftGrade } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 import { grading } from '@/types/models';
 import './DraftGrade.css';
 
@@ -26,7 +26,7 @@ export const DraftGrade: React.FC<DraftGradeProps> = ({
       try {
         setLoading(true);
         setError(null);
-        const g = await GetDraftGrade(sessionID);
+        const g = await drafts.getDraftGrade(sessionID);
         setGrade(g);
       } catch {
         // Grade might not exist yet - not necessarily an error
@@ -43,7 +43,7 @@ export const DraftGrade: React.FC<DraftGradeProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const g = await CalculateDraftGrade(sessionID);
+      const g = await drafts.calculateDraftGrade(sessionID);
       setGrade(g);
       if (onGradeCalculated) {
         onGradeCalculated(g);

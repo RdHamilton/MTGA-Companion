@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { GetDraftPerformanceMetrics, ResetDraftPerformanceMetrics } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 import { metrics } from '@/types/models';
 import './PerformanceMetrics.css';
+
+// No-op stub - reset not implemented in REST API
+async function resetDraftPerformanceMetrics(): Promise<void> {
+  console.warn('ResetDraftPerformanceMetrics: Not implemented in REST API');
+}
 
 interface PerformanceMetricsProps {
     autoRefresh?: boolean; // Auto-refresh metrics every N seconds
@@ -32,7 +37,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
     const loadMetrics = async () => {
         try {
             setLoading(true);
-            const data = await GetDraftPerformanceMetrics();
+            const data = await drafts.getDraftPerformanceMetrics();
             setStats(data);
         } catch (err) {
             console.error('Error loading performance metrics:', err);
@@ -43,7 +48,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
 
     const handleReset = async () => {
         try {
-            await ResetDraftPerformanceMetrics();
+            await resetDraftPerformanceMetrics();
             await loadMetrics();
         } catch (err) {
             console.error('Error resetting metrics:', err);

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Decks from './Decks';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockDecks } from '@/test/mocks/apiMock';
 import { gui } from '@/types/models';
 
 // Mock useNavigate
@@ -93,7 +93,7 @@ describe('Decks', () => {
       const loadingPromise = new Promise<any>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.ListDecks.mockReturnValue(loadingPromise);
+      mockDecks.getDecks.mockReturnValue(loadingPromise);
 
       renderWithRouter(<Decks />);
 
@@ -111,7 +111,7 @@ describe('Decks', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.ListDecks.mockRejectedValue(new Error('Database error'));
+      mockDecks.getDecks.mockRejectedValue(new Error('Database error'));
 
       renderWithRouter(<Decks />);
 
@@ -124,7 +124,7 @@ describe('Decks', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.ListDecks.mockRejectedValue('Unknown error');
+      mockDecks.getDecks.mockRejectedValue('Unknown error');
 
       renderWithRouter(<Decks />);
 
@@ -137,8 +137,8 @@ describe('Decks', () => {
     });
 
     it('should have retry button that reloads decks', async () => {
-      mockWailsApp.ListDecks.mockRejectedValueOnce(new Error('Temporary error'));
-      mockWailsApp.ListDecks.mockResolvedValueOnce(createMockDeckList());
+      mockDecks.getDecks.mockRejectedValueOnce(new Error('Temporary error'));
+      mockDecks.getDecks.mockResolvedValueOnce(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -159,7 +159,7 @@ describe('Decks', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no decks exist', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue([]);
+      mockDecks.getDecks.mockResolvedValue([]);
 
       renderWithRouter(<Decks />);
 
@@ -172,7 +172,7 @@ describe('Decks', () => {
     });
 
     it('should show empty state when API returns null', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(null);
+      mockDecks.getDecks.mockResolvedValue(null);
 
       renderWithRouter(<Decks />);
 
@@ -184,7 +184,7 @@ describe('Decks', () => {
     });
 
     it('should show create button in empty state', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue([]);
+      mockDecks.getDecks.mockResolvedValue([]);
 
       renderWithRouter(<Decks />);
 
@@ -198,7 +198,7 @@ describe('Decks', () => {
 
   describe('Deck List Display', () => {
     it('should render deck cards when decks exist', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -212,7 +212,7 @@ describe('Decks', () => {
     });
 
     it('should display page title', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -224,7 +224,7 @@ describe('Decks', () => {
     });
 
     it('should display format for each deck', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -238,7 +238,7 @@ describe('Decks', () => {
     });
 
     it('should display draft badge for draft decks', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -250,7 +250,7 @@ describe('Decks', () => {
     });
 
     it('should display import badge for imported decks', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -262,7 +262,7 @@ describe('Decks', () => {
     });
 
     it('should display modified date when available', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue([
+      mockDecks.getDecks.mockResolvedValue([
         createMockDeckListItem({
           modifiedAt: new Date('2024-01-15T10:00:00').toISOString(),
         }),
@@ -278,7 +278,7 @@ describe('Decks', () => {
     });
 
     it('should show create button in header when decks exist', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -292,7 +292,7 @@ describe('Decks', () => {
 
   describe('Navigation', () => {
     it('should navigate to deck builder when clicking deck card', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -309,7 +309,7 @@ describe('Decks', () => {
     });
 
     it('should navigate to deck builder when clicking edit button', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -328,7 +328,7 @@ describe('Decks', () => {
 
   describe('Create Deck Dialog', () => {
     it('should open create dialog when clicking create button', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -346,7 +346,7 @@ describe('Decks', () => {
     });
 
     it('should close create dialog when clicking cancel', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -367,7 +367,7 @@ describe('Decks', () => {
     });
 
     it('should close create dialog when clicking close button', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -388,7 +388,7 @@ describe('Decks', () => {
     });
 
     it('should close create dialog when clicking overlay', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -410,8 +410,8 @@ describe('Decks', () => {
     });
 
     it('should create deck and navigate to deck builder', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.CreateDeck.mockResolvedValue({ ID: 'new-deck-id' });
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.createDeck.mockResolvedValue({ ID: 'new-deck-id' });
 
       renderWithRouter(<Decks />);
 
@@ -429,13 +429,17 @@ describe('Decks', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create Deck' }));
 
       await waitFor(() => {
-        expect(mockWailsApp.CreateDeck).toHaveBeenCalledWith('My New Deck', 'standard', 'manual', null);
+        expect(mockDecks.createDeck).toHaveBeenCalledWith({
+          name: 'My New Deck',
+          format: 'standard',
+          source: 'manual',
+        });
       });
       expect(mockNavigate).toHaveBeenCalledWith('/deck-builder/new-deck-id');
     });
 
     it('should show alert when creating deck with empty name', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       renderWithRouter(<Decks />);
@@ -454,8 +458,8 @@ describe('Decks', () => {
     });
 
     it('should allow selecting different formats', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.CreateDeck.mockResolvedValue({ ID: 'new-deck-id' });
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.createDeck.mockResolvedValue({ ID: 'new-deck-id' });
 
       renderWithRouter(<Decks />);
 
@@ -476,13 +480,17 @@ describe('Decks', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create Deck' }));
 
       await waitFor(() => {
-        expect(mockWailsApp.CreateDeck).toHaveBeenCalledWith('Historic Deck', 'historic', 'manual', null);
+        expect(mockDecks.createDeck).toHaveBeenCalledWith({
+          name: 'Historic Deck',
+          format: 'historic',
+          source: 'manual',
+        });
       });
     });
 
     it('should create deck when pressing Enter in name input', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.CreateDeck.mockResolvedValue({ ID: 'new-deck-id' });
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.createDeck.mockResolvedValue({ ID: 'new-deck-id' });
 
       renderWithRouter(<Decks />);
 
@@ -499,13 +507,17 @@ describe('Decks', () => {
       fireEvent.keyDown(nameInput, { key: 'Enter' });
 
       await waitFor(() => {
-        expect(mockWailsApp.CreateDeck).toHaveBeenCalledWith('Enter Test Deck', 'standard', 'manual', null);
+        expect(mockDecks.createDeck).toHaveBeenCalledWith({
+          name: 'Enter Test Deck',
+          format: 'standard',
+          source: 'manual',
+        });
       });
     });
 
     it('should show error alert when deck creation fails', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.CreateDeck.mockRejectedValue(new Error('Creation failed'));
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.createDeck.mockRejectedValue(new Error('Creation failed'));
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       renderWithRouter(<Decks />);
@@ -531,7 +543,7 @@ describe('Decks', () => {
 
   describe('Delete Deck Dialog', () => {
     it('should open delete dialog when clicking delete button', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -550,7 +562,7 @@ describe('Decks', () => {
     });
 
     it('should close delete dialog when clicking cancel', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -573,7 +585,7 @@ describe('Decks', () => {
     });
 
     it('should close delete dialog when clicking overlay', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -595,8 +607,8 @@ describe('Decks', () => {
     });
 
     it('should delete deck when confirming deletion', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.DeleteDeck.mockResolvedValue(undefined);
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.deleteDeck.mockResolvedValue(undefined);
 
       renderWithRouter(<Decks />);
 
@@ -614,16 +626,16 @@ describe('Decks', () => {
       fireEvent.click(confirmDeleteButton);
 
       await waitFor(() => {
-        expect(mockWailsApp.DeleteDeck).toHaveBeenCalledWith('deck-1');
+        expect(mockDecks.deleteDeck).toHaveBeenCalledWith('deck-1');
       });
     });
 
     it('should reload decks after successful deletion', async () => {
-      mockWailsApp.ListDecks.mockResolvedValueOnce(createMockDeckList());
-      mockWailsApp.ListDecks.mockResolvedValueOnce([
+      mockDecks.getDecks.mockResolvedValueOnce(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValueOnce([
         createMockDeckListItem({ id: 'deck-2', name: 'Azorius Control' }),
       ]);
-      mockWailsApp.DeleteDeck.mockResolvedValue(undefined);
+      mockDecks.deleteDeck.mockResolvedValue(undefined);
 
       renderWithRouter(<Decks />);
 
@@ -641,13 +653,13 @@ describe('Decks', () => {
       fireEvent.click(confirmDeleteButton);
 
       await waitFor(() => {
-        expect(mockWailsApp.ListDecks).toHaveBeenCalledTimes(2);
+        expect(mockDecks.getDecks).toHaveBeenCalledTimes(2);
       });
     });
 
     it('should show error alert when deletion fails', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-      mockWailsApp.DeleteDeck.mockRejectedValue(new Error('Deletion failed'));
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.deleteDeck.mockRejectedValue(new Error('Deletion failed'));
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       renderWithRouter(<Decks />);
@@ -672,7 +684,7 @@ describe('Decks', () => {
     });
 
     it('should display warning text in delete dialog', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 
@@ -691,7 +703,7 @@ describe('Decks', () => {
 
   describe('Format Options', () => {
     it('should have all format options in create dialog', async () => {
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
 
       renderWithRouter(<Decks />);
 

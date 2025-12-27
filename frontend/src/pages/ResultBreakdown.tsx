@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetStats } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -68,7 +68,7 @@ const ResultBreakdown = () => {
         }
       }
 
-      const data = await GetStats(filter);
+      const data = await matches.getStats(matches.statsFilterToRequest(filter));
       setMetrics(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load performance metrics');

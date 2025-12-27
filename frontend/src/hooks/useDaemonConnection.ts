@@ -1,13 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  GetConnectionStatus,
-  SetDaemonPort,
-  ReconnectToDaemon,
-  SwitchToStandaloneMode,
-  SwitchToDaemonMode,
-} from '@/services/api/legacy';
+import { system } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 import { gui } from '@/types/models';
+
+// No-op functions - daemon control not implemented in REST API
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const setDaemonPort = async (_port: number): Promise<void> => {
+  // No-op in REST API mode
+};
+
+const reconnectToDaemon = async (): Promise<void> => {
+  // No-op in REST API mode
+};
+
+const switchToStandaloneMode = async (): Promise<void> => {
+  // No-op in REST API mode
+};
+
+const switchToDaemonMode = async (): Promise<void> => {
+  // No-op in REST API mode
+};
 
 export interface UseDaemonConnectionReturn {
   /** Current connection status */
@@ -42,7 +54,7 @@ export function useDaemonConnection(): UseDaemonConnectionReturn {
 
   const loadConnectionStatus = useCallback(async () => {
     try {
-      const status = await GetConnectionStatus();
+      const status = await system.getStatus();
       setConnectionStatus(gui.ConnectionStatus.createFrom(status));
       setDaemonPortState(status.port || 9999);
     } catch {
@@ -62,7 +74,7 @@ export function useDaemonConnection(): UseDaemonConnectionReturn {
     setDaemonPortState(port);
 
     try {
-      await SetDaemonPort(port);
+      await setDaemonPort(port);
     } catch (error) {
       showToast.show(`Failed to set daemon port: ${error}`, 'error');
     }
@@ -71,7 +83,7 @@ export function useDaemonConnection(): UseDaemonConnectionReturn {
   const handleReconnect = useCallback(async () => {
     setIsReconnecting(true);
     try {
-      await ReconnectToDaemon();
+      await reconnectToDaemon();
       await loadConnectionStatus();
       showToast.show('Successfully reconnected to daemon', 'success');
     } catch (error) {
@@ -86,11 +98,11 @@ export function useDaemonConnection(): UseDaemonConnectionReturn {
 
     try {
       if (mode === 'standalone') {
-        await SwitchToStandaloneMode();
+        await switchToStandaloneMode();
         await loadConnectionStatus();
         showToast.show('Switched to standalone mode', 'success');
       } else if (mode === 'daemon') {
-        await SwitchToDaemonMode();
+        await switchToDaemonMode();
         await loadConnectionStatus();
         showToast.show('Switched to daemon mode', 'success');
       }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { GetStats, GetMatches } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import './Footer.css';
 
@@ -14,19 +14,19 @@ const Footer = () => {
     try {
       // Get overall stats
       const filter = new models.StatsFilter();
-      const statsData = await GetStats(filter);
+      const statsData = await matches.getStats(matches.statsFilterToRequest(filter));
       setStats(statsData);
 
       // Get recent matches to calculate streak and last match time
-      const matches = await GetMatches(filter);
+      const matchData = await matches.getMatches(matches.statsFilterToRequest(filter));
 
-      if (matches && matches.length > 0) {
+      if (matchData && matchData.length > 0) {
         // Calculate current streak
-        const lastResult = matches[0].Result;
+        const lastResult = matchData[0].Result;
         let streakCount = 1;
 
-        for (let i = 1; i < matches.length; i++) {
-          if (matches[i].Result === lastResult) {
+        for (let i = 1; i < matchData.length; i++) {
+          if (matchData[i].Result === lastResult) {
             streakCount++;
           } else {
             break;
@@ -39,7 +39,7 @@ const Footer = () => {
         });
 
         // Format last match time
-        const lastMatchDate = new Date(matches[0].Timestamp as string);
+        const lastMatchDate = new Date(matchData[0].Timestamp as string);
         setLastMatch(lastMatchDate.toLocaleString());
       }
     } catch (err) {

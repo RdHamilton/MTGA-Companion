@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { GetMatches } from '@/services/api/legacy';
+import { matches as matchesApi } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
@@ -17,7 +17,7 @@ const MatchHistory = () => {
   const { filters, updateFilters } = useAppContext();
   const { dateRange, customStartDate, customEndDate, cardFormat, queueType, result } = filters.matchHistory;
 
-  const [matches, setMatches] = useState<models.Match[]>([]);
+  const [matchList, setMatchList] = useState<models.Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,8 +97,8 @@ const MatchHistory = () => {
         filter.Result = result;
       }
 
-      const matchData = await GetMatches(filter);
-      setMatches(matchData || []);
+      const matchData = await matchesApi.getMatches(matchesApi.statsFilterToRequest(filter));
+      setMatchList(matchData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches');
       console.error('Error loading matches:', err);
@@ -176,8 +176,8 @@ const MatchHistory = () => {
           filter.Result = result;
         }
 
-        const matchData = await GetMatches(filter);
-        setMatches(matchData || []);
+        const matchData = await matchesApi.getMatches(matchesApi.statsFilterToRequest(filter));
+        setMatchList(matchData || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load matches');
         console.error('Error loading matches:', err);
@@ -230,7 +230,7 @@ const MatchHistory = () => {
   };
 
   // Sort and paginate matches
-  const sortedMatches = [...matches].sort((a, b) => {
+  const sortedMatches = [...matchList].sort((a, b) => {
     let aVal: string | number = String(a[sortField] ?? '');
     let bVal: string | number = String(b[sortField] ?? '');
 
@@ -352,9 +352,9 @@ const MatchHistory = () => {
           </div>
         </div>
 
-        {!loading && !error && matches.length > 0 && (
+        {!loading && !error && matchList.length > 0 && (
           <div className="match-count">
-            Showing {paginatedMatches.length} of {matches.length} match{matches.length !== 1 ? 'es' : ''}
+            Showing {paginatedMatches.length} of {matchList.length} match{matchList.length !== 1 ? 'es' : ''}
             {totalPages > 1 && ` (Page ${page} of ${totalPages})`}
           </div>
         )}
@@ -371,7 +371,7 @@ const MatchHistory = () => {
         />
       )}
 
-      {!loading && !error && matches.length === 0 && (
+      {!loading && !error && matchList.length === 0 && (
         dateRange === 'all' && cardFormat === 'all' && queueType === 'all' && result === 'all' ? (
           <EmptyState
             icon="🎮"
@@ -390,7 +390,7 @@ const MatchHistory = () => {
       )}
 
       {/* Table Container - Scrollable */}
-      {!loading && !error && matches.length > 0 && (
+      {!loading && !error && matchList.length > 0 && (
         <>
           <div className="match-history-table-container">
             <table>

@@ -2,24 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Meta from './Meta';
-import { gui, time } from '@/types/models';
+import { gui } from '@/types/models';
 
-// Mock the Wails App functions
-vi.mock('@/services/api/legacy', () => ({
-  GetMetaDashboard: vi.fn(),
-  RefreshMetaData: vi.fn(),
-  GetSupportedFormats: vi.fn(),
+// Mock the API modules
+vi.mock('@/services/api', () => ({
+  meta: {
+    getMetaArchetypes: vi.fn(),
+  },
+  matches: {
+    getFormats: vi.fn(),
+  },
 }));
 
-import {
-  GetMetaDashboard,
-  RefreshMetaData,
-  GetSupportedFormats,
-} from '@/services/api/legacy';
+import { meta, matches } from '@/services/api';
 
-const mockGetMetaDashboard = vi.mocked(GetMetaDashboard);
-const mockRefreshMetaData = vi.mocked(RefreshMetaData);
-const mockGetSupportedFormats = vi.mocked(GetSupportedFormats);
+// Use loose typing for mocks to allow test data that doesn't exactly match API types
+const mockGetMetaArchetypes = meta.getMetaArchetypes as ReturnType<typeof vi.fn>;
+const mockGetFormats = matches.getFormats as ReturnType<typeof vi.fn>;
 
 const renderMeta = () => {
   return render(
@@ -29,27 +28,9 @@ const renderMeta = () => {
   );
 };
 
-// Create a mock time.Time that works with JSON
-const createMockTime = (dateStr: string): time.Time => {
-  const mockTime = new time.Time({});
-  // Override toString to return the date string
-  mockTime.toString = () => dateStr;
-  return mockTime;
-};
-
-const createMockDashboardData = (overrides: Partial<{
-  format: string;
-  archetypes: gui.ArchetypeInfo[];
-  tournaments: gui.TournamentInfo[];
-  totalArchetypes: number;
-  lastUpdated: time.Time;
-  sources: string[];
-  error: string;
-}> = {}): gui.MetaDashboardResponse => {
-  const response = new gui.MetaDashboardResponse({});
-
-  response.format = overrides.format ?? 'standard';
-  response.archetypes = overrides.archetypes ?? [
+// Create mock archetypes array (what meta.getMetaArchetypes returns)
+const createMockArchetypes = (): gui.ArchetypeInfo[] => {
+  return [
     Object.assign(new gui.ArchetypeInfo({}), {
       name: 'Mono Red Aggro',
       colors: ['R'],
@@ -81,28 +62,27 @@ const createMockDashboardData = (overrides: Partial<{
       trendDirection: 'down',
     }),
   ];
-  response.tournaments = overrides.tournaments ?? [
-    Object.assign(new gui.TournamentInfo({}), {
-      name: 'Pro Tour Test',
-      date: createMockTime('2024-01-15T00:00:00Z'),
-      players: 256,
-      format: 'standard',
-      topDecks: ['Mono Red Aggro', 'Azorius Control', 'Golgari Midrange'],
-      sourceUrl: 'https://example.com/tournament',
-    }),
-  ];
-  response.totalArchetypes = overrides.totalArchetypes ?? 3;
-  response.lastUpdated = overrides.lastUpdated ?? createMockTime('2024-01-20T12:00:00Z');
-  response.sources = overrides.sources ?? ['MTGGoldfish', 'MTGTop8'];
-  response.error = overrides.error ?? '';
+};
 
-  return response;
+// Create new archetype for update tests
+const createNewArchetype = (): gui.ArchetypeInfo => {
+  return Object.assign(new gui.ArchetypeInfo({}), {
+    name: 'New Archetype',
+    colors: ['W'],
+    metaShare: 20.0,
+    tournamentTop8s: 15,
+    tournamentWins: 5,
+    tier: 1,
+    confidenceScore: 0.99,
+    trendDirection: 'up',
+  });
 };
 
 describe('Meta', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetSupportedFormats.mockResolvedValue(['standard', 'historic', 'explorer']);
+    mockGetFormats.mockResolvedValue(['standard', 'historic', 'explorer']);
+    mockGetMetaArchetypes.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -111,7 +91,7 @@ describe('Meta', () => {
 
   describe('rendering', () => {
     it('renders the page title', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -119,7 +99,7 @@ describe('Meta', () => {
     });
 
     it('renders the format selector', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -129,7 +109,7 @@ describe('Meta', () => {
     });
 
     it('renders the refresh button', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -137,8 +117,8 @@ describe('Meta', () => {
     });
 
     it('shows loading state initially', async () => {
-      mockGetMetaDashboard.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(createMockDashboardData()), 100))
+      mockGetMetaArchetypes.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(createMockArchetypes()), 100))
       );
 
       renderMeta();
@@ -147,7 +127,7 @@ describe('Meta', () => {
     });
 
     it('displays archetype data after loading', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -160,7 +140,7 @@ describe('Meta', () => {
     });
 
     it('displays tier badges', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -172,7 +152,7 @@ describe('Meta', () => {
     });
 
     it('displays meta share percentages', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -184,7 +164,7 @@ describe('Meta', () => {
     });
 
     it('displays tournament top 8s', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -194,7 +174,7 @@ describe('Meta', () => {
     });
 
     it('displays tournament wins', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -204,17 +184,18 @@ describe('Meta', () => {
     });
 
     it('displays data sources', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
+      // Component creates dashboard locally, sources are empty
       await waitFor(() => {
-        expect(screen.getByText('MTGGoldfish, MTGTop8')).toBeInTheDocument();
+        expect(screen.getByText('N/A')).toBeInTheDocument();
       });
     });
 
     it('displays total archetypes count', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -225,41 +206,35 @@ describe('Meta', () => {
   });
 
   describe('tournaments section', () => {
-    it('renders tournament information', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
+    // Note: Tournament data is no longer returned by meta.getMetaArchetypes
+    // These tests are skipped as the component now only displays archetype data
+    it.skip('renders tournament information', async () => {
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
       renderMeta();
-
       await waitFor(() => {
         expect(screen.getByText('Pro Tour Test')).toBeInTheDocument();
       });
     });
 
-    it('displays tournament player count', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
+    it.skip('displays tournament player count', async () => {
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
       renderMeta();
-
       await waitFor(() => {
         expect(screen.getByText('256 players')).toBeInTheDocument();
       });
     });
 
-    it('displays tournament top decks', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
+    it.skip('displays tournament top decks', async () => {
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
       renderMeta();
-
       await waitFor(() => {
         expect(screen.getByText(/Top Decks:/)).toBeInTheDocument();
       });
     });
 
-    it('renders tournament link when sourceUrl is present', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
+    it.skip('renders tournament link when sourceUrl is present', async () => {
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
       renderMeta();
-
       await waitFor(() => {
         const link = screen.getByText('View Details →');
         expect(link).toBeInTheDocument();
@@ -269,20 +244,8 @@ describe('Meta', () => {
   });
 
   describe('error handling', () => {
-    it('displays error message when API returns error', async () => {
-      mockGetMetaDashboard.mockResolvedValue(
-        createMockDashboardData({ error: 'Failed to fetch data' })
-      );
-
-      renderMeta();
-
-      await waitFor(() => {
-        expect(screen.getByText(/failed to fetch data/i)).toBeInTheDocument();
-      });
-    });
-
     it('displays error when API call fails', async () => {
-      mockGetMetaDashboard.mockRejectedValue(new Error('Network error'));
+      mockGetMetaArchetypes.mockRejectedValue(new Error('Network error'));
 
       renderMeta();
 
@@ -292,9 +255,7 @@ describe('Meta', () => {
     });
 
     it('shows no data message when archetypes are empty', async () => {
-      mockGetMetaDashboard.mockResolvedValue(
-        createMockDashboardData({ archetypes: [], tournaments: [] })
-      );
+      mockGetMetaArchetypes.mockResolvedValue([]);
 
       renderMeta();
 
@@ -306,17 +267,17 @@ describe('Meta', () => {
 
   describe('format selection', () => {
     it('loads supported formats on mount', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
       await waitFor(() => {
-        expect(mockGetSupportedFormats).toHaveBeenCalledTimes(1);
+        expect(mockGetFormats).toHaveBeenCalledTimes(1);
       });
     });
 
     it('changes format when selection changes', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -326,18 +287,18 @@ describe('Meta', () => {
       });
 
       // Clear the mock to track only the new call
-      mockGetMetaDashboard.mockClear();
+      mockGetMetaArchetypes.mockClear();
 
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: 'historic' } });
 
       await waitFor(() => {
-        expect(mockGetMetaDashboard).toHaveBeenCalledWith('historic');
+        expect(mockGetMetaArchetypes).toHaveBeenCalledWith('historic');
       });
     });
 
     it('renders all supported formats as options', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -351,9 +312,8 @@ describe('Meta', () => {
   });
 
   describe('refresh functionality', () => {
-    it('calls RefreshMetaData when refresh button is clicked', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-      mockRefreshMetaData.mockResolvedValue(createMockDashboardData());
+    it('calls getMetaArchetypes when refresh button is clicked', async () => {
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -361,19 +321,23 @@ describe('Meta', () => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
 
+      // Clear mock to track refresh call
+      mockGetMetaArchetypes.mockClear();
+
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mockRefreshMetaData).toHaveBeenCalledWith('standard');
+        expect(mockGetMetaArchetypes).toHaveBeenCalledWith('standard');
       });
     });
 
     it('shows refreshing state when refreshing', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-      mockRefreshMetaData.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(createMockDashboardData()), 100))
-      );
+      mockGetMetaArchetypes
+        .mockResolvedValueOnce(createMockArchetypes())
+        .mockImplementationOnce(
+          () => new Promise((resolve) => setTimeout(() => resolve(createMockArchetypes()), 100))
+        );
 
       renderMeta();
 
@@ -388,29 +352,16 @@ describe('Meta', () => {
     });
 
     it('updates data after refresh', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
-      const updatedData = createMockDashboardData({
-        archetypes: [
-          Object.assign(new gui.ArchetypeInfo({}), {
-            name: 'New Archetype',
-            colors: ['W'],
-            metaShare: 20.0,
-            tournamentTop8s: 15,
-            tournamentWins: 5,
-            tier: 1,
-            confidenceScore: 0.99,
-            trendDirection: 'up',
-          }),
-        ],
-      });
-      mockRefreshMetaData.mockResolvedValue(updatedData);
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
       await waitFor(() => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
+
+      // Update mock for refresh to return new data
+      mockGetMetaArchetypes.mockResolvedValue([createNewArchetype()]);
 
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);
@@ -421,14 +372,16 @@ describe('Meta', () => {
     });
 
     it('displays error when refresh fails', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-      mockRefreshMetaData.mockRejectedValue(new Error('Refresh failed'));
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
       await waitFor(() => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
+
+      // Make next call fail
+      mockGetMetaArchetypes.mockRejectedValue(new Error('Refresh failed'));
 
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);
@@ -441,7 +394,7 @@ describe('Meta', () => {
 
   describe('trend indicators', () => {
     it('renders up trend icon for rising archetypes', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -452,7 +405,7 @@ describe('Meta', () => {
     });
 
     it('renders down trend icon for falling archetypes', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -463,7 +416,7 @@ describe('Meta', () => {
     });
 
     it('renders stable trend icon for stable archetypes', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -476,7 +429,7 @@ describe('Meta', () => {
 
   describe('color badges', () => {
     it('renders color pips for archetypes', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -496,7 +449,7 @@ describe('Meta', () => {
 
   describe('accessibility', () => {
     it('has accessible format selector', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -507,7 +460,7 @@ describe('Meta', () => {
     });
 
     it('has accessible refresh button', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -515,20 +468,8 @@ describe('Meta', () => {
       expect(refreshButton).toBeInTheDocument();
     });
 
-    it('opens external links in new tab', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
-
-      renderMeta();
-
-      await waitFor(() => {
-        const link = screen.getByText('View Details →');
-        expect(link).toHaveAttribute('target', '_blank');
-        expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-      });
-    });
-
     it('archetype cards are accessible with role button and tabIndex', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -545,7 +486,7 @@ describe('Meta', () => {
 
   describe('archetype detail view', () => {
     it('opens detail panel when clicking on an archetype card', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -566,7 +507,7 @@ describe('Meta', () => {
     });
 
     it('shows meta share in detail panel', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -584,7 +525,7 @@ describe('Meta', () => {
     });
 
     it('shows tournament top 8s in detail panel', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -602,7 +543,7 @@ describe('Meta', () => {
     });
 
     it('shows tournament wins in detail panel', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -619,7 +560,7 @@ describe('Meta', () => {
     });
 
     it('shows data confidence in detail panel', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -637,7 +578,7 @@ describe('Meta', () => {
     });
 
     it('shows trend analysis section', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -655,7 +596,7 @@ describe('Meta', () => {
     });
 
     it('shows tier explanation section', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -673,7 +614,7 @@ describe('Meta', () => {
     });
 
     it('closes detail panel when clicking close button', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -699,7 +640,7 @@ describe('Meta', () => {
     });
 
     it('closes detail panel when clicking overlay', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -725,7 +666,7 @@ describe('Meta', () => {
     });
 
     it('does not close panel when clicking inside panel', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -749,7 +690,7 @@ describe('Meta', () => {
     });
 
     it('opens detail panel with keyboard Enter key', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -766,7 +707,7 @@ describe('Meta', () => {
     });
 
     it('shows different trend message for down trend', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -784,7 +725,7 @@ describe('Meta', () => {
     });
 
     it('shows different trend message for stable trend', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
@@ -802,7 +743,7 @@ describe('Meta', () => {
     });
 
     it('shows tier 2 explanation for tier 2 decks', async () => {
-      mockGetMetaDashboard.mockResolvedValue(createMockDashboardData());
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 

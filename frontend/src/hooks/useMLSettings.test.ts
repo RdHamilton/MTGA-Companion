@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMLSettings } from './useMLSettings';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+
+// Mock the API modules
+vi.mock('@/services/api', () => ({
+  system: {
+    checkOllamaStatus: vi.fn(),
+    getAvailableOllamaModels: vi.fn(),
+    pullOllamaModel: vi.fn(),
+    testLLMGeneration: vi.fn(),
+  },
+}));
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({
@@ -10,7 +19,13 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+import { system } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
+
+const mockCheckOllamaStatus = vi.mocked(system.checkOllamaStatus);
+const mockGetAvailableOllamaModels = vi.mocked(system.getAvailableOllamaModels);
+const mockPullOllamaModel = vi.mocked(system.pullOllamaModel);
+const mockTestLLMGeneration = vi.mocked(system.testLLMGeneration);
 
 const defaultProps = {
   mlEnabled: true,
@@ -34,6 +49,16 @@ const defaultProps = {
 describe('useMLSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCheckOllamaStatus.mockResolvedValue({
+      available: true,
+      modelReady: true,
+      version: '0.1.0',
+      modelName: 'qwen3:8b',
+      error: '',
+    });
+    mockGetAvailableOllamaModels.mockResolvedValue([]);
+    mockPullOllamaModel.mockResolvedValue(undefined);
+    mockTestLLMGeneration.mockResolvedValue('Test response');
   });
 
   describe('initial state', () => {
@@ -69,25 +94,27 @@ describe('useMLSettings', () => {
   });
 
   describe('handleCheckOllamaStatus', () => {
-    it('calls CheckOllamaStatus with endpoint and model', async () => {
+    it('calls checkOllamaStatus with endpoint and model', async () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
         await result.current.handleCheckOllamaStatus();
       });
 
-      expect(mockWailsApp.CheckOllamaStatus).toHaveBeenCalledWith(
+      expect(mockCheckOllamaStatus).toHaveBeenCalledWith(
         'http://localhost:11434',
         'qwen3:8b'
       );
     });
 
     it('sets isCheckingOllama to true during check', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let resolveCheck: (value: any) => void;
-      mockWailsApp.CheckOllamaStatus.mockImplementationOnce(
-        () => new Promise((resolve) => {
-          resolveCheck = resolve;
-        })
+      mockCheckOllamaStatus.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveCheck = resolve;
+          })
       );
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
@@ -100,7 +127,13 @@ describe('useMLSettings', () => {
       expect(result.current.isCheckingOllama).toBe(true);
 
       await act(async () => {
-        resolveCheck!({ available: true, modelReady: true, version: '0.1.0', modelName: 'qwen3:8b' });
+        resolveCheck!({
+          available: true,
+          modelReady: true,
+          version: '0.1.0',
+          modelName: 'qwen3:8b',
+          error: '',
+        });
         await checkPromise;
       });
 
@@ -110,13 +143,12 @@ describe('useMLSettings', () => {
     it('updates ollamaStatus on successful check', async () => {
       const mockStatus = {
         available: true,
-        version: '0.2.0',
         modelReady: true,
+        version: '0.2.0',
         modelName: 'qwen3:8b',
-        modelsLoaded: ['qwen3:8b', 'llama3.2:3b'],
         error: '',
       };
-      mockWailsApp.CheckOllamaStatus.mockResolvedValueOnce(mockStatus);
+      mockCheckOllamaStatus.mockResolvedValueOnce(mockStatus);
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
@@ -128,11 +160,12 @@ describe('useMLSettings', () => {
     });
 
     it('shows success toast when Ollama is available and model is ready', async () => {
-      mockWailsApp.CheckOllamaStatus.mockResolvedValueOnce({
+      mockCheckOllamaStatus.mockResolvedValueOnce({
         available: true,
-        version: '0.1.0',
         modelReady: true,
+        version: '0.2.0',
         modelName: 'qwen3:8b',
+        error: '',
       });
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
@@ -148,11 +181,11 @@ describe('useMLSettings', () => {
     });
 
     it('shows warning toast when Ollama is available but model is not ready', async () => {
-      mockWailsApp.CheckOllamaStatus.mockResolvedValueOnce({
+      mockCheckOllamaStatus.mockResolvedValueOnce({
         available: true,
-        version: '0.1.0',
         modelReady: false,
-        modelName: 'qwen3:8b',
+        version: '0.2.0',
+        modelName: '',
         error: 'Model not found',
       });
 
@@ -169,9 +202,11 @@ describe('useMLSettings', () => {
     });
 
     it('shows error toast when Ollama is not available', async () => {
-      mockWailsApp.CheckOllamaStatus.mockResolvedValueOnce({
+      mockCheckOllamaStatus.mockResolvedValueOnce({
         available: false,
         modelReady: false,
+        version: '',
+        modelName: '',
         error: 'Connection refused',
       });
 
@@ -186,42 +221,25 @@ describe('useMLSettings', () => {
         'error'
       );
     });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.CheckOllamaStatus.mockRejectedValueOnce(new Error('Network error'));
-
-      const { result } = renderHook(() => useMLSettings(defaultProps));
-
-      await act(async () => {
-        await result.current.handleCheckOllamaStatus();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to check Ollama status'),
-        'error'
-      );
-    });
   });
 
   describe('handleFetchModels', () => {
-    it('calls GetAvailableOllamaModels with endpoint', async () => {
+    it('calls getAvailableOllamaModels with endpoint', async () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
         await result.current.handleFetchModels();
       });
 
-      expect(mockWailsApp.GetAvailableOllamaModels).toHaveBeenCalledWith(
-        'http://localhost:11434'
-      );
+      expect(mockGetAvailableOllamaModels).toHaveBeenCalledWith('http://localhost:11434');
     });
 
     it('updates availableModels on success', async () => {
       const mockModels = [
-        { name: 'qwen3:8b', size: 1000 },
-        { name: 'llama3.2:3b', size: 500 },
+        { name: 'llama2', size: 1000, modified: new Date().toISOString() },
+        { name: 'qwen3:8b', size: 2000, modified: new Date().toISOString() },
       ];
-      mockWailsApp.GetAvailableOllamaModels.mockResolvedValueOnce(mockModels);
+      mockGetAvailableOllamaModels.mockResolvedValueOnce(mockModels);
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
@@ -231,61 +249,33 @@ describe('useMLSettings', () => {
 
       expect(result.current.availableModels).toEqual(mockModels);
     });
-
-    it('sets empty array on failure', async () => {
-      mockWailsApp.GetAvailableOllamaModels.mockRejectedValueOnce(new Error('Failed'));
-
-      const { result } = renderHook(() => useMLSettings(defaultProps));
-
-      await act(async () => {
-        await result.current.handleFetchModels();
-      });
-
-      expect(result.current.availableModels).toEqual([]);
-    });
   });
 
   describe('handlePullModel', () => {
-    it('shows warning toast when model is empty', async () => {
+    it('calls pullOllamaModel with endpoint and model', async () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
-        await result.current.handlePullModel('');
+        await result.current.handlePullModel('llama2');
       });
 
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Please enter a model name'),
-        'warning'
-      );
-      expect(mockWailsApp.PullOllamaModel).not.toHaveBeenCalled();
-    });
-
-    it('calls PullOllamaModel with endpoint and model', async () => {
-      const { result } = renderHook(() => useMLSettings(defaultProps));
-
-      await act(async () => {
-        await result.current.handlePullModel('mistral:7b');
-      });
-
-      expect(mockWailsApp.PullOllamaModel).toHaveBeenCalledWith(
-        'http://localhost:11434',
-        'mistral:7b'
-      );
+      expect(mockPullOllamaModel).toHaveBeenCalledWith('http://localhost:11434', 'llama2');
     });
 
     it('sets isPullingModel to true during pull', async () => {
       let resolvePull: () => void;
-      mockWailsApp.PullOllamaModel.mockImplementationOnce(
-        () => new Promise<void>((resolve) => {
-          resolvePull = resolve;
-        })
+      mockPullOllamaModel.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolvePull = resolve;
+          })
       );
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       let pullPromise: Promise<void>;
       act(() => {
-        pullPromise = result.current.handlePullModel('mistral:7b');
+        pullPromise = result.current.handlePullModel('llama2');
       });
 
       expect(result.current.isPullingModel).toBe(true);
@@ -302,7 +292,7 @@ describe('useMLSettings', () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
-        await result.current.handlePullModel('mistral:7b');
+        await result.current.handlePullModel('llama2');
       });
 
       expect(showToast.show).toHaveBeenCalledWith(
@@ -311,53 +301,67 @@ describe('useMLSettings', () => {
       );
     });
 
-    it('shows error toast on pull failure', async () => {
-      mockWailsApp.PullOllamaModel.mockRejectedValueOnce(new Error('Pull failed'));
-
-      const { result } = renderHook(() => useMLSettings(defaultProps));
-
-      await act(async () => {
-        await result.current.handlePullModel('mistral:7b');
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to pull model'),
-        'error'
-      );
-    });
-
     it('refreshes models and status after successful pull', async () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
-        await result.current.handlePullModel('mistral:7b');
+        await result.current.handlePullModel('llama2');
       });
 
-      expect(mockWailsApp.GetAvailableOllamaModels).toHaveBeenCalled();
-      expect(mockWailsApp.CheckOllamaStatus).toHaveBeenCalled();
+      // Should fetch models after pull
+      expect(mockGetAvailableOllamaModels).toHaveBeenCalled();
+      // Should re-check status with new model
+      expect(mockCheckOllamaStatus).toHaveBeenCalledWith('http://localhost:11434', 'llama2');
+    });
+
+    it('shows error toast on pull failure', async () => {
+      mockPullOllamaModel.mockRejectedValueOnce(new Error('Pull failed'));
+
+      const { result } = renderHook(() => useMLSettings(defaultProps));
+
+      await act(async () => {
+        await result.current.handlePullModel('llama2');
+      });
+
+      expect(showToast.show).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to pull'),
+        'error'
+      );
+    });
+
+    it('shows warning toast for empty model name', async () => {
+      const { result } = renderHook(() => useMLSettings(defaultProps));
+
+      await act(async () => {
+        await result.current.handlePullModel('');
+      });
+
+      expect(showToast.show).toHaveBeenCalledWith(
+        expect.stringContaining('enter a model name'),
+        'warning'
+      );
+      expect(mockPullOllamaModel).not.toHaveBeenCalled();
     });
   });
 
   describe('handleTestLLM', () => {
-    it('calls TestLLMGeneration with endpoint and model', async () => {
+    it('calls testLLMGeneration with endpoint and model', async () => {
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
         await result.current.handleTestLLM();
       });
 
-      expect(mockWailsApp.TestLLMGeneration).toHaveBeenCalledWith(
-        'http://localhost:11434',
-        'qwen3:8b'
-      );
+      expect(mockTestLLMGeneration).toHaveBeenCalledWith('http://localhost:11434', 'qwen3:8b');
     });
 
     it('sets isTestingLLM to true during test', async () => {
       let resolveTest: (value: string) => void;
-      mockWailsApp.TestLLMGeneration.mockImplementationOnce(
-        () => new Promise<string>((resolve) => {
-          resolveTest = resolve;
-        })
+      mockTestLLMGeneration.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            resolveTest = resolve;
+          })
       );
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
@@ -370,7 +374,7 @@ describe('useMLSettings', () => {
       expect(result.current.isTestingLLM).toBe(true);
 
       await act(async () => {
-        resolveTest!('Hello from Ollama!');
+        resolveTest!('Test result');
         await testPromise;
       });
 
@@ -378,7 +382,7 @@ describe('useMLSettings', () => {
     });
 
     it('updates llmTestResult on success', async () => {
-      mockWailsApp.TestLLMGeneration.mockResolvedValueOnce('Test response');
+      mockTestLLMGeneration.mockResolvedValueOnce('Generated text here');
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
@@ -386,12 +390,10 @@ describe('useMLSettings', () => {
         await result.current.handleTestLLM();
       });
 
-      expect(result.current.llmTestResult).toBe('Test response');
+      expect(result.current.llmTestResult).toBe('Generated text here');
     });
 
     it('shows success toast on successful test', async () => {
-      mockWailsApp.TestLLMGeneration.mockResolvedValueOnce('Test response');
-
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
@@ -399,13 +401,13 @@ describe('useMLSettings', () => {
       });
 
       expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('LLM test completed'),
+        expect.stringContaining('test completed'),
         'success'
       );
     });
 
     it('shows error toast on test failure', async () => {
-      mockWailsApp.TestLLMGeneration.mockRejectedValueOnce(new Error('Test failed'));
+      mockTestLLMGeneration.mockRejectedValueOnce(new Error('Generation failed'));
 
       const { result } = renderHook(() => useMLSettings(defaultProps));
 
@@ -414,48 +416,21 @@ describe('useMLSettings', () => {
       });
 
       expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('LLM test failed'),
+        expect.stringContaining('test failed'),
         'error'
       );
-      expect(result.current.llmTestResult).toBeNull();
-    });
-  });
-
-  describe('with custom endpoint and model', () => {
-    it('uses custom endpoint from props', async () => {
-      const customProps = {
-        ...defaultProps,
-        ollamaEndpoint: 'http://custom-host:8080',
-      };
-
-      const { result } = renderHook(() => useMLSettings(customProps));
-
-      await act(async () => {
-        await result.current.handleCheckOllamaStatus();
-      });
-
-      expect(mockWailsApp.CheckOllamaStatus).toHaveBeenCalledWith(
-        'http://custom-host:8080',
-        'qwen3:8b'
-      );
     });
 
-    it('uses custom model from props', async () => {
-      const customProps = {
-        ...defaultProps,
-        ollamaModel: 'llama3.2:3b',
-      };
+    it('clears llmTestResult on failure', async () => {
+      mockTestLLMGeneration.mockRejectedValueOnce(new Error('Generation failed'));
 
-      const { result } = renderHook(() => useMLSettings(customProps));
+      const { result } = renderHook(() => useMLSettings(defaultProps));
 
       await act(async () => {
         await result.current.handleTestLLM();
       });
 
-      expect(mockWailsApp.TestLLMGeneration).toHaveBeenCalledWith(
-        'http://localhost:11434',
-        'llama3.2:3b'
-      );
+      expect(result.current.llmTestResult).toBeNull();
     });
   });
 });

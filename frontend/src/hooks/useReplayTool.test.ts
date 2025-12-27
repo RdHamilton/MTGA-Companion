@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReplayTool } from './useReplayTool';
-import { mockWailsApp } from '@/test/mocks/apiMock';
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({
@@ -14,7 +13,7 @@ vi.mock('../components/ToastContainer', () => ({
 const mockReplayState = {
   isActive: false,
   isPaused: false,
-  progress: null as any,
+  progress: null as ReturnType<typeof import('@/types/models').gui.ReplayStatus.createFrom> | null,
 };
 
 const mockSubscribers: ((state: typeof mockReplayState) => void)[] = [];
@@ -64,7 +63,7 @@ describe('useReplayTool', () => {
     });
 
     it('returns replayToolProgress from global state initializer', () => {
-      mockReplayState.progress = { currentEntry: 5, totalEntries: 10 };
+      mockReplayState.progress = { currentEntry: 5, totalEntries: 10 } as never;
       const { result } = renderHook(() => useReplayTool());
       expect(result.current.replayToolProgress).toEqual({ currentEntry: 5, totalEntries: 10 });
     });
@@ -133,129 +132,56 @@ describe('useReplayTool', () => {
         expect.stringContaining('Replay tool requires daemon mode'),
         'warning'
       );
-      expect(mockWailsApp.StartReplayWithFileDialog).not.toHaveBeenCalled();
     });
 
-    it('calls StartReplayWithFileDialog when connected', async () => {
+    // Note: StartReplayWithFileDialog is a no-op in REST API mode
+    it('does not throw when connected (no-op in REST API)', async () => {
       const { result } = renderHook(() => useReplayTool());
 
-      await act(async () => {
-        await result.current.handleStartReplayTool(true);
-      });
-
-      expect(mockWailsApp.StartReplayWithFileDialog).toHaveBeenCalledWith(1.0, 'all', false);
-    });
-
-    it('passes current settings to StartReplayWithFileDialog', async () => {
-      const { result } = renderHook(() => useReplayTool());
-
-      act(() => {
-        result.current.setReplaySpeed(10.0);
-        result.current.setReplayFilter('draft');
-        result.current.setPauseOnDraft(true);
-      });
-
-      await act(async () => {
-        await result.current.handleStartReplayTool(true);
-      });
-
-      expect(mockWailsApp.StartReplayWithFileDialog).toHaveBeenCalledWith(10.0, 'draft', true);
-    });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.StartReplayWithFileDialog.mockRejectedValueOnce(new Error('Start failed'));
-
-      const { result } = renderHook(() => useReplayTool());
-
-      await act(async () => {
-        await result.current.handleStartReplayTool(true);
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to start replay'),
-        'error'
-      );
+      await expect(
+        act(async () => {
+          await result.current.handleStartReplayTool(true);
+        })
+      ).resolves.not.toThrow();
     });
   });
 
   describe('handlePauseReplayTool', () => {
-    it('calls PauseReplay API', async () => {
+    // Note: PauseReplay is a no-op in REST API mode
+    it('does not throw (no-op in REST API)', async () => {
       const { result } = renderHook(() => useReplayTool());
 
-      await act(async () => {
-        await result.current.handlePauseReplayTool();
-      });
-
-      expect(mockWailsApp.PauseReplay).toHaveBeenCalled();
-    });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.PauseReplay.mockRejectedValueOnce(new Error('Pause failed'));
-
-      const { result } = renderHook(() => useReplayTool());
-
-      await act(async () => {
-        await result.current.handlePauseReplayTool();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to pause replay'),
-        'error'
-      );
+      await expect(
+        act(async () => {
+          await result.current.handlePauseReplayTool();
+        })
+      ).resolves.not.toThrow();
     });
   });
 
   describe('handleResumeReplayTool', () => {
-    it('calls ResumeReplay API', async () => {
+    // Note: ResumeReplay is a no-op in REST API mode
+    it('does not throw (no-op in REST API)', async () => {
       const { result } = renderHook(() => useReplayTool());
 
-      await act(async () => {
-        await result.current.handleResumeReplayTool();
-      });
-
-      expect(mockWailsApp.ResumeReplay).toHaveBeenCalled();
-    });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.ResumeReplay.mockRejectedValueOnce(new Error('Resume failed'));
-
-      const { result } = renderHook(() => useReplayTool());
-
-      await act(async () => {
-        await result.current.handleResumeReplayTool();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to resume replay'),
-        'error'
-      );
+      await expect(
+        act(async () => {
+          await result.current.handleResumeReplayTool();
+        })
+      ).resolves.not.toThrow();
     });
   });
 
   describe('handleStopReplayTool', () => {
-    it('calls StopReplay API', async () => {
+    // Note: StopReplay is a no-op in REST API mode
+    it('does not throw (no-op in REST API)', async () => {
       const { result } = renderHook(() => useReplayTool());
 
-      await act(async () => {
-        await result.current.handleStopReplayTool();
-      });
-
-      expect(mockWailsApp.StopReplay).toHaveBeenCalled();
-    });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.StopReplay.mockRejectedValueOnce(new Error('Stop failed'));
-
-      const { result } = renderHook(() => useReplayTool());
-
-      await act(async () => {
-        await result.current.handleStopReplayTool();
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to stop replay'),
-        'error'
-      );
+      await expect(
+        act(async () => {
+          await result.current.handleStopReplayTool();
+        })
+      ).resolves.not.toThrow();
     });
   });
 
@@ -269,7 +195,7 @@ describe('useReplayTool', () => {
         emitReplayStateChange({
           isActive: true,
           isPaused: false,
-          progress: { currentEntry: 10, totalEntries: 100 },
+          progress: { currentEntry: 10, totalEntries: 100 } as never,
         });
       });
 

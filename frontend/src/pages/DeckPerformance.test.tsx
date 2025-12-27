@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import DeckPerformance from './DeckPerformance';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { AppProvider } from '../context/AppContext';
 import { models } from '@/types/models';
@@ -62,7 +62,7 @@ describe('DeckPerformance', () => {
       const loadingPromise = new Promise<Record<string, models.Statistics>>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.GetStatsByDeck.mockReturnValue(loadingPromise);
+      mockMatches.getMatchupMatrix.mockReturnValue(loadingPromise);
 
       renderWithProvider(<DeckPerformance />);
 
@@ -77,7 +77,7 @@ describe('DeckPerformance', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetStatsByDeck.mockRejectedValue(new Error('Database error'));
+      mockMatches.getMatchupMatrix.mockRejectedValue(new Error('Database error'));
 
       renderWithProvider(<DeckPerformance />);
 
@@ -88,7 +88,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.GetStatsByDeck.mockRejectedValue('Unknown error');
+      mockMatches.getMatchupMatrix.mockRejectedValue('Unknown error');
 
       renderWithProvider(<DeckPerformance />);
 
@@ -100,7 +100,7 @@ describe('DeckPerformance', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no deck data', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue({});
+      mockMatches.getMatchupMatrix.mockResolvedValue({});
 
       renderWithProvider(<DeckPerformance />);
 
@@ -113,7 +113,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should show empty state when API returns null', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(null);
+      mockMatches.getMatchupMatrix.mockResolvedValue(null);
 
       renderWithProvider(<DeckPerformance />);
 
@@ -125,7 +125,7 @@ describe('DeckPerformance', () => {
 
   describe('Data Display', () => {
     it('should render deck cards with statistics', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -137,7 +137,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should display win rate correctly', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -149,7 +149,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should display match counts', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -161,7 +161,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should display deck count', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -171,7 +171,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should display singular deck count for one deck', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue({
+      mockMatches.getMatchupMatrix.mockResolvedValue({
         'Mono Red Aggro': createMockStatistics(),
       });
 
@@ -183,7 +183,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should display wins and losses', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue({
+      mockMatches.getMatchupMatrix.mockResolvedValue({
         'Test Deck': createMockStatistics({ MatchesWon: 15, MatchesLost: 5 }),
       });
 
@@ -197,7 +197,7 @@ describe('DeckPerformance', () => {
 
   describe('Filters', () => {
     it('should render date range filter with default value', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -208,7 +208,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should render format filter', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -218,7 +218,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should render sort by filter', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -229,7 +229,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should render sort order filter', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -240,7 +240,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should show custom date inputs when custom range selected', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -258,47 +258,47 @@ describe('DeckPerformance', () => {
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByDeck).toHaveBeenCalled();
+        expect(mockMatches.getMatchupMatrix).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetStatsByDeck.mock.calls.length;
+      const initialCallCount = mockMatches.getMatchupMatrix.mock.calls.length;
 
       const dateRangeSelect = getSelectByLabel('Date Range');
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByDeck.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatchupMatrix.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should refetch data when format changes', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByDeck).toHaveBeenCalled();
+        expect(mockMatches.getMatchupMatrix).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetStatsByDeck.mock.calls.length;
+      const initialCallCount = mockMatches.getMatchupMatrix.mock.calls.length;
 
       const formatSelect = getSelectByLabel('Format');
       fireEvent.change(formatSelect, { target: { value: 'Ladder' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByDeck.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatchupMatrix.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
   });
 
   describe('Sorting', () => {
     it('should sort by win rate descending by default', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -311,7 +311,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should sort by win rate ascending when changed', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -330,7 +330,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should sort by match count when selected', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -350,7 +350,7 @@ describe('DeckPerformance', () => {
     });
 
     it('should sort by deck name when selected', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -375,7 +375,7 @@ describe('DeckPerformance', () => {
 
   describe('Real-time Updates', () => {
     it('should reload data when stats:updated event fires', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -383,10 +383,10 @@ describe('DeckPerformance', () => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
 
-      const initialCallCount = mockWailsApp.GetStatsByDeck.mock.calls.length;
+      const initialCallCount = mockMatches.getMatchupMatrix.mock.calls.length;
 
       // Update mock to return different data
-      mockWailsApp.GetStatsByDeck.mockResolvedValue({
+      mockMatches.getMatchupMatrix.mockResolvedValue({
         'Updated Deck': createMockStatistics(),
       });
 
@@ -395,12 +395,12 @@ describe('DeckPerformance', () => {
       });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByDeck.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatchupMatrix.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should unsubscribe from events on unmount', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       const { unmount } = renderWithProvider(<DeckPerformance />);
 
@@ -410,20 +410,20 @@ describe('DeckPerformance', () => {
 
       unmount();
 
-      const callCountAfterUnmount = mockWailsApp.GetStatsByDeck.mock.calls.length;
+      const callCountAfterUnmount = mockMatches.getMatchupMatrix.mock.calls.length;
 
       await act(async () => {
         mockEventEmitter.emit('stats:updated', {});
       });
 
       // Should not have called GetStatsByDeck again after unmount
-      expect(mockWailsApp.GetStatsByDeck.mock.calls.length).toBe(callCountAfterUnmount);
+      expect(mockMatches.getMatchupMatrix.mock.calls.length).toBe(callCountAfterUnmount);
     });
   });
 
   describe('Page Title', () => {
     it('should display page title', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -435,7 +435,7 @@ describe('DeckPerformance', () => {
 
   describe('Unknown Deck Handling', () => {
     it('should display "Unknown Deck" for empty deck name', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue({
+      mockMatches.getMatchupMatrix.mockResolvedValue({
         '': createMockStatistics(),
       });
 
@@ -449,7 +449,7 @@ describe('DeckPerformance', () => {
 
   describe('API Filter Parameters', () => {
     it('should pass constructed formats for constructed filter', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -462,14 +462,14 @@ describe('DeckPerformance', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockWailsApp.GetStatsByDeck.mock.calls.slice(-1)[0] as any[];
+        const lastCall = mockMatches.getMatchupMatrix.mock.calls.slice(-1)[0] as any[];
         const filter = lastCall[0] as models.StatsFilter;
         expect(filter.Formats).toEqual(['Ladder', 'Play']);
       });
     });
 
     it('should pass single format for specific format filter', async () => {
-      mockWailsApp.GetStatsByDeck.mockResolvedValue(createMockDeckStatsResponse());
+      mockMatches.getMatchupMatrix.mockResolvedValue(createMockDeckStatsResponse());
 
       renderWithProvider(<DeckPerformance />);
 
@@ -482,7 +482,7 @@ describe('DeckPerformance', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockWailsApp.GetStatsByDeck.mock.calls.slice(-1)[0] as any[];
+        const lastCall = mockMatches.getMatchupMatrix.mock.calls.slice(-1)[0] as any[];
         const filter = lastCall[0] as models.StatsFilter;
         expect(filter.Format).toBe('Ladder');
       });

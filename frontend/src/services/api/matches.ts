@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models } from '@/types/models';
+import { models, storage } from '@/types/models';
 
 // Re-export types for convenience
 export type Match = models.Match;
@@ -141,6 +141,24 @@ export async function getPerformanceMetrics(
  */
 export async function getRankProgression(format: string): Promise<models.RankProgression> {
   return get<models.RankProgression>(`/matches/rank-progression/${encodeURIComponent(format)}`);
+}
+
+/**
+ * Get rank progression timeline for a format.
+ */
+export async function getRankProgressionTimeline(
+  format: string,
+  startDate: Date,
+  endDate: Date,
+  period: string
+): Promise<storage.RankTimeline> {
+  const params = new URLSearchParams({
+    format,
+    start_date: startDate.toISOString(),
+    end_date: endDate.toISOString(),
+    period,
+  });
+  return get<storage.RankTimeline>(`/matches/rank-progression-timeline?${params.toString()}`);
 }
 
 /**

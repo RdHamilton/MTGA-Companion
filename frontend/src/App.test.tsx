@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, act, render } from '@testing-library/react';
 import App from './App';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches, mockSystem } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { resetReplayState, getReplayState } from './utils/replayState';
 import { gui } from '@/types/models';
@@ -78,7 +78,7 @@ describe('App', () => {
     resetReplayState();
 
     // Setup default mocks
-    mockWailsApp.GetStats.mockResolvedValue({
+    mockMatches.getStats.mockResolvedValue({
       TotalMatches: 0,
       MatchesWon: 0,
       MatchesLost: 0,
@@ -87,7 +87,7 @@ describe('App', () => {
       GamesLost: 0,
       WinRate: 0,
     });
-    mockWailsApp.GetConnectionStatus.mockResolvedValue({
+    mockSystem.getStatus.mockResolvedValue({
       status: 'standalone',
       connected: false,
     });

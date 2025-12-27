@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
-import {
-  GetMetaDashboard,
-  RefreshMetaData,
-  GetSupportedFormats,
-} from '@/services/api/legacy';
+import { meta, matches } from '@/services/api';
 import { gui } from '@/types/models';
 import './Meta.css';
+
+// Convert meta.getMetaArchetypes response to MetaDashboardResponse
+async function getMetaDashboard(format: string): Promise<gui.MetaDashboardResponse> {
+  const archetypes = await meta.getMetaArchetypes(format);
+  return {
+    archetypes: archetypes as unknown as gui.ArchetypeInfo[],
+    format,
+    totalArchetypes: archetypes.length,
+    lastUpdated: new Date().toISOString(),
+    sources: [],
+    convertValues: () => ({}),
+  };
+}
 
 export default function Meta() {
   const [format, setFormat] = useState<string>('standard');
@@ -20,7 +29,7 @@ export default function Meta() {
   useEffect(() => {
     const loadFormats = async () => {
       try {
-        const formats = await GetSupportedFormats();
+        const formats = await matches.getFormats();
         setSupportedFormats(formats);
       } catch (err) {
         console.error('Failed to load formats:', err);
@@ -36,7 +45,7 @@ export default function Meta() {
       setLoading(true);
       setError(null);
       try {
-        const data = await GetMetaDashboard(format);
+        const data = await getMetaDashboard(format);
         if (data.error) {
           setError(data.error);
         } else {
@@ -55,7 +64,7 @@ export default function Meta() {
     setRefreshing(true);
     setError(null);
     try {
-      const data = await RefreshMetaData(format);
+      const data = await getMetaDashboard(format);
       if (data.error) {
         setError(data.error);
       } else {

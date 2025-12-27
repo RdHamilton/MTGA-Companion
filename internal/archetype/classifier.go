@@ -292,7 +292,11 @@ func (c *Classifier) getDominantColors(colorCounts map[string]int, totalCards in
 		counts = append(counts, colorCount{color, count})
 	}
 	sort.Slice(counts, func(i, j int) bool {
-		return counts[i].count > counts[j].count
+		if counts[i].count != counts[j].count {
+			return counts[i].count > counts[j].count
+		}
+		// When counts are equal, sort alphabetically by color for deterministic order
+		return counts[i].color < counts[j].color
 	})
 
 	// A color is dominant if it represents at least 15% of colored cards

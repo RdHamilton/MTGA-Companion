@@ -1,10 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  CheckOllamaStatus,
-  GetAvailableOllamaModels,
-  PullOllamaModel,
-  TestLLMGeneration,
-} from '@/services/api/legacy';
+import { system } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 import type { gui } from '@/types/models';
 
@@ -84,7 +79,7 @@ export function useMLSettings(props: UseMLSettingsProps): UseMLSettingsReturn {
     setOllamaStatus(null);
 
     try {
-      const status = await CheckOllamaStatus(ollamaEndpoint, ollamaModel);
+      const status = await system.checkOllamaStatus(ollamaEndpoint, ollamaModel);
       setOllamaStatus(status);
 
       if (status.available && status.modelReady) {
@@ -112,7 +107,7 @@ export function useMLSettings(props: UseMLSettingsProps): UseMLSettingsReturn {
 
   const handleFetchModels = useCallback(async () => {
     try {
-      const models = await GetAvailableOllamaModels(ollamaEndpoint);
+      const models = await system.getAvailableOllamaModels(ollamaEndpoint);
       setAvailableModels(models);
     } catch (error) {
       console.error('Failed to fetch available models:', error);
@@ -133,12 +128,12 @@ export function useMLSettings(props: UseMLSettingsProps): UseMLSettingsReturn {
     );
 
     try {
-      await PullOllamaModel(ollamaEndpoint, model);
+      await system.pullOllamaModel(ollamaEndpoint, model);
       showToast.show(`Successfully pulled model "${model}"!`, 'success');
       // Refresh models list after pulling
       await handleFetchModels();
       // Re-check status with new model
-      const status = await CheckOllamaStatus(ollamaEndpoint, model);
+      const status = await system.checkOllamaStatus(ollamaEndpoint, model);
       setOllamaStatus(status);
     } catch (error) {
       showToast.show(`Failed to pull model: ${error}`, 'error');
@@ -152,7 +147,7 @@ export function useMLSettings(props: UseMLSettingsProps): UseMLSettingsReturn {
     setLlmTestResult(null);
 
     try {
-      const result = await TestLLMGeneration(ollamaEndpoint, ollamaModel);
+      const result = await system.testLLMGeneration(ollamaEndpoint, ollamaModel);
       setLlmTestResult(result);
       showToast.show('LLM test completed successfully!', 'success');
     } catch (error) {

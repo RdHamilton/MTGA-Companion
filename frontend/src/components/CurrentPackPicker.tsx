@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetCurrentPackWithRecommendation } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 import { gui } from '@/types/models';
 import './CurrentPackPicker.css';
 
@@ -19,7 +19,7 @@ const CurrentPackPicker: React.FC<CurrentPackPickerProps> = ({ sessionID, onRefr
         try {
             setLoading(true);
             setError(null);
-            const data = await GetCurrentPackWithRecommendation(sessionID);
+            const data = await drafts.getCurrentPackWithRecommendation(sessionID);
             setPackData(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load pack data');

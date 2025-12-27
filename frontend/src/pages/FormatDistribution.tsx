@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { GetStatsByFormat } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -117,7 +117,7 @@ const FormatDistribution = () => {
         filter.EndDate = end;
       }
 
-      const data = await GetStatsByFormat(filter);
+      const data = await matches.getFormatDistribution(matches.statsFilterToRequest(filter));
 
       // Convert map to array
       const statsArray: FormatStats[] = Object.entries(data || {}).map(([format, stats]) => ({

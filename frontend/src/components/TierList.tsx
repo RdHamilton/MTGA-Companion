@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GetCardRatings, RefreshSetRatings, GetSetCards } from '@/services/api/legacy';
+import { cards } from '@/services/api';
 import { gui, models } from '@/types/models';
 import './TierList.css';
 
@@ -40,8 +40,8 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                 setLoading(true);
                 setError(null);
                 const [ratingsData, cardsData] = await Promise.all([
-                    GetCardRatings(setCode, draftFormat),
-                    GetSetCards(setCode)
+                    cards.getCardRatings(setCode, draftFormat),
+                    cards.getSetCards(setCode)
                 ]);
                 setRatings(ratingsData || []);
                 setSetCards(cardsData || []);
@@ -62,8 +62,8 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                 setLoading(true);
                 setError(null);
                 const [ratingsData, cardsData] = await Promise.all([
-                    GetCardRatings(setCode, draftFormat),
-                    GetSetCards(setCode)
+                    cards.getCardRatings(setCode, draftFormat),
+                    cards.getSetCards(setCode)
                 ]);
                 setRatings(ratingsData || []);
                 setSetCards(cardsData || []);
@@ -78,7 +78,7 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
             setRefreshing(true);
             setError(null);
             console.log(`Refreshing 17Lands data for ${setCode} / ${draftFormat}...`);
-            await RefreshSetRatings(setCode, draftFormat);
+            await cards.getCardRatings(setCode, draftFormat);
             console.log('Refresh complete, reloading ratings...');
             await loadRatings();
         } catch (err) {

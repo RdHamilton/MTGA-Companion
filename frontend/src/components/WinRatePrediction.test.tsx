@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WinRatePrediction } from './WinRatePrediction';
 
-// Mock Wails functions
-vi.mock('@/services/api/legacy', () => ({
-  PredictDraftWinRate: vi.fn(),
-  GetDraftWinRatePrediction: vi.fn(),
+// Mock drafts API module
+vi.mock('@/services/api', () => ({
+  drafts: {
+    getDraftWinRatePrediction: vi.fn(),
+  },
 }));
 
-import { PredictDraftWinRate, GetDraftWinRatePrediction } from '@/services/api/legacy';
+import { drafts } from '@/services/api';
 
 const mockPrediction = {
   PredictedWinRate: 0.55,
@@ -36,7 +37,7 @@ describe('WinRatePrediction', () => {
 
   describe('Loading State', () => {
     it('should show loading state initially', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockImplementation(
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -46,8 +47,8 @@ describe('WinRatePrediction', () => {
     });
 
     it('should show loading state when calculating prediction', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockImplementation(
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -66,8 +67,8 @@ describe('WinRatePrediction', () => {
 
   describe('Error State', () => {
     it('should show error message when calculation fails', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Calculation failed'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Calculation failed'));
 
       render(<WinRatePrediction sessionID="test-session" showPredictButton={true} />);
 
@@ -85,8 +86,8 @@ describe('WinRatePrediction', () => {
     });
 
     it('should show generic error for non-Error exceptions', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockRejectedValue('String error');
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue('String error');
 
       render(<WinRatePrediction sessionID="test-session" showPredictButton={true} />);
 
@@ -106,7 +107,7 @@ describe('WinRatePrediction', () => {
 
   describe('No Prediction State', () => {
     it('should return null when no prediction and no predict button', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
 
       const { container } = render(<WinRatePrediction sessionID="test-session" showPredictButton={false} />);
 
@@ -116,7 +117,7 @@ describe('WinRatePrediction', () => {
     });
 
     it('should show predict button when no prediction exists', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
 
       render(<WinRatePrediction sessionID="test-session" showPredictButton={true} />);
 
@@ -126,8 +127,8 @@ describe('WinRatePrediction', () => {
     });
 
     it('should call PredictDraftWinRate when predict button clicked', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
 
       render(<WinRatePrediction sessionID="test-session" showPredictButton={true} />);
 
@@ -140,14 +141,14 @@ describe('WinRatePrediction', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(PredictDraftWinRate).toHaveBeenCalledWith('test-session');
+        expect(drafts.getDraftWinRatePrediction).toHaveBeenCalledWith('test-session');
       });
     });
   });
 
   describe('Prediction Display', () => {
     beforeEach(() => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
     });
 
     it('should display prediction win rate', async () => {
@@ -193,7 +194,7 @@ describe('WinRatePrediction', () => {
 
   describe('Compact Mode', () => {
     beforeEach(() => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
     });
 
     it('should render in compact mode', async () => {
@@ -232,7 +233,7 @@ describe('WinRatePrediction', () => {
 
   describe('Modal Interaction', () => {
     beforeEach(() => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
     });
 
     it('should open breakdown modal on click', async () => {
@@ -312,7 +313,7 @@ describe('WinRatePrediction', () => {
 
   describe('Modal Content', () => {
     beforeEach(() => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
     });
 
     it('should display prediction factors', async () => {
@@ -405,8 +406,8 @@ describe('WinRatePrediction', () => {
   describe('Callback Handling', () => {
     it('should call onPredictionCalculated when prediction calculated', async () => {
       const onPredictionCalculated = vi.fn();
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
 
       render(
         <WinRatePrediction
@@ -430,8 +431,8 @@ describe('WinRatePrediction', () => {
     });
 
     it('should not error when onPredictionCalculated not provided', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-      (PredictDraftWinRate as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
 
       render(<WinRatePrediction sessionID="test-session" showPredictButton={true} />);
 
@@ -455,7 +456,7 @@ describe('WinRatePrediction', () => {
   describe('Win Rate Color Coding', () => {
     it('should use green for high win rate (60%+)', async () => {
       const highWinPrediction = { ...mockPrediction, PredictedWinRate: 0.65 };
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(highWinPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(highWinPrediction);
 
       const { container } = render(<WinRatePrediction sessionID="test-session" />);
 
@@ -467,7 +468,7 @@ describe('WinRatePrediction', () => {
 
     it('should use blue for good win rate (55-60%)', async () => {
       const goodWinPrediction = { ...mockPrediction, PredictedWinRate: 0.57 };
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(goodWinPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(goodWinPrediction);
 
       const { container } = render(<WinRatePrediction sessionID="test-session" />);
 
@@ -479,7 +480,7 @@ describe('WinRatePrediction', () => {
 
     it('should use orange for average win rate (50-55%)', async () => {
       const avgWinPrediction = { ...mockPrediction, PredictedWinRate: 0.52 };
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(avgWinPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(avgWinPrediction);
 
       const { container } = render(<WinRatePrediction sessionID="test-session" />);
 
@@ -491,7 +492,7 @@ describe('WinRatePrediction', () => {
 
     it('should use red for low win rate (<50%)', async () => {
       const lowWinPrediction = { ...mockPrediction, PredictedWinRate: 0.45 };
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(lowWinPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(lowWinPrediction);
 
       const { container } = render(<WinRatePrediction sessionID="test-session" />);
 
@@ -504,18 +505,18 @@ describe('WinRatePrediction', () => {
 
   describe('Session ID Changes', () => {
     it('should reload prediction when sessionID changes', async () => {
-      (GetDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
+      (drafts.getDraftWinRatePrediction as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrediction);
 
       const { rerender } = render(<WinRatePrediction sessionID="session-1" />);
 
       await waitFor(() => {
-        expect(GetDraftWinRatePrediction).toHaveBeenCalledWith('session-1');
+        expect(drafts.getDraftWinRatePrediction).toHaveBeenCalledWith('session-1');
       });
 
       rerender(<WinRatePrediction sessionID="session-2" />);
 
       await waitFor(() => {
-        expect(GetDraftWinRatePrediction).toHaveBeenCalledWith('session-2');
+        expect(drafts.getDraftWinRatePrediction).toHaveBeenCalledWith('session-2');
       });
     });
   });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetMatchGames } from '@/services/api/legacy';
+import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from './LoadingSpinner';
 import './MatchDetailsModal.css';
@@ -19,7 +19,7 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
       try {
         setLoading(true);
         setError(null);
-        const gamesData = await GetMatchGames(match.ID);
+        const gamesData = await matches.getMatchGames(match.ID);
         setGames(gamesData || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load games');

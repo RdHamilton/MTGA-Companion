@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import MatchHistory from './MatchHistory';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 import { models } from '@/types/models';
 
@@ -55,7 +55,7 @@ describe('MatchHistory', () => {
       const loadingPromise = new Promise<models.Match[]>((resolve) => {
         resolveMatches = resolve;
       });
-      mockWailsApp.GetMatches.mockReturnValue(loadingPromise);
+      mockMatches.getMatches.mockReturnValue(loadingPromise);
 
       renderWithProvider(<MatchHistory />);
 
@@ -70,7 +70,7 @@ describe('MatchHistory', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetMatches.mockRejectedValue(new Error('Database error'));
+      mockMatches.getMatches.mockRejectedValue(new Error('Database error'));
 
       renderWithProvider(<MatchHistory />);
 
@@ -81,7 +81,7 @@ describe('MatchHistory', () => {
     });
 
     it('should show generic error for non-Error rejections', async () => {
-      mockWailsApp.GetMatches.mockRejectedValue('Unknown error');
+      mockMatches.getMatches.mockRejectedValue('Unknown error');
 
       renderWithProvider(<MatchHistory />);
 
@@ -94,7 +94,7 @@ describe('MatchHistory', () => {
   describe('Empty State', () => {
     it('should show filtered empty state when no matches with default filters', async () => {
       // Default dateRange is '7days', not 'all', so filtered empty state shows
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -110,7 +110,7 @@ describe('MatchHistory', () => {
     });
 
     it('should show default empty state when all filters are set to all', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -137,7 +137,7 @@ describe('MatchHistory', () => {
     });
 
     it('should show filtered empty state when non-default filters applied', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -163,7 +163,7 @@ describe('MatchHistory', () => {
 
     it('should show filtered empty state when API returns null', async () => {
       // With default filters (dateRange='7days'), shows filtered empty state
-      mockWailsApp.GetMatches.mockResolvedValue(null);
+      mockMatches.getMatches.mockResolvedValue(null);
 
       renderWithProvider(<MatchHistory />);
 
@@ -184,7 +184,7 @@ describe('MatchHistory', () => {
         createMockMatch({ ID: 'match-001', Result: 'Win' }),
         createMockMatch({ ID: 'match-002', Result: 'Loss' }),
       ];
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -198,7 +198,7 @@ describe('MatchHistory', () => {
         createMockMatch({ ID: 'match-001', Result: 'Win' }),
         createMockMatch({ ID: 'match-002', Result: 'Loss' }),
       ];
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -210,7 +210,7 @@ describe('MatchHistory', () => {
 
     it('should display match score', async () => {
       const match = createMockMatch({ PlayerWins: 2, OpponentWins: 1 });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -221,7 +221,7 @@ describe('MatchHistory', () => {
 
     it('should display opponent name', async () => {
       const match = createMockMatch({ OpponentName: 'TestOpponent' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -232,7 +232,7 @@ describe('MatchHistory', () => {
 
     it('should display dash for missing opponent name', async () => {
       const match = createMockMatch({ OpponentName: undefined });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -243,7 +243,7 @@ describe('MatchHistory', () => {
 
     it('should display format', async () => {
       const match = createMockMatch({ Format: 'Ladder' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -254,7 +254,7 @@ describe('MatchHistory', () => {
 
     it('should display event name', async () => {
       const match = createMockMatch({ EventName: 'Premier Draft' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -265,7 +265,7 @@ describe('MatchHistory', () => {
 
     it('should normalize format with underscore suffix', async () => {
       const match = createMockMatch({ Format: 'QuickDraft_TLA_20251127' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -278,7 +278,7 @@ describe('MatchHistory', () => {
 
     it('should normalize event name with underscore suffix', async () => {
       const match = createMockMatch({ EventName: 'PremierDraft_MKM_20241120' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -293,7 +293,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 5 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -303,7 +303,7 @@ describe('MatchHistory', () => {
     });
 
     it('should display singular match count', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([createMockMatch()]);
+      mockMatches.getMatches.mockResolvedValue([createMockMatch()]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -315,7 +315,7 @@ describe('MatchHistory', () => {
 
   describe('Table Headers', () => {
     it('should display all table headers', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([createMockMatch()]);
+      mockMatches.getMatches.mockResolvedValue([createMockMatch()]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -344,7 +344,7 @@ describe('MatchHistory', () => {
         createMockMatch({ ID: 'match-001', Timestamp: new Date('2024-01-10').toISOString() }),
         createMockMatch({ ID: 'match-002', Timestamp: new Date('2024-01-15').toISOString() }),
       ];
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -357,7 +357,7 @@ describe('MatchHistory', () => {
 
     it('should toggle sort direction when clicking same header', async () => {
       const matches = [createMockMatch()];
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -392,7 +392,7 @@ describe('MatchHistory', () => {
         createMockMatch({ ID: 'match-001', Result: 'Win' }),
         createMockMatch({ ID: 'match-002', Result: 'Loss' }),
       ];
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -411,7 +411,7 @@ describe('MatchHistory', () => {
     });
 
     it('should sort by format when clicking Format header', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([createMockMatch()]);
+      mockMatches.getMatches.mockResolvedValue([createMockMatch()]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -429,7 +429,7 @@ describe('MatchHistory', () => {
     });
 
     it('should sort by event when clicking Event header', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([createMockMatch()]);
+      mockMatches.getMatches.mockResolvedValue([createMockMatch()]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -450,7 +450,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -480,7 +480,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -497,7 +497,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -516,7 +516,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 50 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -535,7 +535,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -558,7 +558,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 50 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -581,7 +581,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -595,7 +595,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -615,7 +615,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 15 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -629,7 +629,7 @@ describe('MatchHistory', () => {
       const matches = Array.from({ length: 25 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })
       );
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       renderWithProvider(<MatchHistory />);
 
@@ -641,7 +641,7 @@ describe('MatchHistory', () => {
 
   describe('Filters', () => {
     it('should render date range filter with default value', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -652,7 +652,7 @@ describe('MatchHistory', () => {
     });
 
     it('should render card format filter', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -663,7 +663,7 @@ describe('MatchHistory', () => {
     });
 
     it('should render queue type filter', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -674,7 +674,7 @@ describe('MatchHistory', () => {
     });
 
     it('should render result filter', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -685,7 +685,7 @@ describe('MatchHistory', () => {
     });
 
     it('should show custom date inputs when custom range selected', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -703,83 +703,83 @@ describe('MatchHistory', () => {
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+        expect(mockMatches.getMatches).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetMatches.mock.calls.length;
+      const initialCallCount = mockMatches.getMatches.mock.calls.length;
 
       const dateRangeSelect = getSelectByLabel('Date Range');
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should refetch data when card format changes', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+        expect(mockMatches.getMatches).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetMatches.mock.calls.length;
+      const initialCallCount = mockMatches.getMatches.mock.calls.length;
 
       const formatSelect = getSelectByLabel('Card Format');
       fireEvent.change(formatSelect, { target: { value: 'Standard' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should refetch data when queue type changes', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+        expect(mockMatches.getMatches).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetMatches.mock.calls.length;
+      const initialCallCount = mockMatches.getMatches.mock.calls.length;
 
       const queueSelect = getSelectByLabel('Queue Type');
       fireEvent.change(queueSelect, { target: { value: 'Ladder' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should refetch data when result filter changes', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+        expect(mockMatches.getMatches).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetMatches.mock.calls.length;
+      const initialCallCount = mockMatches.getMatches.mock.calls.length;
 
       const resultSelect = getSelectByLabel('Result');
       fireEvent.change(resultSelect, { target: { value: 'win' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getMatches.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
 
     it('should have all date range options', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -795,7 +795,7 @@ describe('MatchHistory', () => {
     });
 
     it('should have all card format options', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -811,7 +811,7 @@ describe('MatchHistory', () => {
     });
 
     it('should have all queue type options', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -825,7 +825,7 @@ describe('MatchHistory', () => {
     });
 
     it('should have all result options', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -842,7 +842,7 @@ describe('MatchHistory', () => {
   describe('Match Details Modal', () => {
     it('should open modal when clicking on a match row', async () => {
       const match = createMockMatch({ OpponentName: 'TestOpponent' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -862,7 +862,7 @@ describe('MatchHistory', () => {
 
     it('should close modal when clicking close button', async () => {
       const match = createMockMatch({ OpponentName: 'ModalTestOpponent' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -892,7 +892,7 @@ describe('MatchHistory', () => {
 
   describe('Page Header', () => {
     it('should display page title', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -904,16 +904,16 @@ describe('MatchHistory', () => {
 
   describe('API Calls', () => {
     it('should call GetMatches with filter', async () => {
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+        expect(mockMatches.getMatches).toHaveBeenCalled();
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const call = mockWailsApp.GetMatches.mock.calls[0] as any[];
+      const call = mockMatches.getMatches.mock.calls[0] as any[];
       expect(call[0]).toBeInstanceOf(models.StatsFilter);
     });
   });
@@ -921,7 +921,7 @@ describe('MatchHistory', () => {
   describe('Row Styling', () => {
     it('should apply win class to winning match rows', async () => {
       const match = createMockMatch({ Result: 'Win' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -933,7 +933,7 @@ describe('MatchHistory', () => {
 
     it('should apply loss class to losing match rows', async () => {
       const match = createMockMatch({ Result: 'Loss' });
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
@@ -945,7 +945,7 @@ describe('MatchHistory', () => {
 
     it('should apply clickable-row class to match rows', async () => {
       const match = createMockMatch();
-      mockWailsApp.GetMatches.mockResolvedValue([match]);
+      mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 

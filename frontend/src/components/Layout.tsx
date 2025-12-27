@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Footer from './Footer';
-import { GetConnectionStatus, ResumeReplay, StopReplay } from '@/services/api/legacy';
+import { system } from '@/services/api';
 import { EventsOn, EventsOff } from '@/services/websocketClient';
 import { getReplayState, subscribeToReplayState } from '../App';
 import { gui } from '@/types/models';
@@ -66,7 +66,7 @@ const Layout = ({ children }: LayoutProps) => {
   useEffect(() => {
     const loadConnectionStatus = async () => {
       try {
-        const status = await GetConnectionStatus();
+        const status = await system.getStatus();
         setConnectionStatus(gui.ConnectionStatus.createFrom(status));
       } catch (error) {
         console.error('Failed to load connection status:', error);
@@ -89,21 +89,14 @@ const Layout = ({ children }: LayoutProps) => {
   }, []);
 
   const handleResumeReplay = async () => {
-    try {
-      await ResumeReplay();
-    } catch (error) {
-      console.error('Failed to resume replay:', error);
-    }
+    // Replay control not implemented in REST API yet
+    console.log('Resume replay not implemented in REST API');
   };
 
   const handleStopReplay = async () => {
-    try {
-      await StopReplay();
-      // Navigate to settings after stopping
-      navigate('/settings');
-    } catch (error) {
-      console.error('Failed to stop replay:', error);
-    }
+    // Replay control not implemented in REST API yet
+    console.log('Stop replay not implemented in REST API');
+    navigate('/settings');
   };
 
   return (

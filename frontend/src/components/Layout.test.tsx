@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import Layout from './Layout';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockSystem, mockMatches } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
 // Mock the getReplayState and subscribeToReplayState functions
@@ -41,7 +41,7 @@ describe('Layout Component', () => {
     mockSubscribers.length = 0;
     mockReplayState.isActive = false;
     mockReplayState.isPaused = false;
-    mockWailsApp.GetConnectionStatus.mockResolvedValue({
+    mockSystem.getStatus.mockResolvedValue({
       status: 'standalone',
       connected: false,
     });
@@ -124,7 +124,7 @@ describe('Layout Component', () => {
 
   describe('Connection Status', () => {
     it('should display connection status indicator', async () => {
-      mockWailsApp.GetConnectionStatus.mockResolvedValue({
+      mockSystem.getStatus.mockResolvedValue({
         status: 'connected',
         connected: true,
       });
@@ -143,7 +143,7 @@ describe('Layout Component', () => {
     });
 
     it('should update connection status when daemon:connected event fires', async () => {
-      mockWailsApp.GetConnectionStatus
+      mockSystem.getStatus
         .mockResolvedValueOnce({
           status: 'standalone',
           connected: false,
@@ -243,7 +243,7 @@ describe('Layout Component', () => {
       );
 
       // Verify the mock function exists
-      expect(mockWailsApp.ResumeReplay).toBeDefined();
+      expect(mockSystem.resumeReplay).toBeDefined();
     });
 
     it('should have StopReplay function available', () => {
@@ -258,7 +258,7 @@ describe('Layout Component', () => {
       );
 
       // Verify the mock function exists
-      expect(mockWailsApp.StopReplay).toBeDefined();
+      expect(mockSystem.stopReplay).toBeDefined();
     });
   });
 
@@ -275,7 +275,7 @@ describe('Layout Component', () => {
     });
 
     it('should render Footer component', () => {
-      mockWailsApp.GetStats.mockResolvedValue({
+      mockMatches.getStats.mockResolvedValue({
         TotalMatches: 0,
         MatchesWon: 0,
         MatchesLost: 0,
@@ -299,7 +299,7 @@ describe('Layout Component', () => {
 
   describe('Error Handling', () => {
     it('should handle connection status load error gracefully', async () => {
-      mockWailsApp.GetConnectionStatus.mockRejectedValue(new Error('Failed to load'));
+      mockSystem.getStatus.mockRejectedValue(new Error('Failed to load'));
 
       render(
         <Layout>
@@ -312,7 +312,7 @@ describe('Layout Component', () => {
     });
 
     it('should handle connection status error without crashing', async () => {
-      mockWailsApp.GetConnectionStatus.mockRejectedValue(new Error('Connection error'));
+      mockSystem.getStatus.mockRejectedValue(new Error('Connection error'));
 
       expect(() => {
         render(

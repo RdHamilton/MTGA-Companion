@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import FormatDistribution from './FormatDistribution';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 import { models } from '@/types/models';
 
@@ -83,7 +83,7 @@ describe('FormatDistribution', () => {
       const loadingPromise = new Promise<Record<string, models.Statistics>>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.GetStatsByFormat.mockReturnValue(loadingPromise);
+      mockMatches.getFormatDistribution.mockReturnValue(loadingPromise);
 
       renderWithProvider(<FormatDistribution />);
 
@@ -98,7 +98,7 @@ describe('FormatDistribution', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetStatsByFormat.mockRejectedValue(new Error('Database unavailable'));
+      mockMatches.getFormatDistribution.mockRejectedValue(new Error('Database unavailable'));
 
       renderWithProvider(<FormatDistribution />);
 
@@ -109,7 +109,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.GetStatsByFormat.mockRejectedValue('Unknown error');
+      mockMatches.getFormatDistribution.mockRejectedValue('Unknown error');
 
       renderWithProvider(<FormatDistribution />);
 
@@ -121,7 +121,7 @@ describe('FormatDistribution', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no format data', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({});
+      mockMatches.getFormatDistribution.mockResolvedValue({});
 
       renderWithProvider(<FormatDistribution />);
 
@@ -134,7 +134,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should show empty state when API returns null', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(null);
+      mockMatches.getFormatDistribution.mockResolvedValue(null);
 
       renderWithProvider(<FormatDistribution />);
 
@@ -146,7 +146,7 @@ describe('FormatDistribution', () => {
 
   describe('Data Display', () => {
     it('should render bar chart by default', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -157,7 +157,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should render format cards with statistics', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -169,7 +169,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should display win rates correctly', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -181,7 +181,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should display format count and total matches', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -191,7 +191,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should display singular format count for one format', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+      mockMatches.getFormatDistribution.mockResolvedValue({
         Ladder: createMockStatistics({ TotalMatches: 25 }),
       });
 
@@ -203,7 +203,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should display wins and losses', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+      mockMatches.getFormatDistribution.mockResolvedValue({
         Ladder: createMockStatistics({ MatchesWon: 20, MatchesLost: 5 }),
       });
 
@@ -216,7 +216,7 @@ describe('FormatDistribution', () => {
 
     it('should aggregate formats with underscore suffixes', async () => {
       // Two QuickDraft formats from different sets should be combined
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+      mockMatches.getFormatDistribution.mockResolvedValue({
         'QuickDraft_TLA_20251127': createMockStatistics({ TotalMatches: 8, MatchesWon: 5, MatchesLost: 3 }),
         'QuickDraft_MKM_20241120': createMockStatistics({ TotalMatches: 12, MatchesWon: 7, MatchesLost: 5 }),
         Play: createMockStatistics({ TotalMatches: 10, MatchesWon: 6, MatchesLost: 4 }),
@@ -237,7 +237,7 @@ describe('FormatDistribution', () => {
 
     it('should combine stats when aggregating formats', async () => {
       // Two PremierDraft formats should have their wins/losses combined
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+      mockMatches.getFormatDistribution.mockResolvedValue({
         'PremierDraft_TLA_20251127': createMockStatistics({ TotalMatches: 5, MatchesWon: 3, MatchesLost: 2 }),
         'PremierDraft_MKM_20241120': createMockStatistics({ TotalMatches: 5, MatchesWon: 2, MatchesLost: 3 }),
       });
@@ -254,7 +254,7 @@ describe('FormatDistribution', () => {
 
   describe('Filters', () => {
     it('should render date range filter with default value', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -265,7 +265,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should render chart type filter', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -275,7 +275,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should render sort by filter', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -286,7 +286,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should render sort order filter', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -297,7 +297,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should show custom date inputs when custom range selected', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -315,7 +315,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should switch to pie chart when chart type changes', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -333,28 +333,28 @@ describe('FormatDistribution', () => {
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByFormat).toHaveBeenCalled();
+        expect(mockMatches.getFormatDistribution).toHaveBeenCalled();
       });
 
-      const initialCallCount = mockWailsApp.GetStatsByFormat.mock.calls.length;
+      const initialCallCount = mockMatches.getFormatDistribution.mock.calls.length;
 
       const dateRangeSelect = getSelectByLabel('Date Range');
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByFormat.mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect(mockMatches.getFormatDistribution.mock.calls.length).toBeGreaterThan(initialCallCount);
       });
     });
   });
 
   describe('Sorting', () => {
     it('should sort by match count descending by default', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -367,7 +367,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should sort by win rate when selected', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -387,7 +387,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should sort by format name when selected', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -410,7 +410,7 @@ describe('FormatDistribution', () => {
     });
 
     it('should sort ascending when order changed', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -431,7 +431,7 @@ describe('FormatDistribution', () => {
 
   describe('Page Header', () => {
     it('should display page title', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -443,7 +443,7 @@ describe('FormatDistribution', () => {
 
   describe('Unknown Format Handling', () => {
     it('should display "Unknown Format" for empty format name', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue({
+      mockMatches.getFormatDistribution.mockResolvedValue({
         '': createMockStatistics(),
       });
 
@@ -457,7 +457,7 @@ describe('FormatDistribution', () => {
 
   describe('Chart Data Transformation', () => {
     it('should transform data correctly for bar chart', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
@@ -474,16 +474,16 @@ describe('FormatDistribution', () => {
 
   describe('API Calls', () => {
     it('should call GetStatsByFormat with filter', async () => {
-      mockWailsApp.GetStatsByFormat.mockResolvedValue(createMockFormatStatsResponse());
+      mockMatches.getFormatDistribution.mockResolvedValue(createMockFormatStatsResponse());
 
       renderWithProvider(<FormatDistribution />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetStatsByFormat).toHaveBeenCalled();
+        expect(mockMatches.getFormatDistribution).toHaveBeenCalled();
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const call = mockWailsApp.GetStatsByFormat.mock.calls[0] as any[];
+      const call = mockMatches.getFormatDistribution.mock.calls[0] as any[];
       expect(call[0]).toBeInstanceOf(models.StatsFilter);
     });
   });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import Footer from './Footer';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { models } from '@/types/models';
 
@@ -47,8 +47,8 @@ describe('Footer Component', () => {
 
   describe('Loading State', () => {
     it('should display loading state initially', () => {
-      mockWailsApp.GetStats.mockImplementation(() => new Promise(() => {})); // Never resolves
-      mockWailsApp.GetMatches.mockImplementation(() => new Promise(() => {}));
+      mockMatches.getStats.mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockMatches.getMatches.mockImplementation(() => new Promise(() => {}));
 
       render(<Footer />);
 
@@ -59,8 +59,8 @@ describe('Footer Component', () => {
   describe('Empty State', () => {
     it('should display empty state when no matches exist', async () => {
       const emptyStats = createMockStatistics({ TotalMatches: 0 });
-      mockWailsApp.GetStats.mockResolvedValue(emptyStats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(emptyStats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -73,8 +73,8 @@ describe('Footer Component', () => {
   describe('Statistics Display', () => {
     it('should display total matches count', async () => {
       const stats = createMockStatistics({ TotalMatches: 100 });
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -90,8 +90,8 @@ describe('Footer Component', () => {
         MatchesLost: 40,
         WinRate: 0.6,
       });
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -106,8 +106,8 @@ describe('Footer Component', () => {
       const stats = createMockStatistics({
         WinRate: 0.5555, // Should display as 55.6%
       });
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -123,8 +123,8 @@ describe('Footer Component', () => {
           Timestamp: new Date('2025-11-20T10:00:00Z'),
         }),
       ];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 
@@ -146,8 +146,8 @@ describe('Footer Component', () => {
         createMockMatch({ Result: 'win' }),
         createMockMatch({ Result: 'loss' }),
       ];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 
@@ -164,8 +164,8 @@ describe('Footer Component', () => {
         createMockMatch({ Result: 'loss' }),
         createMockMatch({ Result: 'win' }),
       ];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 
@@ -177,8 +177,8 @@ describe('Footer Component', () => {
 
     it('should not display streak when count is 0', async () => {
       const stats = createMockStatistics();
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -197,8 +197,8 @@ describe('Footer Component', () => {
         createMockMatch({ Result: 'win' }),
         createMockMatch({ Result: 'loss' }),
       ];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 
@@ -213,8 +213,8 @@ describe('Footer Component', () => {
       const initialStats = createMockStatistics({ TotalMatches: 10 });
       const updatedStats = createMockStatistics({ TotalMatches: 11 });
 
-      mockWailsApp.GetStats.mockResolvedValueOnce(initialStats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValueOnce(initialStats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -223,7 +223,7 @@ describe('Footer Component', () => {
       });
 
       // Update mock to return new stats
-      mockWailsApp.GetStats.mockResolvedValueOnce(updatedStats);
+      mockMatches.getStats.mockResolvedValueOnce(updatedStats);
 
       // Trigger stats:updated event
       mockEventEmitter.emit('stats:updated');
@@ -241,8 +241,8 @@ describe('Footer Component', () => {
         createMockMatch({ Result: 'win' }),
       ];
 
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValueOnce(initialMatches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValueOnce(initialMatches);
 
       render(<Footer />);
 
@@ -251,7 +251,7 @@ describe('Footer Component', () => {
       });
 
       // Update matches
-      mockWailsApp.GetMatches.mockResolvedValueOnce(updatedMatches);
+      mockMatches.getMatches.mockResolvedValueOnce(updatedMatches);
 
       // Trigger event
       mockEventEmitter.emit('stats:updated');
@@ -264,8 +264,8 @@ describe('Footer Component', () => {
 
   describe('Error Handling', () => {
     it('should handle GetStats error gracefully', async () => {
-      mockWailsApp.GetStats.mockRejectedValue(new Error('Failed to load stats'));
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockRejectedValue(new Error('Failed to load stats'));
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -277,8 +277,8 @@ describe('Footer Component', () => {
 
     it('should handle GetMatches error gracefully', async () => {
       const stats = createMockStatistics();
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockRejectedValue(new Error('Failed to load matches'));
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockRejectedValue(new Error('Failed to load matches'));
 
       render(<Footer />);
 
@@ -292,8 +292,8 @@ describe('Footer Component', () => {
   describe('Visual Elements', () => {
     it('should display footer icon', async () => {
       const stats = createMockStatistics();
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue([]);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
 
       render(<Footer />);
 
@@ -305,8 +305,8 @@ describe('Footer Component', () => {
     it('should apply correct CSS class for win streak', async () => {
       const stats = createMockStatistics();
       const matches = [createMockMatch({ Result: 'win' })];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 
@@ -319,8 +319,8 @@ describe('Footer Component', () => {
     it('should apply correct CSS class for loss streak', async () => {
       const stats = createMockStatistics();
       const matches = [createMockMatch({ Result: 'loss' })];
-      mockWailsApp.GetStats.mockResolvedValue(stats);
-      mockWailsApp.GetMatches.mockResolvedValue(matches);
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue(matches);
 
       render(<Footer />);
 

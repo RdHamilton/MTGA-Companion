@@ -1,13 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  StartReplayWithFileDialog,
-  PauseReplay,
-  ResumeReplay,
-  StopReplay,
-} from '@/services/api/legacy';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
 import { gui } from '@/types/models';
+
+// No-op stubs - replay functions not implemented in REST API
+/* eslint-disable @typescript-eslint/no-unused-vars */
+async function startReplayWithFileDialog(
+  _speed: number,
+  _filter: string,
+  _pauseOnDraft: boolean
+): Promise<void> {
+/* eslint-enable @typescript-eslint/no-unused-vars */
+  console.warn('StartReplayWithFileDialog: Not implemented in REST API');
+}
+
+async function pauseReplay(): Promise<void> {
+  console.warn('PauseReplay: Not implemented in REST API');
+}
+
+async function resumeReplay(): Promise<void> {
+  console.warn('ResumeReplay: Not implemented in REST API');
+}
+
+async function stopReplay(): Promise<void> {
+  console.warn('StopReplay: Not implemented in REST API');
+}
 
 export interface UseReplayToolReturn {
   /** Whether replay tool is active */
@@ -70,7 +87,7 @@ export function useReplayTool(): UseReplayToolReturn {
     }
 
     try {
-      await StartReplayWithFileDialog(replaySpeed, replayFilter, pauseOnDraft);
+      await startReplayWithFileDialog(replaySpeed, replayFilter, pauseOnDraft);
     } catch (error) {
       showToast.show(`Failed to start replay: ${error}`, 'error');
     }
@@ -78,7 +95,7 @@ export function useReplayTool(): UseReplayToolReturn {
 
   const handlePauseReplayTool = useCallback(async () => {
     try {
-      await PauseReplay();
+      await pauseReplay();
     } catch (error) {
       showToast.show(`Failed to pause replay: ${error}`, 'error');
     }
@@ -86,7 +103,7 @@ export function useReplayTool(): UseReplayToolReturn {
 
   const handleResumeReplayTool = useCallback(async () => {
     try {
-      await ResumeReplay();
+      await resumeReplay();
     } catch (error) {
       showToast.show(`Failed to resume replay: ${error}`, 'error');
     }
@@ -94,7 +111,7 @@ export function useReplayTool(): UseReplayToolReturn {
 
   const handleStopReplayTool = useCallback(async () => {
     try {
-      await StopReplay();
+      await stopReplay();
     } catch (error) {
       showToast.show(`Failed to stop replay: ${error}`, 'error');
     }

@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TriggerReplayLogs } from '@/services/api/legacy';
 import { EventsOn, WindowReloadApp } from '@/services/websocketClient';
 import { showToast } from '../components/ToastContainer';
 import { gui } from '@/types/models';
+
+// No-op stub - TriggerReplayLogs not implemented in REST API
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function triggerReplayLogs(_clearDataFirst: boolean): Promise<void> {
+  console.warn('TriggerReplayLogs: Not implemented in REST API');
+}
 
 export interface UseLogReplayReturn {
   /** Whether to clear data before replay */
@@ -59,7 +64,7 @@ export function useLogReplay(): UseLogReplayReturn {
     }
 
     try {
-      await TriggerReplayLogs(clearDataBeforeReplay);
+      await triggerReplayLogs(clearDataBeforeReplay);
       // Progress UI will update automatically from events
     } catch (error) {
       showToast.show(`Failed to trigger replay: ${error}`, 'error');

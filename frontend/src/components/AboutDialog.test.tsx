@@ -2,17 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AboutDialog from './AboutDialog';
 
-// Mock the Wails App module
-vi.mock('@/services/api/legacy', () => ({
-  GetAppVersion: vi.fn(),
+// Mock the system API module
+vi.mock('@/services/api', () => ({
+  system: {
+    getVersion: vi.fn(),
+  },
 }));
 
-import { GetAppVersion } from '@/services/api/legacy';
+import { system } from '@/services/api';
 
 describe('AboutDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (GetAppVersion as ReturnType<typeof vi.fn>).mockResolvedValue('v1.3.1');
+    (system.getVersion as ReturnType<typeof vi.fn>).mockResolvedValue({ version: 'v1.3.1' });
   });
   describe('Visibility', () => {
     it('should render when isOpen is true', () => {
@@ -92,7 +94,7 @@ describe('AboutDialog', () => {
       await waitFor(() => {
         expect(screen.getByText(/Version v1\.3\.1/)).toBeInTheDocument();
       });
-      expect(GetAppVersion).toHaveBeenCalled();
+      expect(system.getVersion).toHaveBeenCalled();
     });
 
     it('should show loading state initially', () => {
@@ -102,7 +104,7 @@ describe('AboutDialog', () => {
     });
 
     it('should show Unknown when version fetch fails', async () => {
-      (GetAppVersion as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Failed'));
+      (system.getVersion as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Failed'));
       render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
 
       await waitFor(() => {

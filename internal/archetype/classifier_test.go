@@ -71,7 +71,7 @@ func TestClassifier_GetDominantColors(t *testing.T) {
 			colorCounts: map[string]int{"W": 15, "U": 15, "B": 2},
 			totalCards:  40,
 			wantLen:     2,
-			wantFirst:   "W", // Same count, but W comes first
+			wantFirst:   "U", // Same count, alphabetically sorted (U < W)
 		},
 		{
 			name:        "mono-color splash",

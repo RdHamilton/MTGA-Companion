@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   mockWailsRuntime,
   mockEventEmitter,
-  mockWailsApp,
+  mockDrafts,
+  mockMatches,
   resetMocks,
 } from './index';
 
@@ -68,23 +69,23 @@ describe('Wails Mocks', () => {
     });
   });
 
-  describe('App Mocks', () => {
-    it('should mock GetActiveDraftSessions', async () => {
-      const result = await mockWailsApp.GetActiveDraftSessions();
+  describe('API Mocks', () => {
+    it('should mock getActiveDraftSessions', async () => {
+      const result = await mockDrafts.getActiveDraftSessions();
       expect(result).toEqual([]);
-      expect(mockWailsApp.GetActiveDraftSessions).toHaveBeenCalled();
+      expect(mockDrafts.getActiveDraftSessions).toHaveBeenCalled();
     });
 
-    it('should mock GetMatches', async () => {
-      const result = await mockWailsApp.GetMatches();
+    it('should mock getMatches', async () => {
+      const result = await mockMatches.getMatches();
       expect(result).toEqual([]);
-      expect(mockWailsApp.GetMatches).toHaveBeenCalled();
+      expect(mockMatches.getMatches).toHaveBeenCalled();
     });
 
     it('should reset mocks', () => {
-      mockWailsApp.GetActiveDraftSessions();
+      mockDrafts.getActiveDraftSessions();
       resetMocks();
-      expect(mockWailsApp.GetActiveDraftSessions).not.toHaveBeenCalled();
+      expect(mockDrafts.getActiveDraftSessions).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import WinRateTrend from './WinRateTrend';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockMatches } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 // storage types imported but using any for mock flexibility
 
@@ -104,7 +104,7 @@ describe('WinRateTrend', () => {
       const loadingPromise = new Promise<any>((resolve) => {
         resolvePromise = resolve;
       });
-      mockWailsApp.GetTrendAnalysis.mockReturnValue(loadingPromise);
+      mockMatches.getTrendAnalysis.mockReturnValue(loadingPromise);
 
       renderWithProvider(<WinRateTrend />);
 
@@ -120,7 +120,7 @@ describe('WinRateTrend', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockWailsApp.GetTrendAnalysis.mockRejectedValue(new Error('Network error'));
+      mockMatches.getTrendAnalysis.mockRejectedValue(new Error('Network error'));
 
       renderWithProvider(<WinRateTrend />);
 
@@ -131,7 +131,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockWailsApp.GetTrendAnalysis.mockRejectedValue('Unknown error');
+      mockMatches.getTrendAnalysis.mockRejectedValue('Unknown error');
 
       renderWithProvider(<WinRateTrend />);
 
@@ -143,7 +143,7 @@ describe('WinRateTrend', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no analysis data', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(null);
+      mockMatches.getTrendAnalysis.mockResolvedValue(null);
 
       renderWithProvider(<WinRateTrend />);
 
@@ -156,7 +156,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should show empty state when periods array is empty', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue({
+      mockMatches.getTrendAnalysis.mockResolvedValue({
         Periods: [],
         Overall: null,
         Trend: '',
@@ -173,7 +173,7 @@ describe('WinRateTrend', () => {
 
   describe('Data Display', () => {
     it('should render line chart by default', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -184,7 +184,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should display summary information', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -198,7 +198,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should display trend with correct value', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -208,7 +208,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should display overall win rate', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -219,7 +219,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should transform data correctly for chart', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -243,7 +243,7 @@ describe('WinRateTrend', () => {
     }
 
     it('should render date range filter with default value', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -256,7 +256,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should render format filter with default value', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -269,7 +269,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should render chart type filter with default value', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -282,7 +282,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should update date range when filter changes', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -299,7 +299,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should update format when filter changes', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -316,7 +316,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should switch to bar chart when chart type changes', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -343,22 +343,23 @@ describe('WinRateTrend', () => {
     }
 
     it('should call GetTrendAnalysis with correct parameters for 7days', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetTrendAnalysis).toHaveBeenCalled();
+        expect(mockMatches.getTrendAnalysis).toHaveBeenCalled();
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const call = mockWailsApp.GetTrendAnalysis.mock.calls[0] as any[];
-      expect(call[2]).toBe('daily'); // periodType for 7days
-      expect(call[3]).toEqual([]); // formats for 'all'
+      const calls = mockMatches.getTrendAnalysis.mock.calls as any[][];
+      const call = calls[0][0];
+      expect(call.period_type).toBe('daily'); // periodType for 7days
+      expect(call.formats).toBeUndefined(); // formats for 'all' is undefined
     });
 
     it('should refetch data when date range changes', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -370,12 +371,12 @@ describe('WinRateTrend', () => {
       fireEvent.change(dateRangeSelect, { target: { value: '30days' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetTrendAnalysis).toHaveBeenCalledTimes(2);
+        expect(mockMatches.getTrendAnalysis).toHaveBeenCalledTimes(2);
       });
     });
 
     it('should refetch data when format changes', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -387,12 +388,12 @@ describe('WinRateTrend', () => {
       fireEvent.change(formatSelect, { target: { value: 'Ladder' } });
 
       await waitFor(() => {
-        expect(mockWailsApp.GetTrendAnalysis).toHaveBeenCalledTimes(2);
+        expect(mockMatches.getTrendAnalysis).toHaveBeenCalledTimes(2);
       });
     });
 
     it('should pass constructed formats for constructed filter', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -405,15 +406,16 @@ describe('WinRateTrend', () => {
 
       await waitFor(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastCall = mockWailsApp.GetTrendAnalysis.mock.calls.slice(-1)[0] as any[];
-        expect(lastCall[3]).toEqual(['Ladder', 'Play']);
+        const calls = mockMatches.getTrendAnalysis.mock.calls as any[][];
+        const lastCall = calls.slice(-1)[0][0];
+        expect(lastCall.formats).toEqual(['Ladder', 'Play']);
       });
     });
   });
 
   describe('Export Button', () => {
     it('should render export button', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
 
       renderWithProvider(<WinRateTrend />);
 
@@ -423,7 +425,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should show alert when export button is clicked', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
+      mockMatches.getTrendAnalysis.mockResolvedValue(createMockTrendAnalysis());
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       renderWithProvider(<WinRateTrend />);
@@ -441,7 +443,7 @@ describe('WinRateTrend', () => {
 
   describe('Trend Display', () => {
     it('should display declining trend correctly', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(
+      mockMatches.getTrendAnalysis.mockResolvedValue(
         createMockTrendAnalysis({
           Trend: 'declining',
           TrendValue: -0.05,
@@ -457,7 +459,7 @@ describe('WinRateTrend', () => {
     });
 
     it('should display stable trend correctly', async () => {
-      mockWailsApp.GetTrendAnalysis.mockResolvedValue(
+      mockMatches.getTrendAnalysis.mockResolvedValue(
         createMockTrendAnalysis({
           Trend: 'stable',
           TrendValue: 0,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { GetActiveQuests, GetQuestHistory, GetCurrentAccount } from '@/services/api/legacy';
+import { quests, system } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
@@ -64,7 +64,7 @@ const Quests = () => {
 
       // Load quest data sequentially with better error reporting
       try {
-        const active = await GetActiveQuests();
+        const active = await quests.getActiveQuests();
         setActiveQuests(active || []);
       } catch (activeErr) {
         console.error('Error loading active quests:', activeErr);
@@ -73,7 +73,7 @@ const Quests = () => {
 
       try {
         console.log('Loading quest history with dates:', startDate, endDate, historyLimit);
-        const history = await GetQuestHistory(startDate, endDate, historyLimit);
+        const history = await quests.getQuestHistory(startDate, endDate, historyLimit);
         console.log('Quest history loaded:', history?.length || 0, 'quests');
         setQuestHistory(history || []);
       } catch (historyErr) {
@@ -82,7 +82,7 @@ const Quests = () => {
       }
 
       try {
-        const account = await GetCurrentAccount();
+        const account = await system.getCurrentAccount();
         setCurrentAccount(account);
       } catch (accountErr) {
         console.error('Error loading current account:', accountErr);
@@ -135,7 +135,7 @@ const Quests = () => {
 
         // Load quest data sequentially with better error reporting
         try {
-          const active = await GetActiveQuests();
+          const active = await quests.getActiveQuests();
           setActiveQuests(active || []);
         } catch (activeErr) {
           console.error('Error loading active quests:', activeErr);
@@ -144,7 +144,7 @@ const Quests = () => {
 
         try {
           console.log('Loading quest history with dates:', startDate, endDate, historyLimit);
-          const history = await GetQuestHistory(startDate, endDate, historyLimit);
+          const history = await quests.getQuestHistory(startDate, endDate, historyLimit);
           console.log('Quest history loaded:', history?.length || 0, 'quests');
           setQuestHistory(history || []);
         } catch (historyErr) {
@@ -153,7 +153,7 @@ const Quests = () => {
         }
 
         try {
-          const account = await GetCurrentAccount();
+          const account = await system.getCurrentAccount();
           setCurrentAccount(account);
         } catch (accountErr) {
           console.error('Error loading current account:', accountErr);

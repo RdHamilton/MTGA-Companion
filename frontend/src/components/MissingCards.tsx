@@ -1,7 +1,28 @@
 import { useState, useEffect } from 'react';
-import { GetMissingCards } from '@/services/api/legacy';
 import { models } from '@/types/models';
 import './MissingCards.css';
+
+// GetMissingCards for draft context returns empty analysis (not implemented in REST API)
+/* eslint-disable @typescript-eslint/no-unused-vars */
+async function getMissingCardsForDraft(
+  _sessionId: string,
+  _packNumber: number,
+  _pickNumber: number
+): Promise<models.MissingCardsAnalysis> {
+/* eslint-enable @typescript-eslint/no-unused-vars */
+  // Draft-context missing cards not implemented in REST API
+  return new models.MissingCardsAnalysis({
+    SessionID: '',
+    PackNumber: 0,
+    PickNumber: 0,
+    InitialCards: [],
+    CurrentCards: [],
+    PickedByMe: [],
+    MissingCards: [],
+    TotalMissing: 0,
+    BombsMissing: 0,
+  });
+}
 
 interface MissingCardsProps {
   sessionID: string;
@@ -27,7 +48,7 @@ const MissingCards = ({ sessionID, packNumber, pickNumber }: MissingCardsProps) 
       setError(null);
 
       try {
-        const result = await GetMissingCards(sessionID, packNumber, pickNumber);
+        const result = await getMissingCardsForDraft(sessionID, packNumber, pickNumber);
         // Only set analysis if we have actual missing cards
         if (result && result.TotalMissing > 0) {
           setAnalysis(result);

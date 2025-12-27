@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import { DraftGrade } from './DraftGrade';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockDrafts } from '@/test/mocks/apiMock';
 import { grading } from '@/types/models';
 
 function createMockDraftGrade(overrides: Partial<grading.DraftGrade> = {}): grading.DraftGrade {
@@ -28,7 +28,7 @@ describe('DraftGrade Component', () => {
 
   describe('Initial State', () => {
     it('should show loading state initially', () => {
-      mockWailsApp.GetDraftGrade.mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockDrafts.getDraftGrade.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -36,7 +36,7 @@ describe('DraftGrade Component', () => {
     });
 
     it('should hide when no grade exists and showCalculateButton is false', async () => {
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade found'));
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade found'));
 
       const { container } = render(<DraftGrade sessionID="test-session" showCalculateButton={false} />);
 
@@ -46,7 +46,7 @@ describe('DraftGrade Component', () => {
     });
 
     it('should show calculate button when no grade exists and showCalculateButton is true', async () => {
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade found'));
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade found'));
 
       render(<DraftGrade sessionID="test-session" showCalculateButton={true} />);
 
@@ -59,7 +59,7 @@ describe('DraftGrade Component', () => {
   describe('Display Grade', () => {
     it('should display grade in full mode', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -71,7 +71,7 @@ describe('DraftGrade Component', () => {
 
     it('should display grade in compact mode', async () => {
       const grade = createMockDraftGrade({ overall_grade: 'A' });
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" compact={true} />);
 
@@ -94,7 +94,7 @@ describe('DraftGrade Component', () => {
       for (const testCase of testCases) {
         vi.clearAllMocks();
         const grade = createMockDraftGrade({ overall_grade: testCase.grade });
-        mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+        mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
         const { container } = render(<DraftGrade sessionID="test-session" compact={true} />);
 
@@ -109,9 +109,9 @@ describe('DraftGrade Component', () => {
 
   describe('Calculate Grade', () => {
     it('should calculate grade when button is clicked', async () => {
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade'));
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade'));
       const newGrade = createMockDraftGrade();
-      mockWailsApp.CalculateDraftGrade.mockResolvedValue(newGrade);
+      mockDrafts.calculateDraftGrade.mockResolvedValue(newGrade);
 
       render(<DraftGrade sessionID="test-session" showCalculateButton={true} />);
 
@@ -123,15 +123,15 @@ describe('DraftGrade Component', () => {
       await userEvent.click(calculateButton);
 
       await waitFor(() => {
-        expect(mockWailsApp.CalculateDraftGrade).toHaveBeenCalledWith('test-session');
+        expect(mockDrafts.calculateDraftGrade).toHaveBeenCalledWith('test-session');
         expect(screen.getByText('B+')).toBeInTheDocument();
       });
     });
 
     it('should call onGradeCalculated callback when grade is calculated', async () => {
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade'));
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade'));
       const newGrade = createMockDraftGrade();
-      mockWailsApp.CalculateDraftGrade.mockResolvedValue(newGrade);
+      mockDrafts.calculateDraftGrade.mockResolvedValue(newGrade);
       const onGradeCalculated = vi.fn();
 
       render(
@@ -155,8 +155,8 @@ describe('DraftGrade Component', () => {
     });
 
     it('should display error when grade calculation fails', async () => {
-      mockWailsApp.GetDraftGrade.mockRejectedValue(new Error('No grade'));
-      mockWailsApp.CalculateDraftGrade.mockRejectedValue(new Error('Calculation failed'));
+      mockDrafts.getDraftGrade.mockRejectedValue(new Error('No grade'));
+      mockDrafts.calculateDraftGrade.mockRejectedValue(new Error('Calculation failed'));
 
       render(<DraftGrade sessionID="test-session" showCalculateButton={true} />);
 
@@ -176,7 +176,7 @@ describe('DraftGrade Component', () => {
   describe('Grade Breakdown Modal', () => {
     it('should open breakdown modal when grade is clicked', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -194,7 +194,7 @@ describe('DraftGrade Component', () => {
 
     it('should display component scores in breakdown modal', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -219,7 +219,7 @@ describe('DraftGrade Component', () => {
         best_picks: ['Lightning Bolt - P1P1', 'Counterspell - P1P3'],
         worst_picks: ['Vanilla Bear - P2P8'],
       });
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -244,7 +244,7 @@ describe('DraftGrade Component', () => {
       const grade = createMockDraftGrade({
         suggestions: ['Focus on 2-color decks', 'Pick more removal spells'],
       });
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -264,7 +264,7 @@ describe('DraftGrade Component', () => {
 
     it('should close breakdown modal when close button is clicked', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -289,7 +289,7 @@ describe('DraftGrade Component', () => {
 
     it('should close breakdown modal when overlay is clicked', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" />);
 
@@ -318,7 +318,7 @@ describe('DraftGrade Component', () => {
   describe('Compact Mode', () => {
     it('should render badge in compact mode', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" compact={true} showCalculateButton={true} />);
 
@@ -333,7 +333,7 @@ describe('DraftGrade Component', () => {
 
     it('should display tooltip on hover in compact mode', async () => {
       const grade = createMockDraftGrade({ overall_score: 85.5 });
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" compact={true} />);
 
@@ -345,7 +345,7 @@ describe('DraftGrade Component', () => {
 
     it('should open breakdown modal when compact badge is clicked', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" compact={true} />);
 
@@ -366,7 +366,7 @@ describe('DraftGrade Component', () => {
 
     it('should close breakdown modal when close button is clicked in compact mode', async () => {
       const grade = createMockDraftGrade();
-      mockWailsApp.GetDraftGrade.mockResolvedValue(grade);
+      mockDrafts.getDraftGrade.mockResolvedValue(grade);
 
       render(<DraftGrade sessionID="test-session" compact={true} />);
 

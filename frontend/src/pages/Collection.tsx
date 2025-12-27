@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetCollection, GetAllSetInfo } from '@/services/api/legacy';
+import { collection, cards as cardsApi } from '@/services/api';
 import { gui } from '@/types/models';
 import SetCompletionPanel from '../components/SetCompletion';
 import './Collection.css';
@@ -67,22 +67,19 @@ export default function Collection() {
     setLoading(true);
     setError(null);
     try {
-      const filter = new gui.CollectionFilter({
-        searchTerm: debouncedSearchTerm,
-        setCode: filters.setCode,
+      const apiFilter = {
+        set_code: filters.setCode,
         rarity: filters.rarity,
         colors: filters.colors,
-        ownedOnly: filters.ownedOnly,
-        sortBy: filters.sortBy,
-        sortDesc: filters.sortDesc,
-        limit: ITEMS_PER_PAGE,
-        offset: (currentPage - 1) * ITEMS_PER_PAGE,
-      });
+        owned_only: filters.ownedOnly,
+      };
 
-      const response = await GetCollection(filter);
-      setCards(response.cards || []);
-      setTotalCount(response.totalCount);
-      setFilterCount(response.filterCount);
+      const collectionCards = await collection.getCollection(apiFilter);
+      // Note: REST API doesn't support search/sort/pagination server-side
+      // The component handles this with client-side filtering
+      setCards(collectionCards || []);
+      setTotalCount(collectionCards.length);
+      setFilterCount(collectionCards.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load collection');
       console.error('Failed to load collection:', err);
@@ -93,7 +90,7 @@ export default function Collection() {
 
   const loadSets = useCallback(async () => {
     try {
-      const setInfo = await GetAllSetInfo();
+      const setInfo = await cardsApi.getAllSetInfo();
       setSets(setInfo || []);
     } catch (err) {
       console.error('Failed to load sets:', err);

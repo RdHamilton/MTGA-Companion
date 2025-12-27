@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import DraftStatistics from './DraftStatistics';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockDrafts } from '@/test/mocks/apiMock';
 import { models } from '@/types/models';
 
 function createMockDeckMetrics(overrides: Partial<models.DeckMetrics> = {}): models.DeckMetrics {
@@ -48,7 +48,7 @@ describe('DraftStatistics Component', () => {
 
   describe('Loading and Error States', () => {
     it('should display loading state while fetching metrics', () => {
-      mockWailsApp.GetDraftDeckMetrics.mockImplementation(() => new Promise(() => {})); // Never resolves
+      mockDrafts.getDraftDeckMetrics.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       render(<DraftStatistics sessionID="test-session" pickCount={5} />);
 
@@ -56,7 +56,7 @@ describe('DraftStatistics Component', () => {
     });
 
     it('should display error message when fetching fails', async () => {
-      mockWailsApp.GetDraftDeckMetrics.mockRejectedValue(new Error('Failed to load metrics'));
+      mockDrafts.getDraftDeckMetrics.mockRejectedValue(new Error('Failed to load metrics'));
 
       render(<DraftStatistics sessionID="test-session" pickCount={5} />);
 
@@ -67,7 +67,7 @@ describe('DraftStatistics Component', () => {
 
     it('should display empty state when no cards are drafted', async () => {
       const emptyMetrics = createMockDeckMetrics({ total_cards: 0 });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(emptyMetrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(emptyMetrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={0} />);
 
@@ -80,7 +80,7 @@ describe('DraftStatistics Component', () => {
   describe('Summary Statistics Display', () => {
     it('should display total cards count', async () => {
       const metrics = createMockDeckMetrics({ total_cards: 23 });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -92,7 +92,7 @@ describe('DraftStatistics Component', () => {
 
     it('should display average CMC correctly', async () => {
       const metrics = createMockDeckMetrics({ cmc_average: 2.87 });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -107,7 +107,7 @@ describe('DraftStatistics Component', () => {
         total_cards: 23,
         creature_count: 15,
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -122,7 +122,7 @@ describe('DraftStatistics Component', () => {
         total_cards: 23,
         noncreature_count: 8,
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -136,7 +136,7 @@ describe('DraftStatistics Component', () => {
   describe('Mana Curve Display', () => {
     it('should render mana curve chart', async () => {
       const metrics = createMockDeckMetrics();
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -147,7 +147,7 @@ describe('DraftStatistics Component', () => {
 
     it('should render creatures vs spells chart', async () => {
       const metrics = createMockDeckMetrics();
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -168,7 +168,7 @@ describe('DraftStatistics Component', () => {
           G: 7,
         },
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -181,7 +181,7 @@ describe('DraftStatistics Component', () => {
       const metrics = createMockDeckMetrics({
         multi_color_count: 2,
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -194,7 +194,7 @@ describe('DraftStatistics Component', () => {
       const metrics = createMockDeckMetrics({
         colorless_count: 3,
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 
@@ -216,7 +216,7 @@ describe('DraftStatistics Component', () => {
           Planeswalker: 1,
         },
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={25} />);
 
@@ -237,7 +237,7 @@ describe('DraftStatistics Component', () => {
           Instant: 5,
         },
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={20} />);
 
@@ -253,7 +253,7 @@ describe('DraftStatistics Component', () => {
       const metrics1 = createMockDeckMetrics({ total_cards: 10, creature_count: 5 });
       const metrics2 = createMockDeckMetrics({ total_cards: 20, creature_count: 12 });
 
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValueOnce(metrics1);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValueOnce(metrics1);
 
       const { rerender } = render(<DraftStatistics sessionID="test-session" pickCount={10} />);
 
@@ -263,7 +263,7 @@ describe('DraftStatistics Component', () => {
         expect(totalCards).toBeInTheDocument();
       });
 
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValueOnce(metrics2);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValueOnce(metrics2);
       rerender(<DraftStatistics sessionID="test-session" pickCount={20} />);
 
       await waitFor(() => {
@@ -271,14 +271,14 @@ describe('DraftStatistics Component', () => {
         expect(totalCards).toBeInTheDocument();
       });
 
-      expect(mockWailsApp.GetDraftDeckMetrics).toHaveBeenCalledTimes(2);
+      expect(mockDrafts.getDraftDeckMetrics).toHaveBeenCalledTimes(2);
     });
 
     it('should reload metrics when sessionID changes', async () => {
       const metrics1 = createMockDeckMetrics({ total_cards: 10 });
       const metrics2 = createMockDeckMetrics({ total_cards: 12 });
 
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValueOnce(metrics1);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValueOnce(metrics1);
 
       const { rerender } = render(<DraftStatistics sessionID="session-1" pickCount={10} />);
 
@@ -286,15 +286,15 @@ describe('DraftStatistics Component', () => {
         expect(screen.getByText('10')).toBeInTheDocument();
       });
 
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValueOnce(metrics2);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValueOnce(metrics2);
       rerender(<DraftStatistics sessionID="session-2" pickCount={12} />);
 
       await waitFor(() => {
         expect(screen.getByText('12')).toBeInTheDocument();
       });
 
-      expect(mockWailsApp.GetDraftDeckMetrics).toHaveBeenCalledWith('session-1');
-      expect(mockWailsApp.GetDraftDeckMetrics).toHaveBeenCalledWith('session-2');
+      expect(mockDrafts.getDraftDeckMetrics).toHaveBeenCalledWith('session-1');
+      expect(mockDrafts.getDraftDeckMetrics).toHaveBeenCalledWith('session-2');
     });
   });
 
@@ -305,7 +305,7 @@ describe('DraftStatistics Component', () => {
         creature_count: 0,
         noncreature_count: 10,
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={10} />);
 
@@ -319,7 +319,7 @@ describe('DraftStatistics Component', () => {
       const metrics = createMockDeckMetrics({
         type_breakdown: {},
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={10} />);
 
@@ -338,7 +338,7 @@ describe('DraftStatistics Component', () => {
           G: 0,
         },
       });
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={10} />);
 
@@ -351,7 +351,7 @@ describe('DraftStatistics Component', () => {
   describe('Chart Rendering', () => {
     it('should render all required charts when data is present', async () => {
       const metrics = createMockDeckMetrics();
-      mockWailsApp.GetDraftDeckMetrics.mockResolvedValue(metrics);
+      mockDrafts.getDraftDeckMetrics.mockResolvedValue(metrics);
 
       render(<DraftStatistics sessionID="test-session" pickCount={23} />);
 

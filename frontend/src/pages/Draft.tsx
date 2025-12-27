@@ -1,7 +1,32 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GetActiveDraftSessions, GetCompletedDraftSessions, GetDraftPicks, GetDraftPacks, GetSetCards, GetCardByArenaID, AnalyzeSessionPickQuality, GetPickAlternatives, GetDraftGrade, GetCardRatings, PauseReplay, ResumeReplay, StopReplay } from '@/services/api/legacy';
+import { drafts, cards } from '@/services/api';
 import { models, pickquality, grading, gui } from '@/types/models';
+
+// No-op stubs - replay control not implemented in REST API
+async function pauseReplay(): Promise<void> {
+  console.warn('PauseReplay: Not implemented in REST API');
+}
+
+async function resumeReplay(): Promise<void> {
+  console.warn('ResumeReplay: Not implemented in REST API');
+}
+
+async function stopReplay(): Promise<void> {
+  console.warn('StopReplay: Not implemented in REST API');
+}
+
+// Helper to get completed drafts with limit support
+async function getCompletedDraftSessions(limit?: number): Promise<models.DraftSession[]> {
+  const sessions = await drafts.getCompletedDraftSessions();
+  return limit ? sessions.slice(0, limit) : sessions;
+}
+
+// Helper to get draft packs (cast from pool to pack sessions)
+async function getDraftPacks(sessionId: string): Promise<models.DraftPackSession[]> {
+  return drafts.getDraftPool(sessionId) as unknown as Promise<models.DraftPackSession[]>;
+}
+
 import { EventsOn } from '@/services/websocketClient';
 import { getReplayState } from '../App';
 import TierList from '../components/TierList';
@@ -107,7 +132,7 @@ const Draft: React.FC = () => {
     const loadHistoricalDrafts = async () => {
         try {
             setHistoricalState(prev => ({ ...prev, loading: true, error: null }));
-            const sessions = await GetCompletedDraftSessions(20); // Get last 20 completed drafts
+            const sessions = await getCompletedDraftSessions(20); // Get last 20 completed drafts
             setHistoricalState({
                 sessions: sessions || [],
                 loading: false,
@@ -129,8 +154,8 @@ const Draft: React.FC = () => {
 
             // Load picks and packs
             const [picks, packs] = await Promise.all([
-                GetDraftPicks(session.ID),
-                GetDraftPacks(session.ID),
+                drafts.getDraftPicks(session.ID),
+                getDraftPacks(session.ID),
             ]);
 
             // Get unique card IDs from picks
@@ -138,7 +163,7 @@ const Draft: React.FC = () => {
 
             // Fetch each picked card
             const pickedCardsPromises = Array.from(uniqueCardIds).map(cardId =>
-                GetCardByArenaID(cardId).catch(() => null)
+                cards.getCardByArenaId(Number(cardId)).catch(() => null)
             );
             const pickedCardsResults = await Promise.all(pickedCardsPromises);
             const pickedCards = pickedCardsResults.filter(c => c !== null) as models.SetCard[];
@@ -146,7 +171,7 @@ const Draft: React.FC = () => {
             // Try to load grade if it exists
             let grade: grading.DraftGrade | null = null;
             try {
-                grade = await GetDraftGrade(session.ID);
+                grade = await drafts.getDraftGrade(session.ID);
             } catch {
                 // Grade doesn't exist yet, that's okay
             }
@@ -196,7 +221,7 @@ const Draft: React.FC = () => {
             setState(prev => ({ ...prev, loading: true, error: null }));
 
             // Get active draft sessions
-            const sessions = await GetActiveDraftSessions();
+            const sessions = await drafts.getActiveDraftSessions();
             console.log('[loadActiveDraft] Got sessions:', sessions?.length || 0);
 
             if (!sessions || sessions.length === 0) {
@@ -217,10 +242,10 @@ const Draft: React.FC = () => {
             // Load draft data
             console.log('[loadActiveDraft] Loading data for session:', session.ID, 'SetCode:', session.SetCode);
             const [picks, packs, setCards, ratings] = await Promise.all([
-                GetDraftPicks(session.ID),
-                GetDraftPacks(session.ID),
-                GetSetCards(session.SetCode),
-                GetCardRatings(session.SetCode, session.DraftType),
+                drafts.getDraftPicks(session.ID),
+                getDraftPacks(session.ID),
+                cards.getSetCards(session.SetCode),
+                cards.getCardRatings(session.SetCode, session.DraftType),
             ]);
             console.log('[loadActiveDraft] Data loaded successfully:');
             console.log('  - Picks:', picks?.length || 0);
@@ -245,10 +270,10 @@ const Draft: React.FC = () => {
             if (session.ID && picks && picks.length > 0) {
                 console.log('[loadActiveDraft] Auto-analyzing', picks.length, 'picks for session', session.ID);
                 try {
-                    await AnalyzeSessionPickQuality(session.ID);
+                    await drafts.analyzeSessionPickQuality(session.ID);
                     console.log('[loadActiveDraft] Auto-analysis complete');
                     // Reload picks to get updated quality data
-                    const updatedPicks = await GetDraftPicks(session.ID);
+                    const updatedPicks = await drafts.getDraftPicks(session.ID);
                     setState(prev => ({
                         ...prev,
                         picks: updatedPicks || [],
@@ -300,7 +325,7 @@ const Draft: React.FC = () => {
 
         try {
             setIsAnalyzing(true);
-            await AnalyzeSessionPickQuality(state.session.ID);
+            await drafts.analyzeSessionPickQuality(state.session.ID);
             // Reload picks to get updated quality data
             await loadActiveDraft();
         } catch (error) {
@@ -339,7 +364,7 @@ const Draft: React.FC = () => {
         }
 
         try {
-            const alternatives = await GetPickAlternatives(sessionID, packNum, pickNum);
+            const alternatives = await drafts.getPickAlternatives(sessionID, packNum, pickNum);
             if (alternatives) {
                 setPickAlternatives(prev => new Map(prev).set(key, alternatives));
                 return alternatives;
@@ -726,7 +751,7 @@ const Draft: React.FC = () => {
                             className="replay-btn replay-resume"
                             onClick={async () => {
                                 try {
-                                    await ResumeReplay();
+                                    await resumeReplay();
                                 } catch (error) {
                                     console.error('Failed to resume replay:', error);
                                 }
@@ -740,7 +765,7 @@ const Draft: React.FC = () => {
                             className="replay-btn replay-pause"
                             onClick={async () => {
                                 try {
-                                    await PauseReplay();
+                                    await pauseReplay();
                                 } catch (error) {
                                     console.error('Failed to pause replay:', error);
                                 }
@@ -754,7 +779,7 @@ const Draft: React.FC = () => {
                         className="replay-btn replay-stop"
                         onClick={async () => {
                             try {
-                                await StopReplay();
+                                await stopReplay();
                             } catch (error) {
                                 console.error('Failed to stop replay:', error);
                             }

@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import CurrentPackPicker from './CurrentPackPicker';
-import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockDrafts } from '@/test/mocks/apiMock';
 import { gui } from '@/types/models';
 
 function createMockPackCard(overrides: Partial<gui.PackCardWithRating> = {}): gui.PackCardWithRating {
@@ -51,7 +51,7 @@ describe('CurrentPackPicker Component', () => {
 
   describe('Loading State', () => {
     it('should show loading state initially', () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockImplementation(() => new Promise(() => {}));
+      mockDrafts.getCurrentPackWithRecommendation.mockImplementation(() => new Promise(() => {}));
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -61,7 +61,7 @@ describe('CurrentPackPicker Component', () => {
 
   describe('Error State', () => {
     it('should show error message when loading fails', async () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockRejectedValue(new Error('Network error'));
+      mockDrafts.getCurrentPackWithRecommendation.mockRejectedValue(new Error('Network error'));
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -71,7 +71,7 @@ describe('CurrentPackPicker Component', () => {
     });
 
     it('should show retry button when error occurs', async () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockRejectedValue(new Error('Network error'));
+      mockDrafts.getCurrentPackWithRecommendation.mockRejectedValue(new Error('Network error'));
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -81,9 +81,9 @@ describe('CurrentPackPicker Component', () => {
     });
 
     it('should reload data when retry button is clicked', async () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockRejectedValueOnce(new Error('Network error'));
+      mockDrafts.getCurrentPackWithRecommendation.mockRejectedValueOnce(new Error('Network error'));
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValueOnce(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValueOnce(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -101,7 +101,7 @@ describe('CurrentPackPicker Component', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no pack data available', async () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(null);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(null);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -111,7 +111,7 @@ describe('CurrentPackPicker Component', () => {
     });
 
     it('should show help text when no pack data', async () => {
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(null);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(null);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -124,7 +124,7 @@ describe('CurrentPackPicker Component', () => {
   describe('Display Pack Data', () => {
     it('should display pack label', async () => {
       const packData = createMockPackResponse({ pack_label: 'Pack 2, Pick 5' });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -135,7 +135,7 @@ describe('CurrentPackPicker Component', () => {
 
     it('should display pool size', async () => {
       const packData = createMockPackResponse({ pool_size: 10 });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -146,7 +146,7 @@ describe('CurrentPackPicker Component', () => {
 
     it('should display cards in the pack', async () => {
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -166,7 +166,7 @@ describe('CurrentPackPicker Component', () => {
           createMockPackCard({ arena_id: '3', name: 'Card C', tier: 'B' }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -182,7 +182,7 @@ describe('CurrentPackPicker Component', () => {
       const packData = createMockPackResponse();
       // Verify the recommended_card is set
       expect(packData.recommended_card).toBeDefined();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -195,7 +195,7 @@ describe('CurrentPackPicker Component', () => {
 
     it('should highlight the recommended card in the grid', async () => {
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       const { container } = render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -207,7 +207,7 @@ describe('CurrentPackPicker Component', () => {
 
     it('should display Best Pick indicator on recommended card', async () => {
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -220,7 +220,7 @@ describe('CurrentPackPicker Component', () => {
   describe('Refresh Functionality', () => {
     it('should have a refresh button', async () => {
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -232,8 +232,8 @@ describe('CurrentPackPicker Component', () => {
     it('should reload data when refresh button is clicked', async () => {
       const packData1 = createMockPackResponse({ pack_label: 'Pack 1, Pick 1' });
       const packData2 = createMockPackResponse({ pack_label: 'Pack 1, Pick 2' });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValueOnce(packData1);
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValueOnce(packData2);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValueOnce(packData1);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValueOnce(packData2);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -250,7 +250,7 @@ describe('CurrentPackPicker Component', () => {
 
     it('should call onRefresh callback when refresh is clicked', async () => {
       const packData = createMockPackResponse();
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
       const onRefresh = vi.fn();
 
       render(<CurrentPackPicker sessionID="test-session" onRefresh={onRefresh} />);
@@ -272,7 +272,7 @@ describe('CurrentPackPicker Component', () => {
           createMockPackCard({ arena_id: '1', name: 'Card A', gihwr: 58.5 }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -287,7 +287,7 @@ describe('CurrentPackPicker Component', () => {
           createMockPackCard({ arena_id: '1', name: 'Card A', alsa: 3.2 }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -304,7 +304,7 @@ describe('CurrentPackPicker Component', () => {
           createMockPackCard({ arena_id: '1', name: 'Card A', colors: ['R', 'U'] }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       const { container } = render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -320,7 +320,7 @@ describe('CurrentPackPicker Component', () => {
           createMockPackCard({ arena_id: '1', name: 'Artifact', colors: [] }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       const { container } = render(<CurrentPackPicker sessionID="test-session" />);
 
@@ -335,19 +335,19 @@ describe('CurrentPackPicker Component', () => {
     it('should reload data when sessionID changes', async () => {
       const packData1 = createMockPackResponse({ session_id: 'session-1' });
       const packData2 = createMockPackResponse({ session_id: 'session-2' });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValueOnce(packData1);
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValueOnce(packData2);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValueOnce(packData1);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValueOnce(packData2);
 
       const { rerender } = render(<CurrentPackPicker sessionID="session-1" />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetCurrentPackWithRecommendation).toHaveBeenCalledWith('session-1');
+        expect(mockDrafts.getCurrentPackWithRecommendation).toHaveBeenCalledWith('session-1');
       });
 
       rerender(<CurrentPackPicker sessionID="session-2" />);
 
       await waitFor(() => {
-        expect(mockWailsApp.GetCurrentPackWithRecommendation).toHaveBeenCalledWith('session-2');
+        expect(mockDrafts.getCurrentPackWithRecommendation).toHaveBeenCalledWith('session-2');
       });
     });
   });
@@ -363,7 +363,7 @@ describe('CurrentPackPicker Component', () => {
           }),
         ],
       });
-      mockWailsApp.GetCurrentPackWithRecommendation.mockResolvedValue(packData);
+      mockDrafts.getCurrentPackWithRecommendation.mockResolvedValue(packData);
 
       render(<CurrentPackPicker sessionID="test-session" />);
 

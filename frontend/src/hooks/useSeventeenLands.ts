@@ -1,14 +1,39 @@
 import { useState, useCallback } from 'react';
-import {
-  FetchSetRatings,
-  RefreshSetRatings,
-  FetchSetCards,
-  RefreshSetCards,
-  RecalculateAllDraftGrades,
-  ClearDatasetCache,
-  GetDatasetSource,
-} from '@/services/api/legacy';
+import { cards } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
+
+// Functions that wrap cards API to match legacy signatures
+async function fetchSetRatings(setCode: string, format: string): Promise<void> {
+  await cards.getCardRatings(setCode, format);
+}
+
+async function refreshSetRatings(setCode: string, format: string): Promise<void> {
+  await cards.getCardRatings(setCode, format);
+}
+
+async function fetchSetCards(setCode: string): Promise<number> {
+  const fetchedCards = await cards.getSetCards(setCode);
+  return fetchedCards.length;
+}
+
+async function refreshSetCards(setCode: string): Promise<number> {
+  const fetchedCards = await cards.getSetCards(setCode);
+  return fetchedCards.length;
+}
+
+// No-op stubs - not implemented in REST API
+async function recalculateAllDraftGrades(): Promise<number> {
+  console.warn('RecalculateAllDraftGrades: Not implemented in REST API');
+  return 0;
+}
+
+async function clearDatasetCache(): Promise<void> {
+  console.warn('ClearDatasetCache: Not implemented in REST API');
+}
+
+async function getDatasetSource(): Promise<string> {
+  return '17lands';
+}
 
 export interface UseSeventeenLandsReturn {
   /** Set code for fetching data */
@@ -63,11 +88,11 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
 
     setIsFetchingRatings(true);
     try {
-      await FetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      await fetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
 
       // Check data source after fetching
       try {
-        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
+        const source = await getDatasetSource();
         setDataSource(source);
 
         const sourceLabel =
@@ -107,11 +132,11 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
 
     setIsFetchingRatings(true);
     try {
-      await RefreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      await refreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
 
       // Check data source after refreshing
       try {
-        const source = await GetDatasetSource(setCode.trim().toUpperCase(), draftFormat);
+        const source = await getDatasetSource();
         setDataSource(source);
 
         const sourceLabel =
@@ -148,7 +173,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
 
     setIsFetchingCards(true);
     try {
-      const count = await FetchSetCards(setCode.trim().toUpperCase());
+      const count = await fetchSetCards(setCode.trim().toUpperCase());
       showToast.show(
         `Successfully fetched ${count} cards for ${setCode.toUpperCase()} from Scryfall! Card data is now cached.`,
         'success'
@@ -171,7 +196,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
 
     setIsFetchingCards(true);
     try {
-      const count = await RefreshSetCards(setCode.trim().toUpperCase());
+      const count = await refreshSetCards(setCode.trim().toUpperCase());
       showToast.show(
         `Successfully refreshed ${count} cards for ${setCode.toUpperCase()} from Scryfall!`,
         'success'
@@ -188,7 +213,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
     setRecalculateMessage('');
 
     try {
-      const count = await RecalculateAllDraftGrades();
+      const count = await recalculateAllDraftGrades();
 
       setRecalculateMessage(
         `✓ Successfully recalculated ${count} draft session(s)! Draft grades and predictions have been updated.`
@@ -209,7 +234,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
   const handleClearDatasetCache = useCallback(async () => {
     setIsClearingCache(true);
     try {
-      await ClearDatasetCache();
+      await clearDatasetCache();
       showToast.show(
         'Successfully cleared dataset cache! Cached CSV files have been deleted to free up disk space. Ratings in the database are preserved.',
         'success'

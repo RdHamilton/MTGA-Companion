@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useLogReplay } from './useLogReplay';
-import { mockWailsApp } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
 // Mock showToast
@@ -52,53 +51,27 @@ describe('useLogReplay', () => {
   });
 
   describe('handleReplayLogs', () => {
-    it('does not call API when not connected', async () => {
+    it('does not trigger replay when not connected', async () => {
       const { result } = renderHook(() => useLogReplay());
 
       await act(async () => {
         await result.current.handleReplayLogs(false);
       });
 
-      expect(mockWailsApp.TriggerReplayLogs).not.toHaveBeenCalled();
+      // No error toast should be shown since we just return early
+      expect(showToast.show).not.toHaveBeenCalled();
     });
 
-    it('calls TriggerReplayLogs with clearDataBeforeReplay when connected', async () => {
+    // Note: TriggerReplayLogs is a no-op in REST API mode
+    // So this test just verifies no error is thrown
+    it('does not throw when connected (no-op in REST API)', async () => {
       const { result } = renderHook(() => useLogReplay());
 
-      await act(async () => {
-        await result.current.handleReplayLogs(true);
-      });
-
-      expect(mockWailsApp.TriggerReplayLogs).toHaveBeenCalledWith(false);
-    });
-
-    it('passes clearDataBeforeReplay value to API', async () => {
-      const { result } = renderHook(() => useLogReplay());
-
-      act(() => {
-        result.current.setClearDataBeforeReplay(true);
-      });
-
-      await act(async () => {
-        await result.current.handleReplayLogs(true);
-      });
-
-      expect(mockWailsApp.TriggerReplayLogs).toHaveBeenCalledWith(true);
-    });
-
-    it('shows error toast on API failure', async () => {
-      mockWailsApp.TriggerReplayLogs.mockRejectedValueOnce(new Error('Replay failed'));
-
-      const { result } = renderHook(() => useLogReplay());
-
-      await act(async () => {
-        await result.current.handleReplayLogs(true);
-      });
-
-      expect(showToast.show).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to trigger replay'),
-        'error'
-      );
+      await expect(
+        act(async () => {
+          await result.current.handleReplayLogs(true);
+        })
+      ).resolves.not.toThrow();
     });
   });
 

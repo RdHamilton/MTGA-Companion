@@ -2,21 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { gui } from '@/types/models';
-
-// Create hoisted mock functions
-const { mockGetCollection, mockGetCollectionStats, mockGetAllSetInfo } = vi.hoisted(() => ({
-  mockGetCollection: vi.fn(),
-  mockGetCollectionStats: vi.fn(),
-  mockGetAllSetInfo: vi.fn(),
-}));
-
-// Mock the Wails App module
-vi.mock('@/services/api/legacy', () => ({
-  GetCollection: mockGetCollection,
-  GetCollectionStats: mockGetCollectionStats,
-  GetAllSetInfo: mockGetAllSetInfo,
-}));
-
+import { mockCollection, mockCards as mockCardsApi } from '@/test/mocks/apiMock';
 import Collection from './Collection';
 
 // Helper function to create mock collection card
@@ -38,15 +24,6 @@ function createMockCollectionCard(overrides: Record<string, unknown> = {}): gui.
     power: '',
     toughness: '',
     ...overrides,
-  });
-}
-
-// Helper to create mock collection response
-function createMockCollectionResponse(cards: gui.CollectionCard[] = [], totalCount?: number, filterCount?: number): gui.CollectionResponse {
-  return new gui.CollectionResponse({
-    cards,
-    totalCount: totalCount ?? cards.length,
-    filterCount: filterCount ?? cards.length,
   });
 }
 
@@ -104,13 +81,13 @@ describe('Collection', () => {
 
   describe('Loading State', () => {
     it('should show loading spinner while fetching collection', async () => {
-      let resolvePromise: (value: gui.CollectionResponse) => void;
-      const loadingPromise = new Promise<gui.CollectionResponse>((resolve) => {
+      let resolvePromise: (value: gui.CollectionCard[]) => void;
+      const loadingPromise = new Promise<gui.CollectionCard[]>((resolve) => {
         resolvePromise = resolve;
       });
-      mockGetCollection.mockReturnValue(loadingPromise);
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([createMockSetInfo()]);
+      mockCollection.getCollection.mockReturnValue(loadingPromise);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       renderWithRouter(<Collection />);
 
@@ -118,7 +95,7 @@ describe('Collection', () => {
 
       expect(screen.getByText('Loading collection...')).toBeInTheDocument();
 
-      resolvePromise!(createMockCollectionResponse());
+      resolvePromise!([]);
       await waitFor(() => {
         expect(screen.queryByText('Loading collection...')).not.toBeInTheDocument();
       });
@@ -127,9 +104,9 @@ describe('Collection', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockGetCollection.mockRejectedValue(new Error('Database error'));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockRejectedValue(new Error('Database error'));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -142,9 +119,9 @@ describe('Collection', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockGetCollection.mockRejectedValue('Unknown error');
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockRejectedValue('Unknown error');
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -157,9 +134,9 @@ describe('Collection', () => {
     });
 
     it('should have retry button in error state', async () => {
-      mockGetCollection.mockRejectedValue(new Error('Database error'));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockRejectedValue(new Error('Database error'));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -176,9 +153,9 @@ describe('Collection', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no cards found', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse());
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -197,9 +174,9 @@ describe('Collection', () => {
         createMockCollectionCard({ cardId: 2, name: 'Counterspell', colors: ['U'], rarity: 'uncommon' }),
         createMockCollectionCard({ cardId: 3, name: 'Giant Growth', colors: ['G'], rarity: 'common' }),
       ];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -214,9 +191,9 @@ describe('Collection', () => {
     });
 
     it('should display page title', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -228,12 +205,12 @@ describe('Collection', () => {
     });
 
     it('should display collection stats', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({
         totalUniqueCards: 150,
         totalCards: 600,
       }));
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -248,9 +225,9 @@ describe('Collection', () => {
 
     it('should display card without quantity badge', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 4, name: 'Test Card' })];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -270,9 +247,9 @@ describe('Collection', () => {
         name: 'Test Card',
         imageUri: 'https://cards.scryfall.io/normal/front/1/2/test.jpg'
       })];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -287,9 +264,9 @@ describe('Collection', () => {
 
   describe('Filters', () => {
     it('should have search input', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -301,9 +278,9 @@ describe('Collection', () => {
     });
 
     it('should have set filter dropdown', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([
         createMockSetInfo({ code: 'sta', name: 'Strixhaven Mystical Archive' }),
         createMockSetInfo({ code: 'dsk', name: 'Duskmourn' }),
       ]);
@@ -318,9 +295,9 @@ describe('Collection', () => {
     });
 
     it('should have rarity filter dropdown', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -332,9 +309,9 @@ describe('Collection', () => {
     });
 
     it('should have color filter buttons', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -352,9 +329,9 @@ describe('Collection', () => {
     });
 
     it('should have owned only checkbox', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -366,9 +343,9 @@ describe('Collection', () => {
     });
 
     it('should toggle color filter when clicking color button', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -390,23 +367,24 @@ describe('Collection', () => {
 
     it('should display result count', async () => {
       const mockCards = [createMockCollectionCard()];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards, 100, 50));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
-        expect(screen.getByText('Showing 50 of 100 cards')).toBeInTheDocument();
+        // With REST API, totalCount equals filterCount (both from array length)
+        expect(screen.getByText('Showing 1 of 1 cards')).toBeInTheDocument();
       });
     });
 
     it('should call GetCollection when search term changes', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -423,17 +401,24 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(350);
 
       await waitFor(() => {
-        expect(mockGetCollection).toHaveBeenCalledTimes(2);
+        expect(mockCollection.getCollection).toHaveBeenCalledTimes(2);
       });
     });
   });
 
   describe('Pagination', () => {
+    // Create >50 cards to trigger pagination (ITEMS_PER_PAGE = 50)
+    function createManyCards(count: number): gui.CollectionCard[] {
+      return Array.from({ length: count }, (_, i) =>
+        createMockCollectionCard({ cardId: i + 1, arenaId: i + 1, name: `Card ${i + 1}` })
+      );
+    }
+
     it('should show pagination when multiple pages exist', async () => {
-      const mockCards = [createMockCollectionCard()];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards, 100, 100));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      const mockCards = createManyCards(75); // 2 pages
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -449,10 +434,10 @@ describe('Collection', () => {
     });
 
     it('should disable first/previous buttons on first page', async () => {
-      const mockCards = [createMockCollectionCard()];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards, 100, 100));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      const mockCards = createManyCards(75); // 2 pages
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -465,10 +450,10 @@ describe('Collection', () => {
     });
 
     it('should navigate to next page when clicking next', async () => {
-      const mockCards = [createMockCollectionCard()];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards, 100, 100));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      const mockCards = createManyCards(75); // 2 pages
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -487,9 +472,9 @@ describe('Collection', () => {
 
     it('should not show pagination when only one page', async () => {
       const mockCards = [createMockCollectionCard()];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards, 10, 10));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -511,9 +496,9 @@ describe('Collection', () => {
           imageUri: 'https://cards.scryfall.io/normal/front/1/2/test-card.jpg',
         }),
       ];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -535,9 +520,9 @@ describe('Collection', () => {
           rarity: 'rare',
         }),
       ];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -556,9 +541,9 @@ describe('Collection', () => {
 
   describe('Set Completion Panel', () => {
     it('should show Set Completion button', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -570,9 +555,9 @@ describe('Collection', () => {
     });
 
     it('should toggle Set Completion panel visibility', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -593,9 +578,9 @@ describe('Collection', () => {
   describe('Card Display Features', () => {
     it('should display card with not-owned class when quantity is 0', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 0 })];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -611,9 +596,9 @@ describe('Collection', () => {
 
     it('should not show quantity badge for unowned cards', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 0, name: 'Unowned Card' })];
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse(mockCards));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -630,9 +615,9 @@ describe('Collection', () => {
 
   describe('Empty State Variations', () => {
     it('should show filter adjustment suggestion when filters are active', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 100, totalCards: 100 }));
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 100, totalCards: 100 }));
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -654,9 +639,9 @@ describe('Collection', () => {
     });
 
     it('should show "start playing" message when collection is truly empty', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -670,9 +655,9 @@ describe('Collection', () => {
 
   describe('Sort Options', () => {
     it('should have sort dropdown', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
@@ -684,9 +669,9 @@ describe('Collection', () => {
     });
 
     it('should have all sort options', async () => {
-      mockGetCollection.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
-      mockGetCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockGetAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
 
