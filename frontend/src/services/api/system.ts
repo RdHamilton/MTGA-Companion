@@ -102,7 +102,8 @@ export async function checkOllamaStatus(
  * Get available Ollama models.
  */
 export async function getAvailableOllamaModels(endpoint: string): Promise<gui.OllamaModel[]> {
-  return get<gui.OllamaModel[]>('/llm/models');
+  const params = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
+  return get<gui.OllamaModel[]>(`/llm/models${params}`);
 }
 
 /**
@@ -130,6 +131,6 @@ export async function exportMLTrainingData(limit: number): Promise<gui.MLTrainin
 /**
  * Get feedback dashboard metrics.
  */
-export async function getFeedbackDashboardMetrics(): Promise<gui.FeedbackDashboardMetrics> {
-  return get<gui.FeedbackDashboardMetrics>('/feedback/dashboard');
+export async function getFeedbackDashboardMetrics(): Promise<gui.DashboardMetricsResponse> {
+  return get<gui.DashboardMetricsResponse>('/feedback/dashboard');
 }

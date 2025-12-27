@@ -136,11 +136,21 @@ describe('system API', () => {
   });
 
   describe('getAvailableOllamaModels', () => {
-    it('should call get with correct path', async () => {
+    it('should call get with endpoint in query', async () => {
       const mockModels = [{ name: 'llama2', size: 1000 }];
       vi.mocked(get).mockResolvedValue(mockModels);
 
       const result = await system.getAvailableOllamaModels('http://localhost:11434');
+
+      expect(get).toHaveBeenCalledWith('/llm/models?endpoint=http%3A%2F%2Flocalhost%3A11434');
+      expect(result).toEqual(mockModels);
+    });
+
+    it('should call get without query when endpoint is empty', async () => {
+      const mockModels = [{ name: 'llama2', size: 1000 }];
+      vi.mocked(get).mockResolvedValue(mockModels);
+
+      const result = await system.getAvailableOllamaModels('');
 
       expect(get).toHaveBeenCalledWith('/llm/models');
       expect(result).toEqual(mockModels);
