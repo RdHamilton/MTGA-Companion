@@ -15,13 +15,23 @@ permissions:
   contents: write
 
 jobs:
+  # Run E2E tests before building release (only for tag pushes)
+  e2e-validation:
+    name: E2E Validation
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/e2e-full.yml
+    with:
+      run_cross_browser: true
+
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    needs: [e2e-validation]
+    if: always() && (needs.e2e-validation.result == 'success' || needs.e2e-validation.result == 'skipped')
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -31,7 +41,7 @@ jobs:
         go-version: '1.24'
 
     - name: Set up Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
@@ -60,7 +70,7 @@ jobs:
         Compress-Archive -Path *, ../../README.md, ../../LICENSE -DestinationPath ../../dist/mtga-companion-windows-amd64.zip
 
     - name: Upload Windows artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v4
       with:
         name: windows-build
         path: dist/*.zip
@@ -69,10 +79,12 @@ jobs:
   build-macos:
     name: Build macOS
     runs-on: macos-latest
+    needs: [e2e-validation]
+    if: always() && (needs.e2e-validation.result == 'success' || needs.e2e-validation.result == 'skipped')
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -82,7 +94,7 @@ jobs:
         go-version: '1.24'
 
     - name: Set up Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
@@ -110,7 +122,7 @@ jobs:
         tar -czf ../../dist/mtga-companion-macos-universal.tar.gz *.app
 
     - name: Upload macOS artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v4
       with:
         name: macos-build
         path: dist/*.tar.gz
@@ -119,10 +131,12 @@ jobs:
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    needs: [e2e-validation]
+    if: always() && (needs.e2e-validation.result == 'success' || needs.e2e-validation.result == 'skipped')
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -132,7 +146,7 @@ jobs:
         go-version: '1.24'
 
     - name: Set up Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
@@ -165,7 +179,7 @@ jobs:
         tar -czf ../../dist/mtga-companion-linux-amd64.tar.gz mtga-companion
 
     - name: Upload Linux artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v4
       with:
         name: linux-build
         path: dist/*.tar.gz
@@ -179,12 +193,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v4
       with:
         path: artifacts
 

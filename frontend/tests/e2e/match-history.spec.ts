@@ -3,20 +3,17 @@ import { test, expect } from '@playwright/test';
 /**
  * Match History E2E Tests
  *
- * Prerequisites:
- * - Run `wails dev` in the project root before running these tests
- * - The app should be accessible at http://localhost:34115
+ * Tests the main Match History page which is the default landing page.
+ * Uses REST API backend for testing.
  */
 test.describe('Match History', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the app and wait for it to load
     await page.goto('/');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 10000 });
   });
 
   test.describe('Navigation and Page Load', () => {
-    test('should display Match History as the default page', async ({ page }) => {
-      // Match History should be the default/home page
+    test('@smoke should display Match History as the default page', async ({ page }) => {
       await expect(page.locator('h1.page-title')).toHaveText('Match History');
     });
 
@@ -28,15 +25,13 @@ test.describe('Match History', () => {
   });
 
   test.describe('Filter Controls', () => {
-    test('should display date range filter', async ({ page }) => {
+    test('@smoke should display date range filter', async ({ page }) => {
       const filterRow = page.locator('.filter-row');
       await expect(filterRow).toBeVisible();
 
-      // Check for date range dropdown
       const dateRangeSelect = filterRow.locator('select').first();
       await expect(dateRangeSelect).toBeVisible();
 
-      // Verify options exist
       const options = await dateRangeSelect.locator('option').allTextContents();
       expect(options).toContain('Last 7 Days');
       expect(options).toContain('Last 30 Days');
@@ -48,7 +43,6 @@ test.describe('Match History', () => {
       const cardFormatLabel = page.locator('.filter-label').filter({ hasText: 'Card Format' });
       await expect(cardFormatLabel).toBeVisible();
 
-      // Find the associated select
       const filterGroup = cardFormatLabel.locator('..');
       const select = filterGroup.locator('select');
       await expect(select).toBeVisible();
@@ -88,11 +82,9 @@ test.describe('Match History', () => {
     });
 
     test('should show custom date pickers when Custom Range is selected', async ({ page }) => {
-      // Select Custom Range
       const dateRangeSelect = page.locator('.filter-group').first().locator('select');
       await dateRangeSelect.selectOption('custom');
 
-      // Custom date pickers should now be visible
       const startDateInput = page.locator('input[type="date"]').first();
       const endDateInput = page.locator('input[type="date"]').last();
 
@@ -103,24 +95,15 @@ test.describe('Match History', () => {
 
   test.describe('Content State', () => {
     test('should display either matches table or empty state after loading', async ({ page }) => {
-      // Wait for either table or empty state to appear (one must be visible after loading)
-      // Using Promise.race to wait for whichever appears first
       const table = page.locator('.match-history-table-container');
       const emptyState = page.locator('.empty-state');
 
-      // Wait for loading to complete by waiting for either content type to appear
-      await Promise.race([
-        table.waitFor({ state: 'visible', timeout: 10000 }),
-        emptyState.waitFor({ state: 'visible', timeout: 10000 }),
-      ]).catch(() => {
-        // One of them should appear
-      });
+      // Wait for either content type to appear
+      await expect(table.or(emptyState)).toBeVisible({ timeout: 10000 });
 
-      // Now check which one is visible
       const hasTable = await table.isVisible();
       const hasEmptyState = await emptyState.isVisible();
 
-      // One of these should be true
       expect(hasTable || hasEmptyState).toBeTruthy();
 
       if (hasEmptyState) {
@@ -129,7 +112,6 @@ test.describe('Match History', () => {
       }
 
       if (hasTable) {
-        // Verify the table has expected structure
         await expect(table.locator('table')).toBeVisible();
       }
     });
@@ -144,7 +126,6 @@ test.describe('Match History', () => {
         const headers = table.locator('thead th');
         const headerTexts = await headers.allTextContents();
 
-        // Check for expected column headers (they include sort icons)
         expect(headerTexts.some((h) => h.includes('Time'))).toBeTruthy();
         expect(headerTexts.some((h) => h.includes('Result'))).toBeTruthy();
         expect(headerTexts.some((h) => h.includes('Format'))).toBeTruthy();
@@ -159,7 +140,6 @@ test.describe('Match History', () => {
       const hasTable = await table.isVisible().catch(() => false);
 
       if (hasTable) {
-        // Time column should be sortable (has click handler)
         const timeHeader = table.locator('thead th').first();
         await expect(timeHeader).toHaveCSS('cursor', 'pointer');
       }
@@ -168,10 +148,10 @@ test.describe('Match History', () => {
 
   test.describe('Loading State', () => {
     test('should not show error state on initial load', async ({ page }) => {
-      // Wait for loading to complete
-      await page.waitForTimeout(2000);
+      // Wait for content to load
+      const content = page.locator('.match-history-table-container, .empty-state');
+      await expect(content.first()).toBeVisible({ timeout: 10000 });
 
-      // Should not show error state
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
     });
@@ -179,12 +159,12 @@ test.describe('Match History', () => {
 
   test.describe('Match Count', () => {
     test('should display match count when matches exist', async ({ page }) => {
-      const hasTable = await page.locator('.match-history-table-container').isVisible().catch(() => false);
+      const table = page.locator('.match-history-table-container');
+      const hasTable = await table.isVisible().catch(() => false);
 
       if (hasTable) {
         const matchCount = page.locator('.match-count');
         await expect(matchCount).toBeVisible();
-        // Should contain text like "Showing X of Y matches"
         await expect(matchCount).toContainText('Showing');
       }
     });

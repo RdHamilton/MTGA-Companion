@@ -3,73 +3,64 @@ import { test, expect } from '@playwright/test';
 /**
  * Decks Page E2E Tests
  *
- * Prerequisites:
- * - Run `wails dev` in the project root before running these tests
- * - The app should be accessible at http://localhost:34115
+ * Tests the Decks page functionality including navigation and deck management.
+ * Uses REST API backend for testing.
  */
 test.describe('Decks', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the app and wait for it to load
     await page.goto('/');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 10000 });
 
-    // Navigate to Decks page
     await page.click('a[href="/decks"]');
     await page.waitForURL('**/decks');
   });
 
   test.describe('Navigation and Page Load', () => {
-    test('should navigate to Decks page', async ({ page }) => {
-      const decksPage = page.locator('.decks-page');
-      await expect(decksPage).toBeVisible({ timeout: 10000 });
+    test('@smoke should navigate to Decks page', async ({ page }) => {
+      await expect(page.locator('h1')).toContainText('Decks');
     });
 
     test('should display page title', async ({ page }) => {
-      await expect(page.locator('h1')).toContainText('Decks');
+      const header = page.locator('h1');
+      await expect(header).toBeVisible();
+      await expect(header).toContainText('Decks');
     });
   });
 
   test.describe('Deck List', () => {
-    test('should display decks or empty state', async ({ page }) => {
-      // Wait for loading to complete
-      await Promise.race([
-        page.locator('.deck-card').first().waitFor({ state: 'visible', timeout: 10000 }),
-        page.locator('.empty-state').waitFor({ state: 'visible', timeout: 10000 }),
-        page.locator('.decks-page:not(.loading-state)').waitFor({ state: 'visible', timeout: 10000 }),
-      ]).catch(() => {});
+    test('should display deck cards or empty state', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
 
-      // Wait for content to render
-      await page.waitForTimeout(500);
+      // Wait for either content type to appear
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
 
-      // Either deck cards or empty state should be visible (or just decks page without loading)
-      const hasDecks = await page.locator('.deck-card').first().isVisible().catch(() => false);
-      const hasEmptyState = await page.locator('.empty-state').isVisible().catch(() => false);
-      const decksPageVisible = await page.locator('.decks-page').isVisible();
+      const hasCards = await deckCard.first().isVisible();
+      const hasEmptyState = await emptyState.isVisible();
 
-      expect(hasDecks || hasEmptyState || decksPageVisible).toBeTruthy();
+      expect(hasCards || hasEmptyState).toBeTruthy();
     });
   });
 
-  test.describe('Create Deck Button', () => {
-    test('should have a create deck button', async ({ page }) => {
-      // Wait for page to load
-      await page.waitForTimeout(1000);
+  test.describe('Create Deck', () => {
+    test('should have create deck button', async ({ page }) => {
+      // Wait for page to fully load
+      const pageContent = page.locator('.deck-card, .empty-state, .decks-header');
+      await expect(pageContent.first()).toBeVisible({ timeout: 10000 });
 
-      // Look for create deck button
       const createButton = page.locator('button').filter({ hasText: /create|new/i });
-      const hasCreateButton = await createButton.isVisible().catch(() => false);
+      const hasButton = await createButton.isVisible().catch(() => false);
 
-      // Create button should exist (may be in header or elsewhere)
-      expect(hasCreateButton).toBeTruthy();
+      expect(hasButton).toBeTruthy();
     });
   });
 
   test.describe('Loading State', () => {
     test('should not show error state on initial load', async ({ page }) => {
-      // Wait for loading to complete
-      await page.waitForTimeout(2000);
+      // Wait for content to load
+      const content = page.locator('.deck-card, .empty-state');
+      await expect(content.first()).toBeVisible({ timeout: 10000 });
 
-      // Should not show error state
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
     });
