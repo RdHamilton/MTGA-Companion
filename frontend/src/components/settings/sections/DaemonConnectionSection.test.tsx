@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DaemonConnectionSection } from './DaemonConnectionSection';
-import { gui } from '../../../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 describe('DaemonConnectionSection', () => {
   const createConnectionStatus = (status: string) => new gui.ConnectionStatus({

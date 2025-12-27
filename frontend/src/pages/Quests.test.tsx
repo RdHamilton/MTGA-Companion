@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import Quests from './Quests';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
-import { models } from '../../wailsjs/go/models';
+import { models } from '@/types/models';
 
 // Helper function to create mock Quest
 function createMockQuest(overrides: Partial<models.Quest> = {}): models.Quest {

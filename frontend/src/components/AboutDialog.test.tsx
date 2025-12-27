@@ -3,11 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AboutDialog from './AboutDialog';
 
 // Mock the Wails App module
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   GetAppVersion: vi.fn(),
 }));
 
-import { GetAppVersion } from '../../wailsjs/go/main/App';
+import { GetAppVersion } from '@/services/api/legacy';
 
 describe('AboutDialog', () => {
   beforeEach(() => {

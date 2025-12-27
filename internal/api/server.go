@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -21,6 +23,10 @@ type Server struct {
 	router     *chi.Mux
 	httpServer *http.Server
 	port       int
+
+	// Browser auto-open configuration
+	openBrowser bool
+	frontendURL string
 
 	// WebSocket hub for real-time events
 	wsHub *websocket.Hub
@@ -43,13 +49,17 @@ type Server struct {
 
 // Config holds configuration for the API server.
 type Config struct {
-	Port int
+	Port        int
+	OpenBrowser bool   // Whether to auto-open browser on startup
+	FrontendURL string // URL to open in browser (e.g., http://localhost:3000)
 }
 
 // DefaultConfig returns the default API server configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Port: 8080,
+		Port:        8080,
+		OpenBrowser: false,
+		FrontendURL: "",
 	}
 }
 
@@ -65,6 +75,8 @@ func NewServer(cfg *Config, services *gui.Services, facades *Facades) *Server {
 	s := &Server{
 		router:           chi.NewRouter(),
 		port:             cfg.Port,
+		openBrowser:      cfg.OpenBrowser,
+		frontendURL:      cfg.FrontendURL,
 		wsHub:            wsHub,
 		services:         services,
 		matchFacade:      facades.Match,
@@ -175,7 +187,37 @@ func (s *Server) Start() error {
 		}
 	}()
 
+	// Open browser after short delay to ensure server is ready
+	if s.openBrowser && s.frontendURL != "" {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			if err := openBrowser(s.frontendURL); err != nil {
+				log.Printf("Failed to open browser: %v", err)
+			} else {
+				log.Printf("Opened browser to %s", s.frontendURL)
+			}
+		}()
+	}
+
 	return nil
+}
+
+// openBrowser opens the specified URL in the default browser.
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	return cmd.Start()
 }
 
 // Shutdown gracefully shuts down the API server.

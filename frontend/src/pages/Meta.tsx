@@ -3,8 +3,8 @@ import {
   GetMetaDashboard,
   RefreshMetaData,
   GetSupportedFormats,
-} from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+} from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import './Meta.css';
 
 export default function Meta() {

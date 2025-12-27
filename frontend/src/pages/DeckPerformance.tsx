@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetStatsByDeck } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { EventsOn } from '@/services/websocketClient';
+import { GetStatsByDeck } from '@/services/api/legacy';
+import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';

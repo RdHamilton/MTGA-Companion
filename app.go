@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
-
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
@@ -84,16 +81,8 @@ func (a *App) startup(ctx context.Context) {
 	// Auto-initialize database with default path
 	if err := a.systemFacade.Initialize(ctx, ""); err != nil {
 		log.Printf("ERROR: Failed to initialize database: %v", err)
-
-		// Show error dialog to user
-		_, diagErr := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-			Type:    wailsruntime.ErrorDialog,
-			Title:   "Database Initialization Failed",
-			Message: fmt.Sprintf("Failed to initialize database\n\nError: %v\n\nPlease check:\n• Directory permissions\n• Disk space\n• You can configure a different path in Settings", err),
-		})
-		if diagErr != nil {
-			log.Printf("Failed to show error dialog: %v", diagErr)
-		}
+		log.Printf("Please check: directory permissions, disk space, or configure a different path in Settings")
+		// The frontend will detect initialization failure via the /api/system/status endpoint
 		return
 	}
 
@@ -168,9 +157,10 @@ func (a *App) TriggerReplayLogs(clearData bool) error {
 	return a.systemFacade.TriggerReplayLogs(a.ctx, clearData)
 }
 
-// StartReplayWithFileDialog starts replay with a file dialog
-func (a *App) StartReplayWithFileDialog(speed float64, filterType string, pauseOnDraft bool) error {
-	return a.systemFacade.StartReplayWithFileDialog(a.ctx, speed, filterType, pauseOnDraft)
+// StartReplayWithFiles starts replay with specified file paths.
+// Note: Use the REST API /api/system/replay/start for new implementations.
+func (a *App) StartReplayWithFiles(filePaths []string, speed float64, filterType string, pauseOnDraft bool) error {
+	return a.systemFacade.StartReplayWithFiles(a.ctx, filePaths, speed, filterType, pauseOnDraft)
 }
 
 // PauseReplay pauses the current replay
@@ -525,29 +515,34 @@ func (a *App) GetAllSetInfo() ([]*gui.SetInfo, error) {
 // Export Methods (ExportFacade)
 // ========================================
 
-// ExportToJSON exports all data to JSON format
-func (a *App) ExportToJSON() error {
-	return a.exportFacade.ExportToJSON(a.ctx)
+// ExportToJSON exports all data to JSON format at the specified path.
+// Note: Use the REST API /api/export/matches for new implementations.
+func (a *App) ExportToJSON(filePath string) error {
+	return a.exportFacade.ExportToJSON(a.ctx, filePath)
 }
 
-// ExportToCSV exports all data to CSV format
-func (a *App) ExportToCSV() error {
-	return a.exportFacade.ExportToCSV(a.ctx)
+// ExportToCSV exports all data to CSV format at the specified path.
+// Note: Use the REST API /api/export/matches for new implementations.
+func (a *App) ExportToCSV(filePath string) error {
+	return a.exportFacade.ExportToCSV(a.ctx, filePath)
 }
 
-// ImportFromFile imports data from a file
-func (a *App) ImportFromFile() error {
-	return a.exportFacade.ImportFromFile(a.ctx)
+// ImportFromFile imports data from the specified file path.
+// Note: Use the REST API /api/export/import/matches for new implementations.
+func (a *App) ImportFromFile(filePath string) error {
+	return a.exportFacade.ImportFromFile(a.ctx, filePath)
 }
 
-// ClearAllData clears all data from the database
+// ClearAllData clears all data from the database.
+// Note: Confirmation should be handled by the caller.
 func (a *App) ClearAllData() error {
 	return a.exportFacade.ClearAllData(a.ctx)
 }
 
-// ImportLogFile imports a log file (Player.log or Player-prev.log)
-func (a *App) ImportLogFile() (*gui.ImportLogFileResult, error) {
-	return a.exportFacade.ImportLogFile(a.ctx)
+// ImportLogFile imports a log file from the specified path.
+// Note: Use the REST API /api/export/import/log for new implementations.
+func (a *App) ImportLogFile(filePath string) (*gui.ImportLogFileResult, error) {
+	return a.exportFacade.ImportLogFile(a.ctx, filePath)
 }
 
 // ========================================
@@ -664,14 +659,10 @@ func (a *App) ValidateDraftDeck(deckID string) (bool, error) {
 	return a.deckFacade.ValidateDraftDeck(a.ctx, deckID)
 }
 
-// ExportDeckToFile exports a deck and shows a native save dialog
-func (a *App) ExportDeckToFile(deckID string) error {
-	return a.deckFacade.ExportDeckToFile(a.ctx, deckID)
-}
-
-// ValidateDeckWithDialog validates a deck and shows result in a native dialog
-func (a *App) ValidateDeckWithDialog(deckID string) error {
-	return a.deckFacade.ValidateDeckWithDialog(a.ctx, deckID)
+// ExportDeckToFile exports a deck to the specified file path.
+// Note: Use the REST API /api/export/deck for new implementations.
+func (a *App) ExportDeckToFile(deckID string, filePath string) error {
+	return a.deckFacade.ExportDeckToFile(a.ctx, deckID, filePath)
 }
 
 // ClassifyDeckArchetype classifies a deck into its archetype based on card composition
@@ -694,9 +685,16 @@ func (a *App) ApplySuggestedDeck(deckID string, suggestion *gui.SuggestedDeckRes
 	return a.deckFacade.ApplySuggestedDeck(a.ctx, deckID, suggestion)
 }
 
-// ExportSuggestedDeck exports a suggested deck to clipboard in Arena format
-func (a *App) ExportSuggestedDeck(suggestion *gui.SuggestedDeckResponse, deckName string) error {
-	return a.deckFacade.ExportSuggestedDeck(a.ctx, suggestion, deckName)
+// GetSuggestedDeckExportContent returns the export content for a suggested deck.
+// Note: Use the REST API for new implementations.
+func (a *App) GetSuggestedDeckExportContent(suggestion *gui.SuggestedDeckResponse, deckName string) (string, error) {
+	return a.deckFacade.GetSuggestedDeckExportContent(a.ctx, suggestion, deckName)
+}
+
+// ExportSuggestedDeckToFile exports a suggested deck to the specified file path.
+// Note: Use the REST API for new implementations.
+func (a *App) ExportSuggestedDeckToFile(suggestion *gui.SuggestedDeckResponse, deckName string, filePath string) error {
+	return a.deckFacade.ExportSuggestedDeckToFile(a.ctx, suggestion, deckName, filePath)
 }
 
 // ========================================

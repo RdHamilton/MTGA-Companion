@@ -1,4 +1,4 @@
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 import './SuggestDecksModal.css';
 
 interface DeckSuggestionCardProps {

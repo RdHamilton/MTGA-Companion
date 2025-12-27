@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { GetSetCompletion, GetAllSetInfo } from '../../wailsjs/go/main/App';
-import { models, gui } from '../../wailsjs/go/models';
+import { GetSetCompletion, GetAllSetInfo } from '@/services/api/legacy';
+import { models, gui } from '@/types/models';
 import './SetCompletion.css';
 
 // Rarity colors for progress bars

@@ -7,7 +7,7 @@ import {
   RecalculateAllDraftGrades,
   ClearDatasetCache,
   GetDatasetSource,
-} from '../../wailsjs/go/main/App';
+} from '@/services/api/legacy';
 import { showToast } from '../components/ToastContainer';
 
 export interface UseSeventeenLandsReturn {

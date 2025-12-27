@@ -1,6 +1,6 @@
 import LoadingButton from '../../LoadingButton';
 import { SettingItem } from '../';
-import { gui } from '../../../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 export interface DataRecoverySectionProps {
   isConnected: boolean;

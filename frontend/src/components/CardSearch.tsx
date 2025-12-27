@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { GetCardByArenaID, GetAllSetInfo, SearchCardsWithCollection } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { GetCardByArenaID, GetAllSetInfo, SearchCardsWithCollection } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import SetSymbol from './SetSymbol';
 import './CardSearch.css';
 

@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Meta from './Meta';
-import { gui, time } from '../../wailsjs/go/models';
+import { gui, time } from '@/types/models';
 
 // Mock the Wails App functions
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('@/services/api/legacy', () => ({
   GetMetaDashboard: vi.fn(),
   RefreshMetaData: vi.fn(),
   GetSupportedFormats: vi.fn(),
@@ -15,7 +15,7 @@ import {
   GetMetaDashboard,
   RefreshMetaData,
   GetSupportedFormats,
-} from '../../wailsjs/go/main/App';
+} from '@/services/api/legacy';
 
 const mockGetMetaDashboard = vi.mocked(GetMetaDashboard);
 const mockRefreshMetaData = vi.mocked(RefreshMetaData);

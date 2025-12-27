@@ -3,9 +3,9 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import Draft from './Draft';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
-import { models, gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
+import { models, gui } from '@/types/models';
 
 // Mock the getReplayState function from App.tsx
 vi.mock('../App', () => ({

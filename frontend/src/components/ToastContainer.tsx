@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
+import { EventsOn } from '@/services/websocketClient';
 import Toast from './Toast';
 import { getReplayState, subscribeToReplayState } from '../App';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 interface ToastData {
   id: number;

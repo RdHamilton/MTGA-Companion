@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import DeckPerformance from './DeckPerformance';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { AppProvider } from '../context/AppContext';
-import { models } from '../../wailsjs/go/models';
+import { models } from '@/types/models';
 
 // Helper function to create mock statistics
 function createMockStatistics(overrides: Partial<models.Statistics> = {}): models.Statistics {

@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
-import { GetSetInfo } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { GetSetInfo } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import './SetSymbol.css';
 
 interface SetSymbolProps {

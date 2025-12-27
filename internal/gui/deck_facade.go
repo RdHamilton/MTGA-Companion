@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/archetype"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -1862,26 +1861,18 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 	}, nil
 }
 
-// ExportDeckToFile exports a deck and prompts user to save to file using native dialog.
-func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error {
-	log.Printf("ExportDeckToFile called with deckID: %s", deckID)
+// ExportDeckToFile exports a deck to the specified file path.
+// If filePath is empty, returns an error. Use ExportDeck to get the content
+// and let the frontend handle file saving via browser download.
+func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string, filePath string) error {
+	log.Printf("ExportDeckToFile called with deckID: %s, filePath: %s", deckID, filePath)
 
 	if deckID == "" {
 		return fmt.Errorf("deck ID is required")
 	}
-
-	// Get deck to use its name for the filename
-	var deck *models.Deck
-	err := storage.RetryOnBusy(func() error {
-		var err error
-		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, deckID)
-		return err
-	})
-	if err != nil {
-		log.Printf("Failed to get deck: %v", err)
-		return fmt.Errorf("failed to get deck: %v", err)
+	if filePath == "" {
+		return fmt.Errorf("file path is required")
 	}
-	log.Printf("Got deck: %s", deck.Name)
 
 	// Export deck content
 	req := &ExportDeckRequest{
@@ -1897,7 +1888,6 @@ func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error 
 		log.Printf("ExportDeck returned error: %v", err)
 		return fmt.Errorf("failed to export deck: %v", err)
 	}
-	log.Printf("ExportDeck succeeded, response.Error: %s", response.Error)
 
 	if response.Error != "" {
 		log.Printf("Response has error: %s", response.Error)
@@ -1905,80 +1895,14 @@ func (d *DeckFacade) ExportDeckToFile(ctx context.Context, deckID string) error 
 	}
 	log.Printf("Export content length: %d bytes", len(response.Content))
 
-	// Prompt user to select save location using native Wails dialog
-	defaultFilename := strings.ReplaceAll(deck.Name, " ", "_") + ".txt"
-	log.Printf("Showing SaveFileDialog with filename: %s", defaultFilename)
-	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
-		DefaultFilename: defaultFilename,
-		Title:           "Export Deck",
-		Filters: []wailsruntime.FileFilter{
-			{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"},
-			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
-		},
-	})
-	if err != nil {
-		log.Printf("SaveFileDialog returned error: %v", err)
-		return fmt.Errorf("failed to show save dialog: %v", err)
-	}
-	if filePath == "" {
-		// User cancelled
-		log.Printf("User cancelled save dialog")
-		return nil
-	}
-	log.Printf("User selected file path: %s", filePath)
-
 	// Save the file
 	err = os.WriteFile(filePath, []byte(response.Content), 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to save file: %v", err)
 	}
 
-	log.Printf("Successfully exported deck '%s' to %s", deck.Name, filepath.Base(filePath))
-
-	// Show success message using native Wails dialog
-	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-		Type:    wailsruntime.InfoDialog,
-		Title:   "Export Successful",
-		Message: fmt.Sprintf("Deck exported successfully!\n\nSaved to: %s\nFormat: %s", filepath.Base(filePath), response.Format),
-	})
-
-	return err
-}
-
-// ValidateDeckWithDialog validates a deck and shows the result in a native dialog.
-func (d *DeckFacade) ValidateDeckWithDialog(ctx context.Context, deckID string) error {
-	if deckID == "" {
-		return fmt.Errorf("deck ID is required")
-	}
-
-	// Validate the deck
-	isValid, err := d.ValidateDraftDeck(ctx, deckID)
-	if err != nil {
-		return fmt.Errorf("failed to validate deck: %v", err)
-	}
-
-	// Show result using native Wails dialog
-	var dialogType wailsruntime.DialogType
-	var title string
-	var message string
-
-	if isValid {
-		dialogType = wailsruntime.InfoDialog
-		title = "Deck Valid"
-		message = "✓ Your deck is valid!\n\nYour deck meets all format requirements and is ready to play."
-	} else {
-		dialogType = wailsruntime.WarningDialog
-		title = "Deck Invalid"
-		message = "✗ Your deck is invalid\n\nYour deck does not meet format requirements. Check the deck statistics for details."
-	}
-
-	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-		Type:    dialogType,
-		Title:   title,
-		Message: message,
-	})
-
-	return err
+	log.Printf("Successfully exported deck to %s", filepath.Base(filePath))
+	return nil
 }
 
 // convertSetCardToCard converts a models.SetCard to a cards.Card.
@@ -2560,12 +2484,9 @@ func (d *DeckFacade) ApplySuggestedDeck(ctx context.Context, deckID string, sugg
 	return nil
 }
 
-// ExportSuggestedDeck exports a suggested deck directly without saving.
-func (d *DeckFacade) ExportSuggestedDeck(ctx context.Context, suggestion *SuggestedDeckResponse, deckName string) error {
-	if d.services.DeckExporter == nil {
-		return &AppError{Message: "Deck exporter not available"}
-	}
-
+// GetSuggestedDeckExportContent returns the export content for a suggested deck.
+// This allows the frontend to handle file saving via browser download.
+func (d *DeckFacade) GetSuggestedDeckExportContent(_ context.Context, suggestion *SuggestedDeckResponse, deckName string) (string, error) {
 	// Build export content in Arena format
 	var content strings.Builder
 	content.WriteString(fmt.Sprintf("Deck: %s (%s)\n\n", deckName, suggestion.ColorCombo.Name))
@@ -2606,38 +2527,26 @@ func (d *DeckFacade) ExportSuggestedDeck(ctx context.Context, suggestion *Sugges
 		content.WriteString(fmt.Sprintf("%d %s\n", land.Quantity, land.Name))
 	}
 
-	// Prompt user to select save location using native Wails dialog
-	defaultFilename := strings.ReplaceAll(deckName, " ", "_") + ".txt"
-	filePath, err := wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
-		DefaultFilename: defaultFilename,
-		Title:           "Export Suggested Deck",
-		Filters: []wailsruntime.FileFilter{
-			{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"},
-			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to show save dialog: %v", err)
-	}
+	return content.String(), nil
+}
+
+// ExportSuggestedDeckToFile exports a suggested deck to the specified file path.
+func (d *DeckFacade) ExportSuggestedDeckToFile(ctx context.Context, suggestion *SuggestedDeckResponse, deckName string, filePath string) error {
 	if filePath == "" {
-		// User cancelled
-		return nil
+		return fmt.Errorf("file path is required")
+	}
+
+	content, err := d.GetSuggestedDeckExportContent(ctx, suggestion, deckName)
+	if err != nil {
+		return err
 	}
 
 	// Save the file
-	err = os.WriteFile(filePath, []byte(content.String()), 0o644)
+	err = os.WriteFile(filePath, []byte(content), 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to save file: %v", err)
 	}
 
 	log.Printf("Exported suggested deck '%s' to %s", deckName, filepath.Base(filePath))
-
-	// Show success message
-	_, err = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-		Type:    wailsruntime.InfoDialog,
-		Title:   "Export Successful",
-		Message: fmt.Sprintf("Deck exported successfully!\n\nSaved to: %s", filepath.Base(filePath)),
-	})
-
-	return err
+	return nil
 }

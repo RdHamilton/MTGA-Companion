@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetAppVersion } from '../../wailsjs/go/main/App';
+import { GetAppVersion } from '@/services/api/legacy';
 import './AboutDialog.css';
 
 interface AboutDialogProps {

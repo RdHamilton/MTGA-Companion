@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ExplainRecommendation } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { ExplainRecommendation } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import './RecommendationCard.css';
 
 interface RecommendationCardProps {

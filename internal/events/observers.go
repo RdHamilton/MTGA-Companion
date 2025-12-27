@@ -2,47 +2,7 @@ package events
 
 import (
 	"log"
-
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
-
-// WailsObserver forwards events to the Wails frontend.
-// Implements the Observer interface to listen for domain events
-// and emit them to the frontend via Wails runtime.
-type WailsObserver struct {
-	name string
-}
-
-// NewWailsObserver creates a new observer that forwards events to Wails frontend.
-func NewWailsObserver() *WailsObserver {
-	return &WailsObserver{
-		name: "WailsObserver",
-	}
-}
-
-// OnEvent forwards the event to the Wails frontend.
-func (o *WailsObserver) OnEvent(event Event) error {
-	if event.Context == nil {
-		log.Printf("[%s] Cannot emit event %s: context is nil", o.name, event.Type)
-		return nil // Don't return error, just skip
-	}
-
-	// Emit event to frontend via Wails runtime
-	wailsruntime.EventsEmit(event.Context, event.Type, event.Data)
-	log.Printf("[%s] Emitted event to frontend: %s", o.name, event.Type)
-	return nil
-}
-
-// GetName returns the observer's name.
-func (o *WailsObserver) GetName() string {
-	return o.name
-}
-
-// ShouldHandle returns true for all events (forwards everything to frontend).
-func (o *WailsObserver) ShouldHandle(eventType string) bool {
-	// Forward all events to frontend
-	return true
-}
 
 // IPCObserver forwards events to the IPC daemon.
 // Implements the Observer interface to listen for domain events

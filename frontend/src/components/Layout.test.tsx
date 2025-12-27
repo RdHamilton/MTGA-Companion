@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import Layout from './Layout';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
 // Mock the getReplayState and subscribeToReplayState functions
 const mockReplayState = {

@@ -1,7 +1,7 @@
 import LoadingButton from '../../LoadingButton';
 import { SettingItem, SettingToggle, SettingSelect } from '../';
 import { useMLSettings } from '../../../hooks';
-import type { gui } from '../../../../wailsjs/go/models';
+import type { gui } from '@/types/models';
 
 export interface MLSettingsSectionProps {
   mlEnabled: boolean;

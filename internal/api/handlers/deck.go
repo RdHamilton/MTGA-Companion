@@ -370,3 +370,394 @@ func (h *DeckHandler) AnalyzeDeck(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, result)
 }
+
+// AddCardRequest represents a request to add a card to a deck.
+type AddCardRequest struct {
+	CardID    int    `json:"card_id"`
+	Quantity  int    `json:"quantity"`
+	Board     string `json:"board"` // main, sideboard
+	FromDraft bool   `json:"from_draft,omitempty"`
+}
+
+// AddCard adds a card to a deck.
+func (h *DeckHandler) AddCard(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	var req AddCardRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.Board == "" {
+		req.Board = "main"
+	}
+	if req.Quantity <= 0 {
+		req.Quantity = 1
+	}
+
+	if err := h.facade.AddCard(r.Context(), deckID, req.CardID, req.Quantity, req.Board, req.FromDraft); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]string{"status": "success"})
+}
+
+// RemoveCardRequest represents a request to remove a card from a deck.
+type RemoveCardRequest struct {
+	CardID int    `json:"card_id"`
+	Board  string `json:"board"`
+}
+
+// RemoveCard removes a card from a deck.
+func (h *DeckHandler) RemoveCard(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	var req RemoveCardRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.Board == "" {
+		req.Board = "main"
+	}
+
+	if err := h.facade.RemoveCard(r.Context(), deckID, req.CardID, req.Board); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.NoContent(w)
+}
+
+// ValidateDraftDeck validates a draft deck meets requirements.
+func (h *DeckHandler) ValidateDraftDeck(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	valid, err := h.facade.ValidateDraftDeck(r.Context(), deckID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]bool{"valid": valid})
+}
+
+// TagRequest represents a request to add/remove a tag.
+type TagRequest struct {
+	Tag string `json:"tag"`
+}
+
+// AddTag adds a tag to a deck.
+func (h *DeckHandler) AddTag(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	var req TagRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.Tag == "" {
+		response.BadRequest(w, errors.New("tag is required"))
+		return
+	}
+
+	if err := h.facade.AddTag(r.Context(), deckID, req.Tag); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]string{"status": "success"})
+}
+
+// RemoveTag removes a tag from a deck.
+func (h *DeckHandler) RemoveTag(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	tag := chi.URLParam(r, "tag")
+
+	if deckID == "" || tag == "" {
+		response.BadRequest(w, errors.New("deck ID and tag are required"))
+		return
+	}
+
+	if err := h.facade.RemoveTag(r.Context(), deckID, tag); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.NoContent(w)
+}
+
+// GetDeckByDraftEvent returns a deck by its draft event ID.
+func (h *DeckHandler) GetDeckByDraftEvent(w http.ResponseWriter, r *http.Request) {
+	draftEventID := chi.URLParam(r, "draftEventID")
+	if draftEventID == "" {
+		response.BadRequest(w, errors.New("draft event ID is required"))
+		return
+	}
+
+	deck, err := h.facade.GetDeckByDraftEvent(r.Context(), draftEventID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if deck == nil {
+		response.NotFound(w, errors.New("deck not found"))
+		return
+	}
+
+	response.Success(w, deck)
+}
+
+// GetRecommendationsRequest represents a request for card recommendations.
+type GetRecommendationsRequest struct {
+	DeckID       string   `json:"deck_id"`
+	MaxResults   int      `json:"max_results,omitempty"`
+	MinScore     float64  `json:"min_score,omitempty"`
+	Colors       []string `json:"colors,omitempty"`
+	CardTypes    []string `json:"card_types,omitempty"`
+	IncludeLands bool     `json:"include_lands,omitempty"`
+}
+
+// GetRecommendations returns card recommendations for a deck.
+func (h *DeckHandler) GetRecommendations(w http.ResponseWriter, r *http.Request) {
+	var req GetRecommendationsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.DeckID == "" {
+		response.BadRequest(w, errors.New("deck_id is required"))
+		return
+	}
+
+	guiReq := &gui.GetRecommendationsRequest{
+		DeckID:       req.DeckID,
+		MaxResults:   req.MaxResults,
+		MinScore:     req.MinScore,
+		Colors:       req.Colors,
+		CardTypes:    req.CardTypes,
+		IncludeLands: req.IncludeLands,
+	}
+
+	recommendations, err := h.facade.GetRecommendations(r.Context(), guiReq)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, recommendations)
+}
+
+// ExplainRecommendationRequest represents a request to explain a recommendation.
+type ExplainRecommendationRequest struct {
+	DeckID string `json:"deck_id"`
+	CardID int    `json:"card_id"`
+}
+
+// ExplainRecommendation explains why a card is recommended.
+func (h *DeckHandler) ExplainRecommendation(w http.ResponseWriter, r *http.Request) {
+	var req ExplainRecommendationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	guiReq := &gui.ExplainRecommendationRequest{
+		DeckID: req.DeckID,
+		CardID: req.CardID,
+	}
+
+	explanation, err := h.facade.ExplainRecommendation(r.Context(), guiReq)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, explanation)
+}
+
+// CloneDeckRequest represents a request to clone a deck.
+type CloneDeckRequest struct {
+	NewName string `json:"new_name"`
+}
+
+// CloneDeck clones a deck with a new name.
+func (h *DeckHandler) CloneDeck(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	var req CloneDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.NewName == "" {
+		response.BadRequest(w, errors.New("new_name is required"))
+		return
+	}
+
+	deck, err := h.facade.CloneDeck(r.Context(), deckID, req.NewName)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Created(w, deck)
+}
+
+// GetDecksByTagsRequest represents a request to get decks by tags.
+type GetDecksByTagsRequest struct {
+	Tags []string `json:"tags"`
+}
+
+// GetDecksByTags returns decks matching the specified tags.
+func (h *DeckHandler) GetDecksByTags(w http.ResponseWriter, r *http.Request) {
+	var req GetDecksByTagsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	decks, err := h.facade.GetDecksByTags(r.Context(), req.Tags)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, decks)
+}
+
+// DeckLibraryFilterRequest represents a filter for deck library.
+type DeckLibraryFilterRequest struct {
+	Format   string   `json:"format,omitempty"`
+	Source   string   `json:"source,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	SortBy   string   `json:"sort_by,omitempty"`
+	SortDesc bool     `json:"sort_desc,omitempty"`
+}
+
+// GetDeckLibrary returns a filtered list of decks.
+func (h *DeckHandler) GetDeckLibrary(w http.ResponseWriter, r *http.Request) {
+	var req DeckLibraryFilterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	var formatPtr, sourcePtr *string
+	if req.Format != "" {
+		formatPtr = &req.Format
+	}
+	if req.Source != "" {
+		sourcePtr = &req.Source
+	}
+
+	filter := &gui.DeckLibraryFilter{
+		Format:   formatPtr,
+		Source:   sourcePtr,
+		Tags:     req.Tags,
+		SortBy:   req.SortBy,
+		SortDesc: req.SortDesc,
+	}
+
+	decks, err := h.facade.GetDeckLibrary(r.Context(), filter)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, decks)
+}
+
+// ClassifyDraftPoolRequest represents a request to classify a draft pool.
+type ClassifyDraftPoolRequest struct {
+	DraftEventID string `json:"draft_event_id"`
+}
+
+// ClassifyDraftPoolArchetype classifies the archetype of a draft pool.
+func (h *DeckHandler) ClassifyDraftPoolArchetype(w http.ResponseWriter, r *http.Request) {
+	var req ClassifyDraftPoolRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	result, err := h.facade.ClassifyDraftPoolArchetype(r.Context(), req.DraftEventID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
+}
+
+// ApplySuggestedDeckRequest represents a request to apply a suggested deck.
+type ApplySuggestedDeckRequest struct {
+	DeckID     string                     `json:"deck_id"`
+	Suggestion *gui.SuggestedDeckResponse `json:"suggestion"`
+}
+
+// ApplySuggestedDeck applies a suggested deck build.
+func (h *DeckHandler) ApplySuggestedDeck(w http.ResponseWriter, r *http.Request) {
+	var req ApplySuggestedDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if err := h.facade.ApplySuggestedDeck(r.Context(), req.DeckID, req.Suggestion); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]string{"status": "success"})
+}
+
+// ExportSuggestedDeckRequest represents a request to export a suggested deck.
+type ExportSuggestedDeckRequest struct {
+	Suggestion *gui.SuggestedDeckResponse `json:"suggestion"`
+	DeckName   string                     `json:"deck_name"`
+}
+
+// ExportSuggestedDeck returns a suggested deck as exportable text.
+func (h *DeckHandler) ExportSuggestedDeck(w http.ResponseWriter, r *http.Request) {
+	var req ExportSuggestedDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	// ExportSuggestedDeck in facade uses a dialog, so we'll just format it here
+	// Return the deck list as text that the frontend can handle
+	response.Success(w, map[string]interface{}{
+		"deck_name":  req.DeckName,
+		"suggestion": req.Suggestion,
+		"message":    "Use the suggestion data to export via frontend",
+	})
+}

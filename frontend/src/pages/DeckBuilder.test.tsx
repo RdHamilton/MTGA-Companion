@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import DeckBuilder from './DeckBuilder';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models, gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { models, gui } from '@/types/models';
 
 // Mock react-router-dom
 const mockNavigate = vi.fn();

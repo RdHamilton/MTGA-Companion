@@ -3,8 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { render } from '../test/utils/testUtils';
 import CardSearch from './CardSearch';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { models } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { models } from '@/types/models';
 
 // Helper function to create mock set card
 function createMockSetCard(overrides: Partial<models.SetCard> = {}): models.SetCard {

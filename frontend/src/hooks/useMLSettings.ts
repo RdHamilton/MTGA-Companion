@@ -4,9 +4,9 @@ import {
   GetAvailableOllamaModels,
   PullOllamaModel,
   TestLLMGeneration,
-} from '../../wailsjs/go/main/App';
+} from '@/services/api/legacy';
 import { showToast } from '../components/ToastContainer';
-import type { gui } from '../../wailsjs/go/models';
+import type { gui } from '@/types/models';
 
 export interface UseMLSettingsProps {
   /** ML enabled state from parent */

@@ -1,24 +1,14 @@
 /**
- * Wails-to-REST Adapter
+ * REST API Adapter
  *
- * This adapter provides a compatibility layer that allows gradual migration
- * from Wails bindings to REST API calls. Components can use this adapter
- * to transparently switch between backends without code changes.
+ * This adapter provides API access using REST endpoints and WebSocket for events.
+ * It exposes a unified interface for accessing all backend services.
  *
  * Usage:
- *   import { useApiAdapter } from '@/services/adapter';
- *
- *   // In component
- *   const api = useApiAdapter();
- *   const matches = await api.matches.getMatches(filter);
- *
- * Configuration:
- *   Set USE_REST_API environment variable or call setUseRestApi(true)
- *   to switch from Wails to REST API.
+ *   import { apiAdapter } from '@/services/adapter';
+ *   const matches = await apiAdapter.matches.getMatches(filter);
  */
 
-import * as WailsApp from 'wailsjs/go/main/App';
-import { EventsOn as WailsEventsOn, EventsOff as WailsEventsOff } from 'wailsjs/runtime/runtime';
 import * as api from './api';
 import {
   connect as wsConnect,
@@ -27,24 +17,23 @@ import {
   EventsOff as WsEventsOff,
 } from './websocketClient';
 import { configureApi, healthCheck } from './apiClient';
-import { models, gui } from 'wailsjs/go/models';
+import { models, gui } from '@/types/models';
 
 // Configuration state
-let useRestApi = false;
 let isInitialized = false;
 
 /**
- * Check if REST API mode is enabled.
+ * Check if REST API mode is enabled (always true now).
  */
 export function isRestApiEnabled(): boolean {
-  return useRestApi;
+  return true;
 }
 
 /**
- * Enable or disable REST API mode.
+ * Enable or disable REST API mode (no-op, always REST now).
  */
-export function setUseRestApi(enabled: boolean): void {
-  useRestApi = enabled;
+export function setUseRestApi(_enabled: boolean): void {
+  // No-op - always using REST API
 }
 
 /**
@@ -60,29 +49,24 @@ export async function initializeServices(options?: {
     return;
   }
 
-  // Check environment or options
-  useRestApi = options?.useRest ?? import.meta.env.VITE_USE_REST_API === 'true';
+  // Configure REST API
+  if (options?.apiBaseUrl) {
+    configureApi({ baseUrl: options.apiBaseUrl });
+  }
 
-  if (useRestApi) {
-    // Configure REST API
-    if (options?.apiBaseUrl) {
-      configureApi({ baseUrl: options.apiBaseUrl });
-    }
+  // Check if API is available
+  const isHealthy = await healthCheck();
+  if (!isHealthy) {
+    console.error('[Adapter] REST API not available');
+    throw new Error('REST API not available');
+  }
 
-    // Check if API is available
-    const isHealthy = await healthCheck();
-    if (!isHealthy) {
-      console.warn('[Adapter] REST API not available, falling back to Wails');
-      useRestApi = false;
-    } else {
-      // Connect WebSocket
-      try {
-        await wsConnect();
-        console.log('[Adapter] REST API mode enabled');
-      } catch (error) {
-        console.error('[Adapter] WebSocket connection failed:', error);
-      }
-    }
+  // Connect WebSocket
+  try {
+    await wsConnect();
+    console.log('[Adapter] REST API mode enabled');
+  } catch (error) {
+    console.error('[Adapter] WebSocket connection failed:', error);
   }
 
   isInitialized = true;
@@ -92,9 +76,7 @@ export async function initializeServices(options?: {
  * Cleanup services on app shutdown.
  */
 export function cleanupServices(): void {
-  if (useRestApi) {
-    wsDisconnect();
-  }
+  wsDisconnect();
   isInitialized = false;
 }
 
@@ -104,31 +86,19 @@ export function cleanupServices(): void {
 
 export const matchesAdapter = {
   async getMatches(filter: models.StatsFilter): Promise<models.Match[]> {
-    if (useRestApi) {
-      return api.matches.getMatches(api.matches.statsFilterToRequest(filter));
-    }
-    return WailsApp.GetMatches(filter);
+    return api.matches.getMatches(api.matches.statsFilterToRequest(filter));
   },
 
   async getStats(filter: models.StatsFilter): Promise<models.Statistics> {
-    if (useRestApi) {
-      return api.matches.getStats(api.matches.statsFilterToRequest(filter));
-    }
-    return WailsApp.GetStats(filter);
+    return api.matches.getStats(api.matches.statsFilterToRequest(filter));
   },
 
   async getFormats(): Promise<string[]> {
-    if (useRestApi) {
-      return api.matches.getFormats();
-    }
-    return WailsApp.GetSupportedFormats();
+    return api.matches.getFormats();
   },
 
   async getMatchGames(matchId: string): Promise<models.Game[]> {
-    if (useRestApi) {
-      return api.matches.getMatchGames(matchId);
-    }
-    return WailsApp.GetMatchGames(matchId);
+    return api.matches.getMatchGames(matchId);
   },
 };
 
@@ -138,38 +108,23 @@ export const matchesAdapter = {
 
 export const draftsAdapter = {
   async getActiveDraftSessions(): Promise<models.DraftSession[]> {
-    if (useRestApi) {
-      return api.drafts.getActiveDraftSessions();
-    }
-    return WailsApp.GetActiveDraftSessions();
+    return api.drafts.getActiveDraftSessions();
   },
 
-  async getCompletedDraftSessions(limit = 100): Promise<models.DraftSession[]> {
-    if (useRestApi) {
-      return api.drafts.getCompletedDraftSessions();
-    }
-    return WailsApp.GetCompletedDraftSessions(limit);
+  async getCompletedDraftSessions(_limit = 100): Promise<models.DraftSession[]> {
+    return api.drafts.getCompletedDraftSessions();
   },
 
   async getDraftSession(sessionId: string): Promise<models.DraftSession> {
-    if (useRestApi) {
-      return api.drafts.getDraftSession(sessionId);
-    }
-    return WailsApp.GetDraftSession(sessionId);
+    return api.drafts.getDraftSession(sessionId);
   },
 
   async getDraftPicks(sessionId: string): Promise<models.DraftPickSession[]> {
-    if (useRestApi) {
-      return api.drafts.getDraftPicks(sessionId);
-    }
-    return WailsApp.GetDraftPicks(sessionId);
+    return api.drafts.getDraftPicks(sessionId);
   },
 
   async getCardRatings(setCode: string, format: string): Promise<gui.CardRatingWithTier[]> {
-    if (useRestApi) {
-      return api.cards.getCardRatings(setCode, format);
-    }
-    return WailsApp.GetCardRatings(setCode, format);
+    return api.cards.getCardRatings(setCode, format);
   },
 };
 
@@ -179,31 +134,19 @@ export const draftsAdapter = {
 
 export const decksAdapter = {
   async getDecks(): Promise<gui.DeckListItem[]> {
-    if (useRestApi) {
-      return api.decks.getDecks();
-    }
-    return WailsApp.ListDecks();
+    return api.decks.getDecks();
   },
 
   async getDeck(deckId: string): Promise<gui.DeckWithCards> {
-    if (useRestApi) {
-      return api.decks.getDeck(deckId);
-    }
-    return WailsApp.GetDeck(deckId);
+    return api.decks.getDeck(deckId);
   },
 
   async getDecksBySource(source: string): Promise<gui.DeckListItem[]> {
-    if (useRestApi) {
-      return api.decks.getDecksBySource(source);
-    }
-    return WailsApp.GetDecksBySource(source);
+    return api.decks.getDecksBySource(source);
   },
 
   async getDecksByFormat(format: string): Promise<gui.DeckListItem[]> {
-    if (useRestApi) {
-      return api.decks.getDecksByFormat(format);
-    }
-    return WailsApp.GetDecksByFormat(format);
+    return api.decks.getDecksByFormat(format);
   },
 
   async createDeck(
@@ -212,48 +155,32 @@ export const decksAdapter = {
     source: string,
     draftEventId?: string
   ): Promise<models.Deck> {
-    if (useRestApi) {
-      return api.decks.createDeck({ name, format, source, draft_event_id: draftEventId });
-    }
-    return WailsApp.CreateDeck(name, format, source, draftEventId || null);
+    return api.decks.createDeck({ name, format, source, draft_event_id: draftEventId });
   },
 
   async deleteDeck(deckId: string): Promise<void> {
-    if (useRestApi) {
-      return api.decks.deleteDeck(deckId);
-    }
-    return WailsApp.DeleteDeck(deckId);
+    return api.decks.deleteDeck(deckId);
   },
 
   async exportDeck(request: gui.ExportDeckRequest): Promise<gui.ExportDeckResponse> {
-    if (useRestApi) {
-      return api.decks.exportDeck(request.deckID, { format: request.format });
-    }
-    return WailsApp.ExportDeck(request);
+    return api.decks.exportDeck(request.deckID, { format: request.format });
   },
 
   async importDeck(request: gui.ImportDeckRequest): Promise<gui.ImportDeckResponse> {
-    if (useRestApi) {
-      return api.decks.importDeck({
-        content: request.importText,
-        name: request.name,
-        format: request.format,
-      });
-    }
-    return WailsApp.ImportDeck(request);
+    return api.decks.importDeck({
+      content: request.importText,
+      name: request.name,
+      format: request.format,
+    });
   },
 
   async suggestDecks(sessionId: string): Promise<gui.SuggestDecksResponse> {
-    if (useRestApi) {
-      const suggestions = await api.decks.suggestDecks({ session_id: sessionId });
-      // Wrap in response format
-      return {
-        suggestions: suggestions,
-        totalCombos: suggestions.length,
-        viableCombos: suggestions.length,
-      } as gui.SuggestDecksResponse;
-    }
-    return WailsApp.SuggestDecks(sessionId);
+    const suggestions = await api.decks.suggestDecks({ session_id: sessionId });
+    return {
+      suggestions: suggestions,
+      totalCombos: suggestions.length,
+      viableCombos: suggestions.length,
+    } as gui.SuggestDecksResponse;
   },
 };
 
@@ -263,38 +190,29 @@ export const decksAdapter = {
 
 export const collectionAdapter = {
   async getCollection(filter?: gui.CollectionFilter): Promise<gui.CollectionResponse> {
-    if (useRestApi) {
-      const apiFilter: api.CollectionFilter = filter
-        ? {
-            set_code: filter.setCode,
-            rarity: filter.rarity,
-            colors: filter.colors,
-            owned_only: filter.ownedOnly,
-          }
-        : {};
-      const cards = await api.collection.getCollection(apiFilter);
-      // Create a proper CollectionResponse object
-      const response = new gui.CollectionResponse();
-      response.cards = cards;
-      response.totalCount = cards.length;
-      response.filterCount = cards.length;
-      return response;
-    }
-    return WailsApp.GetCollection(filter || new gui.CollectionFilter());
+    const apiFilter: api.CollectionFilter = filter
+      ? {
+          set_code: filter.setCode,
+          rarity: filter.rarity,
+          colors: filter.colors,
+          owned_only: filter.ownedOnly,
+        }
+      : {};
+    const cards = await api.collection.getCollection(apiFilter);
+    // Create a proper CollectionResponse object
+    const response = new gui.CollectionResponse();
+    response.cards = cards;
+    response.totalCount = cards.length;
+    response.filterCount = cards.length;
+    return response;
   },
 
   async getCollectionStats(): Promise<gui.CollectionStats> {
-    if (useRestApi) {
-      return api.collection.getCollectionStats();
-    }
-    return WailsApp.GetCollectionStats();
+    return api.collection.getCollectionStats();
   },
 
   async getSetCompletion(): Promise<models.SetCompletion[]> {
-    if (useRestApi) {
-      return api.collection.getSetCompletion();
-    }
-    return WailsApp.GetSetCompletion();
+    return api.collection.getSetCompletion();
   },
 };
 
@@ -304,47 +222,32 @@ export const collectionAdapter = {
 
 export const systemAdapter = {
   async getConnectionStatus(): Promise<gui.ConnectionStatus> {
-    if (useRestApi) {
-      return api.system.getStatus();
-    }
-    return WailsApp.GetConnectionStatus();
+    return api.system.getStatus();
   },
 
   async getVersion(): Promise<{ version: string; service: string }> {
-    if (useRestApi) {
-      return api.system.getVersion();
-    }
-    // Wails doesn't have a version endpoint, return app version
-    return { version: '1.4.0', service: 'mtga-companion' };
+    return api.system.getVersion();
   },
 };
 
 // ============================================================================
-// Events Adapter
+// Events Adapter (WebSocket-based)
 // ============================================================================
 
 /**
  * Subscribe to an event.
- * Uses WebSocket in REST mode, Wails EventsOn otherwise.
+ * Uses WebSocket for real-time events.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function EventsOn(eventName: string, callback: (...data: any[]) => void): () => void {
-  if (useRestApi) {
-    return WsEventsOn(eventName, callback);
-  }
-  return WailsEventsOn(eventName, callback);
+  return WsEventsOn(eventName, callback);
 }
 
 /**
  * Unsubscribe from events.
- * Uses WebSocket in REST mode, Wails EventsOff otherwise.
  */
 export function EventsOff(eventName: string, ...additionalEventNames: string[]): void {
-  if (useRestApi) {
-    WsEventsOff(eventName, ...additionalEventNames);
-  } else {
-    WailsEventsOff(eventName, ...additionalEventNames);
-  }
+  WsEventsOff(eventName, ...additionalEventNames);
 }
 
 // ============================================================================
@@ -373,8 +276,7 @@ export const apiAdapter = {
 // ============================================================================
 
 /**
- * Create a REST API client that maps Wails method names to REST API calls.
- * This is used by the Go App polyfill to redirect window.go.main.App calls.
+ * Create a REST API client that maps legacy method names to REST API calls.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createRestApiClient(): Record<string, (...args: any[]) => Promise<any>> {
@@ -411,101 +313,64 @@ export function createRestApiClient(): Record<string, (...args: any[]) => Promis
     // System methods
     GetConnectionStatus: () => systemAdapter.getConnectionStatus(),
 
-    // Card methods (use REST API directly)
-    GetSetCards: async (setCode: string) => {
-      return api.cards.getSetCards(setCode);
-    },
-    GetCardByArenaID: async (arenaId: number) => {
-      return api.cards.getCardByArenaId(arenaId);
-    },
-    GetAllSetInfo: async () => {
-      return api.cards.getAllSetInfo();
-    },
-    GetCardRatings: async (setCode: string, draftFormat: string) => {
-      return api.cards.getCardRatings(setCode, draftFormat);
-    },
-    SearchCards: async (query: string) => {
-      return api.cards.searchCards({ query });
-    },
+    // Card methods
+    GetSetCards: (setCode: string) => api.cards.getSetCards(setCode),
+    GetCardByArenaID: (arenaId: number) => api.cards.getCardByArenaId(arenaId),
+    GetAllSetInfo: () => api.cards.getAllSetInfo(),
+    GetCardRatings: (setCode: string, draftFormat: string) =>
+      api.cards.getCardRatings(setCode, draftFormat),
+    SearchCards: (query: string) => api.cards.searchCards({ query }),
 
-    // Quest methods (use REST API directly)
-    GetActiveQuests: async () => {
-      const response = await api.quests.getActiveQuests();
-      return response;
-    },
-    GetQuestHistory: async (startDate?: string, endDate?: string, limit?: number) => {
-      const response = await api.quests.getQuestHistory(startDate, endDate, limit);
-      return response;
-    },
-    GetCurrentAccount: async () => {
-      // Return a default account since this isn't implemented yet
-      return { displayName: 'Player', accountID: '' };
-    },
+    // Quest methods
+    GetActiveQuests: () => api.quests.getActiveQuests(),
+    GetQuestHistory: (startDate?: string, endDate?: string, limit?: number) =>
+      api.quests.getQuestHistory(startDate, endDate, limit),
+    GetCurrentAccount: async () => ({ displayName: 'Player', accountID: '' }),
 
     // Stats methods
-    GetTrendAnalysis: async (startDate: Date, endDate: Date, periodType: string, formats: string[]) => {
-      return api.matches.getTrendAnalysis({
+    GetTrendAnalysis: (startDate: Date, endDate: Date, periodType: string, formats: string[]) =>
+      api.matches.getTrendAnalysis({
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         period_type: periodType,
         formats,
-      });
-    },
-    GetStatsByDeck: async (_filter: models.StatsFilter) => {
-      // The REST API returns aggregate stats, not by-deck - return empty for now
-      return {};
-    },
-    GetStatsByFormat: async (filter: models.StatsFilter) => {
-      return api.matches.getFormatDistribution(api.matches.statsFilterToRequest(filter));
-    },
-    GetRankProgressionTimeline: async (format: string, _startDate?: Date, _endDate?: Date, _periodType?: string) => {
-      // Not implemented in REST API yet
-      return { timeline: [], format };
-    },
+      }),
+    GetStatsByDeck: async () => ({}),
+    GetStatsByFormat: (filter: models.StatsFilter) =>
+      api.matches.getFormatDistribution(api.matches.statsFilterToRequest(filter)),
+    GetRankProgressionTimeline: async (format: string) => ({ timeline: [], format }),
 
     // Meta methods
     GetMetaDashboard: async (format: string) => {
-      const response = await api.meta.getMetaArchetypes(format);
-      return { archetypes: response, format };
+      const archetypes = await api.meta.getMetaArchetypes(format);
+      return { archetypes, format };
     },
     RefreshMetaData: async (format: string) => {
-      const response = await api.meta.getMetaArchetypes(format);
-      return { archetypes: response, format };
+      const archetypes = await api.meta.getMetaArchetypes(format);
+      return { archetypes, format };
     },
 
-    // Draft analysis methods (stubs - not fully implemented in REST API)
+    // Draft analysis methods
     AnalyzeSessionPickQuality: async () => Promise.resolve(),
     GetPickAlternatives: async () => null,
     GetDraftGrade: async () => null,
     CalculateDraftGrade: async () => null,
     GetCurrentPackWithRecommendation: async () => null,
 
-    // Replay methods (stubs - handled differently in REST API mode)
+    // Replay methods
     PauseReplay: async () => ({ status: 'ok' }),
     ResumeReplay: async () => ({ status: 'ok' }),
     StopReplay: async () => ({ status: 'ok' }),
     GetReplayStatus: async () => ({ isActive: false, isPaused: false }),
 
     // Settings methods
-    GetAllSettings: async () => {
-      const response = await api.settings.getSettings();
-      return response;
-    },
-    SaveAllSettings: async (settings: gui.AppSettings) => {
-      await api.settings.updateSettings(settings);
-    },
-    GetSetting: async (key: string) => {
-      const response = await api.settings.getSetting(key);
-      return response;
-    },
-    SetSetting: async (key: string, value: unknown) => {
-      await api.settings.updateSetting(key, value);
-    },
+    GetAllSettings: () => api.settings.getSettings(),
+    SaveAllSettings: (settings: gui.AppSettings) => api.settings.updateSettings(settings),
+    GetSetting: (key: string) => api.settings.getSetting(key),
+    SetSetting: (key: string, value: unknown) => api.settings.updateSetting(key, value),
 
     // Format methods
-    GetFormats: async () => {
-      return matchesAdapter.getFormats();
-    },
+    GetFormats: () => matchesAdapter.getFormats(),
   };
 }
 

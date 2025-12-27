@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDaemonConnection } from './useDaemonConnection';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({

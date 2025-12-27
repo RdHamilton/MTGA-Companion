@@ -165,3 +165,276 @@ func (h *CardHandler) GetCardsBulk(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, quantities)
 }
+
+// FetchSetCards manually fetches and caches set cards from Scryfall.
+func (h *CardHandler) FetchSetCards(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	count, err := h.facade.FetchSetCards(r.Context(), setCode)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]interface{}{
+		"status":   "success",
+		"set_code": setCode,
+		"count":    count,
+		"message":  "Set cards fetched successfully",
+	})
+}
+
+// RefreshSetCards deletes and re-fetches all cards for a set.
+func (h *CardHandler) RefreshSetCards(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	count, err := h.facade.RefreshSetCards(r.Context(), setCode)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]interface{}{
+		"status":   "success",
+		"set_code": setCode,
+		"count":    count,
+		"message":  "Set cards refreshed successfully",
+	})
+}
+
+// FetchRatingsRequest represents a request to fetch ratings.
+type FetchRatingsRequest struct {
+	DraftFormat string `json:"draft_format"`
+}
+
+// FetchSetRatings fetches and caches 17Lands ratings for a set.
+func (h *CardHandler) FetchSetRatings(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	var req FetchRatingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	draftFormat := req.DraftFormat
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	if err := h.facade.FetchSetRatings(r.Context(), setCode, draftFormat); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]interface{}{
+		"status":       "success",
+		"set_code":     setCode,
+		"draft_format": draftFormat,
+		"message":      "Ratings fetched successfully",
+	})
+}
+
+// RefreshSetRatings deletes and re-fetches 17Lands ratings for a set.
+func (h *CardHandler) RefreshSetRatings(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	var req FetchRatingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	draftFormat := req.DraftFormat
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	if err := h.facade.RefreshSetRatings(r.Context(), setCode, draftFormat); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]interface{}{
+		"status":       "success",
+		"set_code":     setCode,
+		"draft_format": draftFormat,
+		"message":      "Ratings refreshed successfully",
+	})
+}
+
+// ClearDatasetCache clears all cached 17Lands datasets.
+func (h *CardHandler) ClearDatasetCache(w http.ResponseWriter, r *http.Request) {
+	if err := h.facade.ClearDatasetCache(r.Context()); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]string{
+		"status":  "success",
+		"message": "Dataset cache cleared",
+	})
+}
+
+// GetDatasetSource returns the data source for a set and format.
+func (h *CardHandler) GetDatasetSource(w http.ResponseWriter, r *http.Request) {
+	setCode := r.URL.Query().Get("set")
+	draftFormat := r.URL.Query().Get("format")
+
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set query parameter is required"))
+		return
+	}
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	source := h.facade.GetDatasetSource(r.Context(), setCode, draftFormat)
+
+	response.Success(w, map[string]string{
+		"set_code":     setCode,
+		"draft_format": draftFormat,
+		"source":       source,
+	})
+}
+
+// GetCardRatingByArenaID returns the rating for a specific card.
+func (h *CardHandler) GetCardRatingByArenaID(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	arenaID := chi.URLParam(r, "arenaID")
+
+	if setCode == "" || arenaID == "" {
+		response.BadRequest(w, errors.New("set code and arena ID are required"))
+		return
+	}
+
+	draftFormat := r.URL.Query().Get("format")
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	rating, err := h.facade.GetCardRatingByArenaID(r.Context(), setCode, draftFormat, arenaID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if rating == nil {
+		response.NotFound(w, errors.New("rating not found"))
+		return
+	}
+
+	response.Success(w, rating)
+}
+
+// GetColorRatings returns color combination ratings for a set.
+func (h *CardHandler) GetColorRatings(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	draftFormat := r.URL.Query().Get("format")
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	ratings, err := h.facade.GetColorRatings(r.Context(), setCode, draftFormat)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, ratings)
+}
+
+// GetSetInfo returns information about a specific set.
+func (h *CardHandler) GetSetInfo(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	info, err := h.facade.GetSetInfo(r.Context(), setCode)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if info == nil {
+		response.NotFound(w, errors.New("set not found"))
+		return
+	}
+
+	response.Success(w, info)
+}
+
+// GetRatingsWithEvent returns 17Lands ratings for a set with event type in path.
+func (h *CardHandler) GetRatingsWithEvent(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("set code is required"))
+		return
+	}
+
+	eventType := chi.URLParam(r, "eventType")
+	if eventType == "" {
+		eventType = "PremierDraft"
+	}
+
+	ratings, err := h.facade.GetCardRatings(r.Context(), setCode, eventType)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, ratings)
+}
+
+// SearchWithCollectionRequest represents a search request with collection filter.
+type SearchWithCollectionRequest struct {
+	Query          string   `json:"query"`
+	SetCodes       []string `json:"set_codes,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
+	CollectionOnly bool     `json:"collection_only,omitempty"`
+}
+
+// SearchCardsWithCollection searches for cards and includes collection ownership.
+func (h *CardHandler) SearchCardsWithCollection(w http.ResponseWriter, r *http.Request) {
+	var req SearchWithCollectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	cards, err := h.facade.SearchCardsWithCollection(r.Context(), req.Query, req.SetCodes, limit, req.CollectionOnly)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, cards)
+}

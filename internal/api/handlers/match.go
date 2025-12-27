@@ -91,6 +91,11 @@ func (h *MatchHandler) GetMatches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return empty array instead of nil
+	if matches == nil {
+		matches = []*models.Match{}
+	}
+
 	response.Success(w, matches)
 }
 
@@ -304,4 +309,36 @@ func (h *MatchHandler) GetMatchupMatrix(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response.Success(w, stats)
+}
+
+// GetRankProgression returns rank progression data for a specific format.
+func (h *MatchHandler) GetRankProgression(w http.ResponseWriter, r *http.Request) {
+	format := chi.URLParam(r, "format")
+	if format == "" {
+		response.BadRequest(w, errors.New("format is required"))
+		return
+	}
+
+	progression, err := h.facade.GetRankProgression(r.Context(), format)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if progression == nil {
+		// Return empty progression structure
+		response.Success(w, map[string]interface{}{
+			"format":       format,
+			"current_rank": nil,
+			"peak_rank":    nil,
+			"season_start": nil,
+			"matches_won":  0,
+			"matches_lost": 0,
+			"win_rate":     0.0,
+			"rank_changes": []interface{}{},
+		})
+		return
+	}
+
+	response.Success(w, progression)
 }

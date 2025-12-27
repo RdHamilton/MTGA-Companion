@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models } from 'wailsjs/go/models';
+import { models } from '@/types/models';
 
 // Re-export types for convenience
 export type Match = models.Match;
@@ -125,6 +125,29 @@ export async function getMatchupMatrix(
   filter: StatsFilterRequest = {}
 ): Promise<Record<string, Statistics>> {
   return post<Record<string, Statistics>>('/matches/matchup-matrix', filter);
+}
+
+/**
+ * Get performance metrics with optional filters.
+ */
+export async function getPerformanceMetrics(
+  filter: StatsFilterRequest = {}
+): Promise<PerformanceMetrics> {
+  return post<PerformanceMetrics>('/matches/performance', filter);
+}
+
+/**
+ * Get rank progression for a format.
+ */
+export async function getRankProgression(format: string): Promise<models.RankProgression> {
+  return get<models.RankProgression>(`/matches/rank-progression/${encodeURIComponent(format)}`);
+}
+
+/**
+ * Export matches in specified format.
+ */
+export async function exportMatches(format: 'json' | 'csv'): Promise<unknown> {
+  return get(`/matches/export?format=${format}`);
 }
 
 /**

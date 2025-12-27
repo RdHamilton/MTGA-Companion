@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { GetCurrentPackWithRecommendation } from '../../wailsjs/go/main/App';
-import { gui } from '../../wailsjs/go/models';
+import { GetCurrentPackWithRecommendation } from '@/services/api/legacy';
+import { gui } from '@/types/models';
 import './CurrentPackPicker.css';
 
 interface CurrentPackPickerProps {

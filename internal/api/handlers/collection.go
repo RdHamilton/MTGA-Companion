@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -32,6 +33,44 @@ func (h *CollectionHandler) GetCollection(w http.ResponseWriter, r *http.Request
 		filter = &gui.CollectionFilter{
 			SetCode: setCode,
 			Rarity:  rarity,
+		}
+	}
+
+	collection, err := h.facade.GetCollection(r.Context(), filter)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, collection)
+}
+
+// CollectionFilterRequest represents a JSON request body for collection filtering.
+type CollectionFilterRequest struct {
+	SetCode   string   `json:"set_code,omitempty"`
+	Rarity    string   `json:"rarity,omitempty"`
+	Colors    []string `json:"colors,omitempty"`
+	OwnedOnly *bool    `json:"owned_only,omitempty"`
+}
+
+// GetCollectionPost returns the collection with filters from POST body.
+func (h *CollectionHandler) GetCollectionPost(w http.ResponseWriter, r *http.Request) {
+	var req CollectionFilterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Allow empty body
+		if err.Error() != "EOF" {
+			response.BadRequest(w, errors.New("invalid request body"))
+			return
+		}
+	}
+
+	var filter *gui.CollectionFilter
+	if req.SetCode != "" || req.Rarity != "" || len(req.Colors) > 0 || req.OwnedOnly != nil {
+		filter = &gui.CollectionFilter{
+			SetCode:   req.SetCode,
+			Rarity:    req.Rarity,
+			Colors:    req.Colors,
+			OwnedOnly: req.OwnedOnly != nil && *req.OwnedOnly,
 		}
 	}
 

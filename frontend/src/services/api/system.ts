@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { gui } from 'wailsjs/go/models';
+import { gui, models } from '@/types/models';
 
 // Re-export types for convenience
 export type ConnectionStatus = gui.ConnectionStatus;
@@ -72,4 +72,57 @@ export async function getDatabasePath(): Promise<{ path: string }> {
  */
 export async function setDatabasePath(path: string): Promise<{ status: string }> {
   return post<{ status: string }>('/system/database/path', { path });
+}
+
+/**
+ * Get current account.
+ */
+export async function getCurrentAccount(): Promise<models.Account> {
+  return get<models.Account>('/system/account');
+}
+
+/**
+ * Clear all data.
+ */
+export async function clearAllData(): Promise<void> {
+  return post('/system/clear-data');
+}
+
+/**
+ * Check Ollama status.
+ */
+export async function checkOllamaStatus(
+  endpoint: string,
+  model: string
+): Promise<gui.OllamaStatus> {
+  return post<gui.OllamaStatus>('/system/ollama/status', { endpoint, model });
+}
+
+/**
+ * Get available Ollama models.
+ */
+export async function getAvailableOllamaModels(endpoint: string): Promise<gui.OllamaModel[]> {
+  return post<gui.OllamaModel[]>('/system/ollama/models', { endpoint });
+}
+
+/**
+ * Pull an Ollama model.
+ */
+export async function pullOllamaModel(endpoint: string, model: string): Promise<void> {
+  return post('/system/ollama/pull', { endpoint, model });
+}
+
+/**
+ * Test LLM generation.
+ */
+export async function testLLMGeneration(endpoint: string, model: string): Promise<string> {
+  const result = await post<{ response: string }>('/system/ollama/test', { endpoint, model });
+  return result.response;
+}
+
+/**
+ * Export ML training data.
+ */
+export async function exportMLTrainingData(limit: number): Promise<gui.MLTrainingDataExport> {
+  return post<gui.MLTrainingDataExport>('/system/ml/export', { limit });
 }

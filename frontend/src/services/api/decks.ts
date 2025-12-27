@@ -4,7 +4,7 @@
  */
 
 import { get, post, put, del } from '../apiClient';
-import { models, gui } from 'wailsjs/go/models';
+import { models, gui } from '@/types/models';
 
 // Re-export types for convenience
 export type Deck = models.Deck;
@@ -190,4 +190,117 @@ export async function getDecksBySource(source: string): Promise<DeckListItem[]> 
  */
 export async function getDecksByFormat(format: string): Promise<DeckListItem[]> {
   return getDecks({ format });
+}
+
+/**
+ * Get decks by tags.
+ */
+export async function getDecksByTags(tags: string[]): Promise<DeckListItem[]> {
+  return post<DeckListItem[]>('/decks/by-tags', { tags });
+}
+
+/**
+ * Get deck library with filters.
+ */
+export async function getDeckLibrary(filter: gui.DeckLibraryFilter): Promise<DeckListItem[]> {
+  return post<DeckListItem[]>('/decks/library', filter);
+}
+
+/**
+ * Clone a deck.
+ */
+export async function cloneDeck(deckId: string, newName: string): Promise<Deck> {
+  return post<Deck>(`/decks/${deckId}/clone`, { name: newName });
+}
+
+/**
+ * Get deck by draft event ID.
+ */
+export async function getDeckByDraftEvent(draftEventId: string): Promise<DeckWithCards> {
+  return get<DeckWithCards>(`/decks/by-draft/${draftEventId}`);
+}
+
+/**
+ * Get deck statistics.
+ */
+export async function getDeckStatistics(deckId: string): Promise<DeckStatistics> {
+  return get<DeckStatistics>(`/decks/${deckId}/statistics`);
+}
+
+/**
+ * Get deck performance.
+ */
+export async function getDeckPerformance(deckId: string): Promise<DeckPerformance> {
+  return get<DeckPerformance>(`/decks/${deckId}/performance`);
+}
+
+/**
+ * Validate a draft deck.
+ */
+export async function validateDraftDeck(deckId: string): Promise<boolean> {
+  const result = await post<{ valid: boolean }>(`/decks/${deckId}/validate`);
+  return result.valid;
+}
+
+/**
+ * Apply a suggested deck to an existing deck.
+ */
+export async function applySuggestedDeck(deckId: string, suggestion: SuggestedDeckResponse): Promise<void> {
+  await post(`/decks/${deckId}/apply-suggestion`, suggestion);
+}
+
+/**
+ * Get suggested deck export content.
+ */
+export async function getSuggestedDeckExportContent(suggestion: SuggestedDeckResponse, deckName: string): Promise<string> {
+  const result = await post<{ content: string }>('/decks/suggested/export-content', {
+    suggestion,
+    deck_name: deckName,
+  });
+  return result.content;
+}
+
+/**
+ * Classify deck archetype.
+ */
+export async function classifyDeckArchetype(deckId: string): Promise<ArchetypeClassificationResult> {
+  return get<ArchetypeClassificationResult>(`/decks/${deckId}/classify`);
+}
+
+/**
+ * Add a tag to a deck.
+ */
+export async function addTag(deckId: string, tag: string): Promise<void> {
+  await post(`/decks/${deckId}/tags`, { tag });
+}
+
+/**
+ * Remove a tag from a deck.
+ */
+export async function removeTag(deckId: string, tag: string): Promise<void> {
+  await del(`/decks/${deckId}/tags/${encodeURIComponent(tag)}`);
+}
+
+/**
+ * Add a card to a deck.
+ */
+export async function addCard(request: {
+  deck_id: string;
+  arena_id: number;
+  quantity: number;
+  zone: string;
+  is_sideboard: boolean;
+}): Promise<void> {
+  await post(`/decks/${request.deck_id}/cards`, request);
+}
+
+/**
+ * Remove a card from a deck.
+ */
+export async function removeCard(request: {
+  deck_id: string;
+  arena_id: number;
+  zone: string;
+}): Promise<void> {
+  await del(`/decks/${request.deck_id}/cards/${request.arena_id}?zone=${request.zone}`);
 }

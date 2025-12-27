@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
-import { GetActiveQuests, GetQuestHistory, GetCurrentAccount } from '../../wailsjs/go/main/App';
-import { models } from '../../wailsjs/go/models';
+import { EventsOn } from '@/services/websocketClient';
+import { GetActiveQuests, GetQuestHistory, GetCurrentAccount } from '@/services/api/legacy';
+import { models } from '@/types/models';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
 import EmptyState from '../components/EmptyState';

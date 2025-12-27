@@ -4,7 +4,7 @@
  */
 
 import { get, post } from '../apiClient';
-import { models, gui } from 'wailsjs/go/models';
+import { models, gui, seventeenlands } from '@/types/models';
 
 // Re-export types for convenience
 export type SetCard = models.SetCard;
@@ -68,4 +68,36 @@ export async function getCollectionQuantities(
   arenaIds: number[]
 ): Promise<Record<number, number>> {
   return post<Record<number, number>>('/cards/collection-quantities', { arena_ids: arenaIds });
+}
+
+/**
+ * Get color ratings for a set and format.
+ */
+export async function getColorRatings(
+  setCode: string,
+  format: string
+): Promise<seventeenlands.ColorRating[]> {
+  return get<seventeenlands.ColorRating[]>(`/cards/color-ratings/${setCode}/${format}`);
+}
+
+/**
+ * Card with collection quantity info.
+ */
+export interface CardWithCollection extends SetCard {
+  quantity: number;
+}
+
+/**
+ * Search cards with collection info.
+ */
+export async function searchCardsWithCollection(
+  query: string,
+  sets?: string[],
+  limit?: number
+): Promise<CardWithCollection[]> {
+  return post<CardWithCollection[]>('/cards/search-with-collection', {
+    query,
+    sets,
+    limit,
+  });
 }

@@ -4,10 +4,10 @@ import {
   PauseReplay,
   ResumeReplay,
   StopReplay,
-} from '../../wailsjs/go/main/App';
+} from '@/services/api/legacy';
 import { subscribeToReplayState, getReplayState } from '../App';
 import { showToast } from '../components/ToastContainer';
-import { gui } from '../../wailsjs/go/models';
+import { gui } from '@/types/models';
 
 export interface UseReplayToolReturn {
   /** Whether replay tool is active */

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { GetCardByArenaID } from '../../wailsjs/go/main/App';
-import { models, gui } from '../../wailsjs/go/models';
+import { GetCardByArenaID } from '@/services/api/legacy';
+import { models, gui } from '@/types/models';
 import SetSymbol from './SetSymbol';
 import './DeckList.css';
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useLogReplay } from './useLogReplay';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { mockEventEmitter } from '../test/mocks/wailsRuntime';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({

@@ -18,12 +18,21 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/datasets"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/scryfall"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/setcache"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckexport"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/deckimport"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
 var (
-	port   = flag.Int("port", 8080, "API server port")
-	dbPath = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/data.db)")
+	port        = flag.Int("port", 8080, "API server port")
+	dbPath      = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/mtga.db)")
+	openBrowser = flag.Bool("open-browser", false, "Open browser to frontend on startup")
+	frontendURL = flag.String("frontend-url", "http://localhost:3000", "Frontend URL to open in browser")
 )
 
 func main() {
@@ -41,7 +50,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to get home directory: %v", err)
 		}
-		finalDBPath = filepath.Join(home, ".mtga-companion", "data.db")
+		finalDBPath = filepath.Join(home, ".mtga-companion", "mtga.db")
 	}
 
 	// Ensure directory exists
@@ -75,16 +84,64 @@ func main() {
 	// Create context
 	ctx := context.Background()
 
+	// Initialize card services
+	scryfallClient := scryfall.NewClient()
+
+	// Initialize dataset service for 17Lands ratings
+	datasetService, err := datasets.NewService(datasets.DefaultServiceOptions())
+	if err != nil {
+		log.Fatalf("Failed to initialize dataset service: %v", err)
+	}
+
+	// Initialize SetFetcher for card metadata
+	setFetcher := setcache.NewFetcher(
+		scryfallClient,
+		storageService.SetCardRepo(),
+		storageService.DraftRatingsRepo(),
+	)
+
+	// Initialize RatingsFetcher for draft ratings
+	ratingsFetcher := setcache.NewRatingsFetcherWithDatasets(
+		datasetService,
+		storageService.DraftRatingsRepo(),
+	)
+
+	// Initialize CardService for card metadata with caching
+	cardServiceConfig := cards.DefaultServiceConfig()
+	cardServiceConfig.EnableDB = false
+	cardService, err := cards.NewService(nil, cardServiceConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize card service: %v", err)
+	}
+
+	// Initialize DeckImportParser
+	deckImportParser := deckimport.NewParser(cardService)
+
+	// Initialize DeckExporter with a CardProvider
+	deckExporter := deckexport.NewExporter(cardService)
+
+	// Initialize RecommendationEngine
+	ratingsRepo := storageService.DraftRatingsRepo()
+	setCardRepo := storageService.SetCardRepo()
+	recommendationEngine := recommendations.NewRuleBasedEngineWithSetRepo(cardService, setCardRepo, ratingsRepo)
+
 	// Initialize meta service
 	metaService := meta.NewService(nil)
 
 	// Initialize shared services
 	services := &gui.Services{
-		Context:      ctx,
-		Storage:      storageService,
-		DaemonPort:   9999,
-		DraftMetrics: metrics.NewDraftMetrics(),
-		MetaService:  metaService,
+		Context:              ctx,
+		Storage:              storageService,
+		DaemonPort:           9999,
+		DraftMetrics:         metrics.NewDraftMetrics(),
+		MetaService:          metaService,
+		SetFetcher:           setFetcher,
+		RatingsFetcher:       ratingsFetcher,
+		CardService:          cardService,
+		DatasetService:       datasetService,
+		DeckImportParser:     deckImportParser,
+		DeckExporter:         deckExporter,
+		RecommendationEngine: recommendationEngine,
 	}
 
 	// Create facades
@@ -107,7 +164,9 @@ func main() {
 
 	// Create API server
 	apiConfig := &api.Config{
-		Port: *port,
+		Port:        *port,
+		OpenBrowser: *openBrowser,
+		FrontendURL: *frontendURL,
 	}
 	server := api.NewServer(apiConfig, services, facades)
 

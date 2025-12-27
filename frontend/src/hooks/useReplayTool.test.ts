@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReplayTool } from './useReplayTool';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 
 // Mock showToast
 vi.mock('../components/ToastContainer', () => ({

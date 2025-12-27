@@ -13,8 +13,8 @@ import {
   GetRecommendations,
   ExportDeckToFile,
   ValidateDeckWithDialog,
-} from '../../wailsjs/go/main/App';
-import { models, gui } from '../../wailsjs/go/models';
+} from '@/services/api/legacy';
+import { models, gui } from '@/types/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';

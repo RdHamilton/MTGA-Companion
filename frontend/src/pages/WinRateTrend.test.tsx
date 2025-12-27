@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import WinRateTrend from './WinRateTrend';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
 // storage types imported but using any for mock flexibility
 

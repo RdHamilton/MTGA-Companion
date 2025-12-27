@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import RankProgression from './RankProgression';
-import { mockWailsApp } from '../test/mocks/wailsApp';
+import { mockWailsApp } from '@/test/mocks/apiMock';
 import { AppProvider } from '../context/AppContext';
-import { storage } from '../../wailsjs/go/models';
+import { storage } from '@/types/models';
 
 // Mock Recharts to avoid rendering issues in tests
 vi.mock('recharts', () => ({

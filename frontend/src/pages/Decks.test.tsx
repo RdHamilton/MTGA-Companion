@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Decks from './Decks';
-import { mockWailsApp } from '../test/mocks/wailsApp';
-import { gui } from '../../wailsjs/go/models';
+import { mockWailsApp } from '@/test/mocks/apiMock';
+import { gui } from '@/types/models';
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
@@ -134,21 +134,6 @@ describe('Decks', () => {
         expect(screen.getByText('Error Loading Decks')).toBeInTheDocument();
       });
       expect(screen.getByText('Failed to load decks')).toBeInTheDocument();
-    });
-
-    it('should show error when Wails runtime not initialized after timeout', async () => {
-      clearWailsRuntime();
-      mockWailsApp.ListDecks.mockResolvedValue(createMockDeckList());
-
-      renderWithRouter(<Decks />);
-
-      // Advance past the 5 second timeout
-      await vi.advanceTimersByTimeAsync(5100);
-
-      await waitFor(() => {
-        expect(screen.getByText('Error Loading Decks')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Wails runtime not initialized')).toBeInTheDocument();
     });
 
     it('should have retry button that reloads decks', async () => {
