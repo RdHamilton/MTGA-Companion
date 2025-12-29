@@ -540,26 +540,66 @@ describe('Collection', () => {
   });
 
   describe('Set Completion Panel', () => {
-    it('should show Set Completion button', async () => {
+    it('should not show Set Completion button when no set is selected (#756)', async () => {
       mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
       renderWithRouter(<Collection />);
 
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Button should not be visible when no set is selected
+      expect(screen.queryByRole('button', { name: 'Show Set Completion' })).not.toBeInTheDocument();
+    });
+
+    it('should show Set Completion button when a set is selected (#756)', async () => {
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Select a set from the dropdown
+      const setSelect = screen.getByDisplayValue('All Sets');
+      fireEvent.change(setSelect, { target: { value: 'sta' } });
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Button should now be visible
+      await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
       });
     });
 
-    it('should toggle Set Completion panel visibility', async () => {
+    it('should toggle Set Completion panel visibility when set is selected', async () => {
       mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
+      mockCollection.getSetCompletion.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Wait for collection to load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Select a set
+      const setSelect = screen.getByDisplayValue('All Sets');
+      fireEvent.change(setSelect, { target: { value: 'sta' } });
 
       await vi.advanceTimersByTimeAsync(100);
 
@@ -584,6 +624,17 @@ describe('Collection', () => {
 
       await vi.advanceTimersByTimeAsync(100);
 
+      // Wait for collection to load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Select a set first
+      const setSelect = screen.getByDisplayValue('All Sets');
+      fireEvent.change(setSelect, { target: { value: 'sta' } });
+
+      await vi.advanceTimersByTimeAsync(100);
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
       });
@@ -603,6 +654,17 @@ describe('Collection', () => {
       mockCollection.getSetCompletion.mockResolvedValue([]);
 
       renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Wait for collection to load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Select a set first
+      const setSelect = screen.getByDisplayValue('All Sets');
+      fireEvent.change(setSelect, { target: { value: 'sta' } });
 
       await vi.advanceTimersByTimeAsync(100);
 

@@ -115,7 +115,7 @@ export const handlers = [
   }),
 
   // Set completion endpoint - uses PascalCase to match Go struct serialization
-  http.get(`${API_BASE}/collection/sets/completion`, () => {
+  http.get(`${API_BASE}/collection/sets`, () => {
     return successResponse([
       { SetCode: 'sta', SetName: 'Strixhaven', TotalCards: 63, OwnedCards: 50, Percentage: 79.4 },
       { SetCode: 'dsk', SetName: 'Duskmourn', TotalCards: 200, OwnedCards: 100, Percentage: 50.0 },

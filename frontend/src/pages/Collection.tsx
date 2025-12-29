@@ -170,12 +170,14 @@ export default function Collection() {
             </span>
           </div>
         </div>
-        <button
-          className="set-completion-button"
-          onClick={() => setShowSetCompletion(!showSetCompletion)}
-        >
-          {showSetCompletion ? 'Hide' : 'Show'} Set Completion
-        </button>
+        {filters.setCode && (
+          <button
+            className="set-completion-button"
+            onClick={() => setShowSetCompletion(!showSetCompletion)}
+          >
+            {showSetCompletion ? 'Hide' : 'Show'} Set Completion
+          </button>
+        )}
       </div>
 
       {/* Filter Controls */}
@@ -280,9 +282,12 @@ export default function Collection() {
       </div>
 
       {/* Set Completion Panel */}
-      {showSetCompletion && (
+      {showSetCompletion && filters.setCode && (
         <div className="set-completion-container">
-          <SetCompletionPanel onClose={() => setShowSetCompletion(false)} />
+          <SetCompletionPanel
+            setCode={filters.setCode}
+            onClose={() => setShowSetCompletion(false)}
+          />
         </div>
       )}
 

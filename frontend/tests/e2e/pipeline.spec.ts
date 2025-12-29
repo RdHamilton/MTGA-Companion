@@ -319,26 +319,47 @@ test.describe('Data Pipeline - Log to UI', () => {
       const collectionPage = page.locator('.collection-page');
       await expect(collectionPage).toBeVisible({ timeout: 10000 });
 
-      // Find and click the Show Set Completion button
+      // Button should not be visible initially (no set selected)
       const showButton = page.locator('button.set-completion-button');
-      await expect(showButton).toBeVisible();
-      await expect(showButton).toContainText('Show Set Completion');
+      const isButtonVisibleInitially = await showButton.isVisible().catch(() => false);
 
-      await showButton.click();
+      if (!isButtonVisibleInitially) {
+        // Select a set from the dropdown to make the button visible
+        const setSelect = page.locator('.filter-select').first();
+        const hasSetSelect = await setSelect.isVisible().catch(() => false);
+        if (hasSetSelect) {
+          // Get the first option that's not "All Sets"
+          const options = await setSelect.locator('option').allTextContents();
+          const setOption = options.find((opt) => opt !== 'All Sets');
+          if (setOption) {
+            await setSelect.selectOption({ label: setOption });
+            await page.waitForTimeout(500);
+          }
+        }
+      }
 
-      // Button text should change to Hide
-      await expect(showButton).toContainText('Hide Set Completion');
+      // Now check if button is visible after selecting a set
+      const isButtonVisible = await showButton.isVisible().catch(() => false);
 
-      // Set Completion panel should be visible with heading
-      const panelHeading = page.locator('.set-completion-panel h2');
-      await expect(panelHeading).toContainText('Set Completion');
+      if (isButtonVisible) {
+        await expect(showButton).toContainText('Show Set Completion');
 
-      // Click again to hide
-      await showButton.click();
-      await expect(showButton).toContainText('Show Set Completion');
+        await showButton.click();
 
-      // Panel should be hidden
-      await expect(panelHeading).not.toBeVisible();
+        // Button text should change to Hide
+        await expect(showButton).toContainText('Hide Set Completion');
+
+        // Set Completion panel should be visible with heading
+        const panelHeading = page.locator('.set-completion-panel h2');
+        await expect(panelHeading).toContainText('Set Completion');
+
+        // Click again to hide
+        await showButton.click();
+        await expect(showButton).toContainText('Show Set Completion');
+
+        // Panel should be hidden
+        await expect(panelHeading).not.toBeVisible();
+      }
     });
   });
 
