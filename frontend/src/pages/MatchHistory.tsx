@@ -206,15 +206,55 @@ const MatchHistory = () => {
     return `${wins}-${losses}`;
   };
 
-  // Normalize format name to show just the base format (e.g., "QuickDraft" instead of "QuickDraft_TLA_20251127")
-  const normalizeFormat = (format: string): string => {
-    if (!format) return format;
-    // Extract base format before underscore (e.g., "QuickDraft_TLA_20251127" -> "QuickDraft")
-    const underscoreIndex = format.indexOf('_');
+  // Map queue types to user-friendly names
+  const normalizeQueueType = (queueType: string): string => {
+    if (!queueType) return queueType;
+
+    // Map common MTGA event IDs to friendly names
+    const queueTypeMap: Record<string, string> = {
+      'Play': 'Play Queue',
+      'Ladder': 'Ranked',
+      'Traditional_Ladder': 'Traditional Ranked',
+      'Traditional_Play': 'Traditional Play',
+    };
+
+    // Check if it's a draft format (contains underscore with set code pattern)
+    const underscoreIndex = queueType.indexOf('_');
     if (underscoreIndex !== -1) {
-      return format.substring(0, underscoreIndex);
+      const prefix = queueType.substring(0, underscoreIndex);
+      // Known draft prefixes
+      if (['QuickDraft', 'PremierDraft', 'TradDraft', 'SealedDeck'].includes(prefix)) {
+        return prefix.replace('TradDraft', 'Traditional Draft').replace('SealedDeck', 'Sealed');
+      }
+      // Check if it's a mapped queue type with underscore
+      if (queueTypeMap[queueType]) {
+        return queueTypeMap[queueType];
+      }
+      // Otherwise just return the prefix
+      return prefix;
     }
-    return format;
+
+    return queueTypeMap[queueType] || queueType;
+  };
+
+  // Get the display format - prefer DeckFormat (Standard, Historic, etc.) over queue type
+  const getDisplayFormat = (match: models.Match): string => {
+    // If we have a deck format, use it
+    if (match.DeckFormat) {
+      return match.DeckFormat;
+    }
+    // Fall back to normalized queue type
+    return normalizeQueueType(match.Format);
+  };
+
+  // Get the display event name
+  const getDisplayEventName = (match: models.Match): string => {
+    const queueName = normalizeQueueType(match.EventName || match.Format);
+    // If we have a deck format and it's a constructed queue, combine them
+    if (match.DeckFormat && ['Play Queue', 'Ranked', 'Traditional Ranked', 'Traditional Play'].includes(queueName)) {
+      return `${match.DeckFormat} ${queueName}`;
+    }
+    return queueName;
   };
 
   const handleSort = (field: SortField) => {
@@ -442,8 +482,8 @@ const MatchHistory = () => {
                       {match.Result.toUpperCase()}
                     </span>
                   </td>
-                  <td>{normalizeFormat(match.Format)}</td>
-                  <td>{normalizeFormat(match.EventName)}</td>
+                  <td>{getDisplayFormat(match)}</td>
+                  <td>{getDisplayEventName(match)}</td>
                   <td>{formatScore(match.PlayerWins, match.OpponentWins)}</td>
                   <td>{match.OpponentName || '—'}</td>
                 </tr>

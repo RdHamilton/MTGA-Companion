@@ -242,13 +242,26 @@ describe('MatchHistory', () => {
     });
 
     it('should display format', async () => {
+      const match = createMockMatch({ Format: 'Ladder', DeckFormat: 'Standard' });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Should display DeckFormat when available, otherwise normalized queue type
+        expect(screen.getByText('Standard')).toBeInTheDocument();
+      });
+    });
+
+    it('should display normalized queue type when no deck format', async () => {
       const match = createMockMatch({ Format: 'Ladder' });
       mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(screen.getByText('Ladder')).toBeInTheDocument();
+        // 'Ladder' should be normalized to 'Ranked'
+        expect(screen.getByText('Ranked')).toBeInTheDocument();
       });
     });
 

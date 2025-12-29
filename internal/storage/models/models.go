@@ -31,6 +31,7 @@ type Match struct {
 	OpponentWins    int
 	PlayerTeamID    int
 	DeckID          *string // Nullable, foreign key to decks
+	DeckFormat      *string // Nullable: format of the deck (Standard, Historic, etc.) - populated via JOIN
 	RankBefore      *string // Nullable
 	RankAfter       *string // Nullable
 	Format          string

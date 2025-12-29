@@ -437,16 +437,9 @@ func (r *matchRepository) GetByFormat(ctx context.Context, format string, accoun
 
 // GetMatches retrieves matches based on the given filter with advanced filtering support.
 func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
-	// Determine if we need to JOIN with decks table and use table aliases
-	var fromClause string
-	var tableAlias string
-	if filter.DeckFormat != nil {
-		fromClause = "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
-		tableAlias = "m" // Use table alias when joining
-	} else {
-		fromClause = "FROM matches m"
-		tableAlias = "m" // Still use alias since we always have "m" in this query
-	}
+	// Always JOIN with decks table to get deck format for display
+	fromClause := "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
+	tableAlias := "m"
 
 	// Build WHERE clause using the filter builder with table alias
 	where, args := buildFilterWhereClause(filter, tableAlias)
@@ -454,7 +447,7 @@ func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFil
 	query := fmt.Sprintf(`
 		SELECT
 			m.id, m.account_id, m.event_id, m.event_name, m.timestamp, m.duration_seconds,
-			m.player_wins, m.opponent_wins, m.player_team_id, m.deck_id,
+			m.player_wins, m.opponent_wins, m.player_team_id, m.deck_id, d.format,
 			m.rank_before, m.rank_after, m.format, m.result, m.result_reason,
 			m.opponent_name, m.opponent_id, m.created_at
 		%s
@@ -485,6 +478,7 @@ func (r *matchRepository) GetMatches(ctx context.Context, filter models.StatsFil
 			&match.OpponentWins,
 			&match.PlayerTeamID,
 			&match.DeckID,
+			&match.DeckFormat,
 			&match.RankBefore,
 			&match.RankAfter,
 			&match.Format,
