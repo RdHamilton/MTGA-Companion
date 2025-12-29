@@ -90,17 +90,17 @@ test.describe('Data Pipeline - Log to UI', () => {
     });
 
     test('should display draft session from log file', async ({ page }) => {
+      // Wait for either draft content or empty state to be visible
+      const draftContent = page.locator('.draft-container, .draft-empty');
+      await expect(draftContent.first()).toBeVisible({ timeout: 10000 });
+
       const draftContainer = page.locator('.draft-container');
       const draftEmpty = page.locator('.draft-empty');
       const historicalSection = page.locator('text=Historical Drafts');
 
-      await expect(draftContainer.or(draftEmpty).or(historicalSection)).toBeVisible({
-        timeout: 10000,
-      });
-
-      const hasDraftContent = await draftContainer.isVisible();
-      const hasHistorical = await historicalSection.isVisible();
-      const hasEmpty = await draftEmpty.isVisible();
+      const hasDraftContent = await draftContainer.isVisible().catch(() => false);
+      const hasHistorical = await historicalSection.isVisible().catch(() => false);
+      const hasEmpty = await draftEmpty.isVisible().catch(() => false);
 
       // Should have either active draft content or historical drafts
       expect(hasDraftContent || hasHistorical || hasEmpty).toBeTruthy();
@@ -235,8 +235,8 @@ test.describe('Data Pipeline - Log to UI', () => {
       await page.waitForURL('**/quests');
 
       // Navigate back to Match History
-      await page.click('a[href="/"]');
-      await page.waitForURL(/\/$|\/matches/);
+      await page.click('a[href="/match-history"]');
+      await page.waitForURL('**/match-history');
 
       // Data should still be present
       const table = page.locator('.match-history-table-container table');
