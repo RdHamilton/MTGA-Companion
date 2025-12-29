@@ -345,3 +345,90 @@ func TestParseQuests_QuestCompletion(t *testing.T) {
 		t.Errorf("EndingProgress should equal Goal (%d), got %d", quest.Goal, quest.EndingProgress)
 	}
 }
+
+func TestParseQuestsDetailed_RerollDetection(t *testing.T) {
+	// First response has quest-A, second response has quest-B (quest-A was rerolled)
+	entries := []*LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 10:30:45",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":        "quest-A",
+						"locKey":         "Win 2 games",
+						"goal":           float64(2),
+						"canSwap":        true,
+						"endingProgress": float64(0),
+					},
+				},
+				"canSwap": true,
+			},
+		},
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 11:30:45",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":        "quest-B", // Different quest - quest-A was rerolled
+						"locKey":         "Cast 10 spells",
+						"goal":           float64(10),
+						"canSwap":        true,
+						"endingProgress": float64(0),
+					},
+				},
+				"canSwap": true,
+			},
+		},
+	}
+
+	result, err := ParseQuestsDetailed(entries)
+	if err != nil {
+		t.Fatalf("ParseQuestsDetailed returned error: %v", err)
+	}
+
+	// Should have 2 quests: one completed (quest-A) and one active (quest-B)
+	if len(result.Quests) != 2 {
+		t.Fatalf("Expected 2 quests, got %d", len(result.Quests))
+	}
+
+	// Find quest-A and quest-B
+	var questA, questB *QuestData
+	for _, q := range result.Quests {
+		switch q.QuestID {
+		case "quest-A":
+			questA = q
+		case "quest-B":
+			questB = q
+		}
+	}
+
+	if questA == nil {
+		t.Fatal("quest-A not found")
+	}
+	if questB == nil {
+		t.Fatal("quest-B not found")
+	}
+
+	// Quest-A should be marked as completed (disappeared from response)
+	if !questA.Completed {
+		t.Error("quest-A should be marked as completed when it disappears")
+	}
+	if questA.CompletedAt == nil {
+		t.Error("quest-A CompletedAt should be set when quest disappears")
+	}
+
+	// Quest-B should be active
+	if questB.Completed {
+		t.Error("quest-B should not be marked as completed")
+	}
+
+	// CurrentQuestIDs should only contain quest-B (from the latest response)
+	if result.CurrentQuestIDs["quest-A"] {
+		t.Error("CurrentQuestIDs should NOT contain quest-A")
+	}
+	if !result.CurrentQuestIDs["quest-B"] {
+		t.Error("CurrentQuestIDs should contain quest-B")
+	}
+}
