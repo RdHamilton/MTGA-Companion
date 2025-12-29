@@ -20,6 +20,16 @@ import { test, expect } from '@playwright/test';
  * - 3 quests with full completion (4 daily wins, 15 weekly wins)
  * - Rank progression: Gold 3->4 (Constructed), Silver 2->3 (Limited)
  *
+ * Tests cover:
+ * - Match History: matches display, event types, wins/losses
+ * - Decks: deck display, multiple formats
+ * - Draft: draft sessions, picks
+ * - Quests: quest display, daily/weekly wins
+ * - Collection: collection page load
+ * - Meta: metagame dashboard, format dropdown (#737)
+ * - Charts: deck performance, rank progression, format distribution, result breakdown
+ * - Sorting/Filtering: filter controls on various pages
+ *
  * Run with: USE_LOG_FIXTURES=true npx playwright test --project=pipeline
  */
 test.describe('Data Pipeline - Log to UI', () => {
@@ -303,6 +313,101 @@ test.describe('Data Pipeline - Log to UI', () => {
       // Collection page should load without errors
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
+    });
+  });
+
+  test.describe('Meta Pipeline', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.click('a[href="/meta"]');
+      await page.waitForURL('**/meta');
+    });
+
+    test('should display meta page without errors', async ({ page }) => {
+      // Wait for page to load
+      const metaPage = page.locator('.meta-page');
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
+
+      // Wait for loading to complete
+      const loadingSpinner = page.locator('.meta-loading');
+      await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+
+      // Page should not have error banner (#737 fix - null check)
+      const errorBanner = page.locator('.meta-error');
+      await expect(errorBanner).not.toBeVisible();
+    });
+
+    test('should have format dropdown with friendly names', async ({ page }) => {
+      // Wait for page to load
+      const metaPage = page.locator('.meta-page');
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
+
+      // Find format dropdown
+      const formatSelect = page.locator('.format-select');
+      await expect(formatSelect).toBeVisible();
+
+      // Get all options
+      const options = await formatSelect.locator('option').allTextContents();
+
+      // Should have friendly format names (not raw like "Alchemy_Play")
+      expect(options).toContain('Standard');
+      expect(options).toContain('Historic');
+      expect(options).toContain('Explorer');
+
+      // Should NOT contain draft formats
+      const hasDraftFormats = options.some(opt =>
+        opt.includes('Draft') || opt.includes('Sealed') || opt.includes('QuickDraft')
+      );
+      expect(hasDraftFormats).toBeFalsy();
+
+      // Should NOT contain raw format names with underscores
+      const hasRawFormats = options.some(opt => opt.includes('_'));
+      expect(hasRawFormats).toBeFalsy();
+    });
+
+    test('should filter archetypes by format', async ({ page }) => {
+      // Wait for page to load
+      const metaPage = page.locator('.meta-page');
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
+
+      // Wait for loading to complete
+      const loadingSpinner = page.locator('.meta-loading');
+      await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+
+      // Change format
+      const formatSelect = page.locator('.format-select');
+      await formatSelect.selectOption('historic');
+
+      // Wait for reload
+      await page.waitForTimeout(1000);
+      await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+
+      // Verify the format was changed
+      const selectedValue = await formatSelect.inputValue();
+      expect(selectedValue).toBe('historic');
+
+      // Page should still not have errors
+      const errorBanner = page.locator('.meta-error');
+      await expect(errorBanner).not.toBeVisible();
+    });
+
+    test('should display archetype cards when data is available', async ({ page }) => {
+      // Wait for page to load
+      const metaPage = page.locator('.meta-page');
+      await expect(metaPage).toBeVisible({ timeout: 10000 });
+
+      // Wait for loading to complete
+      const loadingSpinner = page.locator('.meta-loading');
+      await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+
+      // Check for either archetype cards or no-data message (both are valid)
+      const archetypeCards = page.locator('.archetype-card');
+      const noData = page.locator('.no-data');
+
+      const hasArchetypes = await archetypeCards.count() > 0;
+      const hasNoData = await noData.isVisible().catch(() => false);
+
+      // Should have either archetypes or no-data message
+      expect(hasArchetypes || hasNoData).toBeTruthy();
     });
   });
 

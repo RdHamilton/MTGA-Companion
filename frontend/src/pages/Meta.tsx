@@ -1,15 +1,30 @@
 import { useState, useEffect } from 'react';
-import { meta, matches } from '@/services/api';
+import { meta } from '@/services/api';
 import { gui } from '@/types/models';
 import './Meta.css';
+
+/**
+ * Supported formats for metagame data.
+ * Must match formats supported by MTGTop8 backend (internal/meta/mtgtop8.go).
+ * Alchemy is NOT supported as MTGTop8 doesn't track Arena-only formats.
+ */
+const META_FORMATS = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'historic', label: 'Historic' },
+  { value: 'explorer', label: 'Explorer' },
+  { value: 'pioneer', label: 'Pioneer' },
+  { value: 'modern', label: 'Modern' },
+] as const;
 
 // Convert meta.getMetaArchetypes response to MetaDashboardResponse
 async function getMetaDashboard(format: string): Promise<gui.MetaDashboardResponse> {
   const archetypes = await meta.getMetaArchetypes(format);
+  // Null check for archetypes to prevent "Cannot read properties of null" error
+  const archetypeList = archetypes ?? [];
   return {
-    archetypes: archetypes as unknown as gui.ArchetypeInfo[],
+    archetypes: archetypeList as unknown as gui.ArchetypeInfo[],
     format,
-    totalArchetypes: archetypes.length,
+    totalArchetypes: archetypeList.length,
     lastUpdated: new Date().toISOString(),
     sources: [],
     convertValues: () => ({}),
@@ -18,26 +33,11 @@ async function getMetaDashboard(format: string): Promise<gui.MetaDashboardRespon
 
 export default function Meta() {
   const [format, setFormat] = useState<string>('standard');
-  const [supportedFormats, setSupportedFormats] = useState<string[]>([]);
   const [dashboardData, setDashboardData] = useState<gui.MetaDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedArchetype, setSelectedArchetype] = useState<gui.ArchetypeInfo | null>(null);
-
-  // Load supported formats on mount
-  useEffect(() => {
-    const loadFormats = async () => {
-      try {
-        const formats = await matches.getFormats();
-        setSupportedFormats(formats);
-      } catch (err) {
-        console.error('Failed to load formats:', err);
-        setSupportedFormats(['standard', 'historic', 'explorer', 'pioneer', 'modern']);
-      }
-    };
-    loadFormats();
-  }, []);
 
   // Load dashboard data when format changes
   useEffect(() => {
@@ -158,9 +158,9 @@ export default function Meta() {
             onChange={(e) => setFormat(e.target.value)}
             disabled={loading || refreshing}
           >
-            {supportedFormats.map((f) => (
-              <option key={f} value={f}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+            {META_FORMATS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
               </option>
             ))}
           </select>
