@@ -87,15 +87,24 @@ export default defineConfig({
         viewport: { width: 1280, height: 800 },
       },
     },
+    // Pipeline tests - uses log fixtures to test full data flow
+    {
+      name: 'pipeline',
+      testMatch: /pipeline\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 
   // Start both servers for E2E testing
   webServer: [
     // Go REST API server on port 8080
     // In CI, use a temp database with fixtures; locally, reuse existing server
+    // For pipeline tests (USE_LOG_FIXTURES=true), use daemon with log file
     {
       command: process.env.CI
-        ? 'cd .. && go run ./cmd/apiserver --db-path=/tmp/e2e-test.db --load-fixtures=frontend/tests/e2e/fixtures/test-data.sql --daemon=false'
+        ? process.env.USE_LOG_FIXTURES === 'true'
+          ? 'cd .. && go run ./cmd/apiserver --db-path=/tmp/e2e-pipeline.db --daemon=true --log-path=frontend/tests/e2e/fixtures/logs/sample-session.log'
+          : 'cd .. && go run ./cmd/apiserver --db-path=/tmp/e2e-test.db --load-fixtures=frontend/tests/e2e/fixtures/test-data.sql --daemon=false'
         : 'cd .. && go run ./cmd/apiserver',
       url: 'http://localhost:8080/health',
       timeout: 120 * 1000,

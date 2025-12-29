@@ -18,6 +18,7 @@
     "test:e2e:cross-browser": "playwright test --project=smoke --project=firefox --project=webkit",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "test:e2e:pipeline": "USE_LOG_FIXTURES=true playwright test --project=pipeline",
     "screenshots": "playwright test --project=screenshots"
   },
   "dependencies": {
