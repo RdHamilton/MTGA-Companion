@@ -242,13 +242,26 @@ describe('MatchHistory', () => {
     });
 
     it('should display format', async () => {
+      const match = createMockMatch({ Format: 'Ladder', DeckFormat: 'Standard' });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Should display DeckFormat when available, otherwise normalized queue type
+        expect(screen.getByText('Standard')).toBeInTheDocument();
+      });
+    });
+
+    it('should display normalized queue type when no deck format', async () => {
       const match = createMockMatch({ Format: 'Ladder' });
       mockMatches.getMatches.mockResolvedValue([match]);
 
       renderWithProvider(<MatchHistory />);
 
       await waitFor(() => {
-        expect(screen.getByText('Ladder')).toBeInTheDocument();
+        // 'Ladder' should be normalized to 'Ranked'
+        expect(screen.getByText('Ranked')).toBeInTheDocument();
       });
     });
 
@@ -287,6 +300,184 @@ describe('MatchHistory', () => {
       });
       // Should NOT show the full event name with date suffix
       expect(screen.queryByText('PremierDraft_MKM_20241120')).not.toBeInTheDocument();
+    });
+
+    it('should display combined format and queue type for Standard Ranked', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Standard',
+        EventName: 'Ladder',
+        Format: 'Ladder',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Event column should show 'Standard Ranked'
+        expect(screen.getByText('Standard Ranked')).toBeInTheDocument();
+      });
+
+      // Format column should show 'Standard' (exact match)
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'Standard');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should display combined format and queue type for Historic Play Queue', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Historic',
+        EventName: 'Play',
+        Format: 'Play',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Event column should show 'Historic Play Queue'
+        expect(screen.getByText('Historic Play Queue')).toBeInTheDocument();
+      });
+
+      // Format column should show 'Historic' (exact match)
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'Historic');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should normalize Play to Play Queue without DeckFormat', async () => {
+      const match = createMockMatch({
+        DeckFormat: undefined,
+        EventName: 'Play',
+        Format: 'Play',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Both columns should show 'Play Queue'
+        const playQueueElements = screen.getAllByText('Play Queue');
+        expect(playQueueElements.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    it('should display Alchemy format with Alchemy_Ladder event as "Alchemy Ranked"', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Alchemy',
+        EventName: 'Alchemy_Ladder',
+        Format: 'Alchemy_Ladder',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alchemy Ranked')).toBeInTheDocument();
+      });
+
+      // Format column should show 'Alchemy'
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'Alchemy');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should display Alchemy format with Alchemy event as "Alchemy Play Queue"', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Alchemy',
+        EventName: 'Alchemy',
+        Format: 'Alchemy',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alchemy Play Queue')).toBeInTheDocument();
+      });
+    });
+
+    it('should display HistoricBrawl format with HistoricBrawl_Play event as "HistoricBrawl Play Queue"', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'HistoricBrawl',
+        EventName: 'HistoricBrawl_Play',
+        Format: 'HistoricBrawl_Play',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('HistoricBrawl Play Queue')).toBeInTheDocument();
+      });
+
+      // Format column should show 'HistoricBrawl'
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'HistoricBrawl');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should display Explorer format with Explorer_Ladder event as "Explorer Ranked"', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Explorer',
+        EventName: 'Explorer_Ladder',
+        Format: 'Explorer_Ladder',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Explorer Ranked')).toBeInTheDocument();
+      });
+    });
+
+    it('should display Timeless format with Timeless_Ladder event as "Timeless Ranked"', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Timeless',
+        EventName: 'Timeless_Ladder',
+        Format: 'Timeless_Ladder',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Timeless Ranked')).toBeInTheDocument();
+      });
+    });
+
+    it('should display Traditional Draft for TradDraft event', async () => {
+      const match = createMockMatch({
+        DeckFormat: undefined,
+        EventName: 'TradDraft_DSK',
+        Format: 'TradDraft_DSK',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Both Format and Event columns should show 'Traditional Draft'
+        const elements = screen.getAllByText('Traditional Draft');
+        expect(elements.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    it('should display Sealed for SealedDeck event', async () => {
+      const match = createMockMatch({
+        DeckFormat: undefined,
+        EventName: 'SealedDeck_BLB',
+        Format: 'SealedDeck_BLB',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Both Format and Event columns should show 'Sealed'
+        const elements = screen.getAllByText('Sealed');
+        expect(elements.length).toBeGreaterThanOrEqual(2);
+      });
     });
 
     it('should display match count', async () => {

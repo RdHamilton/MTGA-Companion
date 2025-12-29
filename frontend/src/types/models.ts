@@ -2896,6 +2896,7 @@ export namespace models {
 	    OpponentWins: number;
 	    PlayerTeamID: number;
 	    DeckID?: string;
+	    DeckFormat?: string;
 	    RankBefore?: string;
 	    RankAfter?: string;
 	    Format: string;
@@ -2904,11 +2905,11 @@ export namespace models {
 	    OpponentName?: string;
 	    OpponentID?: string;
 	    CreatedAt: time.Time;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Match(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
@@ -2921,6 +2922,7 @@ export namespace models {
 	        this.OpponentWins = source["OpponentWins"];
 	        this.PlayerTeamID = source["PlayerTeamID"];
 	        this.DeckID = source["DeckID"];
+	        this.DeckFormat = source["DeckFormat"];
 	        this.RankBefore = source["RankBefore"];
 	        this.RankAfter = source["RankAfter"];
 	        this.Format = source["Format"];

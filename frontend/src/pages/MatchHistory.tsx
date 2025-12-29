@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
 import { matches as matchesApi } from '@/services/api';
 import { models } from '@/types/models';
+import { getDisplayFormat, getDisplayEventName } from '@/utils/formatNormalization';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
 import EmptyState from '../components/EmptyState';
@@ -206,16 +207,6 @@ const MatchHistory = () => {
     return `${wins}-${losses}`;
   };
 
-  // Normalize format name to show just the base format (e.g., "QuickDraft" instead of "QuickDraft_TLA_20251127")
-  const normalizeFormat = (format: string): string => {
-    if (!format) return format;
-    // Extract base format before underscore (e.g., "QuickDraft_TLA_20251127" -> "QuickDraft")
-    const underscoreIndex = format.indexOf('_');
-    if (underscoreIndex !== -1) {
-      return format.substring(0, underscoreIndex);
-    }
-    return format;
-  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -442,8 +433,8 @@ const MatchHistory = () => {
                       {match.Result.toUpperCase()}
                     </span>
                   </td>
-                  <td>{normalizeFormat(match.Format)}</td>
-                  <td>{normalizeFormat(match.EventName)}</td>
+                  <td>{getDisplayFormat(match)}</td>
+                  <td>{getDisplayEventName(match)}</td>
                   <td>{formatScore(match.PlayerWins, match.OpponentWins)}</td>
                   <td>{match.OpponentName || '—'}</td>
                 </tr>
