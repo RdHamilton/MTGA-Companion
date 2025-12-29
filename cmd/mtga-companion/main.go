@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -826,8 +827,11 @@ func runDaemonCommand() {
 	fmt.Println()
 	fmt.Println("Shutting down...")
 
-	// Stop daemon
-	if err := daemonService.Stop(); err != nil {
+	// Stop daemon with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := daemonService.Stop(shutdownCtx); err != nil {
 		log.Printf("Error stopping daemon: %v", err)
 	}
 
@@ -1008,8 +1012,11 @@ cleanup:
 	fmt.Println()
 	fmt.Println("Shutting down...")
 
-	// Stop daemon
-	if err := daemonService.Stop(); err != nil {
+	// Stop daemon with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := daemonService.Stop(shutdownCtx); err != nil {
 		log.Printf("Error stopping daemon: %v", err)
 	}
 

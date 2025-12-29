@@ -23,8 +23,11 @@ func NewQuestRepository(db *sql.DB) *QuestRepository {
 // Save saves a quest to the database (insert or update)
 func (r *QuestRepository) Save(quest *models.Quest) error {
 	// First, check if a quest with this quest_id already exists
+	// We also check the completed status to handle quest reassignment:
+	// If MTGA reuses a quest_id for a new quest after the old one was completed,
+	// we should create a new record instead of updating the old completed one.
 	existingQuery := `
-		SELECT id, ending_progress, assigned_at FROM quests
+		SELECT id, ending_progress, assigned_at, completed FROM quests
 		WHERE quest_id = ?
 		ORDER BY created_at DESC
 		LIMIT 1
@@ -33,10 +36,21 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	var existingID int
 	var existingProgress int
 	var existingAssignedAt time.Time
-	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt)
+	var existingCompleted bool
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt, &existingCompleted)
 
 	if err == nil {
-		// Quest exists - update it
+		// Quest exists - check if this is a quest reassignment
+		// If the existing quest was completed and the new quest is not completed,
+		// this is a NEW quest with a reused ID - insert it as a new record
+		if existingCompleted && !quest.Completed {
+			// Quest reassignment - insert as new record (fall through to insert logic)
+			err = sql.ErrNoRows // Force insert logic below
+		}
+	}
+
+	if err == nil {
+		// Quest exists and is not a reassignment - update it
 		// Use the completion status from the parser (which detects completion via quest disappearance)
 		// IMPORTANT: Preserve the original assigned_at timestamp for accurate duration calculation
 
@@ -125,10 +139,12 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 }
 
 // GetActiveQuests returns all incomplete, non-rerolled quests (one per unique quest_id)
-// Only returns quests that were last seen in a recent QuestGetQuests response (within 24 hours).
-// This prevents stale quest data from old historical log files from appearing as "active"
-// while allowing quests from the current gaming session (today) to show correctly.
-// Rerolled quests are excluded since they are no longer active in MTGA.
+// that were recently seen in a QuestGetQuests response (within 24 hours).
+// This is used by the API to show currently active quests.
+//
+// The 24-hour filter prevents stale quest data from old log files from appearing,
+// while allowing quests from the current gaming session to show correctly.
+// Quests are marked as "seen" when they appear in a QuestGetQuests response.
 func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
@@ -153,6 +169,37 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active quests: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	return r.scanQuests(rows)
+}
+
+// GetIncompleteQuests returns all incomplete, non-rerolled quests (one per unique quest_id)
+// WITHOUT any timestamp filtering. This is used internally by the log processor to
+// detect rerolled quests - any incomplete quest not in the current MTGA response is rerolled.
+//
+// This method should NOT be used for the API/UI - use GetActiveQuests() instead.
+func (r *QuestRepository) GetIncompleteQuests() ([]*models.Quest, error) {
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.last_seen_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE completed = 0
+			  AND rerolled = 0
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		WHERE q.completed = 0
+		  AND q.rerolled = 0
+		ORDER BY q.assigned_at DESC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get incomplete quests: %w", err)
 	}
 	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
 

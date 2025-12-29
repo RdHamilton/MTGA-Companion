@@ -95,7 +95,7 @@ export default defineConfig({
     // In CI, use a temp database with fixtures; locally, reuse existing server
     {
       command: process.env.CI
-        ? 'cd .. && go run ./cmd/apiserver --db-path=/tmp/e2e-test.db --load-fixtures=frontend/tests/e2e/fixtures/test-data.sql'
+        ? 'cd .. && go run ./cmd/apiserver --db-path=/tmp/e2e-test.db --load-fixtures=frontend/tests/e2e/fixtures/test-data.sql --daemon=false'
         : 'cd .. && go run ./cmd/apiserver',
       url: 'http://localhost:8080/health',
       timeout: 120 * 1000,

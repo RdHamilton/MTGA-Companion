@@ -504,7 +504,12 @@ func (s *SystemFacade) GetConnectionStatus() *ConnectionStatus {
 	status := "standalone"
 	connected := false
 
-	if s.services.IPCClient != nil && s.services.IPCClient.IsConnected() {
+	// Check if daemon is running integrated (same process)
+	if s.services.DaemonService != nil {
+		status = "connected"
+		connected = true
+	} else if s.services.IPCClient != nil && s.services.IPCClient.IsConnected() {
+		// Connected to external daemon via IPC
 		status = "connected"
 		connected = true
 	} else if s.services.IPCClient != nil {

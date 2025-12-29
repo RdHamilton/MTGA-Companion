@@ -1,6 +1,8 @@
-// Package main provides a standalone REST API server for E2E testing.
-// This server starts the REST API without the Wails runtime, enabling
-// frontend E2E tests to run against a real backend.
+// Package main provides the MTGA Companion server with integrated REST API and log processing daemon.
+// This server can run standalone (without the Wails desktop runtime), making it suitable for:
+// - Development with hot-reload frontend
+// - E2E testing
+// - Headless deployment (e.g., server mode)
 package main
 
 import (
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api"
+	"github.com/ramonehamilton/MTGA-Companion/internal/daemon"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
@@ -29,20 +32,33 @@ import (
 )
 
 var (
+	// API server flags
 	port         = flag.Int("port", 8080, "API server port")
 	dbPath       = flag.String("db-path", "", "Database path (default: ~/.mtga-companion/mtga.db)")
 	openBrowser  = flag.Bool("open-browser", false, "Open browser to frontend on startup")
 	frontendURL  = flag.String("frontend-url", "http://localhost:3000", "Frontend URL to open in browser")
 	loadFixtures = flag.String("load-fixtures", "", "Path to SQL fixtures file to load on startup")
+
+	// Daemon flags
+	enableDaemon = flag.Bool("daemon", true, "Enable log processing daemon (default: true)")
+	daemonPort   = flag.Int("daemon-port", 9999, "WebSocket server port for daemon events")
+	logPath      = flag.String("log-path", "", "MTGA Player.log path (auto-detect if empty)")
+	pollInterval = flag.Duration("poll-interval", 2*time.Second, "Log file poll interval")
+	useFSNotify  = flag.Bool("use-fsnotify", true, "Use file system events for log watching")
 )
 
 func main() {
 	flag.Parse()
 
-	fmt.Println("MTGA Companion - REST API Server")
-	fmt.Println("=================================")
+	fmt.Println("MTGA Companion Server")
+	fmt.Println("=====================")
 	fmt.Println()
-	fmt.Printf("Starting API server on port %d...\n", *port)
+	fmt.Printf("API server port: %d\n", *port)
+	if *enableDaemon {
+		fmt.Printf("Daemon enabled:  yes (WebSocket port %d)\n", *daemonPort)
+	} else {
+		fmt.Println("Daemon enabled:  no (standalone API mode)")
+	}
 
 	// Setup database path
 	finalDBPath := *dbPath
@@ -138,11 +154,28 @@ func main() {
 	// Initialize meta service
 	metaService := meta.NewService(nil)
 
+	// Create and start daemon if enabled
+	var daemonService *daemon.Service
+	if *enableDaemon {
+		daemonConfig := daemon.DefaultConfig()
+		daemonConfig.Port = *daemonPort
+		daemonConfig.LogPath = *logPath
+		daemonConfig.PollInterval = *pollInterval
+		daemonConfig.UseFSNotify = *useFSNotify
+		daemonConfig.DBPath = finalDBPath
+
+		daemonService = daemon.New(daemonConfig, storageService)
+		if err := daemonService.Start(); err != nil {
+			log.Fatalf("Failed to start daemon: %v", err)
+		}
+		fmt.Printf("Daemon started on port %d\n", *daemonPort)
+	}
+
 	// Initialize shared services
 	services := &gui.Services{
 		Context:              ctx,
 		Storage:              storageService,
-		DaemonPort:           9999,
+		DaemonPort:           *daemonPort,
 		DraftMetrics:         metrics.NewDraftMetrics(),
 		MetaService:          metaService,
 		SetFetcher:           setFetcher,
@@ -152,6 +185,7 @@ func main() {
 		DeckImportParser:     deckImportParser,
 		DeckExporter:         deckExporter,
 		RecommendationEngine: recommendationEngine,
+		DaemonService:        daemonService,
 	}
 
 	// Create facades
@@ -202,11 +236,19 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Stop daemon first (before API server)
+	if daemonService != nil {
+		fmt.Println("Stopping daemon...")
+		if err := daemonService.Stop(shutdownCtx); err != nil {
+			log.Printf("Error stopping daemon: %v", err)
+		}
+	}
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Error during shutdown: %v", err)
 	}
 
-	fmt.Println("API server stopped.")
+	fmt.Println("Server stopped.")
 }
 
 // loadFixturesFromFile reads and executes SQL statements from a fixture file.

@@ -147,31 +147,47 @@ func (s *Service) Start() error {
 }
 
 // Stop gracefully stops the daemon service.
-func (s *Service) Stop() error {
+// The context can be used to enforce a shutdown deadline.
+func (s *Service) Stop(ctx context.Context) error {
 	log.Println("Stopping daemon...")
 
-	// Archive Player.log before shutdown (Phase 4)
-	if err := s.archiveOnShutdown(); err != nil {
-		log.Printf("Warning: Failed to archive on shutdown: %v", err)
-	}
+	// Create a channel to signal completion
+	done := make(chan struct{})
 
-	// Cancel context
-	s.cancel()
-
-	// Stop poller
-	if s.poller != nil {
-		s.poller.Stop()
-	}
-
-	// Stop WebSocket server
-	if s.wsServer != nil {
-		if err := s.wsServer.Stop(); err != nil {
-			log.Printf("Error stopping WebSocket server: %v", err)
+	go func() {
+		// Archive Player.log before shutdown (Phase 4)
+		if err := s.archiveOnShutdown(); err != nil {
+			log.Printf("Warning: Failed to archive on shutdown: %v", err)
 		}
-	}
 
-	log.Println("Daemon stopped")
-	return nil
+		// Cancel context
+		s.cancel()
+
+		// Stop poller
+		if s.poller != nil {
+			s.poller.Stop()
+		}
+
+		// Stop WebSocket server
+		if s.wsServer != nil {
+			if err := s.wsServer.Stop(); err != nil {
+				log.Printf("Error stopping WebSocket server: %v", err)
+			}
+		}
+
+		close(done)
+	}()
+
+	// Wait for shutdown to complete or context to expire
+	select {
+	case <-done:
+		log.Println("Daemon stopped")
+		return nil
+	case <-ctx.Done():
+		log.Println("Daemon shutdown timed out, forcing stop")
+		s.cancel() // Force cancel if not already done
+		return ctx.Err()
+	}
 }
 
 // processUpdates processes log updates and broadcasts events.
