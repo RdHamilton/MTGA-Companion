@@ -314,6 +314,32 @@ test.describe('Data Pipeline - Log to UI', () => {
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
     });
+
+    test('should toggle Set Completion panel when button is clicked (#756)', async ({ page }) => {
+      const collectionPage = page.locator('.collection-page');
+      await expect(collectionPage).toBeVisible({ timeout: 10000 });
+
+      // Find and click the Show Set Completion button
+      const showButton = page.locator('button.set-completion-button');
+      await expect(showButton).toBeVisible();
+      await expect(showButton).toContainText('Show Set Completion');
+
+      await showButton.click();
+
+      // Button text should change to Hide
+      await expect(showButton).toContainText('Hide Set Completion');
+
+      // Set Completion panel should be visible with heading
+      const panelHeading = page.locator('.set-completion-panel h2');
+      await expect(panelHeading).toContainText('Set Completion');
+
+      // Click again to hide
+      await showButton.click();
+      await expect(showButton).toContainText('Show Set Completion');
+
+      // Panel should be hidden
+      await expect(panelHeading).not.toBeVisible();
+    });
   });
 
   test.describe('Meta Pipeline', () => {

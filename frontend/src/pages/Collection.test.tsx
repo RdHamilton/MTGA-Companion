@@ -573,6 +573,57 @@ describe('Collection', () => {
         expect(screen.getByRole('button', { name: 'Hide Set Completion' })).toBeInTheDocument();
       });
     });
+
+    it('should display Set Completion panel content when button is clicked (#756)', async () => {
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
+      mockCollection.getSetCompletion.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show Set Completion' }));
+
+      await waitFor(() => {
+        // Verify the Set Completion panel heading is visible
+        expect(screen.getByRole('heading', { name: 'Set Completion' })).toBeInTheDocument();
+      });
+    });
+
+    it('should hide Set Completion panel when Hide button is clicked', async () => {
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
+      mockCollection.getSetCompletion.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Show Set Completion' })).toBeInTheDocument();
+      });
+
+      // Open the panel
+      fireEvent.click(screen.getByRole('button', { name: 'Show Set Completion' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Set Completion' })).toBeInTheDocument();
+      });
+
+      // Close the panel
+      fireEvent.click(screen.getByRole('button', { name: 'Hide Set Completion' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { name: 'Set Completion' })).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe('Card Display Features', () => {
