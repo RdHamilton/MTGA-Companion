@@ -45,11 +45,11 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 			continue
 		}
 
-		// Parse timestamp
-		timestamp := time.Now()
+		// Parse timestamp from log entry for AssignedAt/CompletedAt
+		logTimestamp := time.Now()
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
-				timestamp = parsedTime
+				logTimestamp = parsedTime
 			}
 		}
 
@@ -62,23 +62,28 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 				// Track which quest IDs are present in this response
 				currentQuestIDs := make(map[string]bool)
 
+				// Use current time for LastSeenAt - this indicates when we processed the quest,
+				// not when the log entry was written. This ensures quests appear as "active"
+				// when the daemon processes them, even if reading old log entries.
+				now := time.Now()
+
 				if questArray, ok := questsData.([]interface{}); ok {
 					for _, q := range questArray {
 						if questJSON, ok := q.(map[string]interface{}); ok {
-							quest := parseQuestFromMap(questJSON, timestamp)
+							quest := parseQuestFromMap(questJSON, logTimestamp)
 							if quest != nil {
 								currentQuestIDs[quest.QuestID] = true
-								lastSeenQuestIDs[quest.QuestID] = timestamp
+								lastSeenQuestIDs[quest.QuestID] = now
 
 								// Update or add quest
 								if existing, exists := questMap[quest.QuestID]; exists {
 									// Update existing quest progress and last seen timestamp
 									existing.EndingProgress = quest.EndingProgress
 									existing.CanSwap = quest.CanSwap
-									existing.LastSeenAt = &timestamp
+									existing.LastSeenAt = &now
 								} else {
-									// New quest - set last seen to current timestamp
-									quest.LastSeenAt = &timestamp
+									// New quest - set last seen to current time
+									quest.LastSeenAt = &now
 									questMap[quest.QuestID] = quest
 									questsFound++
 								}
@@ -89,11 +94,13 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 				// Check for quest disappearance (completion detection)
 				// If we previously saw a quest but it's not in this response, it was completed
+				// Use log timestamp for CompletedAt since it reflects when the action happened
 				for questID, quest := range questMap {
 					if !quest.Completed && !currentQuestIDs[questID] {
 						// Quest disappeared - mark as completed
 						quest.Completed = true
-						quest.CompletedAt = &timestamp
+						completedAt := logTimestamp
+						quest.CompletedAt = &completedAt
 						// Set progress to goal when completed
 						quest.EndingProgress = quest.Goal
 						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
@@ -105,12 +112,14 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 		// Check for "newQuests" event (newly assigned quests)
 		if newQuestsData, ok := entry.JSON["newQuests"]; ok {
 			if questArray, ok := newQuestsData.([]interface{}); ok {
+				now := time.Now()
 				for _, q := range questArray {
 					if questJSON, ok := q.(map[string]interface{}); ok {
-						quest := parseQuestFromMap(questJSON, timestamp)
+						quest := parseQuestFromMap(questJSON, logTimestamp)
 						if quest != nil {
-							quest.AssignedAt = timestamp
-							lastSeenQuestIDs[quest.QuestID] = timestamp
+							quest.AssignedAt = logTimestamp
+							quest.LastSeenAt = &now
+							lastSeenQuestIDs[quest.QuestID] = now
 
 							// Add or update quest
 							if _, exists := questMap[quest.QuestID]; !exists {
@@ -156,11 +165,11 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 			continue
 		}
 
-		// Parse timestamp
-		timestamp := time.Now()
+		// Parse timestamp from log entry for AssignedAt/CompletedAt
+		logTimestamp := time.Now()
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
-				timestamp = parsedTime
+				logTimestamp = parsedTime
 			}
 		}
 
@@ -174,10 +183,15 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 				// Track which quest IDs are present in this response
 				currentQuestIDs := make(map[string]bool)
 
+				// Use current time for LastSeenAt - this indicates when we processed the quest,
+				// not when the log entry was written. This ensures quests appear as "active"
+				// when the daemon processes them, even if reading old log entries.
+				now := time.Now()
+
 				if questArray, ok := questsData.([]interface{}); ok {
 					for _, q := range questArray {
 						if questJSON, ok := q.(map[string]interface{}); ok {
-							quest := parseQuestFromMap(questJSON, timestamp)
+							quest := parseQuestFromMap(questJSON, logTimestamp)
 							if quest != nil {
 								currentQuestIDs[quest.QuestID] = true
 
@@ -186,10 +200,10 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 									// Update existing quest progress and last seen timestamp
 									existing.EndingProgress = quest.EndingProgress
 									existing.CanSwap = quest.CanSwap
-									existing.LastSeenAt = &timestamp
+									existing.LastSeenAt = &now
 								} else {
-									// New quest - set last seen to current timestamp
-									quest.LastSeenAt = &timestamp
+									// New quest - set last seen to current time
+									quest.LastSeenAt = &now
 									questMap[quest.QuestID] = quest
 									questsFound++
 								}
@@ -198,17 +212,19 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 					}
 				}
 
-				// Track the latest response's quest IDs
-				if timestamp.After(latestResponseTime) {
-					latestResponseTime = timestamp
+				// Track the latest response's quest IDs (use log timestamp for historical tracking)
+				if logTimestamp.After(latestResponseTime) {
+					latestResponseTime = logTimestamp
 					latestResponseQuestIDs = currentQuestIDs
 				}
 
 				// Check for quest disappearance (completion detection)
+				// Use log timestamp for CompletedAt since it reflects when the action happened
 				for questID, quest := range questMap {
 					if !quest.Completed && !currentQuestIDs[questID] {
 						quest.Completed = true
-						quest.CompletedAt = &timestamp
+						completedAt := logTimestamp
+						quest.CompletedAt = &completedAt
 						quest.EndingProgress = quest.Goal
 						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
 					}
@@ -219,11 +235,13 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 		// Check for "newQuests" event (newly assigned quests)
 		if newQuestsData, ok := entry.JSON["newQuests"]; ok {
 			if questArray, ok := newQuestsData.([]interface{}); ok {
+				now := time.Now()
 				for _, q := range questArray {
 					if questJSON, ok := q.(map[string]interface{}); ok {
-						quest := parseQuestFromMap(questJSON, timestamp)
+						quest := parseQuestFromMap(questJSON, logTimestamp)
 						if quest != nil {
-							quest.AssignedAt = timestamp
+							quest.AssignedAt = logTimestamp
+							quest.LastSeenAt = &now
 
 							if _, exists := questMap[quest.QuestID]; !exists {
 								questMap[quest.QuestID] = quest
