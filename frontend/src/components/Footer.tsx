@@ -90,7 +90,8 @@ const Footer = () => {
   return (
     <footer className="app-footer">
       <div className="footer-content">
-        <span className="footer-icon">📊</span>
+        <span className="footer-label">All Time</span>
+        <span className="footer-separator">|</span>
         <span className="footer-stat">
           <strong>Matches:</strong> {stats.TotalMatches}
         </span>

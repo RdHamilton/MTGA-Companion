@@ -290,7 +290,7 @@ describe('Footer Component', () => {
   });
 
   describe('Visual Elements', () => {
-    it('should display footer icon', async () => {
+    it('should display All Time label', async () => {
       const stats = createMockStatistics();
       mockMatches.getStats.mockResolvedValue(stats);
       mockMatches.getMatches.mockResolvedValue([]);
@@ -298,7 +298,7 @@ describe('Footer Component', () => {
       render(<Footer />);
 
       await waitFor(() => {
-        expect(screen.getByText('📊')).toBeInTheDocument();
+        expect(screen.getByText('All Time')).toBeInTheDocument();
       });
     });
 

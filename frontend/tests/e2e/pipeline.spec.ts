@@ -633,7 +633,7 @@ test.describe('Data Pipeline - Log to UI', () => {
 
   test.describe('Footer Stats Pipeline', () => {
     test('should display stats in footer from parsed matches', async ({ page }) => {
-      const footer = page.locator('.footer, footer');
+      const footer = page.locator('.app-footer, footer');
       const hasFooter = await footer.isVisible().catch(() => false);
 
       if (hasFooter) {
@@ -645,6 +645,17 @@ test.describe('Data Pipeline - Log to UI', () => {
           footerText?.includes('W') || footerText?.includes('L') || footerText?.includes('%');
 
         expect(hasStats).toBeTruthy();
+      }
+    });
+
+    test('should display All Time label in footer to clarify stats scope (#741)', async ({ page }) => {
+      const footer = page.locator('.app-footer, footer');
+      const hasFooter = await footer.isVisible().catch(() => false);
+
+      if (hasFooter) {
+        // Footer should clearly indicate these are "All Time" stats
+        const allTimeLabel = footer.locator('.footer-label');
+        await expect(allTimeLabel).toContainText('All Time');
       }
     });
   });
