@@ -119,8 +119,8 @@ func parseConstructedRank(json map[string]interface{}, timestamp time.Time) *Ran
 		update.OldStep = int(rankStep) // No old value in current format
 	}
 
-	// Only add if we have essential data
-	if update.SeasonOrdinal > 0 && (update.NewClass != "" || update.NewLevel > 0) {
+	// Only add if we have essential data - require rank class to prevent "Unranked" entries
+	if update.SeasonOrdinal > 0 && update.NewClass != "" {
 		return update
 	}
 
@@ -157,8 +157,8 @@ func parseLimitedRank(json map[string]interface{}, timestamp time.Time) *RankUpd
 		update.OldStep = int(rankStep) // No old value in current format
 	}
 
-	// Only add if we have essential data
-	if update.SeasonOrdinal > 0 && (update.NewClass != "" || update.NewLevel > 0) {
+	// Only add if we have essential data - require rank class to prevent "Unranked" entries
+	if update.SeasonOrdinal > 0 && update.NewClass != "" {
 		return update
 	}
 

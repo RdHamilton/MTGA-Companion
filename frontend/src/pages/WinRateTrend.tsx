@@ -54,9 +54,12 @@ const WinRateTrend = () => {
         formats = [format];
       }
 
+      // Format dates as YYYY-MM-DD (backend expects this format)
+      const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
       const data = await matches.getTrendAnalysis({
-        start_date: start.toISOString(),
-        end_date: now.toISOString(),
+        start_date: formatDate(start),
+        end_date: formatDate(now),
         period_type: periodType,
         formats: formats || undefined,
       });
