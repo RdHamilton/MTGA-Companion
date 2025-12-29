@@ -74,7 +74,7 @@ jobs:
         find docs/images -name "*.png" -exec optipng -o2 {} \; || true
 
     - name: Upload screenshots as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: documentation-screenshots
         path: docs/images/*.png
