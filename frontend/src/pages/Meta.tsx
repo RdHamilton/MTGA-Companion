@@ -4,15 +4,14 @@ import { gui } from '@/types/models';
 import './Meta.css';
 
 /**
- * Supported constructed formats for metagame data.
- * Only competitive constructed formats are included - no draft formats.
- * Matches the format options in Match History.
+ * Supported formats for metagame data.
+ * Must match formats supported by MTGTop8 backend (internal/meta/mtgtop8.go).
+ * Alchemy is NOT supported as MTGTop8 doesn't track Arena-only formats.
  */
 const META_FORMATS = [
   { value: 'standard', label: 'Standard' },
   { value: 'historic', label: 'Historic' },
   { value: 'explorer', label: 'Explorer' },
-  { value: 'alchemy', label: 'Alchemy' },
   { value: 'pioneer', label: 'Pioneer' },
   { value: 'modern', label: 'Modern' },
 ] as const;
