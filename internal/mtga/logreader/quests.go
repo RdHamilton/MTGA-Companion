@@ -117,7 +117,6 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 					if questJSON, ok := q.(map[string]interface{}); ok {
 						quest := parseQuestFromMap(questJSON, logTimestamp)
 						if quest != nil {
-							quest.AssignedAt = logTimestamp
 							quest.LastSeenAt = &now
 
 							// Add or update quest
@@ -241,7 +240,6 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 					if questJSON, ok := q.(map[string]interface{}); ok {
 						quest := parseQuestFromMap(questJSON, logTimestamp)
 						if quest != nil {
-							quest.AssignedAt = logTimestamp
 							quest.LastSeenAt = &now
 
 							if _, exists := questMap[quest.QuestID]; !exists {

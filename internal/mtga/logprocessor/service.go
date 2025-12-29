@@ -369,7 +369,7 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 	// If we had a QuestGetQuests response, check for rerolled quests
 	// Any active quest in the database that's NOT in the current MTGA response was rerolled
 	if parseResult.HasQuestResponse && len(parseResult.CurrentQuestIDs) > 0 && !s.dryRun {
-		rerolledCount, err := s.markRerolledQuests(parseResult.CurrentQuestIDs, parseResult.LatestResponseTime)
+		rerolledCount, err := s.markRerolledQuests(parseResult.CurrentQuestIDs)
 		if err != nil {
 			log.Printf("Warning: Failed to mark rerolled quests: %v", err)
 		} else if rerolledCount > 0 {
@@ -388,7 +388,7 @@ func (s *Service) processQuests(ctx context.Context, entries []*logreader.LogEnt
 // - GetActiveQuests has a 24-hour filter on last_seen_at for the API
 // - GetIncompleteQuests returns ALL incomplete, non-rerolled quests
 // - This ensures old quests that weren't properly marked are cleaned up
-func (s *Service) markRerolledQuests(currentQuestIDs map[string]bool, timestamp time.Time) (int, error) {
+func (s *Service) markRerolledQuests(currentQuestIDs map[string]bool) (int, error) {
 	// Get ALL incomplete (not completed, not rerolled) quests from the database
 	// We need all of them to properly detect which ones were rerolled
 	incompleteQuests, err := s.storage.Quests().GetIncompleteQuests()
