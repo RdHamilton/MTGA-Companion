@@ -23,8 +23,11 @@ func NewQuestRepository(db *sql.DB) *QuestRepository {
 // Save saves a quest to the database (insert or update)
 func (r *QuestRepository) Save(quest *models.Quest) error {
 	// First, check if a quest with this quest_id already exists
+	// We also check the completed status to handle quest reassignment:
+	// If MTGA reuses a quest_id for a new quest after the old one was completed,
+	// we should create a new record instead of updating the old completed one.
 	existingQuery := `
-		SELECT id, ending_progress, assigned_at FROM quests
+		SELECT id, ending_progress, assigned_at, completed FROM quests
 		WHERE quest_id = ?
 		ORDER BY created_at DESC
 		LIMIT 1
@@ -33,10 +36,21 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	var existingID int
 	var existingProgress int
 	var existingAssignedAt time.Time
-	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt)
+	var existingCompleted bool
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt, &existingCompleted)
 
 	if err == nil {
-		// Quest exists - update it
+		// Quest exists - check if this is a quest reassignment
+		// If the existing quest was completed and the new quest is not completed,
+		// this is a NEW quest with a reused ID - insert it as a new record
+		if existingCompleted && !quest.Completed {
+			// Quest reassignment - insert as new record (fall through to insert logic)
+			err = sql.ErrNoRows // Force insert logic below
+		}
+	}
+
+	if err == nil {
+		// Quest exists and is not a reassignment - update it
 		// Use the completion status from the parser (which detects completion via quest disappearance)
 		// IMPORTANT: Preserve the original assigned_at timestamp for accurate duration calculation
 

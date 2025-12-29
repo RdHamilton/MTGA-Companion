@@ -350,3 +350,85 @@ func TestDeduplicateQuestsByQuestID(t *testing.T) {
 		t.Errorf("calculateTotalGoldEarned with duplicates = %d, want 750", total)
 	}
 }
+
+func TestQuestReassignment(t *testing.T) {
+	// Test that when MTGA reuses a quest_id for a new quest after the old one was completed,
+	// we create a new record instead of updating the old completed one.
+	db := setupTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewQuestRepository(db)
+	now := time.Now().UTC()
+
+	// First, save a quest and complete it
+	quest1 := &models.Quest{
+		QuestID:        "reused-quest-id",
+		QuestType:      "First Quest",
+		Goal:           5,
+		EndingProgress: 5,
+		Completed:      true,
+		AssignedAt:     now.Add(-48 * time.Hour),
+		CompletedAt:    &now,
+		LastSeenAt:     &now,
+	}
+	completedAt := now.Add(-24 * time.Hour)
+	quest1.CompletedAt = &completedAt
+
+	err := repo.Save(quest1)
+	if err != nil {
+		t.Fatalf("Failed to save first quest: %v", err)
+	}
+	firstQuestID := quest1.ID
+
+	// Now MTGA reuses the same quest_id for a NEW quest
+	newLastSeen := now
+	quest2 := &models.Quest{
+		QuestID:        "reused-quest-id", // Same ID!
+		QuestType:      "Second Quest (Reused ID)",
+		Goal:           10,
+		EndingProgress: 0,
+		Completed:      false, // Not completed - this is a NEW quest
+		AssignedAt:     now,
+		LastSeenAt:     &newLastSeen,
+	}
+
+	err = repo.Save(quest2)
+	if err != nil {
+		t.Fatalf("Failed to save second quest: %v", err)
+	}
+
+	// The second quest should get a NEW ID (not update the first)
+	if quest2.ID == firstQuestID {
+		t.Errorf("Quest reassignment should create new record, but got same ID: %d", quest2.ID)
+	}
+
+	// Verify we now have 2 records with the same quest_id
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM quests WHERE quest_id = ?", "reused-quest-id").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count quests: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Expected 2 quests with same quest_id, got %d", count)
+	}
+
+	// Verify the first quest is still completed
+	var firstCompleted bool
+	err = db.QueryRow("SELECT completed FROM quests WHERE id = ?", firstQuestID).Scan(&firstCompleted)
+	if err != nil {
+		t.Fatalf("Failed to query first quest: %v", err)
+	}
+	if !firstCompleted {
+		t.Error("First quest should still be completed")
+	}
+
+	// Verify the second quest is not completed
+	var secondCompleted bool
+	err = db.QueryRow("SELECT completed FROM quests WHERE id = ?", quest2.ID).Scan(&secondCompleted)
+	if err != nil {
+		t.Fatalf("Failed to query second quest: %v", err)
+	}
+	if secondCompleted {
+		t.Error("Second quest should not be completed")
+	}
+}
