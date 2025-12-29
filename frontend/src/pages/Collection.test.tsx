@@ -655,7 +655,8 @@ describe('Collection', () => {
 
   describe('Null/Undefined API Response Handling', () => {
     it('should handle null collection response gracefully', async () => {
-      mockCollection.getCollection.mockResolvedValue(null);
+      // Simulate API returning null (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue(null as unknown as gui.CollectionCard[]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -671,7 +672,8 @@ describe('Collection', () => {
     });
 
     it('should handle undefined collection response gracefully', async () => {
-      mockCollection.getCollection.mockResolvedValue(undefined);
+      // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue(undefined as unknown as gui.CollectionCard[]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -687,8 +689,8 @@ describe('Collection', () => {
     });
 
     it('should handle non-array collection response gracefully', async () => {
-      // API might return an object instead of array
-      mockCollection.getCollection.mockResolvedValue({ error: 'invalid' } as unknown);
+      // API might return an object instead of array (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue({ error: 'invalid' } as unknown as gui.CollectionCard[]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -706,7 +708,8 @@ describe('Collection', () => {
     it('should handle null sets response gracefully', async () => {
       mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockCardsApi.getAllSetInfo.mockResolvedValue(null);
+      // Simulate API returning null (cast to bypass type check - this is what we're testing)
+      mockCardsApi.getAllSetInfo.mockResolvedValue(null as unknown as gui.SetInfo[]);
 
       renderWithRouter(<Collection />);
 
@@ -722,7 +725,8 @@ describe('Collection', () => {
     it('should handle undefined sets response gracefully', async () => {
       mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
-      mockCardsApi.getAllSetInfo.mockResolvedValue(undefined);
+      // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
+      mockCardsApi.getAllSetInfo.mockResolvedValue(undefined as unknown as gui.SetInfo[]);
 
       renderWithRouter(<Collection />);
 
