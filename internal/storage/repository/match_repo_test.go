@@ -1110,3 +1110,365 @@ func TestMatchRepository_GetMatches_MixedDeckAndNoDeck(t *testing.T) {
 		t.Errorf("expected draft match to have nil DeckFormat, got '%s'", *results[1].DeckFormat)
 	}
 }
+
+func TestMatchRepository_GetDailyWins(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	// Get today's start time for comparison
+	now := time.Now().UTC()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	yesterday := startOfToday.Add(-24 * time.Hour)
+
+	// Create matches:
+	// - 2 wins today
+	// - 1 loss today
+	// - 1 win yesterday (should not count)
+	matches := []*models.Match{
+		{
+			ID:           "match-today-win-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(1 * time.Hour), // 1am today
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-today-win-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(3 * time.Hour), // 3am today
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-today-loss",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(5 * time.Hour), // 5am today
+			PlayerWins:   1,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "loss",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-yesterday-win",
+			AccountID:    1,
+			EventID:      "event-4",
+			EventName:    "Standard Ranked",
+			Timestamp:    yesterday.Add(12 * time.Hour), // Noon yesterday
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Get daily wins for all accounts (accountID = 0)
+	dailyWins, err := repo.GetDailyWins(ctx, 0)
+	if err != nil {
+		t.Fatalf("failed to get daily wins: %v", err)
+	}
+
+	if dailyWins != 2 {
+		t.Errorf("expected 2 daily wins, got %d", dailyWins)
+	}
+
+	// Get daily wins for account 1
+	dailyWins, err = repo.GetDailyWins(ctx, 1)
+	if err != nil {
+		t.Fatalf("failed to get daily wins for account: %v", err)
+	}
+
+	if dailyWins != 2 {
+		t.Errorf("expected 2 daily wins for account 1, got %d", dailyWins)
+	}
+
+	// Get daily wins for non-existent account
+	dailyWins, err = repo.GetDailyWins(ctx, 999)
+	if err != nil {
+		t.Fatalf("failed to get daily wins for non-existent account: %v", err)
+	}
+
+	if dailyWins != 0 {
+		t.Errorf("expected 0 daily wins for non-existent account, got %d", dailyWins)
+	}
+}
+
+func TestMatchRepository_GetWeeklyWins(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	// Get this week's start time (Sunday)
+	now := time.Now().UTC()
+	daysSinceSunday := int(now.Weekday())
+	startOfWeek := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 0, 0, 0, 0, time.UTC)
+	lastWeek := startOfWeek.Add(-7 * 24 * time.Hour) // Start of last week
+
+	// Create matches:
+	// - 3 wins this week
+	// - 1 loss this week
+	// - 2 wins last week (should not count)
+	matches := []*models.Match{
+		{
+			ID:           "match-thisweek-win-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Historic Ranked",
+			Timestamp:    startOfWeek.Add(6 * time.Hour), // Sunday 6am
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-thisweek-win-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Historic Ranked",
+			Timestamp:    startOfWeek.Add(30 * time.Hour), // Monday 6am
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-thisweek-win-3",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Historic Ranked",
+			Timestamp:    startOfWeek.Add(54 * time.Hour), // Tuesday 6am
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-thisweek-loss",
+			AccountID:    1,
+			EventID:      "event-4",
+			EventName:    "Historic Ranked",
+			Timestamp:    startOfWeek.Add(12 * time.Hour), // Sunday noon
+			PlayerWins:   0,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "loss",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-lastweek-win-1",
+			AccountID:    1,
+			EventID:      "event-5",
+			EventName:    "Historic Ranked",
+			Timestamp:    lastWeek.Add(24 * time.Hour), // Last Monday
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-lastweek-win-2",
+			AccountID:    1,
+			EventID:      "event-6",
+			EventName:    "Historic Ranked",
+			Timestamp:    lastWeek.Add(48 * time.Hour), // Last Tuesday
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Historic",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Get weekly wins for all accounts
+	weeklyWins, err := repo.GetWeeklyWins(ctx, 0)
+	if err != nil {
+		t.Fatalf("failed to get weekly wins: %v", err)
+	}
+
+	if weeklyWins != 3 {
+		t.Errorf("expected 3 weekly wins, got %d", weeklyWins)
+	}
+
+	// Get weekly wins for account 1
+	weeklyWins, err = repo.GetWeeklyWins(ctx, 1)
+	if err != nil {
+		t.Fatalf("failed to get weekly wins for account: %v", err)
+	}
+
+	if weeklyWins != 3 {
+		t.Errorf("expected 3 weekly wins for account 1, got %d", weeklyWins)
+	}
+
+	// Get weekly wins for non-existent account
+	weeklyWins, err = repo.GetWeeklyWins(ctx, 999)
+	if err != nil {
+		t.Fatalf("failed to get weekly wins for non-existent account: %v", err)
+	}
+
+	if weeklyWins != 0 {
+		t.Errorf("expected 0 weekly wins for non-existent account, got %d", weeklyWins)
+	}
+}
+
+func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create second account
+	_, err := db.Exec(`INSERT INTO accounts (id, name, is_default) VALUES (2, 'Second Account', 0)`)
+	if err != nil {
+		t.Fatalf("failed to create second account: %v", err)
+	}
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	// Create wins for account 1 (3 wins) and account 2 (2 wins)
+	matches := []*models.Match{
+		{
+			ID:           "match-acc1-win-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(2 * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-acc1-win-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(4 * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-acc1-win-3",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(6 * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-acc2-win-1",
+			AccountID:    2,
+			EventID:      "event-4",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(3 * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-acc2-win-2",
+			AccountID:    2,
+			EventID:      "event-5",
+			EventName:    "Standard Ranked",
+			Timestamp:    startOfToday.Add(5 * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Get wins for account 1
+	winsAcc1, err := repo.GetDailyWins(ctx, 1)
+	if err != nil {
+		t.Fatalf("failed to get daily wins for account 1: %v", err)
+	}
+	if winsAcc1 != 3 {
+		t.Errorf("expected 3 daily wins for account 1, got %d", winsAcc1)
+	}
+
+	// Get wins for account 2
+	winsAcc2, err := repo.GetDailyWins(ctx, 2)
+	if err != nil {
+		t.Fatalf("failed to get daily wins for account 2: %v", err)
+	}
+	if winsAcc2 != 2 {
+		t.Errorf("expected 2 daily wins for account 2, got %d", winsAcc2)
+	}
+
+	// Get total wins (all accounts)
+	totalWins, err := repo.GetDailyWins(ctx, 0)
+	if err != nil {
+		t.Fatalf("failed to get total daily wins: %v", err)
+	}
+	if totalWins != 5 {
+		t.Errorf("expected 5 total daily wins, got %d", totalWins)
+	}
+}

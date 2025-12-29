@@ -91,6 +91,8 @@ export const mockQuests = {
   getActiveQuests: vi.fn(),
   getQuestHistory: vi.fn(),
   getCurrentAccount: vi.fn(),
+  getDailyWins: vi.fn(() => Promise.resolve({ wins: 0, goal: 15 })),
+  getWeeklyWins: vi.fn(() => Promise.resolve({ wins: 0, goal: 15 })),
 };
 
 export const mockSettings = {

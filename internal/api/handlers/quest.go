@@ -72,30 +72,30 @@ func (h *QuestHandler) GetQuestHistory(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, quests)
 }
 
-// GetDailyWins returns daily wins progress.
+// GetDailyWins returns daily wins progress, calculated from actual match data.
 func (h *QuestHandler) GetDailyWins(w http.ResponseWriter, r *http.Request) {
-	account, err := h.facade.GetCurrentAccount(r.Context())
+	dailyWins, err := h.facade.GetDailyWins(r.Context())
 	if err != nil {
 		response.InternalError(w, err)
 		return
 	}
 
 	response.Success(w, map[string]interface{}{
-		"dailyWins": account.DailyWins,
+		"dailyWins": dailyWins,
 		"goal":      15,
 	})
 }
 
-// GetWeeklyWins returns weekly wins progress.
+// GetWeeklyWins returns weekly wins progress, calculated from actual match data.
 func (h *QuestHandler) GetWeeklyWins(w http.ResponseWriter, r *http.Request) {
-	account, err := h.facade.GetCurrentAccount(r.Context())
+	weeklyWins, err := h.facade.GetWeeklyWins(r.Context())
 	if err != nil {
 		response.InternalError(w, err)
 		return
 	}
 
 	response.Success(w, map[string]interface{}{
-		"weeklyWins": account.WeeklyWins,
+		"weeklyWins": weeklyWins,
 		"goal":       15,
 	})
 }

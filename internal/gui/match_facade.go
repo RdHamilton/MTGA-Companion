@@ -200,3 +200,46 @@ func (m *MatchFacade) GetCurrentAccount(ctx context.Context) (*models.Account, e
 	}
 	return account, nil
 }
+
+// GetDailyWins returns the number of match wins for today, calculated from actual match data.
+func (m *MatchFacade) GetDailyWins(ctx context.Context) (int, error) {
+	if m.services.Storage == nil {
+		return 0, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+
+	// Get current account to filter by account_id
+	account, err := m.services.Storage.GetCurrentAccount(ctx)
+	if err != nil {
+		log.Printf("Error fetching current account for daily wins: %v", err)
+		return 0, err
+	}
+
+	accountID := 0
+	if account != nil {
+		accountID = account.ID
+	}
+
+	return m.services.Storage.MatchRepo().GetDailyWins(ctx, accountID)
+}
+
+// GetWeeklyWins returns the number of match wins for the current week (Sunday-Saturday),
+// calculated from actual match data.
+func (m *MatchFacade) GetWeeklyWins(ctx context.Context) (int, error) {
+	if m.services.Storage == nil {
+		return 0, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+
+	// Get current account to filter by account_id
+	account, err := m.services.Storage.GetCurrentAccount(ctx)
+	if err != nil {
+		log.Printf("Error fetching current account for weekly wins: %v", err)
+		return 0, err
+	}
+
+	accountID := 0
+	if account != nil {
+		accountID = account.ID
+	}
+
+	return m.services.Storage.MatchRepo().GetWeeklyWins(ctx, accountID)
+}
