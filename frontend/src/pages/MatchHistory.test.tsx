@@ -302,6 +302,65 @@ describe('MatchHistory', () => {
       expect(screen.queryByText('PremierDraft_MKM_20241120')).not.toBeInTheDocument();
     });
 
+    it('should display combined format and queue type for Standard Ranked', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Standard',
+        EventName: 'Ladder',
+        Format: 'Ladder',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Event column should show 'Standard Ranked'
+        expect(screen.getByText('Standard Ranked')).toBeInTheDocument();
+      });
+
+      // Format column should show 'Standard' (exact match)
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'Standard');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should display combined format and queue type for Historic Play Queue', async () => {
+      const match = createMockMatch({
+        DeckFormat: 'Historic',
+        EventName: 'Play',
+        Format: 'Play',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Event column should show 'Historic Play Queue'
+        expect(screen.getByText('Historic Play Queue')).toBeInTheDocument();
+      });
+
+      // Format column should show 'Historic' (exact match)
+      const cells = screen.getAllByRole('cell');
+      const formatCell = cells.find(cell => cell.textContent === 'Historic');
+      expect(formatCell).toBeDefined();
+    });
+
+    it('should normalize Play to Play Queue without DeckFormat', async () => {
+      const match = createMockMatch({
+        DeckFormat: undefined,
+        EventName: 'Play',
+        Format: 'Play',
+      });
+      mockMatches.getMatches.mockResolvedValue([match]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Both columns should show 'Play Queue'
+        const playQueueElements = screen.getAllByText('Play Queue');
+        expect(playQueueElements.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
     it('should display match count', async () => {
       const matches = Array.from({ length: 5 }, (_, i) =>
         createMockMatch({ ID: `match-${i}` })

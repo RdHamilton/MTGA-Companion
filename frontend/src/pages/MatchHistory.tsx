@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
 import { matches as matchesApi } from '@/services/api';
 import { models } from '@/types/models';
+import { getDisplayFormat, getDisplayEventName } from '@/utils/formatNormalization';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Tooltip from '../components/Tooltip';
 import EmptyState from '../components/EmptyState';
@@ -206,56 +207,6 @@ const MatchHistory = () => {
     return `${wins}-${losses}`;
   };
 
-  // Map queue types to user-friendly names
-  const normalizeQueueType = (queueType: string): string => {
-    if (!queueType) return queueType;
-
-    // Map common MTGA event IDs to friendly names
-    const queueTypeMap: Record<string, string> = {
-      'Play': 'Play Queue',
-      'Ladder': 'Ranked',
-      'Traditional_Ladder': 'Traditional Ranked',
-      'Traditional_Play': 'Traditional Play',
-    };
-
-    // Check if it's a draft format (contains underscore with set code pattern)
-    const underscoreIndex = queueType.indexOf('_');
-    if (underscoreIndex !== -1) {
-      const prefix = queueType.substring(0, underscoreIndex);
-      // Known draft prefixes
-      if (['QuickDraft', 'PremierDraft', 'TradDraft', 'SealedDeck'].includes(prefix)) {
-        return prefix.replace('TradDraft', 'Traditional Draft').replace('SealedDeck', 'Sealed');
-      }
-      // Check if it's a mapped queue type with underscore
-      if (queueTypeMap[queueType]) {
-        return queueTypeMap[queueType];
-      }
-      // Otherwise just return the prefix
-      return prefix;
-    }
-
-    return queueTypeMap[queueType] || queueType;
-  };
-
-  // Get the display format - prefer DeckFormat (Standard, Historic, etc.) over queue type
-  const getDisplayFormat = (match: models.Match): string => {
-    // If we have a deck format, use it
-    if (match.DeckFormat) {
-      return match.DeckFormat;
-    }
-    // Fall back to normalized queue type
-    return normalizeQueueType(match.Format);
-  };
-
-  // Get the display event name
-  const getDisplayEventName = (match: models.Match): string => {
-    const queueName = normalizeQueueType(match.EventName || match.Format);
-    // If we have a deck format and it's a constructed queue, combine them
-    if (match.DeckFormat && ['Play Queue', 'Ranked', 'Traditional Ranked', 'Traditional Play'].includes(queueName)) {
-      return `${match.DeckFormat} ${queueName}`;
-    }
-    return queueName;
-  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
