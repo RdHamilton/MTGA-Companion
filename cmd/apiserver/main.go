@@ -239,7 +239,7 @@ func main() {
 	// Stop daemon first (before API server)
 	if daemonService != nil {
 		fmt.Println("Stopping daemon...")
-		if err := daemonService.Stop(); err != nil {
+		if err := daemonService.Stop(shutdownCtx); err != nil {
 			log.Printf("Error stopping daemon: %v", err)
 		}
 	}

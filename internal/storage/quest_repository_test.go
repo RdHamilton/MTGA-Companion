@@ -361,6 +361,7 @@ func TestQuestReassignment(t *testing.T) {
 	now := time.Now().UTC()
 
 	// First, save a quest and complete it
+	completedAt := now.Add(-24 * time.Hour)
 	quest1 := &models.Quest{
 		QuestID:        "reused-quest-id",
 		QuestType:      "First Quest",
@@ -368,11 +369,9 @@ func TestQuestReassignment(t *testing.T) {
 		EndingProgress: 5,
 		Completed:      true,
 		AssignedAt:     now.Add(-48 * time.Hour),
-		CompletedAt:    &now,
+		CompletedAt:    &completedAt,
 		LastSeenAt:     &now,
 	}
-	completedAt := now.Add(-24 * time.Hour)
-	quest1.CompletedAt = &completedAt
 
 	err := repo.Save(quest1)
 	if err != nil {
