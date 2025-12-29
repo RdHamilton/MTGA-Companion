@@ -92,6 +92,9 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 ### Deck Management
 ![Decks](docs/images/decks.png)
 
+### Collection Browser
+![Collection](docs/images/collection.png)
+
 ### Meta Dashboard
 ![Meta Dashboard](docs/images/meta-dashboard.png)
 

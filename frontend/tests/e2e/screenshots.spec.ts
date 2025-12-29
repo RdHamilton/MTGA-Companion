@@ -85,6 +85,20 @@ test.describe('Documentation Screenshots', () => {
     });
   });
 
+  test('capture Collection page', async ({ page }) => {
+    await page.goto('/collection');
+    await expect(page.locator('.app-container')).toBeVisible({ timeout: 15000 });
+
+    // Wait for collection data to load
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000); // Collection may take longer to load
+
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'collection.png'),
+      fullPage: false,
+    });
+  });
+
   test('capture Meta Dashboard', async ({ page }) => {
     await page.goto('/meta');
     await expect(page.locator('.app-container')).toBeVisible({ timeout: 15000 });
