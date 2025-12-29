@@ -9,16 +9,12 @@ vi.mock('@/services/api', () => ({
   meta: {
     getMetaArchetypes: vi.fn(),
   },
-  matches: {
-    getFormats: vi.fn(),
-  },
 }));
 
-import { meta, matches } from '@/services/api';
+import { meta } from '@/services/api';
 
 // Use loose typing for mocks to allow test data that doesn't exactly match API types
 const mockGetMetaArchetypes = meta.getMetaArchetypes as ReturnType<typeof vi.fn>;
-const mockGetFormats = matches.getFormats as ReturnType<typeof vi.fn>;
 
 const renderMeta = () => {
   return render(
@@ -81,7 +77,6 @@ const createNewArchetype = (): gui.ArchetypeInfo => {
 describe('Meta', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetFormats.mockResolvedValue(['standard', 'historic', 'explorer']);
     mockGetMetaArchetypes.mockResolvedValue([]);
   });
 
@@ -266,14 +261,24 @@ describe('Meta', () => {
   });
 
   describe('format selection', () => {
-    it('loads supported formats on mount', async () => {
+    it('renders static format options', async () => {
       mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
 
       renderMeta();
 
+      // Wait for component to render
       await waitFor(() => {
-        expect(mockGetFormats).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
       });
+
+      // Verify static format options are present (no API call needed)
+      const select = screen.getByRole('combobox');
+      expect(select).toBeInTheDocument();
+
+      // Check for expected format options
+      expect(screen.getByRole('option', { name: 'Standard' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Historic' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Explorer' })).toBeInTheDocument();
     });
 
     it('changes format when selection changes', async () => {
