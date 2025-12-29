@@ -67,6 +67,25 @@
   cursor: not-allowed;
 }
 
+/* Auto-refresh indicator (#738) */
+.auto-refresh-indicator {
+  font-size: 0.85rem;
+  color: var(--accent-color, #6b7fd4);
+  padding: 6px 12px;
+  background: rgba(107, 127, 212, 0.1);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
 /* Error */
 .meta-error {
   padding: 16px;

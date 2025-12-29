@@ -341,6 +341,22 @@ const MatchHistory = () => {
               <option value="loss">Losses Only</option>
             </select>
           </div>
+
+          {/* Filtered Record Summary */}
+          {!loading && matchList.length > 0 && (
+            <div className="filter-group record-summary">
+              <label className="filter-label">Record</label>
+              <span className="record-value">
+                {(() => {
+                  const wins = matchList.filter(m => m.Result.toLowerCase() === 'win').length;
+                  const losses = matchList.filter(m => m.Result.toLowerCase() === 'loss').length;
+                  const total = wins + losses;
+                  const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
+                  return `${wins}-${losses} (${winRate}%)`;
+                })()}
+              </span>
+            </div>
+          )}
         </div>
 
         {!loading && !error && matchList.length > 0 && (

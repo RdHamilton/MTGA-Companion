@@ -16,6 +16,43 @@ const META_FORMATS = [
   { value: 'modern', label: 'Modern' },
 ] as const;
 
+// One week in milliseconds for stale data detection (#738)
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Storage key for per-format last refresh timestamps
+const META_REFRESH_TIMESTAMPS_KEY = 'mtga-companion-meta-refresh-timestamps';
+
+// Get last refresh timestamp for a format from localStorage
+function getLastRefreshTimestamp(format: string): number | null {
+  try {
+    const stored = localStorage.getItem(META_REFRESH_TIMESTAMPS_KEY);
+    if (!stored) return null;
+    const timestamps = JSON.parse(stored) as Record<string, number>;
+    return timestamps[format] || null;
+  } catch {
+    return null;
+  }
+}
+
+// Save last refresh timestamp for a format to localStorage
+function saveRefreshTimestamp(format: string): void {
+  try {
+    const stored = localStorage.getItem(META_REFRESH_TIMESTAMPS_KEY);
+    const timestamps = stored ? JSON.parse(stored) as Record<string, number> : {};
+    timestamps[format] = Date.now();
+    localStorage.setItem(META_REFRESH_TIMESTAMPS_KEY, JSON.stringify(timestamps));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+// Check if data for a format is stale (older than 1 week)
+function isDataStale(format: string): boolean {
+  const lastRefresh = getLastRefreshTimestamp(format);
+  if (!lastRefresh) return true; // No data means stale
+  return Date.now() - lastRefresh > ONE_WEEK_MS;
+}
+
 // Convert meta.getMetaArchetypes response to MetaDashboardResponse
 async function getMetaDashboard(format: string): Promise<gui.MetaDashboardResponse> {
   const archetypes = await meta.getMetaArchetypes(format);
@@ -38,6 +75,7 @@ export default function Meta() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedArchetype, setSelectedArchetype] = useState<gui.ArchetypeInfo | null>(null);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
 
   // Load dashboard data when format changes
   useEffect(() => {
@@ -60,6 +98,36 @@ export default function Meta() {
     loadDashboard();
   }, [format]);
 
+  // Auto-refresh stale data (#738)
+  useEffect(() => {
+    // Only check for stale data after initial load completes
+    if (loading || !dashboardData) return;
+
+    // Check if data is stale (older than 1 week)
+    if (isDataStale(format)) {
+      console.log(`[Meta] Data for ${format} is stale (>1 week), triggering auto-refresh`);
+      setAutoRefreshing(true);
+
+      const refreshStaleData = async () => {
+        try {
+          const data = await getMetaDashboard(format);
+          if (!data.error) {
+            setDashboardData(data);
+            saveRefreshTimestamp(format);
+            console.log(`[Meta] Auto-refresh complete for ${format}`);
+          }
+        } catch (err) {
+          console.error(`[Meta] Auto-refresh failed for ${format}:`, err);
+          // Don't show error to user for auto-refresh failures
+        } finally {
+          setAutoRefreshing(false);
+        }
+      };
+
+      refreshStaleData();
+    }
+  }, [loading, dashboardData, format]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     setError(null);
@@ -69,6 +137,7 @@ export default function Meta() {
         setError(data.error);
       } else {
         setDashboardData(data);
+        saveRefreshTimestamp(format);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh meta data');
@@ -167,10 +236,15 @@ export default function Meta() {
           <button
             className="refresh-button"
             onClick={handleRefresh}
-            disabled={loading || refreshing}
+            disabled={loading || refreshing || autoRefreshing}
           >
-            {refreshing ? '⟳ Refreshing...' : '⟳ Refresh'}
+            {refreshing ? '⟳ Refreshing...' : autoRefreshing ? '⟳ Updating...' : '⟳ Refresh'}
           </button>
+          {autoRefreshing && (
+            <span className="auto-refresh-indicator" title="Auto-refreshing stale data">
+              Updating stale data...
+            </span>
+          )}
         </div>
       </div>
 

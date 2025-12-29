@@ -105,3 +105,19 @@ th[style*="cursor: pointer"]:hover {
 .clickable-row:hover {
   background-color: #3d3d3d;
 }
+
+/* Record Summary in Filter Row */
+.record-summary {
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid #3d3d3d;
+}
+
+.record-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4a9eff;
+  padding: 8px 12px;
+  background: rgba(74, 158, 255, 0.1);
+  border-radius: 4px;
+}
