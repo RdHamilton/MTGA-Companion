@@ -31,6 +31,18 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 		INSERT INTO accounts (name, is_default) VALUES ('Default Account', 1);
 
+		CREATE TABLE decks (
+			id TEXT PRIMARY KEY,
+			account_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			format TEXT NOT NULL,
+			source TEXT,
+			draft_event_id TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (account_id) REFERENCES accounts(id)
+		);
+
 		CREATE TABLE matches (
 			id TEXT PRIMARY KEY,
 			account_id INTEGER NOT NULL,
@@ -50,7 +62,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			opponent_name TEXT,
 			opponent_id TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (account_id) REFERENCES accounts(id)
+			FOREIGN KEY (account_id) REFERENCES accounts(id),
+			FOREIGN KEY (deck_id) REFERENCES decks(id)
 		);
 
 		CREATE INDEX idx_matches_timestamp ON matches(timestamp);
@@ -791,5 +804,309 @@ func TestMatchRepository_GetStatsByFormat(t *testing.T) {
 
 	if limitedStats.TotalGames != 3 {
 		t.Errorf("expected 3 Limited games, got %d", limitedStats.TotalGames)
+	}
+}
+
+func TestMatchRepository_GetMatches_WithDeckFormat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create a deck with Standard format
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, "deck-standard-1", 1, "Standard Deck", "Standard", "constructed", now, now)
+	if err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+
+	// Create a match linked to the Standard deck with queue type "Ladder"
+	match := &models.Match{
+		ID:           "match-with-deck",
+		AccountID:    1,
+		EventID:      "event-1",
+		EventName:    "Ladder",
+		Timestamp:    now,
+		PlayerWins:   2,
+		OpponentWins: 1,
+		PlayerTeamID: 1,
+		Format:       "Ladder", // Queue type from MTGA
+		Result:       "win",
+		CreatedAt:    now,
+	}
+	deckID := "deck-standard-1"
+	match.DeckID = &deckID
+
+	if err := repo.Create(ctx, match); err != nil {
+		t.Fatalf("failed to create match: %v", err)
+	}
+
+	// Get matches - should include DeckFormat from JOIN
+	matches, err := repo.GetMatches(ctx, models.StatsFilter{})
+	if err != nil {
+		t.Fatalf("failed to get matches: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+
+	// Verify DeckFormat is populated from the deck's format
+	if matches[0].DeckFormat == nil {
+		t.Fatal("expected DeckFormat to be populated from deck JOIN")
+	}
+
+	if *matches[0].DeckFormat != "Standard" {
+		t.Errorf("expected DeckFormat 'Standard', got '%s'", *matches[0].DeckFormat)
+	}
+
+	// Verify the queue type Format is still preserved
+	if matches[0].Format != "Ladder" {
+		t.Errorf("expected Format 'Ladder', got '%s'", matches[0].Format)
+	}
+}
+
+func TestMatchRepository_GetMatches_WithoutDeck(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create a match without a deck (draft match scenario)
+	match := &models.Match{
+		ID:           "match-no-deck",
+		AccountID:    1,
+		EventID:      "event-draft",
+		EventName:    "QuickDraft_TLA_20251127",
+		Timestamp:    now,
+		PlayerWins:   3,
+		OpponentWins: 2,
+		PlayerTeamID: 1,
+		Format:       "QuickDraft_TLA_20251127",
+		Result:       "win",
+		CreatedAt:    now,
+	}
+
+	if err := repo.Create(ctx, match); err != nil {
+		t.Fatalf("failed to create match: %v", err)
+	}
+
+	// Get matches - DeckFormat should be nil for matches without deck
+	matches, err := repo.GetMatches(ctx, models.StatsFilter{})
+	if err != nil {
+		t.Fatalf("failed to get matches: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+
+	// Verify DeckFormat is nil when no deck is linked
+	if matches[0].DeckFormat != nil {
+		t.Errorf("expected DeckFormat to be nil for match without deck, got '%s'", *matches[0].DeckFormat)
+	}
+
+	// Format should still have the raw queue type
+	if matches[0].Format != "QuickDraft_TLA_20251127" {
+		t.Errorf("expected Format 'QuickDraft_TLA_20251127', got '%s'", matches[0].Format)
+	}
+}
+
+func TestMatchRepository_GetMatches_FilterByDeckFormat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create decks with different formats
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, "deck-standard", 1, "Standard Deck", "Standard", "constructed", now, now)
+	if err != nil {
+		t.Fatalf("failed to create standard deck: %v", err)
+	}
+
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, "deck-historic", 1, "Historic Deck", "Historic", "constructed", now, now)
+	if err != nil {
+		t.Fatalf("failed to create historic deck: %v", err)
+	}
+
+	// Create matches with different deck formats
+	standardDeckID := "deck-standard"
+	historicDeckID := "deck-historic"
+
+	matches := []*models.Match{
+		{
+			ID:           "match-standard-1",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Ladder",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			DeckID:       &standardDeckID,
+			Format:       "Ladder",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-standard-2",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "Play",
+			Timestamp:    now,
+			PlayerWins:   1,
+			OpponentWins: 2,
+			PlayerTeamID: 1,
+			DeckID:       &standardDeckID,
+			Format:       "Play",
+			Result:       "loss",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-historic-1",
+			AccountID:    1,
+			EventID:      "event-3",
+			EventName:    "Ladder",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 1,
+			PlayerTeamID: 1,
+			DeckID:       &historicDeckID,
+			Format:       "Ladder",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Filter by DeckFormat = Standard
+	deckFormat := "Standard"
+	results, err := repo.GetMatches(ctx, models.StatsFilter{DeckFormat: &deckFormat})
+	if err != nil {
+		t.Fatalf("failed to get matches with deck format filter: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("expected 2 Standard matches, got %d", len(results))
+	}
+
+	for _, m := range results {
+		if m.DeckFormat == nil || *m.DeckFormat != "Standard" {
+			t.Errorf("expected DeckFormat 'Standard', got '%v'", m.DeckFormat)
+		}
+	}
+
+	// Filter by DeckFormat = Historic
+	deckFormat = "Historic"
+	results, err = repo.GetMatches(ctx, models.StatsFilter{DeckFormat: &deckFormat})
+	if err != nil {
+		t.Fatalf("failed to get matches with deck format filter: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 Historic match, got %d", len(results))
+	}
+
+	if results[0].DeckFormat == nil || *results[0].DeckFormat != "Historic" {
+		t.Errorf("expected DeckFormat 'Historic', got '%v'", results[0].DeckFormat)
+	}
+}
+
+func TestMatchRepository_GetMatches_MixedDeckAndNoDeck(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create a deck
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO decks (id, account_id, name, format, source, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, "deck-alchemy", 1, "Alchemy Deck", "Alchemy", "constructed", now, now)
+	if err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+
+	alchemyDeckID := "deck-alchemy"
+
+	// Create matches - some with deck, some without
+	matches := []*models.Match{
+		{
+			ID:           "match-alchemy",
+			AccountID:    1,
+			EventID:      "event-1",
+			EventName:    "Alchemy_Ladder",
+			Timestamp:    now,
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			DeckID:       &alchemyDeckID,
+			Format:       "Alchemy_Ladder",
+			Result:       "win",
+			CreatedAt:    now,
+		},
+		{
+			ID:           "match-draft",
+			AccountID:    1,
+			EventID:      "event-2",
+			EventName:    "PremierDraft_MKM_20241120",
+			Timestamp:    now.Add(-1 * time.Hour),
+			PlayerWins:   3,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			DeckID:       nil,
+			Format:       "PremierDraft_MKM_20241120",
+			Result:       "win",
+			CreatedAt:    now.Add(-1 * time.Hour),
+		},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Get all matches
+	results, err := repo.GetMatches(ctx, models.StatsFilter{})
+	if err != nil {
+		t.Fatalf("failed to get matches: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 matches, got %d", len(results))
+	}
+
+	// First match (most recent) should have DeckFormat = Alchemy
+	if results[0].DeckFormat == nil {
+		t.Error("expected first match to have DeckFormat")
+	} else if *results[0].DeckFormat != "Alchemy" {
+		t.Errorf("expected DeckFormat 'Alchemy', got '%s'", *results[0].DeckFormat)
+	}
+
+	// Second match (draft) should have nil DeckFormat
+	if results[1].DeckFormat != nil {
+		t.Errorf("expected draft match to have nil DeckFormat, got '%s'", *results[1].DeckFormat)
 	}
 }
