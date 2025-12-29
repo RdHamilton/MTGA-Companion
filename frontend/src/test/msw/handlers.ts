@@ -114,11 +114,11 @@ export const handlers = [
     ]);
   }),
 
-  // Set completion endpoint
+  // Set completion endpoint - uses PascalCase to match Go struct serialization
   http.get(`${API_BASE}/collection/sets/completion`, () => {
     return successResponse([
-      { setCode: 'sta', setName: 'Strixhaven', owned: 50, total: 63, percentage: 79.4 },
-      { setCode: 'dsk', setName: 'Duskmourn', owned: 100, total: 200, percentage: 50.0 },
+      { SetCode: 'sta', SetName: 'Strixhaven', TotalCards: 63, OwnedCards: 50, Percentage: 79.4 },
+      { SetCode: 'dsk', SetName: 'Duskmourn', TotalCards: 200, OwnedCards: 100, Percentage: 50.0 },
     ]);
   }),
 

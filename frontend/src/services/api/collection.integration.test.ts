@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { server } from '@/test/msw/server';
 import {
-  handlers,
   nullCollectionHandler,
   emptyCollectionHandler,
   errorCollectionHandler,
@@ -172,8 +171,8 @@ describe('Collection API Integration Tests', () => {
 
       expect(Array.isArray(completion)).toBe(true);
       expect(completion.length).toBe(2);
-      expect(completion[0].setCode).toBe('sta');
-      expect(completion[1].setCode).toBe('dsk');
+      expect(completion[0].SetCode).toBe('sta');
+      expect(completion[1].SetCode).toBe('dsk');
     });
   });
 });
