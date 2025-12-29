@@ -110,7 +110,8 @@ export default function Meta() {
 
       const refreshStaleData = async () => {
         try {
-          const data = await getMetaDashboard(format);
+          // Call refresh endpoint to fetch fresh data from external sources
+          const data = await meta.refreshMetaData(format);
           if (!data.error) {
             setDashboardData(data);
             saveRefreshTimestamp(format);
@@ -132,7 +133,8 @@ export default function Meta() {
     setRefreshing(true);
     setError(null);
     try {
-      const data = await getMetaDashboard(format);
+      // Call refresh endpoint to fetch fresh data from external sources
+      const data = await meta.refreshMetaData(format);
       if (data.error) {
         setError(data.error);
       } else {
