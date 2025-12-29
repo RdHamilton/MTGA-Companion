@@ -34,15 +34,17 @@ export async function getQuestHistory(
 /**
  * Get daily wins progress.
  */
-export async function getDailyWins(): Promise<{ wins: number; target: number }> {
-  return get<{ wins: number; target: number }>('/quests/wins/daily');
+export async function getDailyWins(): Promise<{ wins: number; goal: number }> {
+  const response = await get<{ dailyWins: number; goal: number }>('/quests/wins/daily');
+  return { wins: response.dailyWins, goal: response.goal };
 }
 
 /**
  * Get weekly wins progress.
  */
-export async function getWeeklyWins(): Promise<{ wins: number; target: number }> {
-  return get<{ wins: number; target: number }>('/quests/wins/weekly');
+export async function getWeeklyWins(): Promise<{ wins: number; goal: number }> {
+  const response = await get<{ weeklyWins: number; goal: number }>('/quests/wins/weekly');
+  return { wins: response.weeklyWins, goal: response.goal };
 }
 
 /**

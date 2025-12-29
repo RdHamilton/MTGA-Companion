@@ -12,6 +12,8 @@ const Quests = () => {
   const [activeQuests, setActiveQuests] = useState<models.Quest[]>([]);
   const [questHistory, setQuestHistory] = useState<models.Quest[]>([]);
   const [currentAccount, setCurrentAccount] = useState<models.Account | null>(null);
+  const [dailyWins, setDailyWins] = useState<number>(0);
+  const [weeklyWins, setWeeklyWins] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +89,23 @@ const Quests = () => {
       } catch (accountErr) {
         console.error('Error loading current account:', accountErr);
         // Don't throw - account data is optional
+      }
+
+      // Load daily and weekly wins from match data (calculated, not from stale log data)
+      try {
+        const dailyWinsResult = await quests.getDailyWins();
+        setDailyWins(dailyWinsResult.wins);
+      } catch (dailyWinsErr) {
+        console.error('Error loading daily wins:', dailyWinsErr);
+        // Don't throw - wins data is optional
+      }
+
+      try {
+        const weeklyWinsResult = await quests.getWeeklyWins();
+        setWeeklyWins(weeklyWinsResult.wins);
+      } catch (weeklyWinsErr) {
+        console.error('Error loading weekly wins:', weeklyWinsErr);
+        // Don't throw - wins data is optional
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load quest data');
@@ -290,7 +309,7 @@ const Quests = () => {
             </div>
             <div className="stat-card">
               <div className="stat-label">Daily Goal</div>
-              <div className="stat-value">{currentAccount.DailyWins >= 5 ? '✓' : `${currentAccount.DailyWins}/5`}</div>
+              <div className="stat-value">{dailyWins >= 5 ? '✓' : `${dailyWins}/5`}</div>
             </div>
           </div>
         )}
@@ -309,50 +328,48 @@ const Quests = () => {
       {!loading && !error && (
         <>
           {/* Daily/Weekly Wins Section */}
-          {currentAccount && (
-            <div className="quests-section">
-              <h2 className="section-title">Win Progress</h2>
-              <div className="wins-grid">
-                {/* Daily Wins */}
-                <div className="daily-wins-card">
-                  <div className="daily-wins-header">
-                    <span className="daily-wins-title">Daily Wins</span>
-                    <span className="daily-wins-progress">{currentAccount.DailyWins} / 15</span>
-                  </div>
-                  <div className="daily-wins-bar">
-                    <div
-                      className={`daily-wins-fill ${getDailyWinsColorClass(currentAccount.DailyWins)}`}
-                      style={{ width: `${(currentAccount.DailyWins / 15) * 100}%` }}
-                    />
-                  </div>
-                  <div className="daily-wins-footer">
-                    <span className="daily-wins-percent">{((currentAccount.DailyWins / 15) * 100).toFixed(0)}% Complete</span>
-                    <span className="daily-wins-reward">
-                      {currentAccount.DailyWins < 5 ? 'Goal: 5 wins for mastery' : 'Earn up to 1,250 gold'}
-                    </span>
-                  </div>
+          <div className="quests-section">
+            <h2 className="section-title">Win Progress</h2>
+            <div className="wins-grid">
+              {/* Daily Wins */}
+              <div className="daily-wins-card">
+                <div className="daily-wins-header">
+                  <span className="daily-wins-title">Daily Wins</span>
+                  <span className="daily-wins-progress">{dailyWins} / 15</span>
                 </div>
+                <div className="daily-wins-bar">
+                  <div
+                    className={`daily-wins-fill ${getDailyWinsColorClass(dailyWins)}`}
+                    style={{ width: `${(dailyWins / 15) * 100}%` }}
+                  />
+                </div>
+                <div className="daily-wins-footer">
+                  <span className="daily-wins-percent">{((dailyWins / 15) * 100).toFixed(0)}% Complete</span>
+                  <span className="daily-wins-reward">
+                    {dailyWins < 5 ? 'Goal: 5 wins for mastery' : 'Earn up to 1,250 gold'}
+                  </span>
+                </div>
+              </div>
 
-                {/* Weekly Wins */}
-                <div className="daily-wins-card">
-                  <div className="daily-wins-header">
-                    <span className="daily-wins-title">Weekly Wins</span>
-                    <span className="daily-wins-progress">{currentAccount.WeeklyWins} / 15</span>
-                  </div>
-                  <div className="daily-wins-bar">
-                    <div
-                      className="daily-wins-fill weekly"
-                      style={{ width: `${(currentAccount.WeeklyWins / 15) * 100}%` }}
-                    />
-                  </div>
-                  <div className="daily-wins-footer">
-                    <span className="daily-wins-percent">{((currentAccount.WeeklyWins / 15) * 100).toFixed(0)}% Complete</span>
-                    <span className="daily-wins-reward">Earn up to 2,250 gold</span>
-                  </div>
+              {/* Weekly Wins */}
+              <div className="daily-wins-card">
+                <div className="daily-wins-header">
+                  <span className="daily-wins-title">Weekly Wins</span>
+                  <span className="daily-wins-progress">{weeklyWins} / 15</span>
+                </div>
+                <div className="daily-wins-bar">
+                  <div
+                    className="daily-wins-fill weekly"
+                    style={{ width: `${(weeklyWins / 15) * 100}%` }}
+                  />
+                </div>
+                <div className="daily-wins-footer">
+                  <span className="daily-wins-percent">{((weeklyWins / 15) * 100).toFixed(0)}% Complete</span>
+                  <span className="daily-wins-reward">Earn up to 2,250 gold</span>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Active Quests Section */}
           <div className="quests-section">

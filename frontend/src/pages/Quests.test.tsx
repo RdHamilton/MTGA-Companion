@@ -626,7 +626,9 @@ describe('Quests', () => {
     it('should display daily wins progress', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ DailyWins: 7 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount());
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 7, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
@@ -639,7 +641,9 @@ describe('Quests', () => {
     it('should display weekly wins progress', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ WeeklyWins: 10 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount());
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 0, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 10, goal: 15 });
 
       renderWithProvider(<Quests />);
 
@@ -652,7 +656,9 @@ describe('Quests', () => {
     it('should show goal message for under 5 daily wins', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ DailyWins: 3 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount());
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 3, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
@@ -664,7 +670,9 @@ describe('Quests', () => {
     it('should show gold reward message for 5+ daily wins', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ DailyWins: 6 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount());
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 6, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
@@ -673,17 +681,20 @@ describe('Quests', () => {
       });
     });
 
-    it('should not show win progress when no account data', async () => {
+    it('should show win progress even when no account data', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
       mockSystem.getCurrentAccount.mockResolvedValue(null);
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 0, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
       await waitFor(() => {
         expect(screen.getByText('No active quests')).toBeInTheDocument();
       });
-      expect(screen.queryByText('Win Progress')).not.toBeInTheDocument();
+      // Win progress section is now always shown since it comes from match data, not account
+      expect(screen.getByText('Win Progress')).toBeInTheDocument();
     });
   });
 
@@ -749,7 +760,9 @@ describe('Quests', () => {
     it('should display daily goal checkmark when >= 5 wins', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ DailyWins: 5, MasteryMax: 100 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ MasteryMax: 100 }));
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 5, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
@@ -763,7 +776,9 @@ describe('Quests', () => {
     it('should display daily goal progress when < 5 wins', async () => {
       mockQuests.getActiveQuests.mockResolvedValue([]);
       mockQuests.getQuestHistory.mockResolvedValue([]);
-      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ DailyWins: 3, MasteryMax: 100 }));
+      mockSystem.getCurrentAccount.mockResolvedValue(createMockAccount({ MasteryMax: 100 }));
+      mockQuests.getDailyWins.mockResolvedValue({ wins: 3, goal: 15 });
+      mockQuests.getWeeklyWins.mockResolvedValue({ wins: 0, goal: 15 });
 
       renderWithProvider(<Quests />);
 
