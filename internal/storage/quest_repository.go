@@ -124,16 +124,13 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	return nil
 }
 
-// GetActiveQuests returns all incomplete, non-rerolled quests (one per unique quest_id).
-// A quest is considered active if:
-// - It has not been marked as completed (the parser detects completion via quest disappearance)
-// - It has not been marked as rerolled (the parser detects rerolls via comparison with current MTGA state)
-// - It has been seen in a QuestGetQuests response (last_seen_at is not null)
+// GetActiveQuests returns all incomplete, non-rerolled quests (one per unique quest_id)
+// that were recently seen in a QuestGetQuests response (within 24 hours).
+// This is used by the API to show currently active quests.
 //
-// Note: We no longer filter by last_seen_at timestamp because:
-// - The daemon may not re-process old log entries on restart
-// - Completion and reroll detection are the authoritative signals for quest state
-// - If a quest is not completed and not rerolled, it should be considered active
+// The 24-hour filter prevents stale quest data from old log files from appearing,
+// while allowing quests from the current gaming session to show correctly.
+// Quests are marked as "seen" when they appear in a QuestGetQuests response.
 func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 	query := `
 		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
@@ -145,17 +142,50 @@ func (r *QuestRepository) GetActiveQuests() ([]*models.Quest, error) {
 			WHERE completed = 0
 			  AND rerolled = 0
 			  AND last_seen_at IS NOT NULL
+			  AND datetime(last_seen_at) >= datetime('now', '-24 hours')
 			GROUP BY quest_id
 		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
 		WHERE q.completed = 0
 		  AND q.rerolled = 0
 		  AND q.last_seen_at IS NOT NULL
+		  AND datetime(q.last_seen_at) >= datetime('now', '-24 hours')
 		ORDER BY q.assigned_at DESC
 	`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active quests: %w", err)
+	}
+	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
+
+	return r.scanQuests(rows)
+}
+
+// GetIncompleteQuests returns all incomplete, non-rerolled quests (one per unique quest_id)
+// WITHOUT any timestamp filtering. This is used internally by the log processor to
+// detect rerolled quests - any incomplete quest not in the current MTGA response is rerolled.
+//
+// This method should NOT be used for the API/UI - use GetActiveQuests() instead.
+func (r *QuestRepository) GetIncompleteQuests() ([]*models.Quest, error) {
+	query := `
+		SELECT q.id, q.quest_id, q.quest_type, q.goal, q.starting_progress, q.ending_progress,
+		       q.completed, q.can_swap, q.rewards, q.assigned_at, q.completed_at, q.last_seen_at, q.rerolled, q.created_at
+		FROM quests q
+		INNER JOIN (
+			SELECT quest_id, MAX(created_at) as max_created
+			FROM quests
+			WHERE completed = 0
+			  AND rerolled = 0
+			GROUP BY quest_id
+		) latest ON q.quest_id = latest.quest_id AND q.created_at = latest.max_created
+		WHERE q.completed = 0
+		  AND q.rerolled = 0
+		ORDER BY q.assigned_at DESC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get incomplete quests: %w", err)
 	}
 	defer func() { _ = rows.Close() }() //nolint:errcheck // Ignore error on cleanup
 
