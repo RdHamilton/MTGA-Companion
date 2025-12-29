@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { AppProvider } from './context/AppContext'
+import { DownloadProvider } from './context/DownloadContext'
 import { initializeServices } from './services/adapter'
 
 // Initialize services (REST API and WebSocket) before rendering
@@ -10,7 +11,9 @@ initializeServices().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <AppProvider>
-        <App />
+        <DownloadProvider>
+          <App />
+        </DownloadProvider>
       </AppProvider>
     </StrictMode>,
   )
@@ -20,7 +23,9 @@ initializeServices().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <AppProvider>
-        <App />
+        <DownloadProvider>
+          <App />
+        </DownloadProvider>
       </AppProvider>
     </StrictMode>,
   )

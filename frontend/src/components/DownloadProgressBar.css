@@ -1,0 +1,80 @@
+/* Download Progress Bar */
+.download-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid #3d3d3d;
+  min-width: 200px;
+  max-width: 350px;
+}
+
+.download-progress-bar {
+  width: 80px;
+  height: 8px;
+  background: #2d2d2d;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.download-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a9eff, #6bb3ff);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.download-progress-fill.downloading {
+  animation: pulse-progress 1.5s ease-in-out infinite;
+}
+
+.download-progress-fill.error {
+  background: linear-gradient(90deg, #ff4a4a, #ff6b6b);
+}
+
+.download-progress-fill.complete {
+  background: linear-gradient(90deg, #4aff4a, #6bff6b);
+}
+
+@keyframes pulse-progress {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.download-progress-text {
+  font-size: 12px;
+  color: #aaaaaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.download-percentage {
+  color: #4a9eff;
+  font-weight: 500;
+}
+
+.download-error {
+  color: #ff6b6b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .download-progress-container {
+    min-width: 150px;
+    max-width: 200px;
+  }
+
+  .download-progress-bar {
+    width: 60px;
+  }
+
+  .download-progress-text {
+    font-size: 11px;
+  }
+}

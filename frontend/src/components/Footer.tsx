@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
 import { matches } from '@/services/api';
 import { models } from '@/types/models';
+import DownloadProgressBar from './DownloadProgressBar';
 import './Footer.css';
 
 const Footer = () => {
@@ -115,6 +116,7 @@ const Footer = () => {
             </span>
           </>
         )}
+        <DownloadProgressBar />
       </div>
     </footer>
   );
