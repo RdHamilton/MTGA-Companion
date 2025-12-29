@@ -23,7 +23,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
@@ -33,7 +33,7 @@ jobs:
         go-version: '1.24'
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '20'
         cache: 'npm'
@@ -74,7 +74,7 @@ jobs:
         find docs/images -name "*.png" -exec optipng -o2 {} \; || true
 
     - name: Upload screenshots as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: documentation-screenshots
         path: docs/images/*.png
