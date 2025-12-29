@@ -34,8 +34,7 @@ type ParseQuestsResult struct {
 // It looks for QuestGetQuests responses to track quest state and detect completion via disappearance.
 func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 	var quests []*QuestData
-	questMap := make(map[string]*QuestData)        // Track by questId to detect updates
-	lastSeenQuestIDs := make(map[string]time.Time) // Track when each quest was last seen
+	questMap := make(map[string]*QuestData) // Track by questId to detect updates
 
 	questsFound := 0
 	responsesFound := 0
@@ -50,6 +49,8 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 				logTimestamp = parsedTime
+			} else {
+				log.Printf("Quest parser: failed to parse timestamp %q, using current time: %v", entry.Timestamp, err)
 			}
 		}
 
@@ -73,7 +74,6 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 							quest := parseQuestFromMap(questJSON, logTimestamp)
 							if quest != nil {
 								currentQuestIDs[quest.QuestID] = true
-								lastSeenQuestIDs[quest.QuestID] = now
 
 								// Update or add quest
 								if existing, exists := questMap[quest.QuestID]; exists {
@@ -119,7 +119,6 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 						if quest != nil {
 							quest.AssignedAt = logTimestamp
 							quest.LastSeenAt = &now
-							lastSeenQuestIDs[quest.QuestID] = now
 
 							// Add or update quest
 							if _, exists := questMap[quest.QuestID]; !exists {
@@ -170,6 +169,8 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 				logTimestamp = parsedTime
+			} else {
+				log.Printf("Quest parser (detailed): failed to parse timestamp %q, using current time: %v", entry.Timestamp, err)
 			}
 		}
 
