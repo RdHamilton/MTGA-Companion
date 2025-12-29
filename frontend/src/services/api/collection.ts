@@ -49,9 +49,10 @@ export async function getCollectionStats(): Promise<CollectionStats> {
 
 /**
  * Get set completion progress.
+ * Returns completion statistics for all sets.
  */
 export async function getSetCompletion(): Promise<models.SetCompletion[]> {
-  return get<models.SetCompletion[]>('/collection/sets/completion');
+  return get<models.SetCompletion[]>('/collection/sets');
 }
 
 /**

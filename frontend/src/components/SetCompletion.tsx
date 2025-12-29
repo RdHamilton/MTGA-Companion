@@ -16,9 +16,10 @@ const rarityOrder = ['mythic', 'rare', 'uncommon', 'common'];
 
 interface SetCompletionProps {
   onClose?: () => void;
+  setCode?: string; // Filter to show only this set's completion
 }
 
-export default function SetCompletion({ onClose }: SetCompletionProps) {
+export default function SetCompletion({ onClose, setCode }: SetCompletionProps) {
   const [completionData, setCompletionData] = useState<models.SetCompletion[]>([]);
   const [setInfo, setSetInfo] = useState<Map<string, gui.SetInfo>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -43,6 +44,16 @@ export default function SetCompletion({ onClose }: SetCompletionProps) {
           setMap.set(set.code, set);
         });
         setSetInfo(setMap);
+
+        // Auto-expand when filtering by a specific set
+        if (setCode && completion) {
+          const matchingSet = completion.find(
+            (s) => s.SetCode.toLowerCase() === setCode.toLowerCase()
+          );
+          if (matchingSet) {
+            setExpandedSets(new Set([matchingSet.SetCode]));
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load set completion');
         console.error('Failed to load set completion:', err);
@@ -52,7 +63,7 @@ export default function SetCompletion({ onClose }: SetCompletionProps) {
     };
 
     loadData();
-  }, []);
+  }, [setCode]);
 
   const toggleExpanded = (setCode: string) => {
     setExpandedSets((prev) => {
@@ -66,7 +77,12 @@ export default function SetCompletion({ onClose }: SetCompletionProps) {
     });
   };
 
-  const sortedData = [...completionData].sort((a, b) => {
+  // Filter by setCode if provided, then sort
+  const filteredData = setCode
+    ? completionData.filter((s) => s.SetCode.toLowerCase() === setCode.toLowerCase())
+    : completionData;
+
+  const sortedData = [...filteredData].sort((a, b) => {
     let comparison = 0;
     switch (sortBy) {
       case 'name':
