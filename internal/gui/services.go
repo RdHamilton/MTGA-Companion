@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/daemon"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/meta"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
@@ -51,6 +52,9 @@ type Services struct {
 	// Daemon mode flag
 	DaemonMode bool
 	DaemonPort int
+
+	// Daemon service (when running integrated)
+	DaemonService *daemon.Service
 }
 
 // AppError represents an application error with a user-friendly message.

@@ -45,13 +45,13 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 		}
 
 		// Parse timestamp from log entry for AssignedAt/CompletedAt
+		// Many log entries don't have timestamps, so we silently fall back to time.Now()
 		logTimestamp := time.Now()
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 				logTimestamp = parsedTime
-			} else {
-				log.Printf("Quest parser: failed to parse timestamp %q, using current time: %v", entry.Timestamp, err)
 			}
+			// Silently use current time if parsing fails - this is expected for many entry types
 		}
 
 		// Check for QuestGetQuests response (contains current active quests)
@@ -164,13 +164,13 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 		}
 
 		// Parse timestamp from log entry for AssignedAt/CompletedAt
+		// Many log entries don't have timestamps, so we silently fall back to time.Now()
 		logTimestamp := time.Now()
 		if entry.Timestamp != "" {
 			if parsedTime, err := parseLogTimestamp(entry.Timestamp); err == nil {
 				logTimestamp = parsedTime
-			} else {
-				log.Printf("Quest parser (detailed): failed to parse timestamp %q, using current time: %v", entry.Timestamp, err)
 			}
+			// Silently use current time if parsing fails - this is expected for many entry types
 		}
 
 		// Check for QuestGetQuests response (contains current active quests)
