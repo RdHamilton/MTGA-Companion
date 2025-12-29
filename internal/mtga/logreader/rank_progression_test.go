@@ -341,6 +341,27 @@ func TestParseRankUpdates(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "skip current format entries with level but no class (prevents Unranked entries)",
+			entries: []*LogEntry{
+				{
+					IsJSON:    true,
+					Timestamp: "2025-11-14 10:00:00",
+					JSON: map[string]interface{}{
+						"constructedSeasonOrdinal": float64(83),
+						"constructedLevel":         float64(4),
+						"constructedStep":          float64(2),
+						// Missing constructedClass - should be skipped to prevent "Unranked" entries
+					},
+				},
+			},
+			expected: 0,
+			validate: func(t *testing.T, updates []*RankUpdate) {
+				if len(updates) != 0 {
+					t.Fatalf("expected 0 updates for entries without rank class, got %d", len(updates))
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

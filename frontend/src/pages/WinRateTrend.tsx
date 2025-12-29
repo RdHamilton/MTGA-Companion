@@ -54,9 +54,18 @@ const WinRateTrend = () => {
         formats = [format];
       }
 
+      // Format dates as YYYY-MM-DD in local timezone (backend expects this format)
+      // Using local time methods avoids off-by-one day errors from UTC conversion
+      const formatDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const data = await matches.getTrendAnalysis({
-        start_date: start.toISOString(),
-        end_date: now.toISOString(),
+        start_date: formatDate(start),
+        end_date: formatDate(now),
         period_type: periodType,
         formats: formats || undefined,
       });

@@ -412,8 +412,7 @@ test.describe('Data Pipeline - Log to UI', () => {
   });
 
   test.describe('Charts Pipeline', () => {
-    // TODO: Re-enable when #739 is fixed (Win Rate Trend chart fails to load - 400 Bad Request)
-    test.skip('should display Win Rate Trend chart', async ({ page }) => {
+    test('should display Win Rate Trend chart', async ({ page }) => {
       await page.click('a.tab[href="/charts/win-rate-trend"]');
       await page.waitForURL('**/charts/win-rate-trend');
 
@@ -464,6 +463,10 @@ test.describe('Data Pipeline - Log to UI', () => {
       const activeSubTab = page.locator('.sub-tab-bar a.active');
       await expect(activeSubTab).toContainText(/Rank Progression/i);
 
+      // Wait for loading to complete
+      const loadingSpinner = page.locator('.loading-container');
+      await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+
       // Log has rank updates for both Constructed (Gold 3->4) and Limited (Silver 2->3)
       const pageText = await page.textContent('body');
       const hasRankInfo =
@@ -474,6 +477,14 @@ test.describe('Data Pipeline - Log to UI', () => {
         pageText?.includes('Limited');
 
       expect(hasRankInfo).toBeTruthy();
+
+      // Should NOT show "Unranked" as current rank - regression test for #740
+      // Use targeted selector to check only the current rank value, not the entire page
+      const currentRankValue = page.locator('.summary-item:has(.summary-label:has-text("Current Rank")) .summary-value');
+      const currentRankText = await currentRankValue.textContent().catch(() => null);
+      if (currentRankText) {
+        expect(currentRankText.trim()).not.toBe('Unranked');
+      }
 
       const errorState = page.locator('.error-state');
       await expect(errorState).not.toBeVisible();
