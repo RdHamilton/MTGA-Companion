@@ -653,6 +653,93 @@ describe('Collection', () => {
     });
   });
 
+  describe('Null/Undefined API Response Handling', () => {
+    it('should handle null collection response gracefully', async () => {
+      // Simulate API returning null (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue(null as unknown as gui.CollectionCard[]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('No Cards Found')).toBeInTheDocument();
+      });
+      // Should not crash
+      expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+    });
+
+    it('should handle undefined collection response gracefully', async () => {
+      // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue(undefined as unknown as gui.CollectionCard[]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('No Cards Found')).toBeInTheDocument();
+      });
+      // Should not crash
+      expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+    });
+
+    it('should handle non-array collection response gracefully', async () => {
+      // API might return an object instead of array (cast to bypass type check - this is what we're testing)
+      mockCollection.getCollection.mockResolvedValue({ error: 'invalid' } as unknown as gui.CollectionCard[]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('No Cards Found')).toBeInTheDocument();
+      });
+      // Should not crash
+      expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+    });
+
+    it('should handle null sets response gracefully', async () => {
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      // Simulate API returning null (cast to bypass type check - this is what we're testing)
+      mockCardsApi.getAllSetInfo.mockResolvedValue(null as unknown as gui.SetInfo[]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
+      });
+      // Set dropdown should still render with just "All Sets"
+      expect(screen.getByText('All Sets')).toBeInTheDocument();
+    });
+
+    it('should handle undefined sets response gracefully', async () => {
+      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
+      mockCardsApi.getAllSetInfo.mockResolvedValue(undefined as unknown as gui.SetInfo[]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'Lightning Bolt' })).toBeInTheDocument();
+      });
+      // Set dropdown should still render with just "All Sets"
+      expect(screen.getByText('All Sets')).toBeInTheDocument();
+    });
+  });
+
   describe('Sort Options', () => {
     it('should have sort dropdown', async () => {
       mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);

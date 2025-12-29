@@ -23,10 +23,21 @@ export interface CollectionFilter {
 }
 
 /**
+ * Response from collection API.
+ */
+interface CollectionResponse {
+  cards: CollectionCard[];
+  totalCount: number;
+  filterCount: number;
+}
+
+/**
  * Get collection with optional filters.
  */
 export async function getCollection(filter: CollectionFilter = {}): Promise<CollectionCard[]> {
-  return post<CollectionCard[]>('/collection', filter);
+  const response = await post<CollectionResponse>('/collection', filter);
+  // Backend returns { cards: [...], totalCount, filterCount } - extract the cards array
+  return response?.cards ?? [];
 }
 
 /**
