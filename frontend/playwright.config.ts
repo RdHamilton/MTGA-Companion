@@ -78,6 +78,15 @@ export default defineConfig({
       grep: /@smoke/,
       use: { ...devices['Desktop Safari'] },
     },
+    // Screenshots for documentation
+    {
+      name: 'screenshots',
+      testMatch: /screenshots\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
   ],
 
   // Start both servers for E2E testing

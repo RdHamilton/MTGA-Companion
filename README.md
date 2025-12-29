@@ -81,6 +81,27 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 - **Keyboard Navigation**: Full keyboard support for accessibility
 - **LoadingButton Component**: Consistent loading states across all async operations
 
+## Screenshots
+
+### Match History
+![Match History](docs/images/match-history.png)
+
+### Draft History
+![Draft History](docs/images/draft-history.png)
+
+### Deck Management
+![Decks](docs/images/decks.png)
+
+### Meta Dashboard
+![Meta Dashboard](docs/images/meta-dashboard.png)
+
+### Charts & Analytics
+![Deck Performance](docs/images/charts-deck-performance.png)
+
+![Format Distribution](docs/images/charts-format-distribution.png)
+
+> **Note**: Screenshots are generated automatically using Playwright. Run `cd frontend && npm run screenshots` to regenerate them with your local data.
+
 ## Documentation
 
 📚 **[Complete Documentation Wiki →](https://github.com/RdHamilton/MTGA-Companion/wiki)**
