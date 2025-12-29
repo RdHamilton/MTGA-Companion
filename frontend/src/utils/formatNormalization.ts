@@ -1,6 +1,12 @@
 import { models } from '@/types/models';
 
 /**
+ * Format normalization utilities for MTGA event/queue types.
+ * Converts raw MTGA event IDs to user-friendly display names.
+ * @module formatNormalization
+ */
+
+/**
  * Queue type mapping from MTGA event IDs to user-friendly names.
  */
 const QUEUE_TYPE_MAP: Record<string, string> = {
