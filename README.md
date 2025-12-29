@@ -103,7 +103,7 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 
 ![Format Distribution](docs/images/charts-format-distribution.png)
 
-> **Note**: Screenshots are generated automatically using Playwright. Run `cd frontend && npm run screenshots` to regenerate them with your local data.
+> **Note**: Screenshots are generated automatically using Playwright. Run `npm run screenshots` from the project root to regenerate them with your local data.
 
 ## Documentation
 
