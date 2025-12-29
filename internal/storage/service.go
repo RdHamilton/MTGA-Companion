@@ -2005,6 +2005,11 @@ func (s *Service) SettingsRepo() repository.SettingsRepository {
 	return s.settings
 }
 
+// MatchRepo returns the match repository.
+func (s *Service) MatchRepo() repository.MatchRepository {
+	return s.matches
+}
+
 // ClearAllMatches deletes all matches and games for the current account.
 func (s *Service) ClearAllMatches(ctx context.Context) error {
 	return s.matches.DeleteAll(ctx, s.currentAccountID)

@@ -66,6 +66,14 @@ type MatchRepository interface {
 	// If accountID is > 0, only deletes matches for that account.
 	// If accountID is 0, deletes all matches for all accounts.
 	DeleteAll(ctx context.Context, accountID int) error
+
+	// GetDailyWins returns the number of match wins for today (UTC).
+	// If accountID is 0, returns wins for all accounts.
+	GetDailyWins(ctx context.Context, accountID int) (int, error)
+
+	// GetWeeklyWins returns the number of match wins for the current week (Sunday-Saturday UTC).
+	// If accountID is 0, returns wins for all accounts.
+	GetWeeklyWins(ctx context.Context, accountID int) (int, error)
 }
 
 // matchRepository is the concrete implementation of MatchRepository.
@@ -1233,4 +1241,82 @@ func (r *matchRepository) DeleteAll(ctx context.Context, accountID int) error {
 	log.Printf("Deleted %d matches and associated games", rowsAffected)
 
 	return nil
+}
+
+// GetDailyWins returns the number of match wins for today (UTC).
+// If accountID is 0, returns wins for all accounts.
+func (r *matchRepository) GetDailyWins(ctx context.Context, accountID int) (int, error) {
+	// Get today's date bounds in UTC
+	now := time.Now().UTC()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	query := `
+		SELECT COUNT(*)
+		FROM matches
+		WHERE result = 'win'
+		AND timestamp >= ?
+		AND timestamp < ?
+	`
+	args := []interface{}{startOfDay, endOfDay}
+
+	if accountID > 0 {
+		query = `
+			SELECT COUNT(*)
+			FROM matches
+			WHERE result = 'win'
+			AND timestamp >= ?
+			AND timestamp < ?
+			AND account_id = ?
+		`
+		args = append(args, accountID)
+	}
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get daily wins: %w", err)
+	}
+
+	return count, nil
+}
+
+// GetWeeklyWins returns the number of match wins for the current week (Sunday-Saturday UTC).
+// If accountID is 0, returns wins for all accounts.
+func (r *matchRepository) GetWeeklyWins(ctx context.Context, accountID int) (int, error) {
+	// Get this week's date bounds in UTC (Sunday-Saturday)
+	now := time.Now().UTC()
+	// time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
+	daysSinceSunday := int(now.Weekday())
+	startOfWeek := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 0, 0, 0, 0, time.UTC)
+	endOfWeek := startOfWeek.Add(7 * 24 * time.Hour)
+
+	query := `
+		SELECT COUNT(*)
+		FROM matches
+		WHERE result = 'win'
+		AND timestamp >= ?
+		AND timestamp < ?
+	`
+	args := []interface{}{startOfWeek, endOfWeek}
+
+	if accountID > 0 {
+		query = `
+			SELECT COUNT(*)
+			FROM matches
+			WHERE result = 'win'
+			AND timestamp >= ?
+			AND timestamp < ?
+			AND account_id = ?
+		`
+		args = append(args, accountID)
+	}
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get weekly wins: %w", err)
+	}
+
+	return count, nil
 }
