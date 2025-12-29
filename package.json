@@ -1,0 +1,7 @@
+{
+  "name": "mtga-companion",
+  "private": true,
+  "scripts": {
+    "screenshots": "cd frontend && npm run screenshots"
+  }
+}

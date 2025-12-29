@@ -1,0 +1,99 @@
+name: Generate Documentation Screenshots
+
+on:
+  # Run on releases
+  release:
+    types: [published]
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      commit_screenshots:
+        description: 'Commit screenshots to repository'
+        required: true
+        default: 'true'
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  generate-screenshots:
+    name: Generate Screenshots
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      working-directory: frontend
+      run: npm ci
+
+    - name: Install Playwright browsers
+      working-directory: frontend
+      run: npx playwright install --with-deps chromium
+
+    - name: Create test database with fixtures
+      run: |
+        mkdir -p /tmp
+        go run ./cmd/apiserver --db-path=/tmp/screenshots.db --load-fixtures=frontend/tests/e2e/fixtures/test-data.sql &
+        sleep 5
+        # Verify server is running
+        curl -f http://localhost:8080/health || exit 1
+
+    - name: Generate screenshots
+      working-directory: frontend
+      run: |
+        # Start the frontend dev server
+        VITE_USE_REST_API=true npm run dev &
+        sleep 10
+        # Run screenshot tests
+        npm run screenshots
+      env:
+        CI: true
+
+    - name: Optimize screenshots
+      run: |
+        # Install optipng for PNG optimization (optional)
+        sudo apt-get update && sudo apt-get install -y optipng
+        # Optimize all generated screenshots
+        find docs/images -name "*.png" -exec optipng -o2 {} \; || true
+
+    - name: Upload screenshots as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-screenshots
+        path: docs/images/*.png
+        retention-days: 30
+
+    - name: Commit screenshots
+      if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.commit_screenshots == 'true')
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+        # Check if there are changes to commit
+        if git diff --quiet docs/images/; then
+          echo "No screenshot changes to commit"
+          exit 0
+        fi
+
+        git add docs/images/*.png
+        git commit -m "Update documentation screenshots [skip ci]"
+
+        # Push to main branch
+        git push origin HEAD:main
