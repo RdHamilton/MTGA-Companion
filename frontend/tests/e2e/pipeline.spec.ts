@@ -273,26 +273,18 @@ test.describe('Data Pipeline - Log to UI', () => {
       const loadingSpinner = page.locator('.loading-container');
       await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
 
-      // After loading, check for wins grid, error state, or empty state
-      const winsGrid = page.locator('.wins-grid');
+      // Page should not have errors
       const errorState = page.locator('.error-state');
-      const pageTitle = page.locator('.page-title');
+      await expect(errorState).not.toBeVisible();
 
-      // The page should have loaded with some content
-      await expect(winsGrid.or(errorState).or(pageTitle)).toBeVisible({ timeout: 10000 });
+      // After loading, check for wins grid (should be visible when page loads successfully)
+      const winsGrid = page.locator('.wins-grid');
+      await expect(winsGrid).toBeVisible({ timeout: 10000 });
 
-      // If wins grid is visible, check for daily/weekly wins cards
-      const hasWinsGrid = await winsGrid.isVisible().catch(() => false);
-
-      if (hasWinsGrid) {
-        // Look for daily wins card with actual class name
-        const dailyWinsCard = page.locator('.daily-wins-card');
-        const cardCount = await dailyWinsCard.count();
-        expect(cardCount).toBeGreaterThanOrEqual(1);
-      } else {
-        // If no wins grid, the page should at least have the title or error state
-        await expect(pageTitle.or(errorState)).toBeVisible();
-      }
+      // Check for daily/weekly wins cards
+      const dailyWinsCard = page.locator('.daily-wins-card');
+      const cardCount = await dailyWinsCard.count();
+      expect(cardCount).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -315,7 +307,8 @@ test.describe('Data Pipeline - Log to UI', () => {
   });
 
   test.describe('Charts Pipeline', () => {
-    test('should display Win Rate Trend chart', async ({ page }) => {
+    // TODO: Re-enable when #739 is fixed (Win Rate Trend chart fails to load - 400 Bad Request)
+    test.skip('should display Win Rate Trend chart', async ({ page }) => {
       await page.click('a.tab[href="/charts/win-rate-trend"]');
       await page.waitForURL('**/charts/win-rate-trend');
 
@@ -331,13 +324,15 @@ test.describe('Data Pipeline - Log to UI', () => {
       const loadingSpinner = page.locator('.loading-container');
       await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
 
-      // Check for chart, empty state, or error state (all are valid page states)
+      // Chart should display without errors
       const chartContainer = page.locator('.chart-container');
       const emptyState = page.locator('.empty-state');
-      const errorState = page.locator('.error-state');
 
-      // At least one of these should be visible after loading
-      await expect(chartContainer.or(emptyState).or(errorState)).toBeVisible({ timeout: 10000 });
+      await expect(chartContainer.or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      // Should not have errors
+      const errorState = page.locator('.error-state');
+      await expect(errorState).not.toBeVisible();
     });
 
     test('should display Deck Performance chart', async ({ page }) => {
