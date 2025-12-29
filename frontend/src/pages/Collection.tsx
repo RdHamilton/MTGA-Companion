@@ -77,9 +77,11 @@ export default function Collection() {
       const collectionCards = await collection.getCollection(apiFilter);
       // Note: REST API doesn't support search/sort/pagination server-side
       // The component handles this with client-side filtering
-      setCards(collectionCards || []);
-      setTotalCount(collectionCards.length);
-      setFilterCount(collectionCards.length);
+      // Normalize to array to prevent crashes when API returns null/undefined
+      const normalizedCards = Array.isArray(collectionCards) ? collectionCards : [];
+      setCards(normalizedCards);
+      setTotalCount(normalizedCards.length);
+      setFilterCount(normalizedCards.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load collection');
       console.error('Failed to load collection:', err);
@@ -91,7 +93,8 @@ export default function Collection() {
   const loadSets = useCallback(async () => {
     try {
       const setInfo = await cardsApi.getAllSetInfo();
-      setSets(setInfo || []);
+      // Normalize to array to prevent crashes when API returns null/undefined
+      setSets(Array.isArray(setInfo) ? setInfo : []);
     } catch (err) {
       console.error('Failed to load sets:', err);
     }
