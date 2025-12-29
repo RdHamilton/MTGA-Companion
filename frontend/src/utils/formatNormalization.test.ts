@@ -44,6 +44,44 @@ describe('formatNormalization', () => {
       });
     });
 
+    describe('format-specific events', () => {
+      it('should normalize "Alchemy" to "Play Queue"', () => {
+        expect(normalizeQueueType('Alchemy')).toBe('Play Queue');
+      });
+
+      it('should normalize "Alchemy_Play" to "Play Queue"', () => {
+        expect(normalizeQueueType('Alchemy_Play')).toBe('Play Queue');
+      });
+
+      it('should normalize "Alchemy_Ladder" to "Ranked"', () => {
+        expect(normalizeQueueType('Alchemy_Ladder')).toBe('Ranked');
+      });
+
+      it('should normalize "HistoricBrawl" to "Play Queue"', () => {
+        expect(normalizeQueueType('HistoricBrawl')).toBe('Play Queue');
+      });
+
+      it('should normalize "HistoricBrawl_Play" to "Play Queue"', () => {
+        expect(normalizeQueueType('HistoricBrawl_Play')).toBe('Play Queue');
+      });
+
+      it('should normalize "Explorer" to "Play Queue"', () => {
+        expect(normalizeQueueType('Explorer')).toBe('Play Queue');
+      });
+
+      it('should normalize "Explorer_Ladder" to "Ranked"', () => {
+        expect(normalizeQueueType('Explorer_Ladder')).toBe('Ranked');
+      });
+
+      it('should normalize "Timeless" to "Play Queue"', () => {
+        expect(normalizeQueueType('Timeless')).toBe('Play Queue');
+      });
+
+      it('should normalize "Timeless_Ladder" to "Ranked"', () => {
+        expect(normalizeQueueType('Timeless_Ladder')).toBe('Ranked');
+      });
+    });
+
     describe('edge cases', () => {
       it('should return empty string for empty input', () => {
         expect(normalizeQueueType('')).toBe('');
@@ -136,6 +174,43 @@ describe('formatNormalization', () => {
       it('should combine Explorer + Traditional_Ladder', () => {
         const match = createMatch({ DeckFormat: 'Explorer', EventName: 'Traditional_Ladder' });
         expect(getDisplayEventName(match)).toBe('Explorer Traditional Ranked');
+      });
+    });
+
+    describe('format-specific events with DeckFormat', () => {
+      it('should combine Alchemy + Alchemy event to "Alchemy Play Queue"', () => {
+        const match = createMatch({ DeckFormat: 'Alchemy', EventName: 'Alchemy' });
+        expect(getDisplayEventName(match)).toBe('Alchemy Play Queue');
+      });
+
+      it('should combine Alchemy + Alchemy_Ladder to "Alchemy Ranked"', () => {
+        const match = createMatch({ DeckFormat: 'Alchemy', EventName: 'Alchemy_Ladder' });
+        expect(getDisplayEventName(match)).toBe('Alchemy Ranked');
+      });
+
+      it('should combine HistoricBrawl + HistoricBrawl event to "HistoricBrawl Play Queue"', () => {
+        const match = createMatch({ DeckFormat: 'HistoricBrawl', EventName: 'HistoricBrawl' });
+        expect(getDisplayEventName(match)).toBe('HistoricBrawl Play Queue');
+      });
+
+      it('should combine HistoricBrawl + HistoricBrawl_Play to "HistoricBrawl Play Queue"', () => {
+        const match = createMatch({ DeckFormat: 'HistoricBrawl', EventName: 'HistoricBrawl_Play' });
+        expect(getDisplayEventName(match)).toBe('HistoricBrawl Play Queue');
+      });
+
+      it('should combine Explorer + Explorer event to "Explorer Play Queue"', () => {
+        const match = createMatch({ DeckFormat: 'Explorer', EventName: 'Explorer' });
+        expect(getDisplayEventName(match)).toBe('Explorer Play Queue');
+      });
+
+      it('should combine Explorer + Explorer_Ladder to "Explorer Ranked"', () => {
+        const match = createMatch({ DeckFormat: 'Explorer', EventName: 'Explorer_Ladder' });
+        expect(getDisplayEventName(match)).toBe('Explorer Ranked');
+      });
+
+      it('should combine Timeless + Timeless_Ladder to "Timeless Ranked"', () => {
+        const match = createMatch({ DeckFormat: 'Timeless', EventName: 'Timeless_Ladder' });
+        expect(getDisplayEventName(match)).toBe('Timeless Ranked');
       });
     });
 

@@ -16,6 +16,35 @@ const QUEUE_TYPE_MAP: Record<string, string> = {
 const DRAFT_PREFIXES = ['QuickDraft', 'PremierDraft', 'TradDraft', 'SealedDeck'];
 
 /**
+ * Format-specific event IDs that contain the format name.
+ * These map to their queue type suffix.
+ */
+const FORMAT_EVENT_PATTERNS: Record<string, string> = {
+  // Alchemy events
+  'Alchemy': 'Play Queue',
+  'Alchemy_Play': 'Play Queue',
+  'Alchemy_Ladder': 'Ranked',
+  // Historic Brawl events
+  'HistoricBrawl': 'Play Queue',
+  'HistoricBrawl_Play': 'Play Queue',
+  // Brawl events
+  'Brawl': 'Play Queue',
+  'Brawl_Play': 'Play Queue',
+  // Explorer events
+  'Explorer': 'Play Queue',
+  'Explorer_Play': 'Play Queue',
+  'Explorer_Ladder': 'Ranked',
+  // Historic events (when not using generic Play/Ladder)
+  'Historic': 'Play Queue',
+  'Historic_Play': 'Play Queue',
+  'Historic_Ladder': 'Ranked',
+  // Timeless events
+  'Timeless': 'Play Queue',
+  'Timeless_Play': 'Play Queue',
+  'Timeless_Ladder': 'Ranked',
+};
+
+/**
  * Normalizes a queue type to a user-friendly display name.
  *
  * Examples:
@@ -23,12 +52,19 @@ const DRAFT_PREFIXES = ['QuickDraft', 'PremierDraft', 'TradDraft', 'SealedDeck']
  * - 'Ladder' -> 'Ranked'
  * - 'QuickDraft_TLA_20251127' -> 'QuickDraft'
  * - 'TradDraft_MKM' -> 'Traditional Draft'
+ * - 'Alchemy' -> 'Play Queue'
+ * - 'HistoricBrawl_Play' -> 'Play Queue'
  *
  * @param queueType - The raw queue type from MTGA
  * @returns The normalized, user-friendly queue type name
  */
 export function normalizeQueueType(queueType: string): string {
   if (!queueType) return queueType;
+
+  // Check for format-specific event patterns first
+  if (FORMAT_EVENT_PATTERNS[queueType]) {
+    return FORMAT_EVENT_PATTERNS[queueType];
+  }
 
   // Check if it's a draft format (contains underscore with set code pattern)
   const underscoreIndex = queueType.indexOf('_');
@@ -74,16 +110,22 @@ export function getDisplayFormat(match: models.Match): string {
  * Examples:
  * - Standard deck + Ladder -> 'Standard Ranked'
  * - Standard deck + Play -> 'Standard Play Queue'
+ * - Alchemy deck + Alchemy -> 'Alchemy Play Queue'
+ * - HistoricBrawl deck + HistoricBrawl -> 'HistoricBrawl Play Queue'
  * - QuickDraft_TLA -> 'QuickDraft'
  *
  * @param match - The match object
  * @returns The event name to display in the Event column
  */
 export function getDisplayEventName(match: models.Match): string {
-  const queueName = normalizeQueueType(match.EventName || match.Format);
-  // If we have a deck format and it's a constructed queue, combine them
+  const rawEvent = match.EventName || match.Format;
+  const queueName = normalizeQueueType(rawEvent);
+
+  // If we have a deck format, combine with normalized queue type
   if (match.DeckFormat && ['Play Queue', 'Ranked', 'Traditional Ranked', 'Traditional Play'].includes(queueName)) {
     return `${match.DeckFormat} ${queueName}`;
   }
+
+  // For draft formats or when no deck format, just return the normalized queue name
   return queueName;
 }
