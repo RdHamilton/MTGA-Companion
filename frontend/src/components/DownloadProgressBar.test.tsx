@@ -1,7 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import DownloadProgressBar from './DownloadProgressBar';
-import { DownloadProvider } from '@/context/DownloadContext';
 
 // Mock websocketClient
 vi.mock('@/services/websocketClient', () => ({
@@ -23,10 +22,9 @@ describe('DownloadProgressBar', () => {
     vi.clearAllMocks();
   });
 
-  it('should not render when not downloading', () => {
+  it('should not render when no active task', () => {
     mockUseDownload.mockReturnValue({
       state: { tasks: [], activeTask: null },
-      isDownloading: false,
     });
 
     const { container } = render(<DownloadProgressBar />);
@@ -39,7 +37,6 @@ describe('DownloadProgressBar', () => {
         tasks: [{ id: 'test-1', description: 'Downloading meta...', progress: 50, status: 'downloading' }],
         activeTask: { id: 'test-1', description: 'Downloading meta...', progress: 50, status: 'downloading' },
       },
-      isDownloading: true,
     });
 
     render(<DownloadProgressBar />);
@@ -53,7 +50,6 @@ describe('DownloadProgressBar', () => {
         tasks: [{ id: 'test-1', description: 'Downloading meta...', progress: 30, status: 'error', error: 'Network error' }],
         activeTask: { id: 'test-1', description: 'Downloading meta...', progress: 30, status: 'error', error: 'Network error' },
       },
-      isDownloading: false,
     });
 
     render(<DownloadProgressBar />);
@@ -66,7 +62,6 @@ describe('DownloadProgressBar', () => {
         tasks: [{ id: 'test-1', description: 'Starting download...', progress: 0, status: 'downloading' }],
         activeTask: { id: 'test-1', description: 'Starting download...', progress: 0, status: 'downloading' },
       },
-      isDownloading: true,
     });
 
     render(<DownloadProgressBar />);
@@ -80,7 +75,6 @@ describe('DownloadProgressBar', () => {
         tasks: [{ id: 'test-1', description: 'Finishing...', progress: 100, status: 'downloading' }],
         activeTask: { id: 'test-1', description: 'Finishing...', progress: 100, status: 'downloading' },
       },
-      isDownloading: true,
     });
 
     render(<DownloadProgressBar />);

@@ -2,10 +2,10 @@ import { useDownload } from '@/context/DownloadContext';
 import './DownloadProgressBar.css';
 
 const DownloadProgressBar = () => {
-  const { state, isDownloading } = useDownload();
+  const { state } = useDownload();
 
-  // Don't render if nothing is downloading
-  if (!isDownloading && state.tasks.length === 0) {
+  // Don't render if no active task to display
+  if (!state.activeTask) {
     return null;
   }
 

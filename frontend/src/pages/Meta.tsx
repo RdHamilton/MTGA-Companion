@@ -106,37 +106,49 @@ export default function Meta() {
     if (loading || !dashboardData) return;
 
     // Check if data is stale (older than 1 week)
-    if (isDataStale(format)) {
-      console.log(`[Meta] Data for ${format} is stale (>1 week), triggering auto-refresh`);
-      setAutoRefreshing(true);
+    if (!isDataStale(format)) return;
 
-      const formatLabel = META_FORMATS.find(f => f.value === format)?.label || format;
-      const downloadId = `meta-refresh-${format}`;
-      startDownload(downloadId, `Updating ${formatLabel} metagame...`);
-      updateProgress(downloadId, 10);
+    console.log(`[Meta] Data for ${format} is stale (>1 week), triggering auto-refresh`);
+    setAutoRefreshing(true);
+    let cancelled = false;
 
-      const refreshStaleData = async () => {
-        try {
-          updateProgress(downloadId, 30);
-          // Call refresh endpoint to fetch fresh data from external sources
-          const data = await meta.refreshMetaData(format);
-          updateProgress(downloadId, 90);
-          if (!data.error) {
-            setDashboardData(data);
-            saveRefreshTimestamp(format);
-            console.log(`[Meta] Auto-refresh complete for ${format}`);
-          }
-          completeDownload(downloadId);
-        } catch (err) {
-          console.error(`[Meta] Auto-refresh failed for ${format}:`, err);
+    // Capture format at effect start to prevent race conditions
+    const currentFormat = format;
+    const formatLabel = META_FORMATS.find(f => f.value === currentFormat)?.label || currentFormat;
+    const downloadId = `meta-refresh-${currentFormat}`;
+    startDownload(downloadId, `Updating ${formatLabel} metagame...`);
+    updateProgress(downloadId, 10);
+
+    const refreshStaleData = async () => {
+      try {
+        updateProgress(downloadId, 30);
+        // Call refresh endpoint to fetch fresh data from external sources
+        const data = await meta.refreshMetaData(currentFormat);
+        if (cancelled) return; // Don't update if format changed
+        updateProgress(downloadId, 90);
+        if (!data.error) {
+          setDashboardData(data);
+          saveRefreshTimestamp(currentFormat);
+          console.log(`[Meta] Auto-refresh complete for ${currentFormat}`);
+        }
+        completeDownload(downloadId);
+      } catch (err) {
+        if (!cancelled) {
+          console.error(`[Meta] Auto-refresh failed for ${currentFormat}:`, err);
           failDownload(downloadId, 'Failed to refresh meta data');
-        } finally {
+        }
+      } finally {
+        if (!cancelled) {
           setAutoRefreshing(false);
         }
-      };
+      }
+    };
 
-      refreshStaleData();
-    }
+    refreshStaleData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loading, dashboardData, format, startDownload, updateProgress, completeDownload, failDownload]);
 
   const handleRefresh = async () => {

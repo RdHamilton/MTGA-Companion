@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { EventsOn } from '@/services/websocketClient';
 
 // Download state types
@@ -43,6 +43,18 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
     activeTask: null,
   });
 
+  // Track error task removal timeouts for cleanup
+  const errorTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    const timeoutsMap = errorTimeoutsRef.current;
+    return () => {
+      timeoutsMap.forEach((timeout) => clearTimeout(timeout));
+      timeoutsMap.clear();
+    };
+  }, []);
+
   // Start a new download task
   const startDownload = useCallback((id: string, description: string) => {
     setState((prev) => {
@@ -67,7 +79,8 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
 
       return {
         tasks: newTasks,
-        activeTask: newTask,
+        // Only set activeTask if there isn't one already
+        activeTask: prev.activeTask || newTask,
       };
     });
   }, []);
@@ -84,9 +97,12 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
         progress: Math.min(100, Math.max(0, progress)),
       };
 
+      // Only update activeTask if it's null or matches the current task
+      const shouldUpdateActive = !prev.activeTask || prev.activeTask.id === id;
+
       return {
         tasks: newTasks,
-        activeTask: newTasks[taskIndex],
+        activeTask: shouldUpdateActive ? newTasks[taskIndex] : prev.activeTask,
       };
     });
   }, []);
@@ -117,23 +133,42 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
         error,
       };
 
-      // Remove error tasks after 5 seconds
-      setTimeout(() => {
-        setState((current) => ({
-          ...current,
-          tasks: current.tasks.filter((t) => t.id !== id),
-        }));
-      }, 5000);
+      // Find next downloading task for activeTask
+      const nextActive = newTasks.find((t) => t.status === 'downloading') || null;
 
       return {
         tasks: newTasks,
-        activeTask: newTasks[taskIndex],
+        activeTask: nextActive,
       };
     });
+
+    // Schedule removal of error task after 5 seconds (outside setState)
+    // Clear any existing timeout for this id
+    const existingTimeout = errorTimeoutsRef.current.get(id);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    const timeoutId = setTimeout(() => {
+      setState((current) => ({
+        ...current,
+        tasks: current.tasks.filter((t) => t.id !== id),
+      }));
+      errorTimeoutsRef.current.delete(id);
+    }, 5000);
+
+    errorTimeoutsRef.current.set(id, timeoutId);
   }, []);
 
   // Cancel a download task
   const cancelDownload = useCallback((id: string) => {
+    // Clear any error timeout for this task
+    const existingTimeout = errorTimeoutsRef.current.get(id);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      errorTimeoutsRef.current.delete(id);
+    }
+
     setState((prev) => {
       const newTasks = prev.tasks.filter((t) => t.id !== id);
       const nextActive = newTasks.find((t) => t.status === 'downloading') || null;
@@ -147,23 +182,47 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
 
   // Listen for download progress WebSocket events
   useEffect(() => {
-    const unsubscribeProgress = EventsOn('download:progress', (data: { id: string; description: string; progress: number }) => {
-      // Start download if not already started
+    const unsubscribeProgress = EventsOn('download:progress', (rawData: unknown) => {
+      const data = rawData as { id: string; description: string; progress: number };
+      // Handle progress update inline to avoid nested setState calls
       setState((prev) => {
         const existing = prev.tasks.find((t) => t.id === data.id);
         if (!existing) {
-          startDownload(data.id, data.description);
+          // Create new task
+          const newTask: DownloadTask = {
+            id: data.id,
+            description: data.description,
+            progress: Math.min(100, Math.max(0, data.progress)),
+            status: 'downloading',
+          };
+          return {
+            tasks: [...prev.tasks, newTask],
+            activeTask: prev.activeTask || newTask,
+          };
+        } else {
+          // Update existing task progress
+          const taskIndex = prev.tasks.findIndex((t) => t.id === data.id);
+          const newTasks = [...prev.tasks];
+          newTasks[taskIndex] = {
+            ...newTasks[taskIndex],
+            progress: Math.min(100, Math.max(0, data.progress)),
+          };
+          const shouldUpdateActive = !prev.activeTask || prev.activeTask.id === data.id;
+          return {
+            tasks: newTasks,
+            activeTask: shouldUpdateActive ? newTasks[taskIndex] : prev.activeTask,
+          };
         }
-        return prev;
       });
-      updateProgress(data.id, data.progress);
     });
 
-    const unsubscribeComplete = EventsOn('download:complete', (data: { id: string }) => {
+    const unsubscribeComplete = EventsOn('download:complete', (rawData: unknown) => {
+      const data = rawData as { id: string };
       completeDownload(data.id);
     });
 
-    const unsubscribeError = EventsOn('download:error', (data: { id: string; error: string }) => {
+    const unsubscribeError = EventsOn('download:error', (rawData: unknown) => {
+      const data = rawData as { id: string; error: string };
       failDownload(data.id, data.error);
     });
 
@@ -172,12 +231,13 @@ export const DownloadProvider = ({ children }: DownloadProviderProps) => {
       unsubscribeComplete?.();
       unsubscribeError?.();
     };
-  }, [startDownload, updateProgress, completeDownload, failDownload]);
+  }, [completeDownload, failDownload]);
 
-  // Computed values
+  // Computed values - only count downloading tasks for progress
   const isDownloading = state.tasks.some((t) => t.status === 'downloading');
-  const overallProgress = state.tasks.length > 0
-    ? state.tasks.reduce((sum, t) => sum + t.progress, 0) / state.tasks.length
+  const downloadingTasks = state.tasks.filter((t) => t.status === 'downloading');
+  const overallProgress = downloadingTasks.length > 0
+    ? downloadingTasks.reduce((sum, t) => sum + t.progress, 0) / downloadingTasks.length
     : 0;
 
   const value: DownloadContextType = {
