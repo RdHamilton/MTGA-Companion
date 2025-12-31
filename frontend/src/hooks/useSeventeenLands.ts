@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { cards } from '@/services/api';
+import { cards, drafts } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 
 // Functions that wrap cards API to match legacy signatures
@@ -132,7 +132,11 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
 
     setIsFetchingRatings(true);
     try {
-      await refreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      const upperSetCode = setCode.trim().toUpperCase();
+      await refreshSetRatings(upperSetCode, draftFormat);
+
+      // Recalculate grades for existing drafts with this set (#734)
+      const recalcResult = await drafts.recalculateSetGrades(upperSetCode);
 
       // Check data source after refreshing
       try {
@@ -148,13 +152,15 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
                 ? 'legacy API'
                 : source;
 
+        const gradesMsg = recalcResult.count > 0 ? ` Updated ${recalcResult.count} draft grades.` : '';
         showToast.show(
-          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!`,
+          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!${gradesMsg}`,
           'success'
         );
       } catch {
+        const gradesMsg = recalcResult.count > 0 ? ` Updated ${recalcResult.count} draft grades.` : '';
         showToast.show(
-          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`,
+          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!${gradesMsg}`,
           'success'
         );
       }

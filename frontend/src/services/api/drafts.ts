@@ -288,3 +288,23 @@ export async function classifyDraftPoolArchetype(
     session_id: sessionId,
   });
 }
+
+/**
+ * Response from recalculating set grades.
+ */
+export interface RecalculateSetGradesResponse {
+  status: string;
+  set: string;
+  count: number;
+  message: string;
+}
+
+/**
+ * Recalculate all draft grades for a specific set.
+ * Called after refreshing ratings to update existing draft grades.
+ */
+export async function recalculateSetGrades(setCode: string): Promise<RecalculateSetGradesResponse> {
+  return post<RecalculateSetGradesResponse>('/drafts/recalculate-set-grades', {
+    set_code: setCode,
+  });
+}
