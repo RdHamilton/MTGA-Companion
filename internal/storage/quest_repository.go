@@ -23,11 +23,11 @@ func NewQuestRepository(db *sql.DB) *QuestRepository {
 // Save saves a quest to the database (insert or update)
 func (r *QuestRepository) Save(quest *models.Quest) error {
 	// First, check if a quest with this quest_id already exists
-	// We also check the completed status to handle quest reassignment:
-	// If MTGA reuses a quest_id for a new quest after the old one was completed,
-	// we should create a new record instead of updating the old completed one.
+	// We also check the completed/rerolled status to handle quest reassignment:
+	// If MTGA reuses a quest_id for a new quest after the old one was completed or rerolled,
+	// we should create a new record instead of updating the old one.
 	existingQuery := `
-		SELECT id, ending_progress, assigned_at, completed FROM quests
+		SELECT id, ending_progress, assigned_at, completed, rerolled FROM quests
 		WHERE quest_id = ?
 		ORDER BY created_at DESC
 		LIMIT 1
@@ -37,13 +37,14 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 	var existingProgress int
 	var existingAssignedAt time.Time
 	var existingCompleted bool
-	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt, &existingCompleted)
+	var existingRerolled bool
+	err := r.db.QueryRow(existingQuery, quest.QuestID).Scan(&existingID, &existingProgress, &existingAssignedAt, &existingCompleted, &existingRerolled)
 
 	if err == nil {
 		// Quest exists - check if this is a quest reassignment
-		// If the existing quest was completed and the new quest is not completed,
+		// If the existing quest was completed or rerolled and the new quest is not completed,
 		// this is a NEW quest with a reused ID - insert it as a new record
-		if existingCompleted && !quest.Completed {
+		if (existingCompleted || existingRerolled) && !quest.Completed {
 			// Quest reassignment - insert as new record (fall through to insert logic)
 			err = sql.ErrNoRows // Force insert logic below
 		}
@@ -73,7 +74,8 @@ func (r *QuestRepository) Save(quest *models.Quest) error {
 				completed = ?,
 				completed_at = ?,
 				last_seen_at = ?,
-				can_swap = ?
+				can_swap = ?,
+				rerolled = 0
 			WHERE id = ?
 		`
 
