@@ -431,3 +431,177 @@ func TestQuestReassignment(t *testing.T) {
 		t.Error("Second quest should not be completed")
 	}
 }
+
+func TestQuestReassignmentAfterReroll(t *testing.T) {
+	// Test that when MTGA reuses a quest_id for a new quest after the old one was rerolled,
+	// we create a new record instead of updating the old rerolled one.
+	// This is the bug fix for issue where rerolled quests were not properly tracked.
+	db := setupTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewQuestRepository(db)
+	now := time.Now().UTC()
+
+	// First, save a quest and mark it as rerolled
+	lastSeen := now.Add(-24 * time.Hour)
+	quest1 := &models.Quest{
+		QuestID:        "reused-quest-id",
+		QuestType:      "Quests/Quest_Nissas_Journey",
+		Goal:           25,
+		EndingProgress: 0,
+		Completed:      false,
+		Rerolled:       true, // This quest was rerolled
+		AssignedAt:     now.Add(-48 * time.Hour),
+		LastSeenAt:     &lastSeen,
+	}
+
+	err := repo.Save(quest1)
+	if err != nil {
+		t.Fatalf("Failed to save first (rerolled) quest: %v", err)
+	}
+	firstQuestID := quest1.ID
+
+	// Now MTGA reuses the same quest_id for a NEW quest (after reroll)
+	newLastSeen := now
+	quest2 := &models.Quest{
+		QuestID:        "reused-quest-id", // Same ID!
+		QuestType:      "Quests/Quest_Nissas_Journey",
+		Goal:           25,
+		EndingProgress: 0,
+		Completed:      false, // Not completed - this is a NEW quest
+		Rerolled:       false, // This one is NOT rerolled
+		AssignedAt:     now,
+		LastSeenAt:     &newLastSeen,
+	}
+
+	err = repo.Save(quest2)
+	if err != nil {
+		t.Fatalf("Failed to save second quest: %v", err)
+	}
+
+	// The second quest should get a NEW ID (not update the first)
+	if quest2.ID == firstQuestID {
+		t.Errorf("Quest reassignment after reroll should create new record, but got same ID: %d", quest2.ID)
+	}
+
+	// Verify we now have 2 records with the same quest_id
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM quests WHERE quest_id = ?", "reused-quest-id").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count quests: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Expected 2 quests with same quest_id, got %d", count)
+	}
+
+	// Verify the first quest is still marked as rerolled
+	var firstRerolled bool
+	err = db.QueryRow("SELECT rerolled FROM quests WHERE id = ?", firstQuestID).Scan(&firstRerolled)
+	if err != nil {
+		t.Fatalf("Failed to query first quest: %v", err)
+	}
+	if !firstRerolled {
+		t.Error("First quest should still be marked as rerolled")
+	}
+
+	// Verify the second quest is NOT rerolled
+	var secondRerolled bool
+	err = db.QueryRow("SELECT rerolled FROM quests WHERE id = ?", quest2.ID).Scan(&secondRerolled)
+	if err != nil {
+		t.Fatalf("Failed to query second quest: %v", err)
+	}
+	if secondRerolled {
+		t.Error("Second quest should not be rerolled")
+	}
+}
+
+func TestSaveQuestAfterRerollCreatesNewRecord(t *testing.T) {
+	// Test that when a quest was marked as rerolled and MTGA sends a new quest
+	// with the same quest_id, we create a NEW record (not update the old one).
+	// This is the expected behavior when MTGA reuses quest_ids.
+	db := setupTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewQuestRepository(db)
+	now := time.Now().UTC()
+
+	// First, save a quest
+	lastSeen := now.Add(-24 * time.Hour)
+	quest := &models.Quest{
+		QuestID:        "active-quest-id",
+		QuestType:      "Quests/Quest_Fatal_Push",
+		Goal:           25,
+		EndingProgress: 10,
+		Completed:      false,
+		Rerolled:       false,
+		AssignedAt:     now.Add(-48 * time.Hour),
+		LastSeenAt:     &lastSeen,
+	}
+
+	err := repo.Save(quest)
+	if err != nil {
+		t.Fatalf("Failed to save quest: %v", err)
+	}
+	firstQuestID := quest.ID
+
+	// Mark it as rerolled (simulating the quest disappearing from MTGA response)
+	_, err = db.Exec("UPDATE quests SET rerolled = 1 WHERE id = ?", firstQuestID)
+	if err != nil {
+		t.Fatalf("Failed to set rerolled flag: %v", err)
+	}
+
+	// Verify it's now rerolled
+	var rerolled bool
+	err = db.QueryRow("SELECT rerolled FROM quests WHERE id = ?", firstQuestID).Scan(&rerolled)
+	if err != nil {
+		t.Fatalf("Failed to query quest: %v", err)
+	}
+	if !rerolled {
+		t.Error("Quest should be rerolled before second save")
+	}
+
+	// Now save a NEW quest with the same quest_id (simulating MTGA reusing the ID)
+	newLastSeen := now
+	quest.EndingProgress = 0 // New quest has 0 progress
+	quest.LastSeenAt = &newLastSeen
+	quest.AssignedAt = now // New assigned_at
+
+	err = repo.Save(quest)
+	if err != nil {
+		t.Fatalf("Failed to save second quest: %v", err)
+	}
+
+	// The second save should create a NEW record (different ID)
+	if quest.ID == firstQuestID {
+		t.Errorf("Expected new record to be created, but got same ID: %d", quest.ID)
+	}
+
+	// Verify we now have 2 records
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM quests WHERE quest_id = ?", "active-quest-id").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count quests: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Expected 2 quests, got %d", count)
+	}
+
+	// The first record should still be rerolled
+	err = db.QueryRow("SELECT rerolled FROM quests WHERE id = ?", firstQuestID).Scan(&rerolled)
+	if err != nil {
+		t.Fatalf("Failed to query first quest: %v", err)
+	}
+	if !rerolled {
+		t.Error("First quest should still be rerolled")
+	}
+
+	// The new record should NOT be rerolled
+	var newRerolled bool
+	err = db.QueryRow("SELECT rerolled FROM quests WHERE id = ?", quest.ID).Scan(&newRerolled)
+	if err != nil {
+		t.Fatalf("Failed to query new quest: %v", err)
+	}
+	if newRerolled {
+		t.Error("New quest should not be rerolled")
+	}
+}
