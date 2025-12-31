@@ -962,3 +962,27 @@
 .toggle-btn.active:hover {
     background-color: #5ab0ff;
 }
+
+/* Draft Grade and Win Rate Side-by-Side Layout (#735) */
+.draft-grade-winrate-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.draft-grade-winrate-row > * {
+    flex: 1;
+    min-width: 200px;
+}
+
+/* Responsive: Stack on smaller screens */
+@media (max-width: 768px) {
+    .draft-grade-winrate-row {
+        flex-direction: column;
+    }
+
+    .draft-grade-winrate-row > * {
+        min-width: 100%;
+    }
+}

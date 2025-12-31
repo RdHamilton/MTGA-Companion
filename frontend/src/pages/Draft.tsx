@@ -452,7 +452,7 @@ const Draft: React.FC = () => {
                         )}
                     </div>
                     {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
-                        <>
+                        <div className="draft-grade-winrate-row">
                             <DraftGrade
                                 sessionID={historicalDetailState.session.ID}
                                 showCalculateButton={true}
@@ -468,7 +468,7 @@ const Draft: React.FC = () => {
                                     console.log('Prediction calculated:', pred);
                                 }}
                             />
-                        </>
+                        </div>
                     )}
                 </div>
 

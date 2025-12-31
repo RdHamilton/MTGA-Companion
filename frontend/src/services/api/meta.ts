@@ -86,3 +86,12 @@ export async function getFormatInsights(
   const params = new URLSearchParams({ format, setCode });
   return get<insights.FormatInsights>(`/meta/insights?${params.toString()}`);
 }
+
+/**
+ * Refresh meta data from external sources.
+ * Forces a fresh fetch from MTGGoldfish/MTGTop8.
+ */
+export async function refreshMetaData(format: string): Promise<gui.MetaDashboardResponse> {
+  const params = new URLSearchParams({ format });
+  return post<gui.MetaDashboardResponse>(`/meta/refresh?${params.toString()}`, {});
+}

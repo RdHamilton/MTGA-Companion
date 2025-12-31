@@ -1146,4 +1146,78 @@ describe('MatchHistory', () => {
       });
     });
   });
+
+  describe('Record Summary (#730)', () => {
+    it('should display filtered record summary in filter bar', async () => {
+      const matches = [
+        createMockMatch({ ID: 'match-001', Result: 'Win' }),
+        createMockMatch({ ID: 'match-002', Result: 'Win' }),
+        createMockMatch({ ID: 'match-003', Result: 'Loss' }),
+      ];
+      mockMatches.getMatches.mockResolvedValue(matches);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // Should show 2-1 (66.7%) - 2 wins, 1 loss
+        expect(screen.getByText('Record')).toBeInTheDocument();
+        expect(screen.getByText('2-1 (66.7%)')).toBeInTheDocument();
+      });
+    });
+
+    it('should not display record summary when no matches', async () => {
+      mockMatches.getMatches.mockResolvedValue([]);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading matches...')).not.toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Record')).not.toBeInTheDocument();
+    });
+
+    it('should update record summary when filters change', async () => {
+      const allMatches = [
+        createMockMatch({ ID: 'match-001', Result: 'Win' }),
+        createMockMatch({ ID: 'match-002', Result: 'Win' }),
+        createMockMatch({ ID: 'match-003', Result: 'Win' }),
+        createMockMatch({ ID: 'match-004', Result: 'Loss' }),
+      ];
+      mockMatches.getMatches.mockResolvedValue(allMatches);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        // 3 wins, 1 loss = 75%
+        expect(screen.getByText('3-1 (75.0%)')).toBeInTheDocument();
+      });
+
+      // Change to wins only
+      const winsOnly = allMatches.filter(m => m.Result === 'Win');
+      mockMatches.getMatches.mockResolvedValue(winsOnly);
+
+      const resultSelect = getSelectByLabel('Result');
+      fireEvent.change(resultSelect, { target: { value: 'win' } });
+
+      await waitFor(() => {
+        // 3 wins, 0 losses = 100%
+        expect(screen.getByText('3-0 (100.0%)')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle all losses correctly', async () => {
+      const matches = [
+        createMockMatch({ ID: 'match-001', Result: 'Loss' }),
+        createMockMatch({ ID: 'match-002', Result: 'Loss' }),
+      ];
+      mockMatches.getMatches.mockResolvedValue(matches);
+
+      renderWithProvider(<MatchHistory />);
+
+      await waitFor(() => {
+        expect(screen.getByText('0-2 (0.0%)')).toBeInTheDocument();
+      });
+    });
+  });
 });

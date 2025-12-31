@@ -6,6 +6,15 @@ import Layout from './Layout';
 import { mockSystem, mockMatches } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 
+// Mock useDownload since Layout renders Footer which includes DownloadProgressBar
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+  }),
+}));
+
 // Mock the getReplayState and subscribeToReplayState functions
 const mockReplayState = {
   isActive: false,

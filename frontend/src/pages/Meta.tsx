@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { meta } from '@/services/api';
 import { gui } from '@/types/models';
+import { useDownload } from '@/context/DownloadContext';
 import './Meta.css';
 
 /**
@@ -15,6 +16,43 @@ const META_FORMATS = [
   { value: 'pioneer', label: 'Pioneer' },
   { value: 'modern', label: 'Modern' },
 ] as const;
+
+// One week in milliseconds for stale data detection (#738)
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Storage key for per-format last refresh timestamps
+const META_REFRESH_TIMESTAMPS_KEY = 'mtga-companion-meta-refresh-timestamps';
+
+// Get last refresh timestamp for a format from localStorage
+function getLastRefreshTimestamp(format: string): number | null {
+  try {
+    const stored = localStorage.getItem(META_REFRESH_TIMESTAMPS_KEY);
+    if (!stored) return null;
+    const timestamps = JSON.parse(stored) as Record<string, number>;
+    return timestamps[format] || null;
+  } catch {
+    return null;
+  }
+}
+
+// Save last refresh timestamp for a format to localStorage
+function saveRefreshTimestamp(format: string): void {
+  try {
+    const stored = localStorage.getItem(META_REFRESH_TIMESTAMPS_KEY);
+    const timestamps = stored ? JSON.parse(stored) as Record<string, number> : {};
+    timestamps[format] = Date.now();
+    localStorage.setItem(META_REFRESH_TIMESTAMPS_KEY, JSON.stringify(timestamps));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+// Check if data for a format is stale (older than 1 week)
+function isDataStale(format: string): boolean {
+  const lastRefresh = getLastRefreshTimestamp(format);
+  if (!lastRefresh) return true; // No data means stale
+  return Date.now() - lastRefresh > ONE_WEEK_MS;
+}
 
 // Convert meta.getMetaArchetypes response to MetaDashboardResponse
 async function getMetaDashboard(format: string): Promise<gui.MetaDashboardResponse> {
@@ -38,6 +76,8 @@ export default function Meta() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedArchetype, setSelectedArchetype] = useState<gui.ArchetypeInfo | null>(null);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const { startDownload, updateProgress, completeDownload, failDownload } = useDownload();
 
   // Load dashboard data when format changes
   useEffect(() => {
@@ -60,18 +100,83 @@ export default function Meta() {
     loadDashboard();
   }, [format]);
 
+  // Auto-refresh stale data (#738)
+  useEffect(() => {
+    // Only check for stale data after initial load completes
+    if (loading || !dashboardData) return;
+
+    // Check if data is stale (older than 1 week)
+    if (!isDataStale(format)) return;
+
+    console.log(`[Meta] Data for ${format} is stale (>1 week), triggering auto-refresh`);
+    setAutoRefreshing(true);
+    let cancelled = false;
+
+    // Capture format at effect start to prevent race conditions
+    const currentFormat = format;
+    const formatLabel = META_FORMATS.find(f => f.value === currentFormat)?.label || currentFormat;
+    const downloadId = `meta-refresh-${currentFormat}`;
+    startDownload(downloadId, `Updating ${formatLabel} metagame...`);
+    updateProgress(downloadId, 10);
+
+    const refreshStaleData = async () => {
+      try {
+        updateProgress(downloadId, 30);
+        // Call refresh endpoint to fetch fresh data from external sources
+        const data = await meta.refreshMetaData(currentFormat);
+        if (cancelled) return; // Don't update if format changed
+        updateProgress(downloadId, 90);
+        if (!data.error) {
+          setDashboardData(data);
+          saveRefreshTimestamp(currentFormat);
+          console.log(`[Meta] Auto-refresh complete for ${currentFormat}`);
+        }
+        completeDownload(downloadId);
+      } catch (err) {
+        if (!cancelled) {
+          console.error(`[Meta] Auto-refresh failed for ${currentFormat}:`, err);
+          failDownload(downloadId, 'Failed to refresh meta data');
+        }
+      } finally {
+        if (!cancelled) {
+          setAutoRefreshing(false);
+        }
+      }
+    };
+
+    refreshStaleData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, dashboardData, format, startDownload, updateProgress, completeDownload, failDownload]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     setError(null);
+
+    const formatLabel = META_FORMATS.find(f => f.value === format)?.label || format;
+    const downloadId = `meta-refresh-${format}`;
+    startDownload(downloadId, `Refreshing ${formatLabel} metagame...`);
+    updateProgress(downloadId, 10);
+
     try {
-      const data = await getMetaDashboard(format);
+      updateProgress(downloadId, 30);
+      // Call refresh endpoint to fetch fresh data from external sources
+      const data = await meta.refreshMetaData(format);
+      updateProgress(downloadId, 90);
       if (data.error) {
         setError(data.error);
+        failDownload(downloadId, data.error);
       } else {
         setDashboardData(data);
+        saveRefreshTimestamp(format);
+        completeDownload(downloadId);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh meta data');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to refresh meta data';
+      setError(errorMsg);
+      failDownload(downloadId, errorMsg);
     } finally {
       setRefreshing(false);
     }
@@ -167,9 +272,9 @@ export default function Meta() {
           <button
             className="refresh-button"
             onClick={handleRefresh}
-            disabled={loading || refreshing}
+            disabled={loading || refreshing || autoRefreshing}
           >
-            {refreshing ? '⟳ Refreshing...' : '⟳ Refresh'}
+            {refreshing ? '⟳ Refreshing...' : autoRefreshing ? '⟳ Updating...' : '⟳ Refresh'}
           </button>
         </div>
       </div>

@@ -8,13 +8,29 @@ import { gui } from '@/types/models';
 vi.mock('@/services/api', () => ({
   meta: {
     getMetaArchetypes: vi.fn(),
+    refreshMetaData: vi.fn(),
   },
+}));
+
+// Mock useDownload since Meta now uses it for auto-refresh
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: vi.fn(),
+    updateProgress: vi.fn(),
+    completeDownload: vi.fn(),
+    failDownload: vi.fn(),
+    cancelDownload: vi.fn(),
+  }),
 }));
 
 import { meta } from '@/services/api';
 
 // Use loose typing for mocks to allow test data that doesn't exactly match API types
 const mockGetMetaArchetypes = meta.getMetaArchetypes as ReturnType<typeof vi.fn>;
+const mockRefreshMetaData = meta.refreshMetaData as ReturnType<typeof vi.fn>;
 
 const renderMeta = () => {
   return render(
@@ -317,8 +333,9 @@ describe('Meta', () => {
   });
 
   describe('refresh functionality', () => {
-    it('calls getMetaArchetypes when refresh button is clicked', async () => {
+    it('calls refreshMetaData when refresh button is clicked', async () => {
       mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
+      mockRefreshMetaData.mockResolvedValue({ archetypes: createMockArchetypes() });
 
       renderMeta();
 
@@ -327,22 +344,21 @@ describe('Meta', () => {
       });
 
       // Clear mock to track refresh call
-      mockGetMetaArchetypes.mockClear();
+      mockRefreshMetaData.mockClear();
 
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mockGetMetaArchetypes).toHaveBeenCalledWith('standard');
+        expect(mockRefreshMetaData).toHaveBeenCalledWith('standard');
       });
     });
 
     it('shows refreshing state when refreshing', async () => {
-      mockGetMetaArchetypes
-        .mockResolvedValueOnce(createMockArchetypes())
-        .mockImplementationOnce(
-          () => new Promise((resolve) => setTimeout(() => resolve(createMockArchetypes()), 100))
-        );
+      mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
+      mockRefreshMetaData.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ archetypes: createMockArchetypes() }), 100))
+      );
 
       renderMeta();
 
@@ -358,15 +374,13 @@ describe('Meta', () => {
 
     it('updates data after refresh', async () => {
       mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
+      mockRefreshMetaData.mockResolvedValue({ archetypes: [createNewArchetype()] });
 
       renderMeta();
 
       await waitFor(() => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
-
-      // Update mock for refresh to return new data
-      mockGetMetaArchetypes.mockResolvedValue([createNewArchetype()]);
 
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);
@@ -378,15 +392,13 @@ describe('Meta', () => {
 
     it('displays error when refresh fails', async () => {
       mockGetMetaArchetypes.mockResolvedValue(createMockArchetypes());
+      mockRefreshMetaData.mockRejectedValue(new Error('Refresh failed'));
 
       renderMeta();
 
       await waitFor(() => {
         expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
       });
-
-      // Make next call fail
-      mockGetMetaArchetypes.mockRejectedValue(new Error('Refresh failed'));
 
       const refreshButton = screen.getByRole('button', { name: /refresh/i });
       fireEvent.click(refreshButton);

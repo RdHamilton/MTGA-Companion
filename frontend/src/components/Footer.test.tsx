@@ -6,6 +6,15 @@ import { mockMatches } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { models } from '@/types/models';
 
+// Mock useDownload since Footer now includes DownloadProgressBar
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+  }),
+}));
+
 function createMockStatistics(overrides: Partial<models.Statistics> = {}): models.Statistics {
   return new models.Statistics({
     TotalMatches: 100,
