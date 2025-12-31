@@ -17,6 +17,20 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+// Mock useDownload context
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: vi.fn(),
+    updateProgress: vi.fn(),
+    completeDownload: vi.fn(),
+    failDownload: vi.fn(),
+    cancelDownload: vi.fn(),
+  }),
+}));
+
 import { cards } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 

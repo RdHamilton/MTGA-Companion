@@ -49,6 +49,20 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+// Mock useDownload for useSeventeenLands hook
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: vi.fn(),
+    updateProgress: vi.fn(),
+    completeDownload: vi.fn(),
+    failDownload: vi.fn(),
+    cancelDownload: vi.fn(),
+  }),
+}));
+
 import { showToast } from '../components/ToastContainer';
 import { settings, system, matches } from '@/services/api';
 
