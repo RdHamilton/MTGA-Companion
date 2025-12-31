@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -452,6 +453,38 @@ func (h *DraftHandler) RepairSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Success(w, map[string]string{"status": "success"})
+}
+
+// RecalculateSetGradesRequest represents a request to recalculate grades for a set.
+type RecalculateSetGradesRequest struct {
+	SetCode string `json:"set_code"`
+}
+
+// RecalculateSetGrades recalculates all draft grades for a specific set.
+func (h *DraftHandler) RecalculateSetGrades(w http.ResponseWriter, r *http.Request) {
+	var req RecalculateSetGradesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.SetCode == "" {
+		response.BadRequest(w, errors.New("set_code is required"))
+		return
+	}
+
+	count, err := h.facade.RecalculateDraftGradesForSet(r.Context(), req.SetCode)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]interface{}{
+		"status":  "success",
+		"set":     req.SetCode,
+		"count":   count,
+		"message": fmt.Sprintf("Recalculated %d draft grades", count),
+	})
 }
 
 // ArchetypeCardsRequest represents a request for archetype cards.

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { cards } from '@/services/api';
+import { cards, drafts } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 import { useDownload } from '@/context/DownloadContext';
 
@@ -148,8 +148,13 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
     updateProgress(downloadId, 10);
 
     try {
-      updateProgress(downloadId, 30);
+      updateProgress(downloadId, 20);
       await refreshSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      updateProgress(downloadId, 50);
+
+      // Recalculate grades for existing drafts with this set (#734)
+      const upperSetCode = setCode.trim().toUpperCase();
+      const recalcResult = await drafts.recalculateSetGrades(upperSetCode);
       updateProgress(downloadId, 80);
 
       // Check data source after refreshing
@@ -166,13 +171,15 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
                 ? 'legacy API'
                 : source;
 
+        const gradesMsg = recalcResult.count > 0 ? ` Updated ${recalcResult.count} draft grades.` : '';
         showToast.show(
-          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!`,
+          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat}) from ${sourceLabel}!${gradesMsg}`,
           'success'
         );
       } catch {
+        const gradesMsg = recalcResult.count > 0 ? ` Updated ${recalcResult.count} draft grades.` : '';
         showToast.show(
-          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!`,
+          `Successfully refreshed 17Lands ratings for ${setCode.toUpperCase()} (${draftFormat})!${gradesMsg}`,
           'success'
         );
       }

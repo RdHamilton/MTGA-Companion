@@ -739,6 +739,78 @@ func (d *DraftFacade) RecalculateAllDraftGrades(ctx context.Context, refreshSetC
 	return successCount, nil
 }
 
+// RecalculateDraftGradesForSet recalculates grades for all drafts with a specific set code.
+// This is called after refreshing ratings to update existing draft grades with new data.
+func (d *DraftFacade) RecalculateDraftGradesForSet(ctx context.Context, setCode string) (int, error) {
+	if d.services.Storage == nil {
+		return 0, &AppError{Message: "Database not initialized"}
+	}
+
+	if setCode == "" {
+		return 0, &AppError{Message: "Set code is required"}
+	}
+
+	log.Printf("Recalculating draft grades for set %s...", setCode)
+
+	// Get all draft sessions for this set
+	activeSessions, err := d.services.Storage.DraftRepo().GetActiveSessions(ctx)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get active sessions: %v", err)}
+	}
+
+	completedSessions, err := d.services.Storage.DraftRepo().GetCompletedSessions(ctx, 1000)
+	if err != nil {
+		return 0, &AppError{Message: fmt.Sprintf("Failed to get completed sessions: %v", err)}
+	}
+
+	// Filter to only sessions with matching set code
+	var matchingSessions []*models.DraftSession
+	for _, session := range append(activeSessions, completedSessions...) {
+		if session.SetCode == setCode {
+			matchingSessions = append(matchingSessions, session)
+		}
+	}
+
+	log.Printf("Found %d draft sessions for set %s to recalculate", len(matchingSessions), setCode)
+
+	if len(matchingSessions) == 0 {
+		return 0, nil
+	}
+
+	// Recalculate grade and prediction for each session
+	successCount := 0
+	for _, session := range matchingSessions {
+		log.Printf("Recalculating session %s (%s - %s)", session.ID, session.SetCode, session.DraftType)
+
+		// Backfill pick quality data with latest ratings
+		err := d.backfillPickQualityData(ctx, session.ID, session.SetCode, session.DraftType)
+		if err != nil {
+			log.Printf("Warning: Failed to backfill pick quality for session %s: %v", session.ID, err)
+		} else {
+			log.Printf("✓ Backfilled pick quality data for session %s", session.ID)
+		}
+
+		// Recalculate grade
+		_, err = d.CalculateDraftGrade(ctx, session.ID)
+		if err != nil {
+			log.Printf("Warning: Failed to recalculate grade for session %s: %v", session.ID, err)
+			continue
+		}
+
+		// Recalculate prediction
+		_, err = d.PredictDraftWinRate(ctx, session.ID)
+		if err != nil {
+			log.Printf("Warning: Failed to recalculate prediction for session %s: %v", session.ID, err)
+			// Don't fail - continue even if prediction fails
+		}
+
+		successCount++
+	}
+
+	log.Printf("Successfully recalculated %d/%d draft sessions for set %s", successCount, len(matchingSessions), setCode)
+	return successCount, nil
+}
+
 // backfillPickQualityData updates pick quality data for all picks in a session
 // using the latest 17Lands card ratings.
 func (d *DraftFacade) backfillPickQualityData(ctx context.Context, sessionID, setCode, draftFormat string) error {

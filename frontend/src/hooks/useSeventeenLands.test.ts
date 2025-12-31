@@ -8,6 +8,9 @@ vi.mock('@/services/api', () => ({
     getCardRatings: vi.fn(),
     getSetCards: vi.fn(),
   },
+  drafts: {
+    recalculateSetGrades: vi.fn(),
+  },
 }));
 
 // Mock showToast
@@ -31,11 +34,12 @@ vi.mock('@/context/DownloadContext', () => ({
   }),
 }));
 
-import { cards } from '@/services/api';
+import { cards, drafts } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 
 const mockGetCardRatings = vi.mocked(cards.getCardRatings);
 const mockGetSetCards = vi.mocked(cards.getSetCards);
+const mockRecalculateSetGrades = vi.mocked(drafts.recalculateSetGrades);
 
 describe('useSeventeenLands', () => {
   beforeEach(() => {
@@ -43,6 +47,7 @@ describe('useSeventeenLands', () => {
     vi.useFakeTimers();
     mockGetCardRatings.mockResolvedValue([]);
     mockGetSetCards.mockResolvedValue([]);
+    mockRecalculateSetGrades.mockResolvedValue({ status: 'success', set: 'BLB', count: 0, message: '' });
   });
 
   afterEach(() => {

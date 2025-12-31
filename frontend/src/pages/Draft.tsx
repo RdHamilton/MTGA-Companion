@@ -160,8 +160,14 @@ const Draft: React.FC = () => {
                 updateProgress(downloadId, 10);
 
                 try {
-                    updateProgress(downloadId, 30);
+                    updateProgress(downloadId, 20);
                     await cards.refreshSetRatings(setCode, draftType);
+                    updateProgress(downloadId, 50);
+
+                    // Recalculate grades for existing drafts with this set (#734)
+                    console.log(`[Draft] Recalculating grades for ${setCode} drafts...`);
+                    const recalcResult = await drafts.recalculateSetGrades(setCode);
+                    console.log(`[Draft] Recalculated ${recalcResult.count} draft grades`);
                     updateProgress(downloadId, 70);
 
                     // Reload ratings after refresh
