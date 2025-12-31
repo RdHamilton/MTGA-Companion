@@ -101,3 +101,32 @@ export async function searchCardsWithCollection(
     limit,
   });
 }
+
+/**
+ * Ratings staleness information.
+ */
+export interface RatingsStaleness {
+  cachedAt: string;
+  isStale: boolean;
+  cardCount: number;
+}
+
+/**
+ * Check if ratings for a set are stale.
+ */
+export async function getRatingsStaleness(
+  setCode: string,
+  format: string
+): Promise<RatingsStaleness> {
+  return get<RatingsStaleness>(`/cards/ratings/${setCode}/${format}/staleness`);
+}
+
+/**
+ * Refresh ratings for a set (force re-download from 17Lands).
+ */
+export async function refreshSetRatings(
+  setCode: string,
+  format: string = 'PremierDraft'
+): Promise<void> {
+  await post(`/cards/ratings/${setCode}/refresh`, { format });
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { drafts, cards } from '@/services/api';
 import { models, pickquality, grading, gui } from '@/types/models';
+import { useDownload } from '@/context/DownloadContext';
 
 // No-op stubs - replay control not implemented in REST API
 async function pauseReplay(): Promise<void> {
@@ -98,6 +99,9 @@ const Draft: React.FC = () => {
 
     const [selectedCard, setSelectedCard] = useState<models.SetCard | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Download context for progress bar
+    const { startDownload, updateProgress, completeDownload, failDownload } = useDownload();
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
     const [showCurrentPack, setShowCurrentPack] = useState(true);
 
@@ -128,6 +132,61 @@ const Draft: React.FC = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- loadActiveDraft and debouncedLoadActiveDraft are stable
     }, []);
+
+    // Auto-refresh stale ratings data (#732)
+    useEffect(() => {
+        // Only check after initial load completes and we have a session with ratings
+        if (state.loading || !state.session || state.ratings.length === 0) return;
+
+        const checkAndRefreshStaleData = async () => {
+            const setCode = state.session?.SetCode;
+            const draftType = state.session?.DraftType || 'PremierDraft';
+
+            if (!setCode) return;
+
+            try {
+                // Check if ratings are stale
+                const staleness = await cards.getRatingsStaleness(setCode, draftType);
+
+                if (!staleness.isStale) {
+                    console.log(`[Draft] Ratings for ${setCode} are fresh (${staleness.cardCount} cards)`);
+                    return;
+                }
+
+                console.log(`[Draft] Ratings for ${setCode} are stale (>2 weeks), triggering auto-refresh`);
+
+                const downloadId = `draft-ratings-${setCode}`;
+                startDownload(downloadId, `Updating ${setCode} draft ratings...`);
+                updateProgress(downloadId, 10);
+
+                try {
+                    updateProgress(downloadId, 30);
+                    await cards.refreshSetRatings(setCode, draftType);
+                    updateProgress(downloadId, 70);
+
+                    // Reload ratings after refresh
+                    const newRatings = await cards.getCardRatings(setCode, draftType);
+                    updateProgress(downloadId, 90);
+
+                    setState(prev => ({
+                        ...prev,
+                        ratings: newRatings || [],
+                    }));
+
+                    console.log(`[Draft] Auto-refresh complete for ${setCode}`);
+                    completeDownload(downloadId);
+                } catch (err) {
+                    console.error(`[Draft] Auto-refresh failed for ${setCode}:`, err);
+                    failDownload(downloadId, 'Failed to refresh ratings');
+                }
+            } catch (err) {
+                console.error('[Draft] Failed to check ratings staleness:', err);
+            }
+        };
+
+        checkAndRefreshStaleData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when session/ratings change
+    }, [state.loading, state.session?.SetCode, state.ratings.length]);
 
     const loadHistoricalDrafts = async () => {
         try {

@@ -17,6 +17,20 @@ vi.mock('../App', () => ({
   subscribeToReplayState: vi.fn(() => () => {}),
 }));
 
+// Mock useDownload since Draft now uses it for auto-refresh
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: vi.fn(),
+    updateProgress: vi.fn(),
+    completeDownload: vi.fn(),
+    failDownload: vi.fn(),
+    cancelDownload: vi.fn(),
+  }),
+}));
+
 // Helper function to create mock data
 function createMockDraftSession(overrides: Partial<models.DraftSession> = {}): models.DraftSession {
   return new models.DraftSession({
