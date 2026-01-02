@@ -68,9 +68,20 @@ func (f *Fetcher) FetchAndCacheSet(ctx context.Context, mtgaSetCode string) (int
 		return 0, fmt.Errorf("check if set is cached: %w", err)
 	}
 	log.Printf("[FetchAndCacheSet] IsSetCached returned: %v", isCached)
+
 	if isCached {
-		log.Printf("[FetchAndCacheSet] Set %s is already cached, skipping fetch", mtgaSetCode)
-		return 0, nil // Already cached
+		// Check if cached count is complete by comparing to Scryfall's Arena card count
+		needsRefresh, err := f.checkCacheCompleteness(ctx, mtgaSetCode, scryfallSetCode)
+		if err != nil {
+			log.Printf("[FetchAndCacheSet] Failed to check cache completeness: %v", err)
+			// On error, assume cache is valid to avoid unnecessary API calls
+		} else if needsRefresh {
+			log.Printf("[FetchAndCacheSet] Cache is incomplete, refreshing %s", mtgaSetCode)
+			return f.RefreshSet(ctx, mtgaSetCode)
+		}
+
+		log.Printf("[FetchAndCacheSet] Set %s is already cached and complete, skipping fetch", mtgaSetCode)
+		return 0, nil // Already cached and complete
 	}
 
 	// Search for all cards in the set (with pagination)
@@ -362,4 +373,36 @@ func (f *Fetcher) fetchArenaExclusiveSet(ctx context.Context, mtgaSetCode, scryf
 	}
 
 	return len(allCards), nil
+}
+
+// checkCacheCompleteness compares cached card count against Scryfall's expected Arena card count.
+// Returns true if cache needs refresh (cached count is significantly less than expected).
+func (f *Fetcher) checkCacheCompleteness(ctx context.Context, mtgaSetCode, scryfallSetCode string) (bool, error) {
+	// Get cached card count
+	cachedCards, err := f.setCardRepo.GetCardsBySet(ctx, mtgaSetCode)
+	if err != nil {
+		return false, fmt.Errorf("get cached cards: %w", err)
+	}
+	cachedCount := len(cachedCards)
+
+	// Query Scryfall for expected Arena card count (cards with arena_id)
+	// Use game:arena filter to only count cards available in MTG Arena
+	query := fmt.Sprintf("set:%s game:arena", scryfallSetCode)
+	searchResult, err := f.scryfallClient.SearchCards(ctx, query)
+	if err != nil {
+		// If Scryfall query fails, assume cache is valid
+		return false, fmt.Errorf("scryfall search: %w", err)
+	}
+
+	expectedCount := searchResult.TotalCards
+	log.Printf("[checkCacheCompleteness] Set %s: cached=%d, expected=%d", mtgaSetCode, cachedCount, expectedCount)
+
+	// If cached count is less than 90% of expected, refresh is needed
+	// Using 90% threshold to account for potential minor discrepancies
+	if expectedCount > 0 && cachedCount < (expectedCount*9/10) {
+		log.Printf("[checkCacheCompleteness] Cache is incomplete: %d < %d (90%% of %d)", cachedCount, expectedCount*9/10, expectedCount)
+		return true, nil
+	}
+
+	return false, nil
 }
