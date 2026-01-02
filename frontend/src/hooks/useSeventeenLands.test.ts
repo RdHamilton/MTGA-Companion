@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { useSeventeenLands } from './useSeventeenLands';
 
 // Mock the API modules
@@ -7,6 +8,9 @@ vi.mock('@/services/api', () => ({
   cards: {
     getCardRatings: vi.fn(),
     getSetCards: vi.fn(),
+  },
+  drafts: {
+    recalculateSetGrades: vi.fn(),
   },
 }));
 
@@ -17,11 +21,32 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
-import { cards } from '@/services/api';
+// Mock useDownload context
+const mockStartDownload = vi.fn();
+const mockUpdateProgress = vi.fn();
+const mockCompleteDownload = vi.fn();
+const mockFailDownload = vi.fn();
+
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: mockStartDownload,
+    updateProgress: mockUpdateProgress,
+    completeDownload: mockCompleteDownload,
+    failDownload: mockFailDownload,
+    cancelDownload: vi.fn(),
+  }),
+  DownloadProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
+import { cards, drafts } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
 
 const mockGetCardRatings = vi.mocked(cards.getCardRatings);
 const mockGetSetCards = vi.mocked(cards.getSetCards);
+const mockRecalculateSetGrades = vi.mocked(drafts.recalculateSetGrades);
 
 describe('useSeventeenLands', () => {
   beforeEach(() => {
@@ -29,6 +54,7 @@ describe('useSeventeenLands', () => {
     vi.useFakeTimers();
     mockGetCardRatings.mockResolvedValue([]);
     mockGetSetCards.mockResolvedValue([]);
+    mockRecalculateSetGrades.mockResolvedValue({ status: 'success', set: 'BLB', count: 0, message: '' });
   });
 
   afterEach(() => {

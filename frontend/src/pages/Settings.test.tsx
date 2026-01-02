@@ -49,6 +49,21 @@ vi.mock('../components/ToastContainer', () => ({
   },
 }));
 
+// Mock useDownload since Settings uses useSeventeenLands which now uses download progress
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: vi.fn(),
+    updateProgress: vi.fn(),
+    completeDownload: vi.fn(),
+    failDownload: vi.fn(),
+    cancelDownload: vi.fn(),
+  }),
+  DownloadProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 import { showToast } from '../components/ToastContainer';
 import { settings, system, matches } from '@/services/api';
 
