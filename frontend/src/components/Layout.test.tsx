@@ -13,6 +13,7 @@ vi.mock('@/context/DownloadContext', () => ({
     isDownloading: false,
     overallProgress: 0,
   }),
+  DownloadProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock the getReplayState and subscribeToReplayState functions
