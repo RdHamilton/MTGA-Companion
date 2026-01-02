@@ -125,7 +125,7 @@ describe('Footer Component', () => {
       });
     });
 
-    it('should display last match time', async () => {
+    it('should display last match time with Last Played label', async () => {
       const stats = createMockStatistics();
       const matches = [
         createMockMatch({
@@ -138,10 +138,25 @@ describe('Footer Component', () => {
       render(<Footer />);
 
       await waitFor(() => {
-        expect(screen.getByText('Last:')).toBeInTheDocument();
+        expect(screen.getByText('Last Played:')).toBeInTheDocument();
         // The exact format depends on locale, just check it exists
-        const lastMatchText = screen.getByText('Last:').nextSibling;
+        const lastMatchText = screen.getByText('Last Played:').nextSibling;
         expect(lastMatchText).toBeTruthy();
+      });
+    });
+
+    it('should display Synced indicator after data loads', async () => {
+      const stats = createMockStatistics();
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Synced:')).toBeInTheDocument();
+        // Synced time should be present
+        const syncedText = screen.getByText('Synced:').nextSibling;
+        expect(syncedText).toBeTruthy();
       });
     });
   });

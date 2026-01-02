@@ -9,6 +9,7 @@ const Footer = () => {
   const [stats, setStats] = useState<models.Statistics | null>(null);
   const [streak, setStreak] = useState<{ type: string; count: number }>({ type: '', count: 0 });
   const [lastMatch, setLastMatch] = useState<string>('');
+  const [lastSynced, setLastSynced] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   const loadStats = async () => {
@@ -43,6 +44,9 @@ const Footer = () => {
         const lastMatchDate = new Date(matchData[0].Timestamp as string);
         setLastMatch(lastMatchDate.toLocaleString());
       }
+
+      // Update last synced time
+      setLastSynced(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('Error loading footer stats:', err);
     } finally {
@@ -112,7 +116,15 @@ const Footer = () => {
           <>
             <span className="footer-separator">|</span>
             <span className="footer-stat footer-last-match">
-              <strong>Last:</strong> {lastMatch}
+              <strong>Last Played:</strong> {lastMatch}
+            </span>
+          </>
+        )}
+        {lastSynced && (
+          <>
+            <span className="footer-separator">|</span>
+            <span className="footer-stat footer-last-synced">
+              <strong>Synced:</strong> {lastSynced}
             </span>
           </>
         )}
