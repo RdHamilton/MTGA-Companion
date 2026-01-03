@@ -140,6 +140,7 @@ func (s *Server) setupRoutes() {
 		systemHandler := handlers.NewSystemHandler(s.systemFacade)
 		r.Route("/system", func(r chi.Router) {
 			r.Get("/status", systemHandler.GetStatus)
+			r.Get("/health", systemHandler.GetHealth)
 			r.Get("/version", systemHandler.GetVersion)
 			r.Get("/account", systemHandler.GetCurrentAccount)
 			r.Get("/database/path", systemHandler.GetDatabasePath)

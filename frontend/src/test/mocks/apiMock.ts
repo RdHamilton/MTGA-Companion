@@ -125,6 +125,27 @@ export const mockSystem = {
     url: 'ws://localhost:9999',
     port: 9999,
   } as unknown)),
+  getHealth: vi.fn(() => Promise.resolve({
+    status: 'healthy',
+    version: '1.4.0',
+    uptime: 3600,
+    database: {
+      status: 'ok',
+      lastWrite: new Date().toISOString(),
+    },
+    logMonitor: {
+      status: 'ok',
+      lastRead: new Date().toISOString(),
+    },
+    websocket: {
+      status: 'ok',
+      connectedClients: 1,
+    },
+    metrics: {
+      totalProcessed: 100,
+      totalErrors: 0,
+    },
+  } as unknown)),
   getVersion: vi.fn(() => Promise.resolve({ version: '1.0.0', buildDate: '2024-01-01' } as unknown)),
   clearAllData: vi.fn(() => Promise.resolve()),
   checkOllamaStatus: vi.fn(() => Promise.resolve({
