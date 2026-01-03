@@ -199,7 +199,7 @@ export default function Collection() {
         <div className="error-icon">!</div>
         <h2>Error Loading Collection</h2>
         <p>{error}</p>
-        <button onClick={loadCollection} className="retry-button">
+        <button onClick={() => loadCollection()} className="retry-button">
           Retry
         </button>
       </div>
