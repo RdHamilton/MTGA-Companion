@@ -278,6 +278,9 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 					card.TypeLine = strings.Join(meta.Types, " ")
 					card.Colors = meta.Colors
 					card.ImageURI = meta.ImageURL
+					if card.ImageURI == "" {
+						card.ImageURI = "https://cards.scryfall.io/back.png"
+					}
 					if meta.Power != "" {
 						card.Power = meta.Power
 					}
