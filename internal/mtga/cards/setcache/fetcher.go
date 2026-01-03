@@ -280,6 +280,44 @@ func (f *Fetcher) FetchCardByName(ctx context.Context, setCode, cardName, arenaI
 	return card, nil
 }
 
+// FetchCardByArenaID fetches a single card from Scryfall by Arena ID and caches it.
+// Returns the cached card if it already exists, otherwise fetches from Scryfall.
+func (f *Fetcher) FetchCardByArenaID(ctx context.Context, arenaID int) (*models.SetCard, error) {
+	arenaIDStr := fmt.Sprintf("%d", arenaID)
+
+	// Check if card is already cached
+	cachedCard, err := f.setCardRepo.GetCardByArenaID(ctx, arenaIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("check cache: %w", err)
+	}
+	if cachedCard != nil {
+		return cachedCard, nil // Already cached
+	}
+
+	// Fetch from Scryfall
+	log.Printf("[FetchCardByArenaID] Fetching card %d from Scryfall", arenaID)
+	scryfallCard, err := f.scryfallClient.GetCardByArenaID(ctx, arenaID)
+	if err != nil {
+		log.Printf("[FetchCardByArenaID] Scryfall API error for ArenaID %d: %v", arenaID, err)
+		return nil, fmt.Errorf("scryfall fetch failed: %w", err)
+	}
+
+	// Determine set code - use uppercase MTGA convention
+	setCode := strings.ToUpper(scryfallCard.SetCode)
+
+	// Convert Scryfall card to SetCard
+	card := convertScryfallCard(scryfallCard, setCode, time.Now())
+
+	// Save to database
+	if err := f.setCardRepo.SaveCard(ctx, card); err != nil {
+		log.Printf("[FetchCardByArenaID] Failed to save card %d: %v", arenaID, err)
+		return nil, fmt.Errorf("save card: %w", err)
+	}
+
+	log.Printf("[FetchCardByArenaID] Cached card %d: %s (%s)", arenaID, card.Name, card.SetCode)
+	return card, nil
+}
+
 // parseTypeLine parses a type line into individual types.
 // Example: "Creature — Elf Warrior" -> ["Creature", "Elf", "Warrior"]
 func parseTypeLine(typeLine string) []string {

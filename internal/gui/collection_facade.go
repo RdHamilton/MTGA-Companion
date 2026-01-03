@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,6 +11,10 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
+
+// maxAutoLookups limits the number of cards to auto-fetch from Scryfall per request
+// to avoid rate limiting and slow page loads.
+const maxAutoLookups = 10
 
 // CollectionFacade handles all collection-related operations for the GUI.
 type CollectionFacade struct {
@@ -58,9 +63,11 @@ type CollectionFilter struct {
 
 // CollectionResponse contains collection data with pagination info.
 type CollectionResponse struct {
-	Cards       []*CollectionCard `json:"cards"`
-	TotalCount  int               `json:"totalCount"`
-	FilterCount int               `json:"filterCount"` // Count after filters but before pagination
+	Cards                 []*CollectionCard `json:"cards"`
+	TotalCount            int               `json:"totalCount"`
+	FilterCount           int               `json:"filterCount"`           // Count after filters but before pagination
+	UnknownCardsRemaining int               `json:"unknownCardsRemaining"` // Cards without metadata that need Scryfall lookup
+	UnknownCardsFetched   int               `json:"unknownCardsFetched"`   // Cards fetched from Scryfall in this request
 }
 
 // CollectionStats provides summary statistics about the collection.
@@ -154,6 +161,9 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 
 	// Add owned cards that aren't already in the list (either all owned cards if ownedOnly,
 	// or just cards from sets we don't have downloaded)
+	// Track cards that need Scryfall lookup
+	unknownCardIDs := make([]int, 0)
+
 	for cardID, quantity := range collection {
 		if addedCards[cardID] {
 			continue
@@ -183,6 +193,9 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			if meta.Toughness != "" {
 				card.Toughness = meta.Toughness
 			}
+		} else {
+			// Track this card for potential Scryfall lookup
+			unknownCardIDs = append(unknownCardIDs, cardID)
 		}
 
 		if card.ImageURI == "" {
@@ -190,6 +203,60 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		}
 
 		collectionCards = append(collectionCards, card)
+	}
+
+	// Auto-fetch unknown cards from Scryfall (limited to avoid rate limiting)
+	unknownCardsFetched := 0
+	unknownCardsRemaining := len(unknownCardIDs)
+
+	if unknownCardsRemaining > 0 && c.services.SetFetcher != nil {
+		lookupCount := unknownCardsRemaining
+		if lookupCount > maxAutoLookups {
+			lookupCount = maxAutoLookups
+		}
+
+		log.Printf("[GetCollection] Auto-fetching %d/%d unknown cards from Scryfall", lookupCount, unknownCardsRemaining)
+
+		for i := 0; i < lookupCount; i++ {
+			cardID := unknownCardIDs[i]
+			meta, err := c.services.SetFetcher.FetchCardByArenaID(ctx, cardID)
+			if err != nil {
+				log.Printf("[GetCollection] Failed to fetch card %d from Scryfall: %v", cardID, err)
+				continue
+			}
+			if meta == nil {
+				continue
+			}
+
+			unknownCardsFetched++
+			unknownCardsRemaining--
+
+			// Update the card in our collection list
+			for _, card := range collectionCards {
+				if card.ArenaID == cardID {
+					card.Name = meta.Name
+					card.SetCode = meta.SetCode
+					card.Rarity = meta.Rarity
+					card.ManaCost = meta.ManaCost
+					card.CMC = float64(meta.CMC)
+					card.TypeLine = strings.Join(meta.Types, " ")
+					card.Colors = meta.Colors
+					card.ImageURI = meta.ImageURL
+					if meta.Power != "" {
+						card.Power = meta.Power
+					}
+					if meta.Toughness != "" {
+						card.Toughness = meta.Toughness
+					}
+					break
+				}
+			}
+		}
+
+		if unknownCardsRemaining > 0 {
+			log.Printf("[GetCollection] %d more unknown cards remaining (will be fetched on next load)",
+				unknownCardsRemaining)
+		}
 	}
 
 	totalCount := len(collectionCards)
@@ -223,9 +290,11 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 	}
 
 	return &CollectionResponse{
-		Cards:       collectionCards,
-		TotalCount:  totalCount,
-		FilterCount: filterCount,
+		Cards:                 collectionCards,
+		TotalCount:            totalCount,
+		FilterCount:           filterCount,
+		UnknownCardsRemaining: unknownCardsRemaining,
+		UnknownCardsFetched:   unknownCardsFetched,
 	}, nil
 }
 

@@ -25,19 +25,37 @@ export interface CollectionFilter {
 /**
  * Response from collection API.
  */
-interface CollectionResponse {
+export interface CollectionResponse {
   cards: CollectionCard[];
   totalCount: number;
   filterCount: number;
+  unknownCardsRemaining: number;   // Cards without metadata that need Scryfall lookup
+  unknownCardsFetched: number;     // Cards fetched from Scryfall in this request
 }
 
 /**
  * Get collection with optional filters.
+ * Returns full response including metadata counts.
+ */
+export async function getCollectionWithMetadata(filter: CollectionFilter = {}): Promise<CollectionResponse> {
+  const response = await post<CollectionResponse>('/collection', filter);
+  // Handle null/undefined response or missing fields
+  return {
+    cards: response?.cards ?? [],
+    totalCount: response?.totalCount ?? 0,
+    filterCount: response?.filterCount ?? 0,
+    unknownCardsRemaining: response?.unknownCardsRemaining ?? 0,
+    unknownCardsFetched: response?.unknownCardsFetched ?? 0,
+  };
+}
+
+/**
+ * Get collection with optional filters.
+ * Returns just the cards array for backward compatibility.
  */
 export async function getCollection(filter: CollectionFilter = {}): Promise<CollectionCard[]> {
-  const response = await post<CollectionResponse>('/collection', filter);
-  // Backend returns { cards: [...], totalCount, filterCount } - extract the cards array
-  return response?.cards ?? [];
+  const response = await getCollectionWithMetadata(filter);
+  return response.cards;
 }
 
 /**

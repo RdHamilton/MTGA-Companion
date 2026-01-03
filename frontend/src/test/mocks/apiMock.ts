@@ -74,6 +74,13 @@ export const mockDrafts = {
 
 export const mockCollection = {
   getCollection: vi.fn(() => Promise.resolve([] as unknown[])),
+  getCollectionWithMetadata: vi.fn(() => Promise.resolve({
+    cards: [] as unknown[],
+    totalCount: 0,
+    filterCount: 0,
+    unknownCardsRemaining: 0,
+    unknownCardsFetched: 0,
+  })),
   getCollectionStats: vi.fn(() => Promise.resolve({} as unknown)),
   getSetCompletion: vi.fn(() => Promise.resolve([] as unknown[])),
   getMissingCards: vi.fn(() => Promise.resolve(null as unknown)),
