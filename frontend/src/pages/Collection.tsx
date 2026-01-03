@@ -48,6 +48,7 @@ export default function Collection() {
   const autoRefreshRef = useRef<boolean>(false);
   const isLoadingRef = useRef<boolean>(false);
   const isAutoRefreshingRef = useRef<boolean>(false);
+  const autoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -116,8 +117,9 @@ export default function Collection() {
         // Auto-refresh to continue fetching remaining cards
         if (!autoRefreshRef.current) {
           autoRefreshRef.current = true;
-          setTimeout(() => {
+          autoRefreshTimeoutRef.current = setTimeout(() => {
             autoRefreshRef.current = false;
+            autoRefreshTimeoutRef.current = null;
             loadCollection(true); // Pass true to indicate auto-refresh
           }, 500);
         }
@@ -150,6 +152,14 @@ export default function Collection() {
   useEffect(() => {
     loadCollection();
     loadSets();
+
+    // Cleanup: clear auto-refresh timeout on unmount
+    return () => {
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+        autoRefreshTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
