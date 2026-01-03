@@ -301,6 +301,20 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 	if responsesFound > 0 || questsFound > 0 {
 		log.Printf("Quest parser (detailed): Found %d QuestGetQuests responses, parsed %d unique quests, %d current quest IDs",
 			responsesFound, questsFound, len(result.CurrentQuestIDs))
+		// Log the latest response timestamp and current quest IDs for debugging
+		if len(result.CurrentQuestIDs) > 0 {
+			log.Printf("Quest parser (detailed): Latest response timestamp: %s", latestResponseTime.Format("2006-01-02 15:04:05 MST"))
+			for questID := range result.CurrentQuestIDs {
+				// Find the quest to log its type
+				for _, q := range result.Quests {
+					if q.QuestID == questID && !q.Completed && !q.Rerolled {
+						log.Printf("Quest parser (detailed): Current quest: %s (%s) %d/%d",
+							q.QuestID[:8], q.QuestType, q.EndingProgress, q.Goal)
+						break
+					}
+				}
+			}
+		}
 	}
 
 	return result, nil
