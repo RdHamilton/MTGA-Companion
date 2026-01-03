@@ -288,3 +288,16 @@ export async function classifyDraftPoolArchetype(
     session_id: sessionId,
   });
 }
+
+/**
+ * Recalculate draft grades for a specific set.
+ * This is useful after refreshing 17Lands ratings to update grades with new data.
+ *
+ * Note: This is currently a stub - backend implementation pending (#734).
+ */
+export async function recalculateSetGrades(
+  _setCode: string
+): Promise<{ count: number }> {
+  console.warn('[drafts.recalculateSetGrades] Not yet implemented in REST API');
+  return { count: 0 };
+}

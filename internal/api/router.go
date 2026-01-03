@@ -116,6 +116,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/sets/{setCode}/refresh", cardHandler.RefreshSetCards)
 			r.Get("/ratings/{setCode}", cardHandler.GetRatings)
 			r.Get("/ratings/{setCode}/colors", cardHandler.GetColorRatings)
+			r.Get("/ratings/{setCode}/{format}/staleness", cardHandler.GetRatingsStaleness)
 			r.Get("/ratings/{setCode}/{eventType}", cardHandler.GetRatingsWithEvent) // Event type in path
 			r.Get("/ratings/{setCode}/card/{arenaID}", cardHandler.GetCardRatingByArenaID)
 			r.Post("/ratings/{setCode}/fetch", cardHandler.FetchSetRatings)

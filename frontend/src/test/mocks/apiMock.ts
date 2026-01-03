@@ -13,6 +13,8 @@ export const mockCards = {
   searchCards: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
   searchCardsWithCollection: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
   getColorRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getRatingsStaleness: vi.fn((() => Promise.resolve({ cachedAt: new Date().toISOString(), isStale: false, cardCount: 100 })) as MockFn),
+  refreshSetRatings: vi.fn((() => Promise.resolve()) as MockFn),
 };
 
 export const mockMatches = {

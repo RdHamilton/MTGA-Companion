@@ -279,6 +279,28 @@ func (h *CardHandler) RefreshSetRatings(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// GetRatingsStaleness returns staleness information for set ratings.
+func (h *CardHandler) GetRatingsStaleness(w http.ResponseWriter, r *http.Request) {
+	setCode := chi.URLParam(r, "setCode")
+	if setCode == "" {
+		response.BadRequest(w, errors.New("setCode is required"))
+		return
+	}
+
+	draftFormat := chi.URLParam(r, "format")
+	if draftFormat == "" {
+		draftFormat = "PremierDraft"
+	}
+
+	staleness, err := h.facade.GetRatingsStaleness(r.Context(), setCode, draftFormat)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, staleness)
+}
+
 // ClearDatasetCache clears all cached 17Lands datasets.
 func (h *CardHandler) ClearDatasetCache(w http.ResponseWriter, r *http.Request) {
 	if err := h.facade.ClearDatasetCache(r.Context()); err != nil {

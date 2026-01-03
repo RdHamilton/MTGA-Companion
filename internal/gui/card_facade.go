@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
@@ -283,6 +284,45 @@ func (c *CardFacade) GetColorRatings(ctx context.Context, setCode string, draftF
 	}
 
 	return ratings, nil
+}
+
+// RatingsStaleness contains information about when ratings were last updated.
+type RatingsStaleness struct {
+	CachedAt  time.Time `json:"cachedAt"`
+	IsStale   bool      `json:"isStale"`
+	CardCount int       `json:"cardCount"`
+}
+
+// StaleThreshold is the duration after which ratings are considered stale (2 weeks).
+const StaleThreshold = 14 * 24 * time.Hour
+
+// GetRatingsStaleness returns staleness information for card ratings.
+func (c *CardFacade) GetRatingsStaleness(ctx context.Context, setCode string, draftFormat string) (*RatingsStaleness, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	ratings, cachedAt, err := c.services.Storage.DraftRatingsRepo().GetCardRatings(ctx, setCode, draftFormat)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get ratings staleness: %v", err)}
+	}
+
+	// No ratings means no cached data
+	if len(ratings) == 0 {
+		return &RatingsStaleness{
+			CachedAt:  time.Time{},
+			IsStale:   true,
+			CardCount: 0,
+		}, nil
+	}
+
+	isStale := time.Since(cachedAt) > StaleThreshold
+
+	return &RatingsStaleness{
+		CachedAt:  cachedAt,
+		IsStale:   isStale,
+		CardCount: len(ratings),
+	}, nil
 }
 
 // calculateTier determines the tier (S, A, B, C, D, F) based on GIHWR percentage.
