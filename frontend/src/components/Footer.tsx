@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { matches } from '@/services/api';
+import { matches, system } from '@/services/api';
 import { models } from '@/types/models';
 import DownloadProgressBar from './DownloadProgressBar';
 import './Footer.css';
@@ -45,8 +45,21 @@ const Footer = () => {
         setLastMatch(lastMatchDate.toLocaleString());
       }
 
-      // Update last synced time
-      setLastSynced(new Date().toLocaleTimeString());
+      // Get backend sync time from health status
+      try {
+        const health = await system.getHealth();
+        if (health.database.lastWrite) {
+          // Format the RFC3339 timestamp to a user-friendly time
+          const syncDate = new Date(health.database.lastWrite);
+          setLastSynced(syncDate.toLocaleTimeString());
+        } else {
+          // No writes yet, show current time as fallback
+          setLastSynced(new Date().toLocaleTimeString());
+        }
+      } catch {
+        // Fallback to current time if health check fails
+        setLastSynced(new Date().toLocaleTimeString());
+      }
     } catch (err) {
       console.error('Error loading footer stats:', err);
     } finally {

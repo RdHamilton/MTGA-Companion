@@ -952,6 +952,89 @@ func (s *SystemFacade) GetReplayDraftDetectedEvent(ctx context.Context) (*Replay
 	return &ReplayDraftDetectedEvent{}, nil
 }
 
+// HealthStatus represents the health status of the application.
+// Used to expose backend sync timestamps to the frontend.
+type HealthStatus struct {
+	Status     string           `json:"status"`
+	Version    string           `json:"version"`
+	Uptime     float64          `json:"uptime"`
+	Database   DatabaseHealth   `json:"database"`
+	LogMonitor LogMonitorHealth `json:"logMonitor"`
+	WebSocket  WebSocketHealth  `json:"websocket"`
+	Metrics    HealthMetrics    `json:"metrics"`
+}
+
+// DatabaseHealth represents database health status.
+type DatabaseHealth struct {
+	Status    string `json:"status"`
+	LastWrite string `json:"lastWrite,omitempty"`
+}
+
+// LogMonitorHealth represents log monitor health status.
+type LogMonitorHealth struct {
+	Status   string `json:"status"`
+	LastRead string `json:"lastRead,omitempty"`
+}
+
+// WebSocketHealth represents WebSocket server health status.
+type WebSocketHealth struct {
+	Status           string `json:"status"`
+	ConnectedClients int    `json:"connectedClients"`
+}
+
+// HealthMetrics represents daemon performance metrics.
+type HealthMetrics struct {
+	TotalProcessed int64 `json:"totalProcessed"`
+	TotalErrors    int64 `json:"totalErrors"`
+}
+
+// GetHealth returns the current health status including backend sync timestamps.
+// When connected to the daemon, this returns the daemon's health status.
+// In standalone mode, it returns basic health information.
+func (s *SystemFacade) GetHealth(ctx context.Context) (*HealthStatus, error) {
+	// If daemon service is running integrated, get its health status
+	if s.services.DaemonService != nil {
+		daemonHealth := s.services.DaemonService.GetHealth()
+		return &HealthStatus{
+			Status:  daemonHealth.Status,
+			Version: daemonHealth.Version,
+			Uptime:  daemonHealth.Uptime,
+			Database: DatabaseHealth{
+				Status:    daemonHealth.Database.Status,
+				LastWrite: daemonHealth.Database.LastWrite,
+			},
+			LogMonitor: LogMonitorHealth{
+				Status:   daemonHealth.LogMonitor.Status,
+				LastRead: daemonHealth.LogMonitor.LastRead,
+			},
+			WebSocket: WebSocketHealth{
+				Status:           daemonHealth.WebSocket.Status,
+				ConnectedClients: daemonHealth.WebSocket.ConnectedClients,
+			},
+			Metrics: HealthMetrics{
+				TotalProcessed: daemonHealth.Metrics.TotalProcessed,
+				TotalErrors:    daemonHealth.Metrics.TotalErrors,
+			},
+		}, nil
+	}
+
+	// In standalone mode, return basic health status
+	return &HealthStatus{
+		Status:  "standalone",
+		Version: "1.4.0",
+		Database: DatabaseHealth{
+			Status: "ok",
+		},
+		LogMonitor: LogMonitorHealth{
+			Status: "ok",
+		},
+		WebSocket: WebSocketHealth{
+			Status: "ok",
+		},
+		Metrics: HealthMetrics{},
+	}, nil
+}
+
 // localFirstCardProvider implements deckexport.CardProvider by checking
 // SetCardRepo first (local database) before falling back to CardService (Scryfall).
 // This ensures draft cards are found locally without expensive API calls.
