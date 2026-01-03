@@ -54,7 +54,7 @@ describe('useSeventeenLands', () => {
     vi.useFakeTimers();
     mockGetCardRatings.mockResolvedValue([]);
     mockGetSetCards.mockResolvedValue([]);
-    mockRecalculateSetGrades.mockResolvedValue({ status: 'success', set: 'BLB', count: 0, message: '' });
+    mockRecalculateSetGrades.mockResolvedValue({ count: 0 });
   });
 
   afterEach(() => {

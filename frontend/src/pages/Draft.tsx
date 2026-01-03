@@ -132,17 +132,25 @@ const Draft: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- loadActiveDraft and debouncedLoadActiveDraft are stable
     }, []);
 
+    // Track which sessions we've already checked for stale ratings to prevent infinite loops
+    const checkedSessionsRef = useRef<Set<string>>(new Set());
+
     // Auto-refresh stale ratings data (#732)
     useEffect(() => {
         // Only check after initial load completes and we have a session with ratings
         if (state.loading || !state.session || state.ratings.length === 0) return;
 
+        const sessionId = state.session.ID;
+        const setCode = state.session.SetCode;
+        const draftType = state.session.DraftType || 'PremierDraft';
+
+        // Skip if we've already checked this session (prevents infinite loop)
+        if (!setCode || checkedSessionsRef.current.has(sessionId)) return;
+
+        // Mark this session as checked immediately to prevent re-runs
+        checkedSessionsRef.current.add(sessionId);
+
         const checkAndRefreshStaleData = async () => {
-            const setCode = state.session?.SetCode;
-            const draftType = state.session?.DraftType || 'PremierDraft';
-
-            if (!setCode) return;
-
             try {
                 // Check if ratings are stale
                 const staleness = await cards.getRatingsStaleness(setCode, draftType);
@@ -184,8 +192,8 @@ const Draft: React.FC = () => {
         };
 
         checkAndRefreshStaleData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when session/ratings change
-    }, [state.loading, state.session?.SetCode, state.ratings.length]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when session changes, not when ratings are updated
+    }, [state.loading, state.session?.ID]);
 
     const loadHistoricalDrafts = async () => {
         try {
