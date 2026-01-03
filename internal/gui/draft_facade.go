@@ -741,6 +741,11 @@ func (d *DraftFacade) RecalculateAllDraftGrades(ctx context.Context, refreshSetC
 
 // RecalculateDraftGradesForSet recalculates grades for all drafts with a specific set code.
 // This is called after refreshing ratings to update existing draft grades with new data.
+//
+// Note: This method processes sessions synchronously. In typical usage, the number of drafts
+// per set is small (< 50), so this completes quickly. The frontend shows download progress
+// while this runs. If large-scale batch processing is needed, consider using a background
+// job queue instead.
 func (d *DraftFacade) RecalculateDraftGradesForSet(ctx context.Context, setCode string) (int, error) {
 	if d.services.Storage == nil {
 		return 0, &AppError{Message: "Database not initialized"}
@@ -758,7 +763,11 @@ func (d *DraftFacade) RecalculateDraftGradesForSet(ctx context.Context, setCode 
 		return 0, &AppError{Message: fmt.Sprintf("Failed to get active sessions: %v", err)}
 	}
 
-	completedSessions, err := d.services.Storage.DraftRepo().GetCompletedSessions(ctx, 1000)
+	// Limit to most recent 5000 completed sessions. This should be more than sufficient
+	// for typical usage. If a user has more than 5000 drafts for a single set, older
+	// sessions won't be recalculated. Consider pagination if this becomes an issue.
+	const maxCompletedSessions = 5000
+	completedSessions, err := d.services.Storage.DraftRepo().GetCompletedSessions(ctx, maxCompletedSessions)
 	if err != nil {
 		return 0, &AppError{Message: fmt.Sprintf("Failed to get completed sessions: %v", err)}
 	}

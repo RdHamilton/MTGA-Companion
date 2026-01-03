@@ -551,4 +551,77 @@ describe('Draft Component', () => {
       }, { timeout: 2000 });
     });
   });
+
+  describe('Auto-refresh Stale Ratings (#732)', () => {
+    it('should not refresh ratings when they are fresh', async () => {
+      const session = createMockDraftSession();
+      const ratings = [createMockCardRating()];
+
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockCards.getCardRatings.mockResolvedValue(ratings);
+      mockCards.getRatingsStaleness.mockResolvedValue({
+        cachedAt: new Date().toISOString(),
+        isStale: false,
+        cardCount: 100,
+      });
+
+      render(<Draft />);
+
+      await waitFor(() => {
+        expect(mockCards.getRatingsStaleness).toHaveBeenCalledWith('BLB', 'PremierDraft');
+      });
+
+      // Should not have called refresh since ratings are fresh
+      expect(mockCards.refreshSetRatings).not.toHaveBeenCalled();
+    });
+
+    it('should auto-refresh ratings when they are stale', async () => {
+      const session = createMockDraftSession();
+      const ratings = [createMockCardRating()];
+      const newRatings = [createMockCardRating({ name: 'New Card' })];
+
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockCards.getCardRatings
+        .mockResolvedValueOnce(ratings) // Initial load
+        .mockResolvedValueOnce(newRatings); // After refresh
+      mockCards.getRatingsStaleness.mockResolvedValue({
+        cachedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 days old
+        isStale: true,
+        cardCount: 100,
+      });
+      mockCards.refreshSetRatings.mockResolvedValue(undefined);
+
+      render(<Draft />);
+
+      await waitFor(() => {
+        expect(mockCards.refreshSetRatings).toHaveBeenCalledWith('BLB', 'PremierDraft');
+      });
+    });
+
+    it('should handle refresh error gracefully', async () => {
+      const session = createMockDraftSession();
+      const ratings = [createMockCardRating()];
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockDrafts.getActiveDraftSessions.mockResolvedValue([session]);
+      mockCards.getCardRatings.mockResolvedValue(ratings);
+      mockCards.getRatingsStaleness.mockResolvedValue({
+        cachedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+        isStale: true,
+        cardCount: 100,
+      });
+      mockCards.refreshSetRatings.mockRejectedValue(new Error('Network error'));
+
+      render(<Draft />);
+
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[Draft] Auto-refresh failed'),
+          expect.any(Error)
+        );
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
 });

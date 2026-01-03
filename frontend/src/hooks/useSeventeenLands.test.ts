@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { useSeventeenLands } from './useSeventeenLands';
 
 // Mock the API modules
@@ -18,6 +19,26 @@ vi.mock('../components/ToastContainer', () => ({
   showToast: {
     show: vi.fn(),
   },
+}));
+
+// Mock useDownload context
+const mockStartDownload = vi.fn();
+const mockUpdateProgress = vi.fn();
+const mockCompleteDownload = vi.fn();
+const mockFailDownload = vi.fn();
+
+vi.mock('@/context/DownloadContext', () => ({
+  useDownload: () => ({
+    state: { tasks: [], activeTask: null },
+    isDownloading: false,
+    overallProgress: 0,
+    startDownload: mockStartDownload,
+    updateProgress: mockUpdateProgress,
+    completeDownload: mockCompleteDownload,
+    failDownload: mockFailDownload,
+    cancelDownload: vi.fn(),
+  }),
+  DownloadProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
 import { cards, drafts } from '@/services/api';

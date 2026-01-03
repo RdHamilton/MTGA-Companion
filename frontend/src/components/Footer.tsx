@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventsOn } from '@/services/websocketClient';
-import { matches } from '@/services/api';
+import { matches, system } from '@/services/api';
 import { models } from '@/types/models';
 import DownloadProgressBar from './DownloadProgressBar';
 import './Footer.css';
@@ -9,6 +9,7 @@ const Footer = () => {
   const [stats, setStats] = useState<models.Statistics | null>(null);
   const [streak, setStreak] = useState<{ type: string; count: number }>({ type: '', count: 0 });
   const [lastMatch, setLastMatch] = useState<string>('');
+  const [lastSynced, setLastSynced] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   const loadStats = async () => {
@@ -42,6 +43,22 @@ const Footer = () => {
         // Format last match time
         const lastMatchDate = new Date(matchData[0].Timestamp as string);
         setLastMatch(lastMatchDate.toLocaleString());
+      }
+
+      // Get backend sync time from health status
+      try {
+        const health = await system.getHealth();
+        if (health.database.lastWrite) {
+          // Format the RFC3339 timestamp to a user-friendly time
+          const syncDate = new Date(health.database.lastWrite);
+          setLastSynced(syncDate.toLocaleTimeString());
+        } else {
+          // No writes yet, show current time as fallback
+          setLastSynced(new Date().toLocaleTimeString());
+        }
+      } catch {
+        // Fallback to current time if health check fails
+        setLastSynced(new Date().toLocaleTimeString());
       }
     } catch (err) {
       console.error('Error loading footer stats:', err);
@@ -112,7 +129,15 @@ const Footer = () => {
           <>
             <span className="footer-separator">|</span>
             <span className="footer-stat footer-last-match">
-              <strong>Last:</strong> {lastMatch}
+              <strong>Last Played:</strong> {lastMatch}
+            </span>
+          </>
+        )}
+        {lastSynced && (
+          <>
+            <span className="footer-separator">|</span>
+            <span className="footer-stat footer-last-synced">
+              <strong>Synced:</strong> {lastSynced}
             </span>
           </>
         )}

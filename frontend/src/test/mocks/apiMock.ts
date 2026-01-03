@@ -13,6 +13,8 @@ export const mockCards = {
   searchCards: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
   searchCardsWithCollection: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
   getColorRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getRatingsStaleness: vi.fn((() => Promise.resolve({ cachedAt: new Date().toISOString(), isStale: false, cardCount: 100 })) as MockFn),
+  refreshSetRatings: vi.fn((() => Promise.resolve()) as MockFn),
 };
 
 export const mockMatches = {
@@ -122,6 +124,27 @@ export const mockSystem = {
     mode: 'standalone',
     url: 'ws://localhost:9999',
     port: 9999,
+  } as unknown)),
+  getHealth: vi.fn(() => Promise.resolve({
+    status: 'healthy',
+    version: '1.4.0',
+    uptime: 3600,
+    database: {
+      status: 'ok',
+      lastWrite: new Date().toISOString(),
+    },
+    logMonitor: {
+      status: 'ok',
+      lastRead: new Date().toISOString(),
+    },
+    websocket: {
+      status: 'ok',
+      connectedClients: 1,
+    },
+    metrics: {
+      totalProcessed: 100,
+      totalErrors: 0,
+    },
   } as unknown)),
   getVersion: vi.fn(() => Promise.resolve({ version: '1.0.0', buildDate: '2024-01-01' } as unknown)),
   clearAllData: vi.fn(() => Promise.resolve()),

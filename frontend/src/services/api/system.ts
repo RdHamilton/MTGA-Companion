@@ -26,10 +26,62 @@ export interface DaemonStatus {
 }
 
 /**
+ * Database health information.
+ */
+export interface DatabaseHealth {
+  status: string;
+  lastWrite?: string;
+}
+
+/**
+ * Log monitor health information.
+ */
+export interface LogMonitorHealth {
+  status: string;
+  lastRead?: string;
+}
+
+/**
+ * WebSocket health information.
+ */
+export interface WebSocketHealth {
+  status: string;
+  connectedClients: number;
+}
+
+/**
+ * Health metrics.
+ */
+export interface HealthMetrics {
+  totalProcessed: number;
+  totalErrors: number;
+}
+
+/**
+ * System health status including backend sync timestamps.
+ */
+export interface HealthStatus {
+  status: string;
+  version: string;
+  uptime: number;
+  database: DatabaseHealth;
+  logMonitor: LogMonitorHealth;
+  websocket: WebSocketHealth;
+  metrics: HealthMetrics;
+}
+
+/**
  * Get the current connection status.
  */
 export async function getStatus(): Promise<ConnectionStatus> {
   return get<ConnectionStatus>('/system/status');
+}
+
+/**
+ * Get the system health status including backend sync timestamps.
+ */
+export async function getHealth(): Promise<HealthStatus> {
+  return get<HealthStatus>('/system/health');
 }
 
 /**

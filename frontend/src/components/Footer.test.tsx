@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { render } from '../test/utils/testUtils';
 import Footer from './Footer';
-import { mockMatches } from '@/test/mocks/apiMock';
+import { mockMatches, mockSystem } from '@/test/mocks/apiMock';
 import { mockEventEmitter } from '@/test/mocks/websocketMock';
 import { models } from '@/types/models';
 
@@ -13,6 +13,7 @@ vi.mock('@/context/DownloadContext', () => ({
     isDownloading: false,
     overallProgress: 0,
   }),
+  DownloadProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 function createMockStatistics(overrides: Partial<models.Statistics> = {}): models.Statistics {
@@ -125,7 +126,7 @@ describe('Footer Component', () => {
       });
     });
 
-    it('should display last match time', async () => {
+    it('should display last match time with Last Played label', async () => {
       const stats = createMockStatistics();
       const matches = [
         createMockMatch({
@@ -138,10 +139,25 @@ describe('Footer Component', () => {
       render(<Footer />);
 
       await waitFor(() => {
-        expect(screen.getByText('Last:')).toBeInTheDocument();
+        expect(screen.getByText('Last Played:')).toBeInTheDocument();
         // The exact format depends on locale, just check it exists
-        const lastMatchText = screen.getByText('Last:').nextSibling;
+        const lastMatchText = screen.getByText('Last Played:').nextSibling;
         expect(lastMatchText).toBeTruthy();
+      });
+    });
+
+    it('should display Synced indicator after data loads', async () => {
+      const stats = createMockStatistics();
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Synced:')).toBeInTheDocument();
+        // Synced time should be present
+        const syncedText = screen.getByText('Synced:').nextSibling;
+        expect(syncedText).toBeTruthy();
       });
     });
   });
@@ -336,6 +352,100 @@ describe('Footer Component', () => {
       await waitFor(() => {
         const streakElement = screen.getByText('L1').closest('.footer-stat');
         expect(streakElement).toHaveClass('streak-l');
+      });
+    });
+  });
+
+  describe('Backend Sync Time', () => {
+    it('should display backend sync time from health status', async () => {
+      const stats = createMockStatistics();
+      const syncTime = '2025-12-28T15:30:00Z';
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+      mockSystem.getHealth.mockResolvedValue({
+        status: 'healthy',
+        version: '1.4.0',
+        uptime: 3600,
+        database: {
+          status: 'ok',
+          lastWrite: syncTime,
+        },
+        logMonitor: { status: 'ok' },
+        websocket: { status: 'ok', connectedClients: 1 },
+        metrics: { totalProcessed: 100, totalErrors: 0 },
+      });
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Synced:')).toBeInTheDocument();
+        // The time should be formatted from the backend timestamp
+        const syncedText = screen.getByText('Synced:').nextSibling;
+        expect(syncedText).toBeTruthy();
+      });
+    });
+
+    it('should fallback to current time when health check fails', async () => {
+      const stats = createMockStatistics();
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+      mockSystem.getHealth.mockRejectedValue(new Error('Health check failed'));
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Synced:')).toBeInTheDocument();
+        // Should still show synced time (fallback to current time)
+        const syncedText = screen.getByText('Synced:').nextSibling;
+        expect(syncedText).toBeTruthy();
+      });
+    });
+
+    it('should fallback to current time when no lastWrite in health status', async () => {
+      const stats = createMockStatistics();
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+      mockSystem.getHealth.mockResolvedValue({
+        status: 'standalone',
+        version: '1.4.0',
+        uptime: 0,
+        database: {
+          status: 'ok',
+          // No lastWrite field - daemon hasn't written to DB yet
+        },
+        logMonitor: { status: 'ok' },
+        websocket: { status: 'ok', connectedClients: 0 },
+        metrics: { totalProcessed: 0, totalErrors: 0 },
+      });
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Synced:')).toBeInTheDocument();
+        // Should still show synced time (fallback)
+        const syncedText = screen.getByText('Synced:').nextSibling;
+        expect(syncedText).toBeTruthy();
+      });
+    });
+
+    it('should call getHealth when loading stats', async () => {
+      const stats = createMockStatistics();
+      mockMatches.getStats.mockResolvedValue(stats);
+      mockMatches.getMatches.mockResolvedValue([]);
+      mockSystem.getHealth.mockResolvedValue({
+        status: 'healthy',
+        version: '1.4.0',
+        uptime: 3600,
+        database: { status: 'ok', lastWrite: new Date().toISOString() },
+        logMonitor: { status: 'ok' },
+        websocket: { status: 'ok', connectedClients: 1 },
+        metrics: { totalProcessed: 100, totalErrors: 0 },
+      });
+
+      render(<Footer />);
+
+      await waitFor(() => {
+        expect(mockSystem.getHealth).toHaveBeenCalled();
       });
     });
   });

@@ -39,6 +39,7 @@ import PerformanceMetrics from '../components/PerformanceMetrics';
 import FormatInsights from '../components/FormatInsights';
 import CurrentPackPicker from '../components/CurrentPackPicker';
 import { analyzeSynergies, shouldHighlightCard } from '../utils/synergy';
+import { useDownload } from '@/context/DownloadContext';
 import './Draft.css';
 
 interface DraftState {
@@ -101,6 +102,8 @@ const Draft: React.FC = () => {
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
     const [showCurrentPack, setShowCurrentPack] = useState(true);
 
+    const { startDownload, updateProgress, completeDownload, failDownload } = useDownload();
+
     // Refs for deduplication and debouncing
     const loadingRef = useRef<boolean>(false);
     const debounceTimerRef = useRef<number | null>(null);
@@ -128,6 +131,69 @@ const Draft: React.FC = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- loadActiveDraft and debouncedLoadActiveDraft are stable
     }, []);
+
+    // Track which sessions we've already checked for stale ratings to prevent infinite loops
+    const checkedSessionsRef = useRef<Set<string>>(new Set());
+
+    // Auto-refresh stale ratings data (#732)
+    useEffect(() => {
+        // Only check after initial load completes and we have a session with ratings
+        if (state.loading || !state.session || state.ratings.length === 0) return;
+
+        const sessionId = state.session.ID;
+        const setCode = state.session.SetCode;
+        const draftType = state.session.DraftType || 'PremierDraft';
+
+        // Skip if we've already checked this session (prevents infinite loop)
+        if (!setCode || checkedSessionsRef.current.has(sessionId)) return;
+
+        // Mark this session as checked immediately to prevent re-runs
+        checkedSessionsRef.current.add(sessionId);
+
+        const checkAndRefreshStaleData = async () => {
+            try {
+                // Check if ratings are stale
+                const staleness = await cards.getRatingsStaleness(setCode, draftType);
+
+                if (!staleness.isStale) {
+                    console.log(`[Draft] Ratings for ${setCode} are fresh (${staleness.cardCount} cards)`);
+                    return;
+                }
+
+                console.log(`[Draft] Ratings for ${setCode} are stale (>2 weeks), triggering auto-refresh`);
+
+                const downloadId = `draft-ratings-${setCode}`;
+                startDownload(downloadId, `Updating ${setCode} draft ratings...`);
+                updateProgress(downloadId, 10);
+
+                try {
+                    updateProgress(downloadId, 20);
+                    await cards.refreshSetRatings(setCode, draftType);
+                    updateProgress(downloadId, 60);
+
+                    // Reload ratings after refresh
+                    const newRatings = await cards.getCardRatings(setCode, draftType);
+                    updateProgress(downloadId, 90);
+
+                    setState(prev => ({
+                        ...prev,
+                        ratings: newRatings || [],
+                    }));
+
+                    console.log(`[Draft] Auto-refresh complete for ${setCode}`);
+                    completeDownload(downloadId);
+                } catch (err) {
+                    console.error(`[Draft] Auto-refresh failed for ${setCode}:`, err);
+                    failDownload(downloadId, 'Failed to refresh ratings');
+                }
+            } catch (err) {
+                console.error('[Draft] Failed to check ratings staleness:', err);
+            }
+        };
+
+        checkAndRefreshStaleData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when session changes, not when ratings are updated
+    }, [state.loading, state.session?.ID]);
 
     const loadHistoricalDrafts = async () => {
         try {

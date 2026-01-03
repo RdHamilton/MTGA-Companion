@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { cards, drafts } from '@/services/api';
 import { showToast } from '../components/ToastContainer';
+import { useDownload } from '@/context/DownloadContext';
 
 // Functions that wrap cards API to match legacy signatures
 async function fetchSetRatings(setCode: string, format: string): Promise<void> {
@@ -80,15 +81,24 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
   const [dataSource, setDataSource] = useState<string>('');
   const [isClearingCache, setIsClearingCache] = useState(false);
 
+  // Download progress bar context
+  const { startDownload, updateProgress, completeDownload, failDownload } = useDownload();
+
   const handleFetchSetRatings = useCallback(async () => {
     if (!setCode || setCode.trim() === '') {
       showToast.show('Please enter a set code (e.g., TLA, BLB, DSK, FDN)', 'warning');
       return;
     }
 
+    const downloadId = `fetch-ratings-${setCode.trim().toUpperCase()}-${draftFormat}`;
     setIsFetchingRatings(true);
+    startDownload(downloadId, `Fetching ${setCode.toUpperCase()} ratings...`);
+    updateProgress(downloadId, 10);
+
     try {
+      updateProgress(downloadId, 30);
       await fetchSetRatings(setCode.trim().toUpperCase(), draftFormat);
+      updateProgress(downloadId, 80);
 
       // Check data source after fetching
       try {
@@ -114,7 +124,9 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
           'success'
         );
       }
+      completeDownload(downloadId);
     } catch (error) {
+      failDownload(downloadId, `Failed to fetch ratings: ${error}`);
       showToast.show(
         `Failed to fetch 17Lands ratings: ${error}. Make sure: Set code is correct (e.g., TLA, BLB, DSK, FDN), you have internet connection, and 17Lands has data for this set.`,
         'error'
@@ -122,7 +134,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
     } finally {
       setIsFetchingRatings(false);
     }
-  }, [setCode, draftFormat]);
+  }, [setCode, draftFormat, startDownload, updateProgress, completeDownload, failDownload]);
 
   const handleRefreshSetRatings = useCallback(async () => {
     if (!setCode || setCode.trim() === '') {
@@ -130,13 +142,20 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
       return;
     }
 
+    const downloadId = `refresh-ratings-${setCode.trim().toUpperCase()}-${draftFormat}`;
     setIsFetchingRatings(true);
+    startDownload(downloadId, `Refreshing ${setCode.toUpperCase()} ratings...`);
+    updateProgress(downloadId, 10);
+
     try {
       const upperSetCode = setCode.trim().toUpperCase();
+      updateProgress(downloadId, 20);
       await refreshSetRatings(upperSetCode, draftFormat);
+      updateProgress(downloadId, 50);
 
       // Recalculate grades for existing drafts with this set (#734)
       const recalcResult = await drafts.recalculateSetGrades(upperSetCode);
+      updateProgress(downloadId, 80);
 
       // Check data source after refreshing
       try {
@@ -164,12 +183,14 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
           'success'
         );
       }
+      completeDownload(downloadId);
     } catch (error) {
+      failDownload(downloadId, `Failed to refresh ratings: ${error}`);
       showToast.show(`Failed to refresh 17Lands ratings: ${error}`, 'error');
     } finally {
       setIsFetchingRatings(false);
     }
-  }, [setCode, draftFormat]);
+  }, [setCode, draftFormat, startDownload, updateProgress, completeDownload, failDownload]);
 
   const handleFetchSetCards = useCallback(async () => {
     if (!setCode || setCode.trim() === '') {
@@ -177,14 +198,22 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
       return;
     }
 
+    const downloadId = `fetch-cards-${setCode.trim().toUpperCase()}`;
     setIsFetchingCards(true);
+    startDownload(downloadId, `Fetching ${setCode.toUpperCase()} cards...`);
+    updateProgress(downloadId, 10);
+
     try {
+      updateProgress(downloadId, 30);
       const count = await fetchSetCards(setCode.trim().toUpperCase());
+      updateProgress(downloadId, 90);
       showToast.show(
         `Successfully fetched ${count} cards for ${setCode.toUpperCase()} from Scryfall! Card data is now cached.`,
         'success'
       );
+      completeDownload(downloadId);
     } catch (error) {
+      failDownload(downloadId, `Failed to fetch cards: ${error}`);
       showToast.show(
         `Failed to fetch cards: ${error}. Make sure the set code is correct and you have internet connection.`,
         'error'
@@ -192,7 +221,7 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
     } finally {
       setIsFetchingCards(false);
     }
-  }, [setCode]);
+  }, [setCode, startDownload, updateProgress, completeDownload, failDownload]);
 
   const handleRefreshSetCards = useCallback(async () => {
     if (!setCode || setCode.trim() === '') {
@@ -200,19 +229,27 @@ export function useSeventeenLands(): UseSeventeenLandsReturn {
       return;
     }
 
+    const downloadId = `refresh-cards-${setCode.trim().toUpperCase()}`;
     setIsFetchingCards(true);
+    startDownload(downloadId, `Refreshing ${setCode.toUpperCase()} cards...`);
+    updateProgress(downloadId, 10);
+
     try {
+      updateProgress(downloadId, 30);
       const count = await refreshSetCards(setCode.trim().toUpperCase());
+      updateProgress(downloadId, 90);
       showToast.show(
         `Successfully refreshed ${count} cards for ${setCode.toUpperCase()} from Scryfall!`,
         'success'
       );
+      completeDownload(downloadId);
     } catch (error) {
+      failDownload(downloadId, `Failed to refresh cards: ${error}`);
       showToast.show(`Failed to refresh cards: ${error}`, 'error');
     } finally {
       setIsFetchingCards(false);
     }
-  }, [setCode]);
+  }, [setCode, startDownload, updateProgress, completeDownload, failDownload]);
 
   const handleRecalculateGrades = useCallback(async () => {
     setIsRecalculating(true);

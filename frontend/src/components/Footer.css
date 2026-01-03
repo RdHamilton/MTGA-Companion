@@ -57,6 +57,11 @@
   color: #999999;
 }
 
+.footer-last-synced {
+  color: #888888;
+  font-size: 12px;
+}
+
 /* Streak styling */
 .streak-w {
   color: #4caf50;

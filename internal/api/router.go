@@ -117,6 +117,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/sets/{setCode}/refresh", cardHandler.RefreshSetCards)
 			r.Get("/ratings/{setCode}", cardHandler.GetRatings)
 			r.Get("/ratings/{setCode}/colors", cardHandler.GetColorRatings)
+			r.Get("/ratings/{setCode}/{format}/staleness", cardHandler.GetRatingsStaleness)
 			r.Get("/ratings/{setCode}/{eventType}", cardHandler.GetRatingsWithEvent) // Event type in path
 			r.Get("/ratings/{setCode}/card/{arenaID}", cardHandler.GetCardRatingByArenaID)
 			r.Post("/ratings/{setCode}/fetch", cardHandler.FetchSetRatings)
@@ -140,6 +141,7 @@ func (s *Server) setupRoutes() {
 		systemHandler := handlers.NewSystemHandler(s.systemFacade)
 		r.Route("/system", func(r chi.Router) {
 			r.Get("/status", systemHandler.GetStatus)
+			r.Get("/health", systemHandler.GetHealth)
 			r.Get("/version", systemHandler.GetVersion)
 			r.Get("/account", systemHandler.GetCurrentAccount)
 			r.Get("/database/path", systemHandler.GetDatabasePath)
