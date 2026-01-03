@@ -46,6 +46,8 @@ export default function Collection() {
 
   const { startDownload, updateProgress, completeDownload } = useDownload();
   const autoRefreshRef = useRef<boolean>(false);
+  const isLoadingRef = useRef<boolean>(false);
+  const isAutoRefreshingRef = useRef<boolean>(false);
 
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -67,8 +69,19 @@ export default function Collection() {
     return () => clearTimeout(timer);
   }, [filters.searchTerm]);
 
-  const loadCollection = useCallback(async () => {
-    setLoading(true);
+  const loadCollection = useCallback(async (isAutoRefresh = false) => {
+    // Prevent multiple simultaneous requests
+    if (isLoadingRef.current) {
+      return;
+    }
+
+    isLoadingRef.current = true;
+    isAutoRefreshingRef.current = isAutoRefresh;
+
+    // Only show loading spinner for user-initiated loads, not auto-refresh
+    if (!isAutoRefresh) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const apiFilter = {
@@ -90,34 +103,38 @@ export default function Collection() {
       // Show download progress if cards were fetched from Scryfall
       const unknownFetched = response?.unknownCardsFetched ?? 0;
       const unknownRemaining = response?.unknownCardsRemaining ?? 0;
-      if (unknownFetched > 0) {
-        const downloadId = 'collection-card-lookup';
+      const downloadId = 'collection-card-lookup';
+
+      if (unknownFetched > 0 && unknownRemaining > 0) {
+        // Cards were successfully fetched and more remain - continue auto-refresh
         const totalUnknown = unknownRemaining + unknownFetched;
         const progress = Math.round(((totalUnknown - unknownRemaining) / totalUnknown) * 100);
 
-        if (unknownRemaining > 0) {
-          startDownload(downloadId, `Fetching card info from Scryfall...`);
-          updateProgress(downloadId, progress);
+        startDownload(downloadId, `Fetching card info from Scryfall...`);
+        updateProgress(downloadId, progress);
 
-          // Auto-refresh to continue fetching remaining cards
-          if (!autoRefreshRef.current) {
-            autoRefreshRef.current = true;
-            setTimeout(() => {
-              autoRefreshRef.current = false;
-              loadCollection();
-            }, 500);
-          }
-        } else {
-          completeDownload(downloadId);
+        // Auto-refresh to continue fetching remaining cards
+        if (!autoRefreshRef.current) {
+          autoRefreshRef.current = true;
+          setTimeout(() => {
+            autoRefreshRef.current = false;
+            loadCollection(true); // Pass true to indicate auto-refresh
+          }, 500);
         }
+      } else if (unknownFetched > 0) {
+        // All cards fetched, complete the download
+        completeDownload(downloadId);
       }
+      // If unknownFetched === 0, don't auto-refresh (all lookups failed or no cards to fetch)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load collection');
       console.error('Failed to load collection:', err);
     } finally {
+      isLoadingRef.current = false;
+      isAutoRefreshingRef.current = false;
       setLoading(false);
     }
-  }, [debouncedSearchTerm, filters.setCode, filters.rarity, filters.colors, filters.ownedOnly, filters.sortBy, filters.sortDesc, currentPage, startDownload, updateProgress, completeDownload]);
+  }, [filters.setCode, filters.rarity, filters.colors, filters.ownedOnly, startDownload, updateProgress, completeDownload]);
 
   const loadSets = useCallback(async () => {
     try {
@@ -129,15 +146,23 @@ export default function Collection() {
     }
   }, []);
 
+  // Load collection and sets on mount
   useEffect(() => {
     loadCollection();
     loadSets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reload collection when filters change
+  // Reload collection when filters change (but not on mount)
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     loadCollection();
-  }, [loadCollection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.setCode, filters.rarity, filters.colors, filters.ownedOnly]);
 
   // Reset page when filters change
   useEffect(() => {

@@ -388,8 +388,13 @@ describe('Collection', () => {
       });
     });
 
-    it('should call GetCollection when search term changes', async () => {
-      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
+    it('should filter client-side when search term changes (no API call)', async () => {
+      // Create multiple cards to test client-side filtering
+      const mockCards = [
+        createMockCollectionCard({ cardId: 1, arenaId: 1, name: 'Lightning Bolt' }),
+        createMockCollectionCard({ cardId: 2, arenaId: 2, name: 'Counterspell' }),
+      ];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -401,15 +406,18 @@ describe('Collection', () => {
         expect(screen.getByPlaceholderText('Search by name...')).toBeInTheDocument();
       });
 
+      // Verify both cards are shown initially
+      expect(screen.getByAltText('Lightning Bolt')).toBeInTheDocument();
+      expect(screen.getByAltText('Counterspell')).toBeInTheDocument();
+
       const searchInput = screen.getByPlaceholderText('Search by name...');
       fireEvent.change(searchInput, { target: { value: 'Bolt' } });
 
       // Wait for debounce
       await vi.advanceTimersByTimeAsync(350);
 
-      await waitFor(() => {
-        expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(2);
-      });
+      // API should only be called once (on mount) - search is client-side
+      expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -903,6 +911,98 @@ describe('Collection', () => {
       expect(options).toContain('Rarity (Low)');
       expect(options).toContain('CMC (Low)');
       expect(options).toContain('CMC (High)');
+    });
+  });
+
+  describe('Scryfall Auto-Fetch Behavior (#784)', () => {
+    it('should not auto-refresh when no cards are fetched (all lookups failed)', async () => {
+      // Simulate the case where all Scryfall lookups fail
+      const mockCards = [createMockCollectionCard()];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue({
+        ...createMockCollectionResponse(mockCards),
+        unknownCardsFetched: 0, // No cards successfully fetched
+        unknownCardsRemaining: 5, // Cards that failed lookup (now on cooldown)
+      });
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Wait longer than auto-refresh timeout
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // API should only be called once (no auto-refresh since unknownFetched is 0)
+      expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not trigger multiple simultaneous API calls', async () => {
+      const mockCards = [createMockCollectionCard()];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      // Don't wait - check that only one call was made even with rapid mounting
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(10);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Should be called exactly once on mount, not multiple times
+      expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(1);
+    });
+
+    it('should auto-refresh when cards are successfully fetched and more remain', async () => {
+      let callCount = 0;
+      const mockCards = [createMockCollectionCard()];
+
+      // First call: cards fetched, more remaining
+      // Second call: no more cards to fetch
+      mockCollection.getCollectionWithMetadata.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            ...createMockCollectionResponse(mockCards),
+            unknownCardsFetched: 5, // Cards successfully fetched
+            unknownCardsRemaining: 3, // More cards to fetch
+          };
+        }
+        return {
+          ...createMockCollectionResponse(mockCards),
+          unknownCardsFetched: 3, // Final batch fetched
+          unknownCardsRemaining: 0, // No more cards
+        };
+      });
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Wait for auto-refresh timeout (500ms + some buffer)
+      await vi.advanceTimersByTimeAsync(600);
+
+      await waitFor(() => {
+        // Should be called twice (initial + auto-refresh)
+        expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });
