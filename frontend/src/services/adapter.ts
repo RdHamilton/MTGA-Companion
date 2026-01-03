@@ -200,12 +200,14 @@ export const collectionAdapter = {
           owned_only: filter.ownedOnly,
         }
       : {};
-    const cards = await api.collection.getCollection(apiFilter);
+    const apiResponse = await api.collection.getCollectionWithMetadata(apiFilter);
     // Create a proper CollectionResponse object
     const response = new gui.CollectionResponse();
-    response.cards = cards;
-    response.totalCount = cards.length;
-    response.filterCount = cards.length;
+    response.cards = apiResponse.cards;
+    response.totalCount = apiResponse.totalCount;
+    response.filterCount = apiResponse.filterCount;
+    response.unknownCardsRemaining = apiResponse.unknownCardsRemaining;
+    response.unknownCardsFetched = apiResponse.unknownCardsFetched;
     return response;
   },
 

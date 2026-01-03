@@ -508,16 +508,20 @@ export namespace gui {
 	    cards: CollectionCard[];
 	    totalCount: number;
 	    filterCount: number;
-	
+	    unknownCardsRemaining: number;
+	    unknownCardsFetched: number;
+
 	    static createFrom(source: any = {}) {
 	        return new CollectionResponse(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cards = this.convertValues(source["cards"], CollectionCard);
 	        this.totalCount = source["totalCount"];
 	        this.filterCount = source["filterCount"];
+	        this.unknownCardsRemaining = source["unknownCardsRemaining"] ?? 0;
+	        this.unknownCardsFetched = source["unknownCardsFetched"] ?? 0;
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

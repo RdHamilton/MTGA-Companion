@@ -2,6 +2,7 @@ package gui
 
 import (
 	"testing"
+	"time"
 )
 
 const cardBackPlaceholderURL = "https://cards.scryfall.io/back.png"
@@ -264,5 +265,108 @@ func TestWildcardCost_ByRarity(t *testing.T) {
 	}
 	if cost.Total != 11 {
 		t.Errorf("Total = %d, want 11", cost.Total)
+	}
+}
+
+func TestNewCollectionFacade_InitializesFailedLookups(t *testing.T) {
+	facade := NewCollectionFacade(nil)
+
+	if facade.failedLookups == nil {
+		t.Error("Expected failedLookups map to be initialized")
+	}
+
+	if len(facade.failedLookups) != 0 {
+		t.Errorf("Expected failedLookups to be empty, got %d entries", len(facade.failedLookups))
+	}
+}
+
+func TestFailedLookupCooldown_Value(t *testing.T) {
+	// Verify the cooldown is set to 1 hour
+	expectedCooldown := 1 * time.Hour
+	if failedLookupCooldown != expectedCooldown {
+		t.Errorf("failedLookupCooldown = %v, want %v", failedLookupCooldown, expectedCooldown)
+	}
+}
+
+func TestFailedLookupTracking_WithinCooldown(t *testing.T) {
+	facade := NewCollectionFacade(nil)
+
+	// Record a failed lookup
+	cardID := 12345
+	now := time.Now()
+	facade.failedLookups[cardID] = now
+
+	// Check if it's within cooldown (should be skipped)
+	failTime, exists := facade.failedLookups[cardID]
+	if !exists {
+		t.Error("Expected card to be in failedLookups")
+	}
+
+	elapsed := time.Since(failTime)
+	if elapsed >= failedLookupCooldown {
+		t.Error("Expected failed lookup to be within cooldown period")
+	}
+}
+
+func TestFailedLookupTracking_ExpiredCooldown(t *testing.T) {
+	facade := NewCollectionFacade(nil)
+
+	// Record a failed lookup that's older than the cooldown
+	cardID := 12345
+	expiredTime := time.Now().Add(-2 * time.Hour) // 2 hours ago
+	facade.failedLookups[cardID] = expiredTime
+
+	// Check if it's expired (should allow retry)
+	failTime := facade.failedLookups[cardID]
+	elapsed := time.Since(failTime)
+
+	if elapsed < failedLookupCooldown {
+		t.Error("Expected failed lookup to be past cooldown period")
+	}
+}
+
+func TestFailedLookupTracking_MultipleCards(t *testing.T) {
+	facade := NewCollectionFacade(nil)
+
+	// Record multiple failed lookups
+	now := time.Now()
+	facade.failedLookups[111] = now
+	facade.failedLookups[222] = now.Add(-30 * time.Minute) // 30 min ago
+	facade.failedLookups[333] = now.Add(-2 * time.Hour)    // 2 hours ago (expired)
+
+	if len(facade.failedLookups) != 3 {
+		t.Errorf("Expected 3 entries in failedLookups, got %d", len(facade.failedLookups))
+	}
+
+	// Verify each card's status
+	// Card 111: just added, within cooldown
+	if time.Since(facade.failedLookups[111]) >= failedLookupCooldown {
+		t.Error("Card 111 should be within cooldown")
+	}
+
+	// Card 222: 30 min ago, still within cooldown
+	if time.Since(facade.failedLookups[222]) >= failedLookupCooldown {
+		t.Error("Card 222 should be within cooldown")
+	}
+
+	// Card 333: 2 hours ago, expired
+	if time.Since(facade.failedLookups[333]) < failedLookupCooldown {
+		t.Error("Card 333 should be past cooldown")
+	}
+}
+
+func TestMaxAutoLookups_Value(t *testing.T) {
+	// Verify the max auto lookups is reasonable
+	if maxAutoLookups <= 0 {
+		t.Errorf("maxAutoLookups should be positive, got %d", maxAutoLookups)
+	}
+
+	if maxAutoLookups > 50 {
+		t.Errorf("maxAutoLookups should not be too high to avoid rate limiting, got %d", maxAutoLookups)
+	}
+
+	// Current expected value is 10
+	if maxAutoLookups != 10 {
+		t.Errorf("maxAutoLookups = %d, expected 10", maxAutoLookups)
 	}
 }

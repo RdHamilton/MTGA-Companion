@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, cards as cardsApi } from '@/services/api';
 import { gui } from '@/types/models';
+import { useDownload } from '@/context/DownloadContext';
 import SetCompletionPanel from '../components/SetCompletion';
 import './Collection.css';
 
@@ -43,6 +44,9 @@ export default function Collection() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showSetCompletion, setShowSetCompletion] = useState(false);
 
+  const { startDownload, updateProgress, completeDownload } = useDownload();
+  const autoRefreshRef = useRef<boolean>(false);
+
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
     setCode: '',
@@ -74,21 +78,46 @@ export default function Collection() {
         owned_only: filters.ownedOnly,
       };
 
-      const collectionCards = await collection.getCollection(apiFilter);
+      const response = await collection.getCollectionWithMetadata(apiFilter);
       // Note: REST API doesn't support search/sort/pagination server-side
       // The component handles this with client-side filtering
       // Normalize to array to prevent crashes when API returns null/undefined
-      const normalizedCards = Array.isArray(collectionCards) ? collectionCards : [];
+      const normalizedCards = Array.isArray(response?.cards) ? response.cards : [];
       setCards(normalizedCards);
       setTotalCount(normalizedCards.length);
       setFilterCount(normalizedCards.length);
+
+      // Show download progress if cards were fetched from Scryfall
+      const unknownFetched = response?.unknownCardsFetched ?? 0;
+      const unknownRemaining = response?.unknownCardsRemaining ?? 0;
+      if (unknownFetched > 0) {
+        const downloadId = 'collection-card-lookup';
+        const totalUnknown = unknownRemaining + unknownFetched;
+        const progress = Math.round(((totalUnknown - unknownRemaining) / totalUnknown) * 100);
+
+        if (unknownRemaining > 0) {
+          startDownload(downloadId, `Fetching card info from Scryfall...`);
+          updateProgress(downloadId, progress);
+
+          // Auto-refresh to continue fetching remaining cards
+          if (!autoRefreshRef.current) {
+            autoRefreshRef.current = true;
+            setTimeout(() => {
+              autoRefreshRef.current = false;
+              loadCollection();
+            }, 500);
+          }
+        } else {
+          completeDownload(downloadId);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load collection');
       console.error('Failed to load collection:', err);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearchTerm, filters.setCode, filters.rarity, filters.colors, filters.ownedOnly, filters.sortBy, filters.sortDesc, currentPage]);
+  }, [debouncedSearchTerm, filters.setCode, filters.rarity, filters.colors, filters.ownedOnly, filters.sortBy, filters.sortDesc, currentPage, startDownload, updateProgress, completeDownload]);
 
   const loadSets = useCallback(async () => {
     try {

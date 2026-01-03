@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { gui } from '@/types/models';
 import { mockCollection, mockCards as mockCardsApi } from '@/test/mocks/apiMock';
+import { renderWithRouter } from '@/test/utils/testUtils';
 import Collection from './Collection';
 
 // Helper function to create mock collection card
@@ -53,10 +53,17 @@ function createMockSetInfo(overrides: Record<string, unknown> = {}): gui.SetInfo
   });
 }
 
-// Wrapper component with router
-function renderWithRouter(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+// Helper to create mock collection response
+function createMockCollectionResponse(cards: gui.CollectionCard[]) {
+  return {
+    cards,
+    totalCount: cards.length,
+    filterCount: cards.length,
+    unknownCardsRemaining: 0,
+    unknownCardsFetched: 0,
+  };
 }
+
 
 // Setup window.go to simulate Wails runtime being ready
 function setupWailsRuntime() {
@@ -81,11 +88,11 @@ describe('Collection', () => {
 
   describe('Loading State', () => {
     it('should show loading spinner while fetching collection', async () => {
-      let resolvePromise: (value: gui.CollectionCard[]) => void;
-      const loadingPromise = new Promise<gui.CollectionCard[]>((resolve) => {
+      let resolvePromise: (value: ReturnType<typeof createMockCollectionResponse>) => void;
+      const loadingPromise = new Promise<ReturnType<typeof createMockCollectionResponse>>((resolve) => {
         resolvePromise = resolve;
       });
-      mockCollection.getCollection.mockReturnValue(loadingPromise);
+      mockCollection.getCollectionWithMetadata.mockReturnValue(loadingPromise);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
@@ -95,7 +102,7 @@ describe('Collection', () => {
 
       expect(screen.getByText('Loading collection...')).toBeInTheDocument();
 
-      resolvePromise!([]);
+      resolvePromise!(createMockCollectionResponse([]));
       await waitFor(() => {
         expect(screen.queryByText('Loading collection...')).not.toBeInTheDocument();
       });
@@ -104,7 +111,7 @@ describe('Collection', () => {
 
   describe('Error State', () => {
     it('should show error state when API fails', async () => {
-      mockCollection.getCollection.mockRejectedValue(new Error('Database error'));
+      mockCollection.getCollectionWithMetadata.mockRejectedValue(new Error('Database error'));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -119,7 +126,7 @@ describe('Collection', () => {
     });
 
     it('should show generic error message for non-Error rejections', async () => {
-      mockCollection.getCollection.mockRejectedValue('Unknown error');
+      mockCollection.getCollectionWithMetadata.mockRejectedValue('Unknown error');
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -134,7 +141,7 @@ describe('Collection', () => {
     });
 
     it('should have retry button in error state', async () => {
-      mockCollection.getCollection.mockRejectedValue(new Error('Database error'));
+      mockCollection.getCollectionWithMetadata.mockRejectedValue(new Error('Database error'));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -153,7 +160,7 @@ describe('Collection', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no cards found', async () => {
-      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -174,7 +181,7 @@ describe('Collection', () => {
         createMockCollectionCard({ cardId: 2, name: 'Counterspell', colors: ['U'], rarity: 'uncommon' }),
         createMockCollectionCard({ cardId: 3, name: 'Giant Growth', colors: ['G'], rarity: 'common' }),
       ];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -191,7 +198,7 @@ describe('Collection', () => {
     });
 
     it('should display page title', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -205,7 +212,7 @@ describe('Collection', () => {
     });
 
     it('should display collection stats', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({
         totalUniqueCards: 150,
         totalCards: 600,
@@ -225,7 +232,7 @@ describe('Collection', () => {
 
     it('should display card without quantity badge', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 4, name: 'Test Card' })];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -247,7 +254,7 @@ describe('Collection', () => {
         name: 'Test Card',
         imageUri: 'https://cards.scryfall.io/normal/front/1/2/test.jpg'
       })];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -264,7 +271,7 @@ describe('Collection', () => {
 
   describe('Filters', () => {
     it('should have search input', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -278,7 +285,7 @@ describe('Collection', () => {
     });
 
     it('should have set filter dropdown', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([
         createMockSetInfo({ code: 'sta', name: 'Strixhaven Mystical Archive' }),
@@ -295,7 +302,7 @@ describe('Collection', () => {
     });
 
     it('should have rarity filter dropdown', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -309,7 +316,7 @@ describe('Collection', () => {
     });
 
     it('should have color filter buttons', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -329,7 +336,7 @@ describe('Collection', () => {
     });
 
     it('should have owned only checkbox', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -343,7 +350,7 @@ describe('Collection', () => {
     });
 
     it('should toggle color filter when clicking color button', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -367,7 +374,7 @@ describe('Collection', () => {
 
     it('should display result count', async () => {
       const mockCards = [createMockCollectionCard()];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -382,7 +389,7 @@ describe('Collection', () => {
     });
 
     it('should call GetCollection when search term changes', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -401,7 +408,7 @@ describe('Collection', () => {
       await vi.advanceTimersByTimeAsync(350);
 
       await waitFor(() => {
-        expect(mockCollection.getCollection).toHaveBeenCalledTimes(2);
+        expect(mockCollection.getCollectionWithMetadata).toHaveBeenCalledTimes(2);
       });
     });
   });
@@ -416,7 +423,7 @@ describe('Collection', () => {
 
     it('should show pagination when multiple pages exist', async () => {
       const mockCards = createManyCards(75); // 2 pages
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -435,7 +442,7 @@ describe('Collection', () => {
 
     it('should disable first/previous buttons on first page', async () => {
       const mockCards = createManyCards(75); // 2 pages
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -451,7 +458,7 @@ describe('Collection', () => {
 
     it('should navigate to next page when clicking next', async () => {
       const mockCards = createManyCards(75); // 2 pages
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -472,7 +479,7 @@ describe('Collection', () => {
 
     it('should not show pagination when only one page', async () => {
       const mockCards = [createMockCollectionCard()];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -496,7 +503,7 @@ describe('Collection', () => {
           imageUri: 'https://cards.scryfall.io/normal/front/1/2/test-card.jpg',
         }),
       ];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -520,7 +527,7 @@ describe('Collection', () => {
           rarity: 'rare',
         }),
       ];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -541,7 +548,7 @@ describe('Collection', () => {
 
   describe('Set Completion Panel', () => {
     it('should not show Set Completion button when no set is selected (#756)', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
@@ -558,7 +565,7 @@ describe('Collection', () => {
     });
 
     it('should show Set Completion button when a set is selected (#756)', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
 
@@ -583,7 +590,7 @@ describe('Collection', () => {
     });
 
     it('should toggle Set Completion panel visibility when set is selected', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
       mockCollection.getSetCompletion.mockResolvedValue([]);
@@ -615,7 +622,7 @@ describe('Collection', () => {
     });
 
     it('should display Set Completion panel content when button is clicked (#756)', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
       mockCollection.getSetCompletion.mockResolvedValue([]);
@@ -648,7 +655,7 @@ describe('Collection', () => {
     });
 
     it('should hide Set Completion panel when Hide button is clicked', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([createMockSetInfo()]);
       mockCollection.getSetCompletion.mockResolvedValue([]);
@@ -691,7 +698,7 @@ describe('Collection', () => {
   describe('Card Display Features', () => {
     it('should display card with not-owned class when quantity is 0', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 0 })];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -709,7 +716,7 @@ describe('Collection', () => {
 
     it('should not show quantity badge for unowned cards', async () => {
       const mockCards = [createMockCollectionCard({ quantity: 0, name: 'Unowned Card' })];
-      mockCollection.getCollection.mockResolvedValue(mockCards);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -728,7 +735,7 @@ describe('Collection', () => {
 
   describe('Empty State Variations', () => {
     it('should show filter adjustment suggestion when filters are active', async () => {
-      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 100, totalCards: 100 }));
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -752,7 +759,7 @@ describe('Collection', () => {
     });
 
     it('should show "start playing" message when collection is truly empty', async () => {
-      mockCollection.getCollection.mockResolvedValue([]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats({ totalUniqueCards: 0, totalCards: 0 }));
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -769,7 +776,8 @@ describe('Collection', () => {
   describe('Null/Undefined API Response Handling', () => {
     it('should handle null collection response gracefully', async () => {
       // Simulate API returning null (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollection.mockResolvedValue(null as unknown as gui.CollectionCard[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(null as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -786,7 +794,8 @@ describe('Collection', () => {
 
     it('should handle undefined collection response gracefully', async () => {
       // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollection.mockResolvedValue(undefined as unknown as gui.CollectionCard[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(undefined as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -803,7 +812,8 @@ describe('Collection', () => {
 
     it('should handle non-array collection response gracefully', async () => {
       // API might return an object instead of array (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollection.mockResolvedValue({ error: 'invalid' } as unknown as gui.CollectionCard[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue({ error: 'invalid' } as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -819,7 +829,7 @@ describe('Collection', () => {
     });
 
     it('should handle null sets response gracefully', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       // Simulate API returning null (cast to bypass type check - this is what we're testing)
       mockCardsApi.getAllSetInfo.mockResolvedValue(null as unknown as gui.SetInfo[]);
@@ -836,7 +846,7 @@ describe('Collection', () => {
     });
 
     it('should handle undefined sets response gracefully', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
       mockCardsApi.getAllSetInfo.mockResolvedValue(undefined as unknown as gui.SetInfo[]);
@@ -855,7 +865,7 @@ describe('Collection', () => {
 
   describe('Sort Options', () => {
     it('should have sort dropdown', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -869,7 +879,7 @@ describe('Collection', () => {
     });
 
     it('should have all sort options', async () => {
-      mockCollection.getCollection.mockResolvedValue([createMockCollectionCard()]);
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 

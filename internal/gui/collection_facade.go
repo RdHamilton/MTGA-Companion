@@ -3,23 +3,36 @@ package gui
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
 
+// maxAutoLookups limits the number of cards to auto-fetch from Scryfall per request
+// to avoid rate limiting and slow page loads.
+const maxAutoLookups = 10
+
+// failedLookupCooldown is the duration to wait before retrying a failed Scryfall lookup.
+const failedLookupCooldown = 1 * time.Hour
+
 // CollectionFacade handles all collection-related operations for the GUI.
 type CollectionFacade struct {
-	services *Services
+	services      *Services
+	failedLookups map[int]time.Time // Track cards that failed Scryfall lookup
+	lookupMu      sync.RWMutex      // Protects failedLookups map
 }
 
 // NewCollectionFacade creates a new CollectionFacade with the given services.
 func NewCollectionFacade(services *Services) *CollectionFacade {
 	return &CollectionFacade{
-		services: services,
+		services:      services,
+		failedLookups: make(map[int]time.Time),
 	}
 }
 
@@ -58,9 +71,11 @@ type CollectionFilter struct {
 
 // CollectionResponse contains collection data with pagination info.
 type CollectionResponse struct {
-	Cards       []*CollectionCard `json:"cards"`
-	TotalCount  int               `json:"totalCount"`
-	FilterCount int               `json:"filterCount"` // Count after filters but before pagination
+	Cards                 []*CollectionCard `json:"cards"`
+	TotalCount            int               `json:"totalCount"`
+	FilterCount           int               `json:"filterCount"`           // Count after filters but before pagination
+	UnknownCardsRemaining int               `json:"unknownCardsRemaining"` // Cards without metadata that need Scryfall lookup
+	UnknownCardsFetched   int               `json:"unknownCardsFetched"`   // Cards fetched from Scryfall in this request
 }
 
 // CollectionStats provides summary statistics about the collection.
@@ -154,6 +169,9 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 
 	// Add owned cards that aren't already in the list (either all owned cards if ownedOnly,
 	// or just cards from sets we don't have downloaded)
+	// Track cards that need Scryfall lookup
+	unknownCardIDs := make([]int, 0)
+
 	for cardID, quantity := range collection {
 		if addedCards[cardID] {
 			continue
@@ -183,6 +201,9 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			if meta.Toughness != "" {
 				card.Toughness = meta.Toughness
 			}
+		} else {
+			// Track this card for potential Scryfall lookup
+			unknownCardIDs = append(unknownCardIDs, cardID)
 		}
 
 		if card.ImageURI == "" {
@@ -190,6 +211,91 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 		}
 
 		collectionCards = append(collectionCards, card)
+	}
+
+	// Auto-fetch unknown cards from Scryfall (limited to avoid rate limiting)
+	unknownCardsFetched := 0
+
+	// Filter out cards that recently failed lookup (within cooldown period)
+	// Also clean up expired entries to prevent unbounded map growth
+	now := time.Now()
+	c.lookupMu.Lock()
+	eligibleCardIDs := make([]int, 0, len(unknownCardIDs))
+	for _, cardID := range unknownCardIDs {
+		if failTime, exists := c.failedLookups[cardID]; exists {
+			if now.Sub(failTime) < failedLookupCooldown {
+				continue // Skip cards that failed recently
+			}
+			// Cooldown expired - remove from failed lookups and allow retry
+			delete(c.failedLookups, cardID)
+		}
+		eligibleCardIDs = append(eligibleCardIDs, cardID)
+	}
+	c.lookupMu.Unlock()
+
+	unknownCardsRemaining := len(eligibleCardIDs)
+
+	if unknownCardsRemaining > 0 && c.services.SetFetcher != nil {
+		lookupCount := unknownCardsRemaining
+		if lookupCount > maxAutoLookups {
+			lookupCount = maxAutoLookups
+		}
+
+		log.Printf("[GetCollection] Auto-fetching %d/%d unknown cards from Scryfall", lookupCount, unknownCardsRemaining)
+
+		for i := 0; i < lookupCount; i++ {
+			cardID := eligibleCardIDs[i]
+			meta, err := c.services.SetFetcher.FetchCardByArenaID(ctx, cardID)
+			if err != nil {
+				log.Printf("[GetCollection] Failed to fetch card %d from Scryfall: %v", cardID, err)
+				// Track this failure to avoid immediate retries
+				c.lookupMu.Lock()
+				c.failedLookups[cardID] = now
+				c.lookupMu.Unlock()
+				unknownCardsRemaining--
+				continue
+			}
+			if meta == nil {
+				// Scryfall returned no data - track as failed
+				c.lookupMu.Lock()
+				c.failedLookups[cardID] = now
+				c.lookupMu.Unlock()
+				unknownCardsRemaining--
+				continue
+			}
+
+			unknownCardsFetched++
+			unknownCardsRemaining--
+
+			// Update the card in our collection list
+			for _, card := range collectionCards {
+				if card.ArenaID == cardID {
+					card.Name = meta.Name
+					card.SetCode = meta.SetCode
+					card.Rarity = meta.Rarity
+					card.ManaCost = meta.ManaCost
+					card.CMC = float64(meta.CMC)
+					card.TypeLine = strings.Join(meta.Types, " ")
+					card.Colors = meta.Colors
+					card.ImageURI = meta.ImageURL
+					if card.ImageURI == "" {
+						card.ImageURI = "https://cards.scryfall.io/back.png"
+					}
+					if meta.Power != "" {
+						card.Power = meta.Power
+					}
+					if meta.Toughness != "" {
+						card.Toughness = meta.Toughness
+					}
+					break
+				}
+			}
+		}
+
+		if unknownCardsRemaining > 0 {
+			log.Printf("[GetCollection] %d more unknown cards remaining (will be fetched on next load)",
+				unknownCardsRemaining)
+		}
 	}
 
 	totalCount := len(collectionCards)
@@ -223,9 +329,11 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 	}
 
 	return &CollectionResponse{
-		Cards:       collectionCards,
-		TotalCount:  totalCount,
-		FilterCount: filterCount,
+		Cards:                 collectionCards,
+		TotalCount:            totalCount,
+		FilterCount:           filterCount,
+		UnknownCardsRemaining: unknownCardsRemaining,
+		UnknownCardsFetched:   unknownCardsFetched,
 	}, nil
 }
 

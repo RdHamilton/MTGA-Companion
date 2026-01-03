@@ -91,6 +91,8 @@ export const handlers = [
       ],
       totalCount: 3,
       filterCount: 3,
+      unknownCardsRemaining: 0,
+      unknownCardsFetched: 0,
     });
   }),
 
