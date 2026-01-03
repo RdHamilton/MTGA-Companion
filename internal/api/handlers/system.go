@@ -25,6 +25,16 @@ func (h *SystemHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, status)
 }
 
+// GetHealth returns the system health status including backend sync timestamps.
+func (h *SystemHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	health, err := h.facade.GetHealth(r.Context())
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+	response.Success(w, health)
+}
+
 // GetDaemonStatus returns the daemon connection status.
 func (h *SystemHandler) GetDaemonStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.facade.GetConnectionStatus()
