@@ -776,7 +776,8 @@ describe('Collection', () => {
   describe('Null/Undefined API Response Handling', () => {
     it('should handle null collection response gracefully', async () => {
       // Simulate API returning null (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollectionWithMetadata.mockResolvedValue(null as unknown);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(null as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -793,7 +794,8 @@ describe('Collection', () => {
 
     it('should handle undefined collection response gracefully', async () => {
       // Simulate API returning undefined (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollectionWithMetadata.mockResolvedValue(undefined as unknown);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(undefined as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
@@ -810,7 +812,8 @@ describe('Collection', () => {
 
     it('should handle non-array collection response gracefully', async () => {
       // API might return an object instead of array (cast to bypass type check - this is what we're testing)
-      mockCollection.getCollectionWithMetadata.mockResolvedValue({ error: 'invalid' } as unknown);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockCollection.getCollectionWithMetadata.mockResolvedValue({ error: 'invalid' } as any);
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
 
