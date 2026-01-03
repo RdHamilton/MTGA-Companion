@@ -432,3 +432,206 @@ func TestParseQuestsDetailed_RerollDetection(t *testing.T) {
 		t.Error("CurrentQuestIDs should contain quest-B")
 	}
 }
+
+func TestParseQuests_RerollDetection_SameQuestId_DifferentDetails(t *testing.T) {
+	// Simulate a reroll where MTGA reuses the same questId but changes the quest details
+	// Entry 1: Quest "Win 4 games" with progress
+	// Entry 2: Same questId but now "Cast 20 spells" (rerolled) - different locKey and goal
+	entries := []*LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 10:30:45",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":          "quest-123",
+						"locKey":           "Win 4 games",
+						"goal":             float64(4),
+						"canSwap":          true,
+						"startingProgress": float64(0),
+						"endingProgress":   float64(2), // Has progress
+					},
+				},
+				"canSwap": true,
+			},
+		},
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 11:00:00",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":          "quest-123",      // Same questId!
+						"locKey":           "Cast 20 spells", // Different quest type
+						"goal":             float64(20),      // Different goal
+						"canSwap":          true,
+						"startingProgress": float64(0), // Reset to 0
+						"endingProgress":   float64(0), // No progress yet
+					},
+				},
+				"canSwap": true,
+			},
+		},
+	}
+
+	quests, err := ParseQuests(entries)
+	if err != nil {
+		t.Fatalf("ParseQuests returned error: %v", err)
+	}
+
+	// Should have 2 quests: the old one marked as rerolled, and the new one
+	if len(quests) != 2 {
+		t.Fatalf("Expected 2 quests (old rerolled + new), got %d", len(quests))
+	}
+
+	// Find the original and new quest
+	var originalQuest, newQuest *QuestData
+	for _, q := range quests {
+		if q.QuestType == "Win 4 games" {
+			originalQuest = q
+		} else if q.QuestType == "Cast 20 spells" {
+			newQuest = q
+		}
+	}
+
+	if originalQuest == nil {
+		t.Fatal("Original quest 'Win 4 games' not found")
+	}
+	if newQuest == nil {
+		t.Fatal("New quest 'Cast 20 spells' not found")
+	}
+
+	// Original quest should be marked as rerolled
+	if !originalQuest.Rerolled {
+		t.Error("Original quest should be marked as rerolled")
+	}
+
+	// Original quest should NOT be marked as completed (it was rerolled, not completed)
+	if originalQuest.Completed {
+		t.Error("Original quest should NOT be marked as completed")
+	}
+
+	// Original quest should have its original progress preserved
+	if originalQuest.EndingProgress != 2 {
+		t.Errorf("Original quest should have EndingProgress 2, got %d", originalQuest.EndingProgress)
+	}
+
+	// New quest should NOT be marked as rerolled or completed
+	if newQuest.Rerolled {
+		t.Error("New quest should NOT be marked as rerolled")
+	}
+	if newQuest.Completed {
+		t.Error("New quest should NOT be marked as completed")
+	}
+
+	// New quest should have the new details
+	if newQuest.Goal != 20 {
+		t.Errorf("New quest should have Goal 20, got %d", newQuest.Goal)
+	}
+	if newQuest.EndingProgress != 0 {
+		t.Errorf("New quest should have EndingProgress 0, got %d", newQuest.EndingProgress)
+	}
+}
+
+func TestIsQuestRerolled(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing *QuestData
+		new      *QuestData
+		expected bool
+	}{
+		{
+			name: "same quest, progress updated - not rerolled",
+			existing: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win 4 games",
+				Goal:           4,
+				EndingProgress: 2,
+			},
+			new: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win 4 games",
+				Goal:           4,
+				EndingProgress: 3,
+			},
+			expected: false,
+		},
+		{
+			name: "different quest type - rerolled",
+			existing: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win 4 games",
+				Goal:           4,
+				EndingProgress: 2,
+			},
+			new: &QuestData{
+				QuestID:          "q1",
+				QuestType:        "Cast 20 spells",
+				Goal:             20,
+				StartingProgress: 0,
+				EndingProgress:   0,
+			},
+			expected: true,
+		},
+		{
+			name: "same quest type but different goal - rerolled",
+			existing: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win X games",
+				Goal:           4,
+				EndingProgress: 2,
+			},
+			new: &QuestData{
+				QuestID:          "q1",
+				QuestType:        "Win X games",
+				Goal:             10, // Different goal
+				StartingProgress: 0,
+				EndingProgress:   0,
+			},
+			expected: true,
+		},
+		{
+			name: "same quest type, progress reset - rerolled",
+			existing: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win 4 games",
+				Goal:           4,
+				EndingProgress: 3, // Had progress
+			},
+			new: &QuestData{
+				QuestID:          "q1",
+				QuestType:        "Win 4 games",
+				Goal:             4,
+				StartingProgress: 0,
+				EndingProgress:   0, // Progress reset
+			},
+			expected: true,
+		},
+		{
+			name: "new quest with no existing progress - not rerolled",
+			existing: &QuestData{
+				QuestID:        "q1",
+				QuestType:      "Win 4 games",
+				Goal:           4,
+				EndingProgress: 0, // No progress yet
+			},
+			new: &QuestData{
+				QuestID:          "q1",
+				QuestType:        "Win 4 games",
+				Goal:             4,
+				StartingProgress: 0,
+				EndingProgress:   0,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isQuestRerolled(tt.existing, tt.new)
+			if result != tt.expected {
+				t.Errorf("isQuestRerolled() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}

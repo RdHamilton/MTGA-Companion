@@ -77,10 +77,25 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 								// Update or add quest
 								if existing, exists := questMap[quest.QuestID]; exists {
-									// Update existing quest progress and last seen timestamp
-									existing.EndingProgress = quest.EndingProgress
-									existing.CanSwap = quest.CanSwap
-									existing.LastSeenAt = &now
+									// Check if this is a reroll - same questId but different quest details
+									// MTGA reuses questIds when rerolling, but the QuestType or Goal changes
+									if isQuestRerolled(existing, quest) {
+										// Mark old quest as rerolled
+										existing.Rerolled = true
+										log.Printf("Quest parser: Quest %s rerolled - type changed from '%s' to '%s'",
+											quest.QuestID, existing.QuestType, quest.QuestType)
+
+										// Create new quest entry with modified key to track both
+										quest.LastSeenAt = &now
+										newQuestKey := quest.QuestID + "_rerolled_" + logTimestamp.Format("20060102150405")
+										questMap[newQuestKey] = quest
+										questsFound++
+									} else {
+										// Same quest, just update progress and last seen timestamp
+										existing.EndingProgress = quest.EndingProgress
+										existing.CanSwap = quest.CanSwap
+										existing.LastSeenAt = &now
+									}
 								} else {
 									// New quest - set last seen to current time
 									quest.LastSeenAt = &now
@@ -95,15 +110,17 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 				// Check for quest disappearance (completion detection)
 				// If we previously saw a quest but it's not in this response, it was completed
 				// Use log timestamp for CompletedAt since it reflects when the action happened
-				for questID, quest := range questMap {
-					if !quest.Completed && !currentQuestIDs[questID] {
+				// Note: Use quest.QuestID (not map key) to check currentQuestIDs because
+				// rerolled quests have a different map key but same QuestID
+				for _, quest := range questMap {
+					if !quest.Completed && !quest.Rerolled && !currentQuestIDs[quest.QuestID] {
 						// Quest disappeared - mark as completed
 						quest.Completed = true
 						completedAt := logTimestamp
 						quest.CompletedAt = &completedAt
 						// Set progress to goal when completed
 						quest.EndingProgress = quest.Goal
-						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
+						log.Printf("Quest parser: Quest %s completed (disappeared from response)", quest.QuestID)
 					}
 				}
 			}
@@ -197,10 +214,25 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 
 								// Update or add quest
 								if existing, exists := questMap[quest.QuestID]; exists {
-									// Update existing quest progress and last seen timestamp
-									existing.EndingProgress = quest.EndingProgress
-									existing.CanSwap = quest.CanSwap
-									existing.LastSeenAt = &now
+									// Check if this is a reroll - same questId but different quest details
+									// MTGA reuses questIds when rerolling, but the QuestType or Goal changes
+									if isQuestRerolled(existing, quest) {
+										// Mark old quest as rerolled
+										existing.Rerolled = true
+										log.Printf("Quest parser: Quest %s rerolled - type changed from '%s' to '%s'",
+											quest.QuestID, existing.QuestType, quest.QuestType)
+
+										// Create new quest entry with modified key to track both
+										quest.LastSeenAt = &now
+										newQuestKey := quest.QuestID + "_rerolled_" + logTimestamp.Format("20060102150405")
+										questMap[newQuestKey] = quest
+										questsFound++
+									} else {
+										// Same quest, just update progress and last seen timestamp
+										existing.EndingProgress = quest.EndingProgress
+										existing.CanSwap = quest.CanSwap
+										existing.LastSeenAt = &now
+									}
 								} else {
 									// New quest - set last seen to current time
 									quest.LastSeenAt = &now
@@ -220,13 +252,15 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 
 				// Check for quest disappearance (completion detection)
 				// Use log timestamp for CompletedAt since it reflects when the action happened
-				for questID, quest := range questMap {
-					if !quest.Completed && !currentQuestIDs[questID] {
+				// Note: Use quest.QuestID (not map key) to check currentQuestIDs because
+				// rerolled quests have a different map key but same QuestID
+				for _, quest := range questMap {
+					if !quest.Completed && !quest.Rerolled && !currentQuestIDs[quest.QuestID] {
 						quest.Completed = true
 						completedAt := logTimestamp
 						quest.CompletedAt = &completedAt
 						quest.EndingProgress = quest.Goal
-						log.Printf("Quest parser: Quest %s completed (disappeared from response)", questID)
+						log.Printf("Quest parser: Quest %s completed (disappeared from response)", quest.QuestID)
 					}
 				}
 			}
@@ -270,6 +304,30 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 	}
 
 	return result, nil
+}
+
+// isQuestRerolled detects if a quest was rerolled by comparing the existing quest
+// with the new quest data. MTGA reuses questIds when rerolling, but changes the
+// quest type (locKey), goal, or resets starting progress.
+func isQuestRerolled(existing, new *QuestData) bool {
+	// If the quest type (locKey) changed, it's definitely a reroll
+	if existing.QuestType != new.QuestType && existing.QuestType != "" && new.QuestType != "" {
+		return true
+	}
+
+	// If the goal changed significantly, it's a reroll
+	// (Small changes might be MTGA adjustments, but a completely different goal is a reroll)
+	if existing.Goal != new.Goal && existing.Goal > 0 && new.Goal > 0 {
+		return true
+	}
+
+	// If the starting progress was reset while we had progress, it's a reroll
+	// This catches cases where the same quest type is rerolled to itself
+	if existing.EndingProgress > 0 && new.StartingProgress == 0 && new.EndingProgress == 0 {
+		return true
+	}
+
+	return false
 }
 
 // parseQuestFromMap extracts quest data from a JSON map.
