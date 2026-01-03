@@ -789,6 +789,12 @@ func (d *DraftFacade) RecalculateDraftGradesForSet(ctx context.Context, setCode 
 	// Recalculate grade and prediction for each session
 	successCount := 0
 	for _, session := range matchingSessions {
+		// Check for context cancellation to respect request lifecycle
+		if ctx.Err() != nil {
+			log.Printf("Context cancelled after recalculating %d/%d sessions for set %s", successCount, len(matchingSessions), setCode)
+			return successCount, ctx.Err()
+		}
+
 		log.Printf("Recalculating session %s (%s - %s)", session.ID, session.SetCode, session.DraftType)
 
 		// Backfill pick quality data with latest ratings
