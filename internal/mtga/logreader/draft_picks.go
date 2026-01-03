@@ -139,6 +139,8 @@ func ParseDraftPicks(entries []*LogEntry) ([]*DraftPicks, error) {
 }
 
 // parseLogTimestamp attempts to parse a timestamp from the log entry format.
+// MTGA log timestamps are in local time (the user's machine timezone).
+// We convert to UTC for consistent storage and comparison with query boundaries.
 func parseLogTimestamp(timestampStr string) (time.Time, error) {
 	// Format: [UnityCrossThreadLogger]2024-01-15 10:30:45
 	// Try to extract the date/time portion
@@ -156,8 +158,11 @@ func parseLogTimestamp(timestampStr string) (time.Time, error) {
 
 	dateTimeStr := parts[len(parts)-2] + " " + parts[len(parts)-1]
 	for _, format := range formats {
-		if t, err := time.Parse(format, dateTimeStr); err == nil {
-			return t, nil
+		if t, err := time.ParseInLocation(format, dateTimeStr, time.Local); err == nil {
+			// Convert local time to UTC for consistent storage and comparison
+			// This ensures GetDailyWins/GetWeeklyWins queries (which use UTC boundaries)
+			// correctly compare against stored timestamps
+			return t.UTC(), nil
 		}
 	}
 

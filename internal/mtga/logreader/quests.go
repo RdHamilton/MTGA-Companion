@@ -385,8 +385,14 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 		quest.Rewards = chestDescStr
 	}
 
-	// Note: Completion is detected by quest disappearance from QuestGetQuests responses,
-	// not by checking progress >= goal. MTGA removes quests from the response when completed.
+	// Primary completion detection is by quest disappearance from QuestGetQuests responses.
+	// As a fallback, if progress >= goal, mark the quest as completed.
+	// This helps when we only have one response (e.g., reading from old logs).
+	if quest.Goal > 0 && quest.EndingProgress >= quest.Goal {
+		quest.Completed = true
+		log.Printf("Quest parser: Quest %s marked completed by progress (%d/%d)",
+			quest.QuestID, quest.EndingProgress, quest.Goal)
+	}
 
 	return quest
 }
