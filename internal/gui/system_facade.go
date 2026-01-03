@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/daemon"
 	"github.com/ramonehamilton/MTGA-Companion/internal/events"
 	"github.com/ramonehamilton/MTGA-Companion/internal/ipc"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -950,6 +951,48 @@ func (s *SystemFacade) GetReplayErrorEvent(ctx context.Context) (*ReplayErrorEve
 // GetReplayDraftDetectedEvent exposes ReplayDraftDetectedEvent type to Wails.
 func (s *SystemFacade) GetReplayDraftDetectedEvent(ctx context.Context) (*ReplayDraftDetectedEvent, error) {
 	return &ReplayDraftDetectedEvent{}, nil
+}
+
+// HealthStatus is an alias for daemon.HealthStatus.
+// Used to expose backend sync timestamps to the frontend.
+type HealthStatus = daemon.HealthStatus
+
+// DatabaseHealth is an alias for daemon.DatabaseHealth.
+type DatabaseHealth = daemon.DatabaseHealth
+
+// LogMonitorHealth is an alias for daemon.LogMonitorHealth.
+type LogMonitorHealth = daemon.LogMonitorHealth
+
+// WebSocketHealth is an alias for daemon.WebSocketHealth.
+type WebSocketHealth = daemon.WebSocketHealth
+
+// HealthMetrics is an alias for daemon.HealthMetrics.
+type HealthMetrics = daemon.HealthMetrics
+
+// GetHealth returns the current health status including backend sync timestamps.
+// When connected to the daemon, this returns the daemon's health status.
+// In standalone mode, it returns basic health information.
+func (s *SystemFacade) GetHealth(ctx context.Context) (*HealthStatus, error) {
+	// If daemon service is running integrated, get its health status directly
+	if s.services.DaemonService != nil {
+		return s.services.DaemonService.GetHealth(), nil
+	}
+
+	// In standalone mode, return basic health status
+	return &HealthStatus{
+		Status:  "standalone",
+		Version: daemon.Version,
+		Database: DatabaseHealth{
+			Status: "ok",
+		},
+		LogMonitor: LogMonitorHealth{
+			Status: "ok",
+		},
+		WebSocket: WebSocketHealth{
+			Status: "ok",
+		},
+		Metrics: HealthMetrics{},
+	}, nil
 }
 
 // localFirstCardProvider implements deckexport.CardProvider by checking
