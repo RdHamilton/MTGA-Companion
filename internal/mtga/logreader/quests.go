@@ -56,7 +56,15 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 		// Check for QuestGetQuests response (contains current active quests)
 		if questsData, ok := entry.JSON["quests"]; ok {
-			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+			// Accept as QuestGetQuests response if:
+			// - canSwap field exists (normal response with quests)
+			// - quests array is empty (all quests completed - MTGA returns {"quests":[]} without canSwap)
+			isEmptyQuests := false
+			if questArray, ok := questsData.([]interface{}); ok && len(questArray) == 0 {
+				isEmptyQuests = true
+			}
+			_, hasCanSwap := entry.JSON["canSwap"]
+			if hasCanSwap || isEmptyQuests {
 				// This is a QuestGetQuests response
 				responsesFound++
 
@@ -192,7 +200,15 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 
 		// Check for QuestGetQuests response (contains current active quests)
 		if questsData, ok := entry.JSON["quests"]; ok {
-			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+			// Accept as QuestGetQuests response if:
+			// - canSwap field exists (normal response with quests)
+			// - quests array is empty (all quests completed - MTGA returns {"quests":[]} without canSwap)
+			isEmptyQuests := false
+			if questArray, ok := questsData.([]interface{}); ok && len(questArray) == 0 {
+				isEmptyQuests = true
+			}
+			_, hasCanSwap := entry.JSON["canSwap"]
+			if hasCanSwap || isEmptyQuests {
 				// This is a QuestGetQuests response
 				responsesFound++
 				result.HasQuestResponse = true
@@ -308,8 +324,13 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 				// Find the quest to log its type
 				for _, q := range result.Quests {
 					if q.QuestID == questID && !q.Completed && !q.Rerolled {
+						// Truncate quest ID for logging (max 8 chars)
+						displayID := q.QuestID
+						if len(displayID) > 8 {
+							displayID = displayID[:8]
+						}
 						log.Printf("Quest parser (detailed): Current quest: %s (%s) %d/%d",
-							q.QuestID[:8], q.QuestType, q.EndingProgress, q.Goal)
+							displayID, q.QuestType, q.EndingProgress, q.Goal)
 						break
 					}
 				}

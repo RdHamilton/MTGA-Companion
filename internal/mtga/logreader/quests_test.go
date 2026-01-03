@@ -533,6 +533,124 @@ func TestParseQuests_RerollDetection_SameQuestId_DifferentDetails(t *testing.T) 
 	}
 }
 
+func TestParseQuests_EmptyQuestsResponse_AllQuestsCompleted(t *testing.T) {
+	// Simulate MTGA returning {"quests":[]} when all quests are completed
+	// This response does NOT have the canSwap field - regression test for bug fix
+	entries := []*LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 10:30:45",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":        "quest-1",
+						"locKey":         "Win 4 games",
+						"goal":           float64(4),
+						"canSwap":        true,
+						"endingProgress": float64(3),
+					},
+					map[string]interface{}{
+						"questId":        "quest-2",
+						"locKey":         "Cast 10 spells",
+						"goal":           float64(10),
+						"canSwap":        true,
+						"endingProgress": float64(8),
+					},
+				},
+				"canSwap": true,
+			},
+		},
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 12:00:00",
+			JSON: map[string]interface{}{
+				// MTGA returns empty quests without canSwap when all are completed
+				"quests": []interface{}{},
+				// Note: NO canSwap field here - this is the bug we're testing
+			},
+		},
+	}
+
+	quests, err := ParseQuests(entries)
+	if err != nil {
+		t.Fatalf("ParseQuests returned error: %v", err)
+	}
+
+	if len(quests) != 2 {
+		t.Fatalf("Expected 2 quests, got %d", len(quests))
+	}
+
+	// Both quests should be marked as completed
+	for _, quest := range quests {
+		if !quest.Completed {
+			t.Errorf("Quest %s should be marked as completed", quest.QuestID)
+		}
+		if quest.CompletedAt == nil {
+			t.Errorf("Quest %s CompletedAt should be set", quest.QuestID)
+		}
+	}
+}
+
+func TestParseQuestsDetailed_EmptyQuestsResponse_AllQuestsCompleted(t *testing.T) {
+	// Simulate MTGA returning {"quests":[]} when all quests are completed
+	// This response does NOT have the canSwap field - regression test for bug fix
+	entries := []*LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 10:30:45",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":        "quest-1",
+						"locKey":         "Win 4 games",
+						"goal":           float64(4),
+						"canSwap":        true,
+						"endingProgress": float64(3),
+					},
+				},
+				"canSwap": true,
+			},
+		},
+		{
+			IsJSON:    true,
+			Timestamp: "[UnityCrossThreadLogger]2024-01-15 12:00:00",
+			JSON: map[string]interface{}{
+				// MTGA returns empty quests without canSwap when all are completed
+				"quests": []interface{}{},
+				// Note: NO canSwap field here - this is the bug we're testing
+			},
+		},
+	}
+
+	result, err := ParseQuestsDetailed(entries)
+	if err != nil {
+		t.Fatalf("ParseQuestsDetailed returned error: %v", err)
+	}
+
+	if len(result.Quests) != 1 {
+		t.Fatalf("Expected 1 quest, got %d", len(result.Quests))
+	}
+
+	// Quest should be marked as completed
+	quest := result.Quests[0]
+	if !quest.Completed {
+		t.Error("Quest should be marked as completed")
+	}
+	if quest.CompletedAt == nil {
+		t.Error("CompletedAt should be set")
+	}
+
+	// HasQuestResponse should be true (we found a QuestGetQuests response)
+	if !result.HasQuestResponse {
+		t.Error("HasQuestResponse should be true")
+	}
+
+	// CurrentQuestIDs should be empty (no active quests)
+	if len(result.CurrentQuestIDs) != 0 {
+		t.Errorf("CurrentQuestIDs should be empty, got %v", result.CurrentQuestIDs)
+	}
+}
+
 func TestIsQuestRerolled(t *testing.T) {
 	tests := []struct {
 		name     string
