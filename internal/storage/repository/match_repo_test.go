@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -1118,22 +1119,27 @@ func TestMatchRepository_GetDailyWins(t *testing.T) {
 	repo := NewMatchRepository(db)
 	ctx := context.Background()
 
-	// Get today's start time for comparison
+	// MTGA resets at 9 AM UTC, so we need to calculate the current "MTGA day"
 	now := time.Now().UTC()
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	yesterday := startOfToday.Add(-24 * time.Hour)
+	// Calculate the start of the current MTGA day (9 AM UTC)
+	mtgaDayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC)
+	if now.Hour() < 9 {
+		// If before 9 AM UTC, the MTGA day started yesterday at 9 AM
+		mtgaDayStart = mtgaDayStart.Add(-24 * time.Hour)
+	}
+	previousMtgaDay := mtgaDayStart.Add(-24 * time.Hour)
 
 	// Create matches:
-	// - 2 wins today
-	// - 1 loss today
-	// - 1 win yesterday (should not count)
+	// - 2 wins in current MTGA day (after 9 AM UTC reset)
+	// - 1 loss in current MTGA day
+	// - 1 win in previous MTGA day (should not count)
 	matches := []*models.Match{
 		{
 			ID:           "match-today-win-1",
 			AccountID:    1,
 			EventID:      "event-1",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(1 * time.Hour), // 1am today
+			Timestamp:    mtgaDayStart.Add(1 * time.Hour), // 10 AM UTC (1 hour after reset)
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1146,7 +1152,7 @@ func TestMatchRepository_GetDailyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-2",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(3 * time.Hour), // 3am today
+			Timestamp:    mtgaDayStart.Add(3 * time.Hour), // 12 PM UTC (3 hours after reset)
 			PlayerWins:   2,
 			OpponentWins: 1,
 			PlayerTeamID: 1,
@@ -1159,7 +1165,7 @@ func TestMatchRepository_GetDailyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-3",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(5 * time.Hour), // 5am today
+			Timestamp:    mtgaDayStart.Add(5 * time.Hour), // 2 PM UTC (5 hours after reset)
 			PlayerWins:   1,
 			OpponentWins: 2,
 			PlayerTeamID: 1,
@@ -1172,7 +1178,7 @@ func TestMatchRepository_GetDailyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-4",
 			EventName:    "Standard Ranked",
-			Timestamp:    yesterday.Add(12 * time.Hour), // Noon yesterday
+			Timestamp:    previousMtgaDay.Add(6 * time.Hour), // Previous MTGA day, 3 PM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1226,23 +1232,29 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 	repo := NewMatchRepository(db)
 	ctx := context.Background()
 
-	// Get this week's start time (Sunday)
+	// MTGA week starts on Sunday at 9 AM UTC
 	now := time.Now().UTC()
 	daysSinceSunday := int(now.Weekday())
-	startOfWeek := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 0, 0, 0, 0, time.UTC)
-	lastWeek := startOfWeek.Add(-7 * 24 * time.Hour) // Start of last week
+
+	// Calculate the start of the current MTGA week (Sunday 9 AM UTC)
+	mtgaWeekStart := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 9, 0, 0, 0, time.UTC)
+	// If it's Sunday and before 9 AM UTC, the MTGA week started last Sunday at 9 AM
+	if now.Weekday() == time.Sunday && now.Hour() < 9 {
+		mtgaWeekStart = mtgaWeekStart.Add(-7 * 24 * time.Hour)
+	}
+	lastMtgaWeek := mtgaWeekStart.Add(-7 * 24 * time.Hour) // Start of last MTGA week
 
 	// Create matches:
-	// - 3 wins this week
-	// - 1 loss this week
-	// - 2 wins last week (should not count)
+	// - 3 wins this MTGA week (after Sunday 9 AM UTC)
+	// - 1 loss this MTGA week
+	// - 2 wins last MTGA week (should not count)
 	matches := []*models.Match{
 		{
 			ID:           "match-thisweek-win-1",
 			AccountID:    1,
 			EventID:      "event-1",
 			EventName:    "Historic Ranked",
-			Timestamp:    startOfWeek.Add(6 * time.Hour), // Sunday 6am
+			Timestamp:    mtgaWeekStart.Add(1 * time.Hour), // Sunday 10 AM UTC (1 hour after reset)
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1255,7 +1267,7 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-2",
 			EventName:    "Historic Ranked",
-			Timestamp:    startOfWeek.Add(30 * time.Hour), // Monday 6am
+			Timestamp:    mtgaWeekStart.Add(25 * time.Hour), // Monday 10 AM UTC
 			PlayerWins:   2,
 			OpponentWins: 1,
 			PlayerTeamID: 1,
@@ -1268,7 +1280,7 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-3",
 			EventName:    "Historic Ranked",
-			Timestamp:    startOfWeek.Add(54 * time.Hour), // Tuesday 6am
+			Timestamp:    mtgaWeekStart.Add(49 * time.Hour), // Tuesday 10 AM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1281,7 +1293,7 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-4",
 			EventName:    "Historic Ranked",
-			Timestamp:    startOfWeek.Add(12 * time.Hour), // Sunday noon
+			Timestamp:    mtgaWeekStart.Add(3 * time.Hour), // Sunday noon UTC
 			PlayerWins:   0,
 			OpponentWins: 2,
 			PlayerTeamID: 1,
@@ -1294,7 +1306,7 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-5",
 			EventName:    "Historic Ranked",
-			Timestamp:    lastWeek.Add(24 * time.Hour), // Last Monday
+			Timestamp:    lastMtgaWeek.Add(25 * time.Hour), // Last Monday 10 AM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1307,7 +1319,7 @@ func TestMatchRepository_GetWeeklyWins(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-6",
 			EventName:    "Historic Ranked",
-			Timestamp:    lastWeek.Add(48 * time.Hour), // Last Tuesday
+			Timestamp:    lastMtgaWeek.Add(49 * time.Hour), // Last Tuesday 10 AM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1367,8 +1379,12 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 	repo := NewMatchRepository(db)
 	ctx := context.Background()
 
+	// MTGA resets at 9 AM UTC
 	now := time.Now().UTC()
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	mtgaDayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC)
+	if now.Hour() < 9 {
+		mtgaDayStart = mtgaDayStart.Add(-24 * time.Hour)
+	}
 
 	// Create wins for account 1 (3 wins) and account 2 (2 wins)
 	matches := []*models.Match{
@@ -1377,7 +1393,7 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-1",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(2 * time.Hour),
+			Timestamp:    mtgaDayStart.Add(2 * time.Hour), // 11 AM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1390,7 +1406,7 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-2",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(4 * time.Hour),
+			Timestamp:    mtgaDayStart.Add(4 * time.Hour), // 1 PM UTC
 			PlayerWins:   2,
 			OpponentWins: 1,
 			PlayerTeamID: 1,
@@ -1403,7 +1419,7 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 			AccountID:    1,
 			EventID:      "event-3",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(6 * time.Hour),
+			Timestamp:    mtgaDayStart.Add(6 * time.Hour), // 3 PM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1416,7 +1432,7 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 			AccountID:    2,
 			EventID:      "event-4",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(3 * time.Hour),
+			Timestamp:    mtgaDayStart.Add(3 * time.Hour), // 12 PM UTC
 			PlayerWins:   2,
 			OpponentWins: 0,
 			PlayerTeamID: 1,
@@ -1429,7 +1445,7 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 			AccountID:    2,
 			EventID:      "event-5",
 			EventName:    "Standard Ranked",
-			Timestamp:    startOfToday.Add(5 * time.Hour),
+			Timestamp:    mtgaDayStart.Add(5 * time.Hour), // 2 PM UTC
 			PlayerWins:   2,
 			OpponentWins: 1,
 			PlayerTeamID: 1,
@@ -1470,5 +1486,51 @@ func TestMatchRepository_GetDailyWins_MultipleAccounts(t *testing.T) {
 	}
 	if totalWins != 5 {
 		t.Errorf("expected 5 total daily wins, got %d", totalWins)
+	}
+}
+
+func TestMatchRepository_GetWeeklyWins_CappedAt15(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	// MTGA week starts on Sunday at 9 AM UTC
+	now := time.Now().UTC()
+	daysSinceSunday := int(now.Weekday())
+	mtgaWeekStart := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 9, 0, 0, 0, time.UTC)
+	if now.Weekday() == time.Sunday && now.Hour() < 9 {
+		mtgaWeekStart = mtgaWeekStart.Add(-7 * 24 * time.Hour)
+	}
+
+	// Create 20 wins this week - should be capped at 15
+	for i := 0; i < 20; i++ {
+		m := &models.Match{
+			ID:           fmt.Sprintf("match-win-%d", i),
+			AccountID:    1,
+			EventID:      fmt.Sprintf("event-%d", i),
+			EventName:    "Standard Ranked",
+			Timestamp:    mtgaWeekStart.Add(time.Duration(i+1) * time.Hour),
+			PlayerWins:   2,
+			OpponentWins: 0,
+			PlayerTeamID: 1,
+			Format:       "Standard",
+			Result:       "win",
+			CreatedAt:    now,
+		}
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Get weekly wins - should be capped at 15 (MTGA max)
+	weeklyWins, err := repo.GetWeeklyWins(ctx, 1)
+	if err != nil {
+		t.Fatalf("failed to get weekly wins: %v", err)
+	}
+
+	if weeklyWins != 15 {
+		t.Errorf("expected weekly wins to be capped at 15, got %d", weeklyWins)
 	}
 }
