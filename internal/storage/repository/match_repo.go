@@ -1243,12 +1243,20 @@ func (r *matchRepository) DeleteAll(ctx context.Context, accountID int) error {
 	return nil
 }
 
-// GetDailyWins returns the number of match wins for today (UTC).
+// mtgaDailyResetHour is the hour in UTC when MTGA resets daily/weekly progress.
+// MTGA resets at 9 AM UTC (4 AM EST / 1 AM PST).
+const mtgaDailyResetHour = 9
+
+// GetDailyWins returns the number of match wins for today based on MTGA's daily reset time (9 AM UTC).
 // If accountID is 0, returns wins for all accounts.
 func (r *matchRepository) GetDailyWins(ctx context.Context, accountID int) (int, error) {
-	// Get today's date bounds in UTC
+	// Get today's date bounds based on MTGA reset time (9 AM UTC)
 	now := time.Now().UTC()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), mtgaDailyResetHour, 0, 0, 0, time.UTC)
+	// If current time is before 9 AM UTC, the "day" started yesterday at 9 AM UTC
+	if now.Hour() < mtgaDailyResetHour {
+		startOfDay = startOfDay.Add(-24 * time.Hour)
+	}
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	query := `
@@ -1281,14 +1289,22 @@ func (r *matchRepository) GetDailyWins(ctx context.Context, accountID int) (int,
 	return count, nil
 }
 
-// GetWeeklyWins returns the number of match wins for the current week (Sunday-Saturday UTC).
+// maxWeeklyWins is the maximum number of weekly wins that count for rewards in MTGA.
+const maxWeeklyWins = 15
+
+// GetWeeklyWins returns the number of match wins for the current week based on MTGA's reset time.
+// MTGA weeks reset on Sunday at 9 AM UTC. Returns at most 15 (the MTGA cap).
 // If accountID is 0, returns wins for all accounts.
 func (r *matchRepository) GetWeeklyWins(ctx context.Context, accountID int) (int, error) {
-	// Get this week's date bounds in UTC (Sunday-Saturday)
+	// Get this week's date bounds based on MTGA reset time (Sunday 9 AM UTC)
 	now := time.Now().UTC()
 	// time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
 	daysSinceSunday := int(now.Weekday())
-	startOfWeek := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, 0, 0, 0, 0, time.UTC)
+	startOfWeek := time.Date(now.Year(), now.Month(), now.Day()-daysSinceSunday, mtgaDailyResetHour, 0, 0, 0, time.UTC)
+	// If we're on Sunday before 9 AM UTC, the week started last Sunday at 9 AM
+	if now.Weekday() == time.Sunday && now.Hour() < mtgaDailyResetHour {
+		startOfWeek = startOfWeek.Add(-7 * 24 * time.Hour)
+	}
 	endOfWeek := startOfWeek.Add(7 * 24 * time.Hour)
 
 	query := `
@@ -1316,6 +1332,11 @@ func (r *matchRepository) GetWeeklyWins(ctx context.Context, accountID int) (int
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get weekly wins: %w", err)
+	}
+
+	// Cap at MTGA's maximum weekly wins for rewards
+	if count > maxWeeklyWins {
+		count = maxWeeklyWins
 	}
 
 	return count, nil
