@@ -49,6 +49,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/insights", draftHandler.GetDraftInsights)
 			r.Post("/archetype-cards", draftHandler.GetArchetypeCards)
 			r.Post("/win-probability", draftHandler.PredictWinProbability)
+			r.Post("/recalculate-set-grades", draftHandler.RecalculateSetGrades)
 			r.Get("/{sessionID}", draftHandler.GetDraftSession)
 			r.Get("/{sessionID}/picks", draftHandler.GetDraftPicks)
 			r.Get("/{sessionID}/packs", draftHandler.GetDraftPacks)
