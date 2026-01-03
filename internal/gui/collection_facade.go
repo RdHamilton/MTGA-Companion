@@ -217,18 +217,21 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 	unknownCardsFetched := 0
 
 	// Filter out cards that recently failed lookup (within cooldown period)
+	// Also clean up expired entries to prevent unbounded map growth
 	now := time.Now()
-	c.lookupMu.RLock()
+	c.lookupMu.Lock()
 	eligibleCardIDs := make([]int, 0, len(unknownCardIDs))
 	for _, cardID := range unknownCardIDs {
 		if failTime, exists := c.failedLookups[cardID]; exists {
 			if now.Sub(failTime) < failedLookupCooldown {
 				continue // Skip cards that failed recently
 			}
+			// Cooldown expired - remove from failed lookups and allow retry
+			delete(c.failedLookups, cardID)
 		}
 		eligibleCardIDs = append(eligibleCardIDs, cardID)
 	}
-	c.lookupMu.RUnlock()
+	c.lookupMu.Unlock()
 
 	unknownCardsRemaining := len(eligibleCardIDs)
 
