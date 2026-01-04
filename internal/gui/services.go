@@ -15,7 +15,18 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/logreader"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/recommendations"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 )
+
+// CardFetcher defines the interface for fetching card metadata from external sources.
+// This interface allows for easy mocking in tests.
+type CardFetcher interface {
+	FetchCardByArenaID(ctx context.Context, arenaID int) (*models.SetCard, error)
+	FetchCardByName(ctx context.Context, setCode, cardName, arenaID string) (*models.SetCard, error)
+	FetchAndCacheSet(ctx context.Context, mtgaSetCode string) (int, error)
+	RefreshSet(ctx context.Context, setCode string) (int, error)
+	GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error)
+}
 
 // Services contains all shared services needed by facades.
 // This struct is passed to each facade to provide access to common dependencies.
@@ -28,7 +39,7 @@ type Services struct {
 
 	// Card data services
 	CardService      *cards.Service
-	SetFetcher       *setcache.Fetcher
+	SetFetcher       CardFetcher // Interface for fetching card metadata (allows mocking)
 	RatingsFetcher   *setcache.RatingsFetcher
 	DatasetService   *datasets.Service
 	DeckImportParser *deckimport.Parser
