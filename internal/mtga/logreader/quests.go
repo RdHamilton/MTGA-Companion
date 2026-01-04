@@ -425,6 +425,7 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 	// This helps when we only have one response (e.g., reading from old logs).
 	if quest.Goal > 0 && quest.EndingProgress >= quest.Goal {
 		quest.Completed = true
+		quest.CompletedAt = &timestamp
 		log.Printf("Quest parser: Quest %s marked completed by progress (%d/%d)",
 			quest.QuestID, quest.EndingProgress, quest.Goal)
 	}
