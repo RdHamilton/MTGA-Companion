@@ -56,7 +56,15 @@ func ParseQuests(entries []*LogEntry) ([]*QuestData, error) {
 
 		// Check for QuestGetQuests response (contains current active quests)
 		if questsData, ok := entry.JSON["quests"]; ok {
-			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+			// Accept as QuestGetQuests response if:
+			// - canSwap field exists (normal response with quests)
+			// - quests array is empty (all quests completed - MTGA returns {"quests":[]} without canSwap)
+			isEmptyQuests := false
+			if questArray, ok := questsData.([]interface{}); ok && len(questArray) == 0 {
+				isEmptyQuests = true
+			}
+			_, hasCanSwap := entry.JSON["canSwap"]
+			if hasCanSwap || isEmptyQuests {
 				// This is a QuestGetQuests response
 				responsesFound++
 
@@ -192,7 +200,15 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 
 		// Check for QuestGetQuests response (contains current active quests)
 		if questsData, ok := entry.JSON["quests"]; ok {
-			if _, hasCanSwap := entry.JSON["canSwap"]; hasCanSwap {
+			// Accept as QuestGetQuests response if:
+			// - canSwap field exists (normal response with quests)
+			// - quests array is empty (all quests completed - MTGA returns {"quests":[]} without canSwap)
+			isEmptyQuests := false
+			if questArray, ok := questsData.([]interface{}); ok && len(questArray) == 0 {
+				isEmptyQuests = true
+			}
+			_, hasCanSwap := entry.JSON["canSwap"]
+			if hasCanSwap || isEmptyQuests {
 				// This is a QuestGetQuests response
 				responsesFound++
 				result.HasQuestResponse = true
@@ -301,6 +317,25 @@ func ParseQuestsDetailed(entries []*LogEntry) (*ParseQuestsResult, error) {
 	if responsesFound > 0 || questsFound > 0 {
 		log.Printf("Quest parser (detailed): Found %d QuestGetQuests responses, parsed %d unique quests, %d current quest IDs",
 			responsesFound, questsFound, len(result.CurrentQuestIDs))
+		// Log the latest response timestamp and current quest IDs for debugging
+		if len(result.CurrentQuestIDs) > 0 {
+			log.Printf("Quest parser (detailed): Latest response timestamp: %s", latestResponseTime.Format("2006-01-02 15:04:05 MST"))
+			for questID := range result.CurrentQuestIDs {
+				// Find the quest to log its type
+				for _, q := range result.Quests {
+					if q.QuestID == questID && !q.Completed && !q.Rerolled {
+						// Truncate quest ID for logging (max 8 chars)
+						displayID := q.QuestID
+						if len(displayID) > 8 {
+							displayID = displayID[:8]
+						}
+						log.Printf("Quest parser (detailed): Current quest: %s (%s) %d/%d",
+							displayID, q.QuestType, q.EndingProgress, q.Goal)
+						break
+					}
+				}
+			}
+		}
 	}
 
 	return result, nil
@@ -385,8 +420,15 @@ func parseQuestFromMap(json map[string]interface{}, timestamp time.Time) *QuestD
 		quest.Rewards = chestDescStr
 	}
 
-	// Note: Completion is detected by quest disappearance from QuestGetQuests responses,
-	// not by checking progress >= goal. MTGA removes quests from the response when completed.
+	// Primary completion detection is by quest disappearance from QuestGetQuests responses.
+	// As a fallback, if progress >= goal, mark the quest as completed.
+	// This helps when we only have one response (e.g., reading from old logs).
+	if quest.Goal > 0 && quest.EndingProgress >= quest.Goal {
+		quest.Completed = true
+		quest.CompletedAt = &timestamp
+		log.Printf("Quest parser: Quest %s marked completed by progress (%d/%d)",
+			quest.QuestID, quest.EndingProgress, quest.Goal)
+	}
 
 	return quest
 }
