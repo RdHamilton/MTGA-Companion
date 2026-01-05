@@ -136,7 +136,7 @@ func (r *ReplayEngine) Start(logPaths []string, speed float64, filterType string
 	log.Println("📝  REPLAY MODE: Data will be processed and stored normally for UI testing")
 
 	// Broadcast replay started event
-	r.service.wsServer.Broadcast(Event{
+	r.service.broadcastEvent(Event{
 		Type: "replay:started",
 		Data: map[string]interface{}{
 			"totalEntries": len(allEntries),
@@ -165,7 +165,7 @@ func (r *ReplayEngine) streamEntries() {
 		r.service.logProcessor.SetReplayMode(false)
 
 		// Broadcast replay completed event
-		r.service.wsServer.Broadcast(Event{
+		r.service.broadcastEvent(Event{
 			Type: "replay:completed",
 			Data: map[string]interface{}{
 				"totalEntries": len(r.entries),
@@ -203,7 +203,7 @@ func (r *ReplayEngine) streamEntries() {
 			r.mu.Unlock()
 
 			log.Println("Replay paused")
-			r.service.wsServer.Broadcast(Event{
+			r.service.broadcastEvent(Event{
 				Type: "replay:paused",
 				Data: map[string]interface{}{
 					"currentEntry": i,
@@ -219,7 +219,7 @@ func (r *ReplayEngine) streamEntries() {
 				r.mu.Unlock()
 
 				log.Println("Replay resumed")
-				r.service.wsServer.Broadcast(Event{
+				r.service.broadcastEvent(Event{
 					Type: "replay:resumed",
 					Data: map[string]interface{}{
 						"currentEntry": i,
@@ -271,7 +271,7 @@ func (r *ReplayEngine) streamEntries() {
 			r.service.processEntries([]*logreader.LogEntry{entry})
 
 			// Emit draft:updated to refresh UI after processing
-			r.service.wsServer.Broadcast(Event{
+			r.service.broadcastEvent(Event{
 				Type: "draft:updated",
 				Data: map[string]interface{}{
 					"message": "Draft data updated",
@@ -299,8 +299,8 @@ func (r *ReplayEngine) streamEntries() {
 			r.mu.Unlock()
 
 			// Broadcast draft detection event
-			log.Printf("Broadcasting replay:draft_detected event to %d client(s)", r.service.wsServer.ClientCount())
-			r.service.wsServer.Broadcast(Event{
+			log.Printf("Broadcasting replay:draft_detected event")
+			r.service.broadcastEvent(Event{
 				Type: "replay:draft_detected",
 				Data: map[string]interface{}{
 					"currentEntry": i,
@@ -310,8 +310,8 @@ func (r *ReplayEngine) streamEntries() {
 			})
 
 			// Also broadcast standard pause event
-			log.Printf("Broadcasting replay:paused event to %d client(s)", r.service.wsServer.ClientCount())
-			r.service.wsServer.Broadcast(Event{
+			log.Printf("Broadcasting replay:paused event")
+			r.service.broadcastEvent(Event{
 				Type: "replay:paused",
 				Data: map[string]interface{}{
 					"currentEntry": i,
@@ -329,7 +329,7 @@ func (r *ReplayEngine) streamEntries() {
 				r.mu.Unlock()
 
 				log.Println("Replay resumed after draft pause")
-				r.service.wsServer.Broadcast(Event{
+				r.service.broadcastEvent(Event{
 					Type: "replay:resumed",
 					Data: map[string]interface{}{
 						"currentEntry": i,
@@ -355,7 +355,7 @@ func (r *ReplayEngine) streamEntries() {
 			percentComplete := float64(i+1) / float64(len(r.entries)) * 100
 			elapsed := time.Since(r.startTime) - r.totalPaused
 
-			r.service.wsServer.Broadcast(Event{
+			r.service.broadcastEvent(Event{
 				Type: "replay:progress",
 				Data: map[string]interface{}{
 					"currentEntry":    i + 1,

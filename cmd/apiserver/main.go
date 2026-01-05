@@ -214,6 +214,14 @@ func main() {
 	}
 	server := api.NewServer(apiConfig, services, facades)
 
+	// Register event forwarder to bridge daemon events to API server WebSocket
+	// This allows the frontend (connected to port 8080) to receive daemon events (from port 9999)
+	if daemonService != nil {
+		forwarder := server.NewDaemonEventForwarder()
+		daemonService.RegisterEventForwarder(forwarder)
+		fmt.Println("Registered daemon event forwarder to API server WebSocket")
+	}
+
 	// Start API server
 	if err := server.Start(); err != nil {
 		log.Fatalf("Failed to start API server: %v", err)
