@@ -457,19 +457,17 @@ func TestAutoFetch_ConcurrentSafety(t *testing.T) {
 	facade, cleanup := setupCollectionFacadeWithMocks(t, mockFetcher, collectionCards, knownCards)
 	defer cleanup()
 
-	// Run concurrent calls
+	// Run concurrent calls (Go 1.25: WaitGroup.Go handles Add/Done)
 	var wg sync.WaitGroup
 	errChan := make(chan error, 5)
 
 	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := facade.GetCollection(context.Background(), &CollectionFilter{OwnedOnly: true})
 			if err != nil {
 				errChan <- err
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

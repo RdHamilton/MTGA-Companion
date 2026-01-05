@@ -135,10 +135,11 @@ func (pm *PollerManager) startPoller(key string, poller *Poller) {
 	updates := poller.Start()
 	errChan := poller.Errors()
 
-	pm.wg.Add(1)
-	// Aggregate updates from this poller
-	go func(pollerKey string) {
-		defer pm.wg.Done()
+	// Capture key by value for the goroutine
+	pollerKey := key
+
+	// Aggregate updates from this poller (Go 1.25: WaitGroup.Go handles Add/Done)
+	pm.wg.Go(func() {
 		for {
 			select {
 			case <-pm.ctx.Done():
@@ -170,7 +171,7 @@ func (pm *PollerManager) startPoller(key string, poller *Poller) {
 				}
 			}
 		}
-	}(key)
+	})
 }
 
 // Stop stops all pollers in the manager.
