@@ -1034,6 +1034,199 @@ func TestFilterNewDraftEvents(t *testing.T) {
 	}
 }
 
+func TestProcessLogEntries_Quests(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	processor := NewService(service)
+
+	// Create test log entries with quest data (QuestGetQuests response format)
+	entries := []*logreader.LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "2025-12-15 10:00:00",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":          "quest-daily-001",
+						"questType":        "Cast 20 spells",
+						"goal":             float64(20),
+						"startingProgress": float64(0),
+						"endingProgress":   float64(4),
+						"locParams": map[string]interface{}{
+							"number1": float64(20),
+						},
+					},
+					map[string]interface{}{
+						"questId":          "quest-daily-002",
+						"questType":        "Win 2 games",
+						"goal":             float64(2),
+						"startingProgress": float64(0),
+						"endingProgress":   float64(1),
+						"locParams": map[string]interface{}{
+							"number1": float64(2),
+						},
+					},
+				},
+				"canSwap": true,
+			},
+		},
+	}
+
+	// Process entries
+	result, err := processor.ProcessLogEntries(ctx, entries)
+	if err != nil {
+		t.Fatalf("ProcessLogEntries failed: %v", err)
+	}
+
+	// Verify quests were stored
+	if result.QuestsStored == 0 {
+		t.Error("Expected quests to be stored, got 0")
+	}
+	if result.QuestsStored != 2 {
+		t.Errorf("Expected 2 quests to be stored, got %d", result.QuestsStored)
+	}
+
+	// Verify no errors
+	if len(result.Errors) > 0 {
+		t.Errorf("Unexpected errors: %v", result.Errors)
+	}
+
+	// Verify quests are in database
+	quests, err := service.Quests().GetActiveQuests()
+	if err != nil {
+		t.Fatalf("Failed to get active quests: %v", err)
+	}
+
+	if len(quests) < 2 {
+		t.Errorf("Expected at least 2 quests in database, got %d", len(quests))
+	}
+
+	// Verify quest data is correct
+	var foundSpellQuest, foundWinQuest bool
+	for _, q := range quests {
+		if q.QuestID == "quest-daily-001" {
+			foundSpellQuest = true
+			if q.EndingProgress != 4 {
+				t.Errorf("Expected quest-daily-001 progress to be 4, got %d", q.EndingProgress)
+			}
+			if q.Goal != 20 {
+				t.Errorf("Expected quest-daily-001 goal to be 20, got %d", q.Goal)
+			}
+		}
+		if q.QuestID == "quest-daily-002" {
+			foundWinQuest = true
+			if q.EndingProgress != 1 {
+				t.Errorf("Expected quest-daily-002 progress to be 1, got %d", q.EndingProgress)
+			}
+			if q.Goal != 2 {
+				t.Errorf("Expected quest-daily-002 goal to be 2, got %d", q.Goal)
+			}
+		}
+	}
+
+	if !foundSpellQuest {
+		t.Error("Expected to find quest-daily-001 in database")
+	}
+	if !foundWinQuest {
+		t.Error("Expected to find quest-daily-002 in database")
+	}
+}
+
+func TestProcessLogEntries_QuestsProgressUpdate(t *testing.T) {
+	service, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	processor := NewService(service)
+
+	// First, store initial quest state
+	entries1 := []*logreader.LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "2025-12-15 10:00:00",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":          "quest-update-test",
+						"questType":        "Cast 30 spells",
+						"goal":             float64(30),
+						"startingProgress": float64(0),
+						"endingProgress":   float64(4),
+						"locParams": map[string]interface{}{
+							"number1": float64(30),
+						},
+					},
+				},
+				"canSwap": true,
+			},
+		},
+	}
+
+	result1, err := processor.ProcessLogEntries(ctx, entries1)
+	if err != nil {
+		t.Fatalf("First ProcessLogEntries failed: %v", err)
+	}
+	if result1.QuestsStored != 1 {
+		t.Errorf("Expected 1 quest stored in first batch, got %d", result1.QuestsStored)
+	}
+
+	// Now simulate a progress update (same quest, higher progress)
+	entries2 := []*logreader.LogEntry{
+		{
+			IsJSON:    true,
+			Timestamp: "2025-12-15 11:00:00",
+			JSON: map[string]interface{}{
+				"quests": []interface{}{
+					map[string]interface{}{
+						"questId":          "quest-update-test",
+						"questType":        "Cast 30 spells",
+						"goal":             float64(30),
+						"startingProgress": float64(0),
+						"endingProgress":   float64(15), // Progress increased from 4 to 15
+						"locParams": map[string]interface{}{
+							"number1": float64(30),
+						},
+					},
+				},
+				"canSwap": true,
+			},
+		},
+	}
+
+	result2, err := processor.ProcessLogEntries(ctx, entries2)
+	if err != nil {
+		t.Fatalf("Second ProcessLogEntries failed: %v", err)
+	}
+
+	// This is the critical test: even for progress UPDATES, QuestsStored should be > 0
+	// so that WebSocket broadcast is triggered
+	if result2.QuestsStored == 0 {
+		t.Error("Expected QuestsStored > 0 for progress update to trigger broadcast")
+	}
+
+	// Verify the updated progress is in database
+	quests, err := service.Quests().GetActiveQuests()
+	if err != nil {
+		t.Fatalf("Failed to get active quests: %v", err)
+	}
+
+	found := false
+	for _, q := range quests {
+		if q.QuestID == "quest-update-test" {
+			found = true
+			if q.EndingProgress != 15 {
+				t.Errorf("Expected updated quest progress to be 15, got %d", q.EndingProgress)
+			}
+		}
+	}
+
+	if !found {
+		t.Error("Quest quest-update-test not found in database after update")
+	}
+}
+
 // Benchmark tests
 func BenchmarkProcessLogEntries(b *testing.B) {
 	service, cleanup := setupTestService(&testing.T{})

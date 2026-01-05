@@ -246,3 +246,9 @@ func (s *Server) WebSocketHub() *websocket.Hub {
 func (s *Server) NewWebSocketObserver() *websocket.WebSocketObserver {
 	return websocket.NewWebSocketObserver(s.wsHub)
 }
+
+// NewDaemonEventForwarder creates a new daemon event forwarder that bridges
+// daemon events (from port 9999) to the API server's WebSocket clients (on port 8080).
+func (s *Server) NewDaemonEventForwarder() *websocket.DaemonEventForwarder {
+	return websocket.NewDaemonEventForwarder(s.wsHub)
+}

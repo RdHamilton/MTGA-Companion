@@ -20,6 +20,13 @@ import (
 // Version is the daemon version
 const Version = "1.0.0"
 
+// EventForwarder is an interface for forwarding daemon events to external systems.
+// This allows the API server to receive daemon events without connecting via WebSocket.
+// The interface uses interface{} to avoid import cycles with packages that implement this.
+type EventForwarder interface {
+	ForwardEvent(event interface{})
+}
+
 // Service represents the daemon service that runs continuously.
 type Service struct {
 	config       *Config
@@ -33,6 +40,10 @@ type Service struct {
 
 	// Replay engine for testing
 	replayEngine *ReplayEngine
+
+	// Event forwarders for external systems (e.g., API server WebSocket)
+	forwarders   []EventForwarder
+	forwardersMu sync.RWMutex
 
 	// Health tracking
 	healthMu       sync.RWMutex
@@ -128,7 +139,7 @@ func (s *Service) Start() error {
 	log.Printf("Status endpoint: http://localhost:%d/status", s.config.Port)
 
 	// Send status event
-	s.wsServer.Broadcast(Event{
+	s.broadcastEvent(Event{
 		Type: "daemon:status",
 		Data: map[string]interface{}{
 			"status":  "running",
@@ -190,6 +201,31 @@ func (s *Service) Stop(ctx context.Context) error {
 	}
 }
 
+// RegisterEventForwarder registers an event forwarder to receive daemon events.
+// This is used by the API server to forward events to its WebSocket clients.
+func (s *Service) RegisterEventForwarder(forwarder EventForwarder) {
+	s.forwardersMu.Lock()
+	defer s.forwardersMu.Unlock()
+	s.forwarders = append(s.forwarders, forwarder)
+	log.Printf("Registered event forwarder (total: %d)", len(s.forwarders))
+}
+
+// broadcastEvent broadcasts an event to both the daemon's WebSocket clients
+// and any registered event forwarders (e.g., the API server).
+func (s *Service) broadcastEvent(event Event) {
+	// Broadcast to daemon's WebSocket clients
+	s.wsServer.Broadcast(event) // Keep direct WebSocket call here
+
+	// Forward to registered forwarders
+	s.forwardersMu.RLock()
+	forwarders := s.forwarders
+	s.forwardersMu.RUnlock()
+
+	for _, forwarder := range forwarders {
+		forwarder.ForwardEvent(event)
+	}
+}
+
 // processUpdates processes log updates and broadcasts events.
 func (s *Service) processUpdates(updates <-chan *logreader.LogEntry, errChan <-chan error) {
 	var entryBuffer []*logreader.LogEntry
@@ -223,7 +259,7 @@ func (s *Service) processUpdates(updates <-chan *logreader.LogEntry, errChan <-c
 			s.healthMu.Unlock()
 
 			// Broadcast error event
-			s.wsServer.Broadcast(Event{
+			s.broadcastEvent(Event{
 				Type: "daemon:error",
 				Data: map[string]interface{}{
 					"error": err.Error(),
@@ -264,7 +300,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 	// Broadcast events for updates
 	if result.MatchesStored > 0 || result.GamesStored > 0 {
 		log.Printf("Stored %d matches, %d games", result.MatchesStored, result.GamesStored)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "stats:updated",
 			Data: map[string]interface{}{
 				"matches": result.MatchesStored,
@@ -275,7 +311,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 
 	if result.DecksStored > 0 {
 		log.Printf("Stored %d deck(s)", result.DecksStored)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "deck:updated",
 			Data: map[string]interface{}{
 				"count": result.DecksStored,
@@ -285,7 +321,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 
 	if result.RanksStored > 0 {
 		log.Printf("Stored %d rank update(s)", result.RanksStored)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "rank:updated",
 			Data: map[string]interface{}{
 				"count": result.RanksStored,
@@ -295,7 +331,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 
 	if result.QuestsStored > 0 {
 		log.Printf("Stored %d quest(s)", result.QuestsStored)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "quest:updated",
 			Data: map[string]interface{}{
 				"count":     result.QuestsStored,
@@ -306,7 +342,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 
 	if result.QuestsCompleted > 0 {
 		log.Printf("Completed %d quest(s)", result.QuestsCompleted)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "quest:updated",
 			Data: map[string]interface{}{
 				"completed": result.QuestsCompleted,
@@ -316,7 +352,7 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 
 	if result.DraftsStored > 0 {
 		log.Printf("Stored %d draft session(s) with %d picks", result.DraftsStored, result.DraftPicksStored)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "draft:updated",
 			Data: map[string]interface{}{
 				"count": result.DraftsStored,
@@ -337,7 +373,7 @@ func (s *Service) sendPeriodicStatus() {
 			return
 		case <-ticker.C:
 			uptime := time.Since(s.startTime).Seconds()
-			s.wsServer.Broadcast(Event{
+			s.broadcastEvent(Event{
 				Type: "daemon:status",
 				Data: map[string]interface{}{
 					"status":  "running",
@@ -454,7 +490,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	log.Println("Starting historical log replay...")
 
 	// Broadcast replay start event
-	s.wsServer.Broadcast(Event{
+	s.broadcastEvent(Event{
 		Type: "replay:started",
 		Data: map[string]interface{}{
 			"clearData": clearData,
@@ -471,7 +507,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	if clearData {
 		log.Println("Clearing all existing data...")
 		if err := s.storage.ClearAllMatches(s.ctx); err != nil {
-			s.wsServer.Broadcast(Event{
+			s.broadcastEvent(Event{
 				Type: "replay:error",
 				Data: map[string]interface{}{
 					"error": fmt.Sprintf("Failed to clear data: %v", err),
@@ -486,7 +522,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	log.Println("Discovering log files...")
 	logFiles, err := s.discoverLogFiles()
 	if err != nil {
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "replay:error",
 			Data: map[string]interface{}{
 				"error": fmt.Sprintf("Failed to discover log files: %v", err),
@@ -496,7 +532,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 	}
 
 	if len(logFiles) == 0 {
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "replay:completed",
 			Data: map[string]interface{}{
 				"message": "No log files found to replay",
@@ -516,7 +552,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 		log.Printf("Reading file %d/%d: %s", i+1, len(logFiles), logFile.Name)
 
 		// Broadcast progress (field names match gui.LogReplayProgress)
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "replay:progress",
 			Data: map[string]interface{}{
 				"totalFiles":       len(logFiles),
@@ -579,7 +615,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 
 		// Broadcast progress (field names match gui.LogReplayProgress)
 		percentComplete := float64(end) / float64(len(allEntries)) * 100
-		s.wsServer.Broadcast(Event{
+		s.broadcastEvent(Event{
 			Type: "replay:progress",
 			Data: map[string]interface{}{
 				"totalFiles":       len(logFiles),
@@ -595,7 +631,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 
 		result, err := s.logProcessor.ProcessLogEntries(s.ctx, chunk)
 		if err != nil {
-			s.wsServer.Broadcast(Event{
+			s.broadcastEvent(Event{
 				Type: "replay:error",
 				Data: map[string]interface{}{
 					"error": fmt.Sprintf("Failed to process entries: %v", err),
@@ -626,7 +662,7 @@ func (s *Service) ReplayHistoricalLogs(clearData bool) error {
 		elapsed, len(allEntries), result.MatchesStored, result.DecksStored, result.QuestsStored, result.DraftsStored)
 
 	// Broadcast completion (field names match gui.LogReplayProgress)
-	s.wsServer.Broadcast(Event{
+	s.broadcastEvent(Event{
 		Type: "replay:completed",
 		Data: map[string]interface{}{
 			"totalFiles":       len(logFiles),
