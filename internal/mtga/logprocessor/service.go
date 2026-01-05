@@ -65,6 +65,9 @@ type ProcessResult struct {
 	DraftPicksStored     int
 	CollectionCardsAdded int // Cards added to collection
 	CollectionNewCards   int // New unique cards discovered
+	GamePlaysStored      int // Game plays stored from GRE messages
+	GameSnapshotsStored  int // Turn snapshots stored
+	OpponentCardsStored  int // Opponent cards observed
 	Errors               []error
 }
 
@@ -109,6 +112,12 @@ func (s *Service) ProcessLogEntries(ctx context.Context, entries []*logreader.Lo
 	// Process collection from decks and draft picks
 	// This must run AFTER processDecks and processDrafts to aggregate all card data
 	if err := s.processCollection(ctx, result); err != nil {
+		result.Errors = append(result.Errors, err)
+	}
+
+	// Process game plays from GRE messages
+	// This captures in-game actions like card plays, attacks, blocks
+	if err := s.processGamePlays(ctx, entries, result); err != nil {
 		result.Errors = append(result.Errors, err)
 	}
 
@@ -1349,4 +1358,162 @@ func (s *Service) inferSetCodeFromCardID(cardID string) string {
 	}
 
 	return setCode
+}
+
+// processGamePlays parses GRE messages and stores game play data (in-game actions).
+// This includes card plays, attacks, blocks, land drops, and turn snapshots.
+func (s *Service) processGamePlays(ctx context.Context, entries []*logreader.LogEntry, result *ProcessResult) error {
+	if s.dryRun {
+		log.Println("[DRY RUN] Would process game plays but skipping in dry run mode")
+		return nil
+	}
+
+	// Get player seat ID from connectResp
+	playerConn := logreader.GetPlayerSeatID(entries)
+	if playerConn == nil {
+		// No player connection info found - no game in progress
+		return nil
+	}
+
+	log.Printf("Found player connection: seat=%d", playerConn.SystemSeatID)
+
+	// Parse game plays (zone changes, attacks, blocks, etc.)
+	gamePlays, err := logreader.ParseGamePlays(entries, playerConn)
+	if err != nil {
+		log.Printf("Warning: Failed to parse game plays: %v", err)
+		return err
+	}
+
+	// Extract opponent cards observed
+	opponentCards, err := logreader.ExtractOpponentCards(entries, playerConn)
+	if err != nil {
+		log.Printf("Warning: Failed to extract opponent cards: %v", err)
+		// Continue - opponent cards are optional
+	}
+
+	// Extract game snapshots
+	snapshots, err := logreader.ExtractGameSnapshots(entries, playerConn)
+	if err != nil {
+		log.Printf("Warning: Failed to extract game snapshots: %v", err)
+		// Continue - snapshots are optional
+	}
+
+	// Store game plays
+	if len(gamePlays) > 0 {
+		// Convert GamePlayEvent to models.GamePlay
+		modelPlays := make([]*models.GamePlay, 0, len(gamePlays))
+		for _, play := range gamePlays {
+			modelPlay := &models.GamePlay{
+				MatchID:        play.MatchID,
+				TurnNumber:     play.TurnNumber,
+				Phase:          play.Phase,
+				PlayerType:     play.PlayerType,
+				ActionType:     play.ActionType,
+				Timestamp:      play.Timestamp,
+				SequenceNumber: play.SequenceNumber,
+			}
+			if play.CardID != 0 {
+				cardID := play.CardID
+				modelPlay.CardID = &cardID
+			}
+			if play.ZoneFrom != "" {
+				zoneFrom := play.ZoneFrom
+				modelPlay.ZoneFrom = &zoneFrom
+			}
+			if play.ZoneTo != "" {
+				zoneTo := play.ZoneTo
+				modelPlay.ZoneTo = &zoneTo
+			}
+			modelPlays = append(modelPlays, modelPlay)
+		}
+
+		// Use batch insert for efficiency
+		if err := s.storage.GamePlayRepo().CreatePlays(ctx, modelPlays); err != nil {
+			log.Printf("Warning: Failed to store game plays: %v", err)
+		} else {
+			result.GamePlaysStored = len(modelPlays)
+			if len(gamePlays) > 0 {
+				log.Printf("✓ Stored %d game play(s) for match %s", len(modelPlays), gamePlays[0].MatchID)
+			}
+		}
+	}
+
+	// Get matchID from the first game play or snapshot for opponent cards
+	var matchID string
+	if len(gamePlays) > 0 {
+		matchID = gamePlays[0].MatchID
+	} else if len(snapshots) > 0 {
+		matchID = snapshots[0].MatchID
+	}
+
+	// Store opponent cards
+	if len(opponentCards) > 0 && matchID != "" {
+		for _, card := range opponentCards {
+			modelCard := &models.OpponentCardObserved{
+				MatchID:       matchID,
+				CardID:        card.CardID,
+				ZoneObserved:  card.ZoneObserved,
+				TurnFirstSeen: card.TurnFirstSeen,
+				TimesSeen:     card.TimesSeen,
+			}
+			if card.CardName != "" {
+				cardName := card.CardName
+				modelCard.CardName = &cardName
+			}
+			if err := s.storage.GamePlayRepo().RecordOpponentCard(ctx, modelCard); err != nil {
+				log.Printf("Warning: Failed to store opponent card: %v", err)
+			} else {
+				result.OpponentCardsStored++
+			}
+		}
+		if result.OpponentCardsStored > 0 {
+			log.Printf("✓ Recorded %d opponent card(s) for match %s", result.OpponentCardsStored, matchID)
+		}
+	}
+
+	// Store game snapshots
+	if len(snapshots) > 0 {
+		for _, snap := range snapshots {
+			modelSnap := &models.GameStateSnapshot{
+				MatchID:      snap.MatchID,
+				TurnNumber:   snap.TurnNumber,
+				ActivePlayer: snap.ActivePlayer,
+				Timestamp:    snap.Timestamp,
+			}
+			if snap.PlayerLife != 0 {
+				life := snap.PlayerLife
+				modelSnap.PlayerLife = &life
+			}
+			if snap.OpponentLife != 0 {
+				life := snap.OpponentLife
+				modelSnap.OpponentLife = &life
+			}
+			if snap.PlayerCardsInHand != 0 {
+				cards := snap.PlayerCardsInHand
+				modelSnap.PlayerCardsInHand = &cards
+			}
+			if snap.OpponentCardsInHand != 0 {
+				cards := snap.OpponentCardsInHand
+				modelSnap.OpponentCardsInHand = &cards
+			}
+			if snap.PlayerLandsInPlay != 0 {
+				lands := snap.PlayerLandsInPlay
+				modelSnap.PlayerLandsInPlay = &lands
+			}
+			if snap.OpponentLandsInPlay != 0 {
+				lands := snap.OpponentLandsInPlay
+				modelSnap.OpponentLandsInPlay = &lands
+			}
+			if err := s.storage.GamePlayRepo().CreateSnapshot(ctx, modelSnap); err != nil {
+				log.Printf("Warning: Failed to store game snapshot: %v", err)
+			} else {
+				result.GameSnapshotsStored++
+			}
+		}
+		if result.GameSnapshotsStored > 0 && len(snapshots) > 0 {
+			log.Printf("✓ Stored %d game snapshot(s) for match %s", result.GameSnapshotsStored, snapshots[0].MatchID)
+		}
+	}
+
+	return nil
 }

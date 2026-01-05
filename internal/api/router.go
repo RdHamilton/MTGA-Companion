@@ -38,6 +38,22 @@ func (s *Server) setupRoutes() {
 			r.Get("/rank-progression-timeline", matchHandler.GetRankProgressionTimeline)
 		})
 
+		// Game Play routes (in-game actions: plays, attacks, blocks, etc.)
+		var gamePlayStorage *storage.Service
+		if s.services != nil {
+			gamePlayStorage = s.services.Storage
+		}
+		gamePlayHandler := handlers.NewGamePlayHandler(gamePlayStorage)
+		r.Route("/gameplays", func(r chi.Router) {
+			r.Get("/game/{gameID}", gamePlayHandler.GetPlaysByGame) // Get plays for a specific game
+		})
+		// Also add game play endpoints under matches for convenience
+		r.Get("/matches/{matchID}/plays", gamePlayHandler.GetMatchPlays)
+		r.Get("/matches/{matchID}/plays/timeline", gamePlayHandler.GetMatchTimeline)
+		r.Get("/matches/{matchID}/plays/summary", gamePlayHandler.GetMatchPlaySummary)
+		r.Get("/matches/{matchID}/opponent-cards", gamePlayHandler.GetMatchOpponentCards)
+		r.Get("/matches/{matchID}/snapshots", gamePlayHandler.GetMatchSnapshots)
+
 		// Draft routes
 		draftHandler := handlers.NewDraftHandler(s.draftFacade)
 		r.Route("/drafts", func(r chi.Router) {
