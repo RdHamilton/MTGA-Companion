@@ -137,6 +137,17 @@ func (s *Server) setupRoutes() {
 			r.Post("/search", collectionHandler.SearchCollection)
 		})
 
+		// Standard format routes
+		standardHandler := handlers.NewStandardHandler(s.services.Storage)
+		r.Route("/standard", func(r chi.Router) {
+			r.Get("/sets", standardHandler.GetStandardSets)
+			r.Get("/rotation", standardHandler.GetUpcomingRotation)
+			r.Get("/rotation/affected-decks", standardHandler.GetRotationAffectedDecks)
+			r.Get("/config", standardHandler.GetStandardConfig)
+			r.Post("/validate/{deckID}", standardHandler.ValidateDeckStandard)
+			r.Get("/cards/{arenaID}/legality", standardHandler.GetCardLegality)
+		})
+
 		// System routes
 		systemHandler := handlers.NewSystemHandler(s.systemFacade)
 		r.Route("/system", func(r chi.Router) {

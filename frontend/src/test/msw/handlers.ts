@@ -55,6 +55,33 @@ export function createMockCollectionCard(overrides: Partial<{
 }
 
 /**
+ * Create mock Standard set matching backend StandardSet struct.
+ */
+export function createMockStandardSet(overrides: Partial<{
+  code: string;
+  name: string;
+  releasedAt: string;
+  rotationDate?: string;
+  isStandardLegal: boolean;
+  iconSvgUri: string;
+  cardCount: number;
+  daysUntilRotation?: number;
+  isRotatingSoon: boolean;
+}> = {}) {
+  return {
+    code: 'dsk',
+    name: 'Duskmourn',
+    releasedAt: '2024-09-27',
+    isStandardLegal: true,
+    iconSvgUri: 'https://example.com/set.svg',
+    cardCount: 291,
+    daysUntilRotation: 365,
+    isRotatingSoon: false,
+    ...overrides,
+  };
+}
+
+/**
  * Create mock set info matching backend SetInfo struct.
  */
 export function createMockSetInfo(overrides: Partial<{
@@ -147,6 +174,77 @@ export const handlers = [
       mode: 'standalone',
       url: 'ws://localhost:9999',
       port: 9999,
+    });
+  }),
+
+  // Standard sets endpoint
+  http.get(`${API_BASE}/standard/sets`, () => {
+    return successResponse([
+      createMockStandardSet({ code: 'dsk', name: 'Duskmourn' }),
+      createMockStandardSet({ code: 'fdn', name: 'Foundations', daysUntilRotation: undefined }),
+    ]);
+  }),
+
+  // Standard rotation endpoint
+  http.get(`${API_BASE}/standard/rotation`, () => {
+    return successResponse({
+      nextRotationDate: '2027-01-01',
+      daysUntilRotation: 365,
+      rotatingSets: [
+        createMockStandardSet({ code: 'mkm', name: 'Murders at Karlov Manor', isRotatingSoon: true }),
+      ],
+      rotatingCardCount: 286,
+      affectedDecks: 3,
+    });
+  }),
+
+  // Standard rotation affected decks endpoint
+  http.get(`${API_BASE}/standard/rotation/affected-decks`, () => {
+    return successResponse([
+      {
+        deckId: 'deck-1',
+        deckName: 'Mono Red Aggro',
+        format: 'Standard',
+        rotatingCardCount: 12,
+        totalCards: 60,
+        percentAffected: 20,
+        rotatingCards: [],
+      },
+    ]);
+  }),
+
+  // Standard config endpoint
+  http.get(`${API_BASE}/standard/config`, () => {
+    return successResponse({
+      id: 1,
+      nextRotationDate: '2027-01-01',
+      rotationEnabled: true,
+      updatedAt: '2024-01-01T00:00:00Z',
+    });
+  }),
+
+  // Standard validate deck endpoint
+  http.post(`${API_BASE}/standard/validate/:deckId`, () => {
+    return successResponse({
+      isLegal: true,
+      errors: [],
+      warnings: [],
+      rotatingCards: [],
+      setBreakdown: [],
+    });
+  }),
+
+  // Standard card legality endpoint
+  http.get(`${API_BASE}/standard/cards/:arenaId/legality`, () => {
+    return successResponse({
+      standard: 'legal',
+      historic: 'legal',
+      explorer: 'legal',
+      pioneer: 'legal',
+      modern: 'legal',
+      alchemy: 'legal',
+      brawl: 'legal',
+      commander: 'legal',
     });
   }),
 ];

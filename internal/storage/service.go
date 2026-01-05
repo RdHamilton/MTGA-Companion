@@ -32,6 +32,7 @@ type Service struct {
 	settings               repository.SettingsRepository
 	deckPerformance        repository.DeckPerformanceRepository
 	recommendationFeedback repository.RecommendationFeedbackRepository
+	standard               repository.StandardRepository
 	currentAccountID       int // Current active account ID
 }
 
@@ -52,6 +53,7 @@ type ServiceConfig struct {
 	Settings               repository.SettingsRepository
 	DeckPerformance        repository.DeckPerformanceRepository
 	RecommendationFeedback repository.RecommendationFeedbackRepository
+	Standard               repository.StandardRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -86,6 +88,7 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 		recommendationFeedback: orDefault(cfg.RecommendationFeedback, func() repository.RecommendationFeedbackRepository {
 			return repository.NewRecommendationFeedbackRepository(conn)
 		}),
+		standard: orDefault(cfg.Standard, func() repository.StandardRepository { return repository.NewStandardRepository(conn) }),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -2008,6 +2011,11 @@ func (s *Service) SettingsRepo() repository.SettingsRepository {
 // MatchRepo returns the match repository.
 func (s *Service) MatchRepo() repository.MatchRepository {
 	return s.matches
+}
+
+// StandardRepo returns the standard repository.
+func (s *Service) StandardRepo() repository.StandardRepository {
+	return s.standard
 }
 
 // ClearAllMatches deletes all matches and games for the current account.

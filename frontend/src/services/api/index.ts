@@ -23,6 +23,7 @@ export * as system from './system';
 export * as quests from './quests';
 export * as meta from './meta';
 export * as settings from './settings';
+export * as standard from './standard';
 
 // Re-export commonly used types
 export type {
@@ -58,3 +59,12 @@ export type {
   VersionInfo,
   DaemonStatus,
 } from './system';
+
+export type {
+  StandardSet,
+  StandardConfig,
+  CardLegality,
+  DeckValidationResult,
+  RotationAffectedDeck,
+  UpcomingRotation,
+} from './standard';
