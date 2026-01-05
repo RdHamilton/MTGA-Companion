@@ -499,3 +499,62 @@ type RecommendationStats struct {
 	WinRateOnAccepted    *float64
 	WinRateOnRejected    *float64
 }
+
+// DeckPermutation represents a specific version of a deck over time.
+// Each modification creates a new permutation, enabling version history tracking.
+type DeckPermutation struct {
+	ID                  int
+	DeckID              string
+	ParentPermutationID *int    // NULL for initial version
+	Cards               string  // JSON array of {card_id, quantity, board}
+	CardHash            string  // Deterministic hash for detecting duplicate permutations
+	VersionNumber       int     // Sequential version number
+	VersionName         *string // Optional user-defined name like "Anti-Aggro Variant"
+	ChangeSummary       *string // Auto-generated or user description of changes
+	MatchesPlayed       int
+	MatchesWon          int
+	GamesPlayed         int
+	GamesWon            int
+	CreatedAt           time.Time
+	LastPlayedAt        *time.Time
+}
+
+// DeckPermutationCard represents a card within a permutation snapshot.
+type DeckPermutationCard struct {
+	CardID   int    `json:"card_id"`
+	Quantity int    `json:"quantity"`
+	Board    string `json:"board"` // "main" or "sideboard"
+}
+
+// DeckPermutationDiff represents the changes between two permutations.
+type DeckPermutationDiff struct {
+	FromPermutationID int
+	ToPermutationID   int
+	AddedCards        []DeckPermutationCard // Cards added in the new version
+	RemovedCards      []DeckPermutationCard // Cards removed from the old version
+	ChangedCards      []DeckCardChange      // Cards with quantity changes
+}
+
+// DeckCardChange represents a quantity change for a card between versions.
+type DeckCardChange struct {
+	CardID      int
+	Board       string
+	OldQuantity int
+	NewQuantity int
+}
+
+// DeckPermutationPerformance provides calculated metrics for a permutation.
+type DeckPermutationPerformance struct {
+	PermutationID int
+	DeckID        string
+	VersionNumber int
+	VersionName   *string
+	MatchesPlayed int
+	MatchesWon    int
+	MatchWinRate  float64
+	GamesPlayed   int
+	GamesWon      int
+	GameWinRate   float64
+	LastPlayedAt  *time.Time
+	CreatedAt     time.Time
+}
