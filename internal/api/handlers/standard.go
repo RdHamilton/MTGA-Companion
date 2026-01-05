@@ -108,14 +108,21 @@ func (h *StandardHandler) ValidateDeckStandard(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Get card names for error messages
+	cardNames, err := h.storage.GetCardNames(r.Context(), arenaIDs)
+	if err != nil {
+		// Non-fatal - continue without names
+		cardNames = make(map[string]string)
+	}
+
 	// Build validation result
-	result := validateDeckForStandard(cards, legalities)
+	result := validateDeckForStandard(cards, legalities, cardNames)
 
 	response.Success(w, result)
 }
 
 // validateDeckForStandard validates a deck's cards against Standard legality.
-func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*models.CardLegality) *models.DeckValidationResult {
+func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*models.CardLegality, cardNames map[string]string) *models.DeckValidationResult {
 	result := &models.DeckValidationResult{
 		IsLegal:      true,
 		Errors:       []models.ValidationError{},
@@ -123,10 +130,10 @@ func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*mo
 		SetBreakdown: []models.DeckSetInfo{},
 	}
 
-	// Track card counts for 4-copy rule
-	cardCounts := make(map[int]int)
+	// Track card counts for 4-copy rule (keyed by arenaID for name lookup)
+	cardCounts := make(map[string]int)
 
-	// Basic lands that are exempt from legality checks
+	// Basic lands that are exempt from the 4-copy rule
 	basicLands := map[string]bool{
 		"Plains": true, "Island": true, "Swamp": true,
 		"Mountain": true, "Forest": true, "Wastes": true,
@@ -134,15 +141,17 @@ func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*mo
 
 	for _, card := range cards {
 		arenaID := fmt.Sprintf("%d", card.CardID)
-		cardCounts[card.CardID] += card.Quantity
+		cardCounts[arenaID] += card.Quantity
+		cardName := cardNames[arenaID]
 
 		legality, found := legalities[arenaID]
 		if !found {
 			// Card not in legality database - warn but don't fail
 			result.Warnings = append(result.Warnings, models.ValidationWarning{
-				CardID:  card.CardID,
-				Type:    "unknown_legality",
-				Details: "Card legality information not available",
+				CardID:   card.CardID,
+				CardName: cardName,
+				Type:     "unknown_legality",
+				Details:  "Card legality information not available",
 			})
 			continue
 		}
@@ -152,30 +161,38 @@ func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*mo
 		case "banned":
 			result.IsLegal = false
 			result.Errors = append(result.Errors, models.ValidationError{
-				CardID:  card.CardID,
-				Reason:  "banned",
-				Details: "Card is banned in Standard",
+				CardID:   card.CardID,
+				CardName: cardName,
+				Reason:   "banned",
+				Details:  "Card is banned in Standard",
 			})
 		case "not_legal":
 			result.IsLegal = false
 			result.Errors = append(result.Errors, models.ValidationError{
-				CardID:  card.CardID,
-				Reason:  "not_legal",
-				Details: "Card is not legal in Standard",
+				CardID:   card.CardID,
+				CardName: cardName,
+				Reason:   "not_legal",
+				Details:  "Card is not legal in Standard",
 			})
 		}
 	}
 
 	// Check 4-copy rule (excluding basic lands)
-	for cardID, count := range cardCounts {
+	for arenaID, count := range cardCounts {
 		if count > 4 {
-			// Check if it's a basic land (we'd need card names here, skip for now)
-			_ = basicLands // Basic land check requires card name lookup
+			cardName := cardNames[arenaID]
+			// Basic lands are exempt from the 4-copy rule
+			if basicLands[cardName] {
+				continue
+			}
 			result.IsLegal = false
+			var cardID int
+			_, _ = fmt.Sscanf(arenaID, "%d", &cardID) // Ignore error - cardID defaults to 0
 			result.Errors = append(result.Errors, models.ValidationError{
-				CardID:  cardID,
-				Reason:  "too_many_copies",
-				Details: fmt.Sprintf("Deck contains %d copies (maximum 4 allowed)", count),
+				CardID:   cardID,
+				CardName: cardName,
+				Reason:   "too_many_copies",
+				Details:  fmt.Sprintf("Deck contains %d copies (maximum 4 allowed)", count),
 			})
 		}
 	}

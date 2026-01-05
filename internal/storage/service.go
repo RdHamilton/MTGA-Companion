@@ -2018,6 +2018,51 @@ func (s *Service) StandardRepo() repository.StandardRepository {
 	return s.standard
 }
 
+// GetCardNames retrieves card names for multiple arena IDs.
+func (s *Service) GetCardNames(ctx context.Context, arenaIDs []string) (map[string]string, error) {
+	if len(arenaIDs) == 0 {
+		return make(map[string]string), nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(arenaIDs))
+	for i, id := range arenaIDs {
+		args[i] = id
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT arena_id, name
+		FROM set_cards
+		WHERE arena_id IN (%s)
+	`, placeholders)
+
+	rows, err := s.db.Conn().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get card names: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var arenaID, name string
+		if err := rows.Scan(&arenaID, &name); err != nil {
+			continue
+		}
+		result[arenaID] = name
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating card names: %w", err)
+	}
+
+	return result, nil
+}
+
 // ClearAllMatches deletes all matches and games for the current account.
 func (s *Service) ClearAllMatches(ctx context.Context) error {
 	return s.matches.DeleteAll(ctx, s.currentAccountID)

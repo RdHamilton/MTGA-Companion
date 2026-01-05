@@ -400,6 +400,7 @@ func (r *standardRepository) GetRotationAffectedDecks(ctx context.Context) ([]*m
 	}
 
 	// Get Standard decks with rotating cards
+	// Uses ASCII control characters as delimiters (defined at package level)
 	query := `
 		WITH rotating_sets AS (
 			SELECT code, name, rotation_date
@@ -431,7 +432,7 @@ func (r *standardRepository) GetRotationAffectedDecks(ctx context.Context) ([]*m
 			format,
 			SUM(quantity) as rotating_card_count,
 			(SELECT SUM(quantity) FROM deck_cards WHERE deck_id = drc.deck_id) as total_cards,
-			GROUP_CONCAT(arena_id || '|' || card_name || '|' || set_code || '|' || set_name || '|' || rotation_date || '|' || quantity, ';;') as rotating_cards_data
+			GROUP_CONCAT(arena_id || '` + fieldSeparator + `' || card_name || '` + fieldSeparator + `' || set_code || '` + fieldSeparator + `' || set_name || '` + fieldSeparator + `' || rotation_date || '` + fieldSeparator + `' || quantity, '` + recordSeparator + `') as rotating_cards_data
 		FROM deck_rotating_cards drc
 		GROUP BY deck_id, deck_name, format
 		ORDER BY rotating_card_count DESC
@@ -477,14 +478,21 @@ func (r *standardRepository) GetRotationAffectedDecks(ctx context.Context) ([]*m
 	return affectedDecks, nil
 }
 
+// ASCII separators used in GROUP_CONCAT to avoid collision with card data
+const (
+	fieldSeparator  = "\x1F" // ASCII 31 - Unit Separator
+	recordSeparator = "\x1E" // ASCII 30 - Record Separator
+)
+
 // parseRotatingCardsData parses the concatenated rotating cards data from SQL.
+// Uses ASCII control characters as delimiters to avoid collision with card names.
 func parseRotatingCardsData(data string, now time.Time) []models.RotatingCard {
 	var cards []models.RotatingCard
 
-	// Split by ;; to get individual cards
-	cardEntries := splitString(data, ";;")
+	// Split by record separator to get individual cards
+	cardEntries := splitString(data, recordSeparator)
 	for _, entry := range cardEntries {
-		parts := splitString(entry, "|")
+		parts := splitString(entry, fieldSeparator)
 		if len(parts) < 5 {
 			continue
 		}
