@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/handlers"
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
 // setupRoutes configures all API routes.
@@ -135,6 +136,21 @@ func (s *Server) setupRoutes() {
 			r.Get("/missing/{setCode}", collectionHandler.GetMissingCards)
 			r.Get("/decks/{deckID}/missing", collectionHandler.GetMissingCardsForDeck)
 			r.Post("/search", collectionHandler.SearchCollection)
+		})
+
+		// Standard format routes
+		var storageService *storage.Service
+		if s.services != nil {
+			storageService = s.services.Storage
+		}
+		standardHandler := handlers.NewStandardHandler(storageService)
+		r.Route("/standard", func(r chi.Router) {
+			r.Get("/sets", standardHandler.GetStandardSets)
+			r.Get("/rotation", standardHandler.GetUpcomingRotation)
+			r.Get("/rotation/affected-decks", standardHandler.GetRotationAffectedDecks)
+			r.Get("/config", standardHandler.GetStandardConfig)
+			r.Post("/validate/{deckID}", standardHandler.ValidateDeckStandard)
+			r.Get("/cards/{arenaID}/legality", standardHandler.GetCardLegality)
 		})
 
 		// System routes

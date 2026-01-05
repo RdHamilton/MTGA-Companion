@@ -32,6 +32,7 @@ type Service struct {
 	settings               repository.SettingsRepository
 	deckPerformance        repository.DeckPerformanceRepository
 	recommendationFeedback repository.RecommendationFeedbackRepository
+	standard               repository.StandardRepository
 	currentAccountID       int // Current active account ID
 }
 
@@ -52,6 +53,7 @@ type ServiceConfig struct {
 	Settings               repository.SettingsRepository
 	DeckPerformance        repository.DeckPerformanceRepository
 	RecommendationFeedback repository.RecommendationFeedbackRepository
+	Standard               repository.StandardRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -86,6 +88,7 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 		recommendationFeedback: orDefault(cfg.RecommendationFeedback, func() repository.RecommendationFeedbackRepository {
 			return repository.NewRecommendationFeedbackRepository(conn)
 		}),
+		standard: orDefault(cfg.Standard, func() repository.StandardRepository { return repository.NewStandardRepository(conn) }),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -2008,6 +2011,56 @@ func (s *Service) SettingsRepo() repository.SettingsRepository {
 // MatchRepo returns the match repository.
 func (s *Service) MatchRepo() repository.MatchRepository {
 	return s.matches
+}
+
+// StandardRepo returns the standard repository.
+func (s *Service) StandardRepo() repository.StandardRepository {
+	return s.standard
+}
+
+// GetCardNames retrieves card names for multiple arena IDs.
+func (s *Service) GetCardNames(ctx context.Context, arenaIDs []string) (map[string]string, error) {
+	if len(arenaIDs) == 0 {
+		return make(map[string]string), nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(arenaIDs))
+	for i, id := range arenaIDs {
+		args[i] = id
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT arena_id, name
+		FROM set_cards
+		WHERE arena_id IN (%s)
+	`, placeholders)
+
+	rows, err := s.db.Conn().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get card names: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var arenaID, name string
+		if err := rows.Scan(&arenaID, &name); err != nil {
+			continue
+		}
+		result[arenaID] = name
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating card names: %w", err)
+	}
+
+	return result, nil
 }
 
 // ClearAllMatches deletes all matches and games for the current account.

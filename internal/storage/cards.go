@@ -9,14 +9,16 @@ import (
 
 // Set represents a Magic set in the local cache.
 type Set struct {
-	Code        string
-	Name        string
-	ReleasedAt  string
-	CardCount   int
-	SetType     string
-	IconSVGURI  string
-	CachedAt    time.Time
-	LastUpdated time.Time
+	Code            string
+	Name            string
+	ReleasedAt      string
+	CardCount       int
+	SetType         string
+	IconSVGURI      string
+	CachedAt        time.Time
+	LastUpdated     time.Time
+	IsStandardLegal bool    // Whether the set is currently Standard-legal
+	RotationDate    *string // Date when set rotates out of Standard (ISO 8601)
 }
 
 // SaveSet saves or updates a set in the database.
@@ -49,7 +51,8 @@ func (s *Service) SaveSet(ctx context.Context, set *Set) error {
 // GetSet retrieves a set by its code.
 func (s *Service) GetSet(ctx context.Context, code string) (*Set, error) {
 	query := `
-		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated
+		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated,
+		       COALESCE(is_standard_legal, FALSE), rotation_date
 		FROM sets
 		WHERE code = ?
 	`
@@ -57,7 +60,7 @@ func (s *Service) GetSet(ctx context.Context, code string) (*Set, error) {
 	var set Set
 	err := s.db.Conn().QueryRowContext(ctx, query, code).Scan(
 		&set.Code, &set.Name, &set.ReleasedAt, &set.CardCount, &set.SetType, &set.IconSVGURI,
-		&set.CachedAt, &set.LastUpdated,
+		&set.CachedAt, &set.LastUpdated, &set.IsStandardLegal, &set.RotationDate,
 	)
 
 	if err == sql.ErrNoRows {
@@ -73,7 +76,8 @@ func (s *Service) GetSet(ctx context.Context, code string) (*Set, error) {
 // GetAllSets retrieves all sets ordered by release date (newest first).
 func (s *Service) GetAllSets(ctx context.Context) ([]*Set, error) {
 	query := `
-		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated
+		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated,
+		       COALESCE(is_standard_legal, FALSE), rotation_date
 		FROM sets
 		ORDER BY released_at DESC
 	`
@@ -89,7 +93,7 @@ func (s *Service) GetAllSets(ctx context.Context) ([]*Set, error) {
 		var set Set
 		err := rows.Scan(
 			&set.Code, &set.Name, &set.ReleasedAt, &set.CardCount, &set.SetType, &set.IconSVGURI,
-			&set.CachedAt, &set.LastUpdated,
+			&set.CachedAt, &set.LastUpdated, &set.IsStandardLegal, &set.RotationDate,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan set: %w", err)
@@ -110,7 +114,8 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 	seconds := int64(olderThan.Seconds())
 
 	query := `
-		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated
+		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated,
+		       COALESCE(is_standard_legal, FALSE), rotation_date
 		FROM sets
 		WHERE unixepoch(last_updated) <= unixepoch('now', '-' || ? || ' seconds')
 		ORDER BY last_updated ASC
@@ -127,7 +132,7 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 		var set Set
 		err := rows.Scan(
 			&set.Code, &set.Name, &set.ReleasedAt, &set.CardCount, &set.SetType, &set.IconSVGURI,
-			&set.CachedAt, &set.LastUpdated,
+			&set.CachedAt, &set.LastUpdated, &set.IsStandardLegal, &set.RotationDate,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan set: %w", err)
