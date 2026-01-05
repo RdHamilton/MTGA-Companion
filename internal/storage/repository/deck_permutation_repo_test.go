@@ -84,7 +84,9 @@ func setupPermutationTestDB(t *testing.T) *sql.DB {
 		CREATE INDEX idx_deck_permutations_deck_id ON deck_permutations(deck_id);
 		CREATE INDEX idx_deck_permutations_parent ON deck_permutations(parent_permutation_id);
 		CREATE INDEX idx_deck_permutations_created ON deck_permutations(deck_id, created_at DESC);
-		CREATE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
+		CREATE UNIQUE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
+		CREATE INDEX idx_deck_permutations_version ON deck_permutations(deck_id, version_number);
+		CREATE INDEX idx_decks_current_permutation ON decks(current_permutation_id);
 
 		-- Insert a default test account
 		INSERT INTO accounts (id, name, is_default, created_at, updated_at)

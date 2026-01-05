@@ -45,11 +45,17 @@ CREATE INDEX idx_deck_permutations_created ON deck_permutations(deck_id, created
 -- Index for performance queries
 CREATE INDEX idx_deck_permutations_win_rate ON deck_permutations(deck_id, matches_won, matches_played);
 
--- Index for detecting duplicate permutations within a deck
-CREATE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
+-- UNIQUE constraint to prevent duplicate permutations (enforces deduplication atomically)
+CREATE UNIQUE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
+
+-- Index for sorting by version_number in GetByDeckID and GetAllPerformance queries
+CREATE INDEX idx_deck_permutations_version ON deck_permutations(deck_id, version_number);
 
 -- Add current_permutation_id to decks table to track which version is currently active
 ALTER TABLE decks ADD COLUMN current_permutation_id INTEGER REFERENCES deck_permutations(id);
+
+-- Index for JOIN operations in GetCurrent query
+CREATE INDEX idx_decks_current_permutation ON decks(current_permutation_id);
 
 -- Create initial permutations for existing decks
 -- This ensures existing decks have at least one permutation entry

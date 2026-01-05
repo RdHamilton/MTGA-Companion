@@ -663,6 +663,32 @@ func (r *deckPermutationRepository) CreateFromCurrentDeck(ctx context.Context, d
 	result, err := tx.ExecContext(ctx, insertQuery,
 		deckID, parentID, string(cardsJSON), cardHash, nextVersion, versionName, changeSummary, createdAtStr)
 	if err != nil {
+		// Handle UNIQUE constraint violation (concurrent insert race condition)
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			// Another transaction inserted this permutation - query and return it
+			existing := &models.DeckPermutation{}
+			err = tx.QueryRowContext(ctx, existingQuery, deckID, cardHash).Scan(
+				&existing.ID, &existing.DeckID, &existing.ParentPermutationID,
+				&existing.Cards, &existing.CardHash, &existing.VersionNumber,
+				&existing.VersionName, &existing.ChangeSummary,
+				&existing.MatchesPlayed, &existing.MatchesWon,
+				&existing.GamesPlayed, &existing.GamesWon,
+				&existing.CreatedAt, &existing.LastPlayedAt,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get concurrent permutation: %w", err)
+			}
+			// Set existing as current
+			_, err = tx.ExecContext(ctx, `UPDATE decks SET current_permutation_id = ? WHERE id = ?`,
+				existing.ID, deckID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to set concurrent permutation as current: %w", err)
+			}
+			if err = tx.Commit(); err != nil {
+				return nil, fmt.Errorf("failed to commit transaction: %w", err)
+			}
+			return existing, nil
+		}
 		return nil, fmt.Errorf("failed to create permutation: %w", err)
 	}
 
