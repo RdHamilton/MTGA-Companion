@@ -95,13 +95,11 @@ func NewScheduler(config SchedulerConfig) (RefreshScheduler, error) {
 func (s *scheduler) Start(ctx context.Context) error {
 	s.ticker = time.NewTicker(s.config.CheckInterval)
 
-	// Start refresh worker
-	s.wg.Add(1)
-	go s.refreshWorker(ctx)
+	// Start refresh worker (Go 1.25: WaitGroup.Go handles Add/Done automatically)
+	s.wg.Go(func() { s.refreshWorker(ctx) })
 
 	// Start scheduler loop
-	s.wg.Add(1)
-	go s.schedulerLoop(ctx)
+	s.wg.Go(func() { s.schedulerLoop(ctx) })
 
 	s.logger.Info("Refresh scheduler started",
 		"checkInterval", s.config.CheckInterval,
@@ -112,8 +110,6 @@ func (s *scheduler) Start(ctx context.Context) error {
 
 // schedulerLoop checks for scheduled tasks.
 func (s *scheduler) schedulerLoop(ctx context.Context) {
-	defer s.wg.Done()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -144,8 +140,6 @@ func (s *scheduler) schedulerLoop(ctx context.Context) {
 
 // refreshWorker processes refresh tasks from the queue.
 func (s *scheduler) refreshWorker(ctx context.Context) {
-	defer s.wg.Done()
-
 	for {
 		select {
 		case <-ctx.Done():
