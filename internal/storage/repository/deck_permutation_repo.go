@@ -680,7 +680,10 @@ func (r *deckPermutationRepository) CreateFromCurrentDeck(ctx context.Context, d
 	if err != nil {
 		return nil, fmt.Errorf("failed to set current permutation: %w", err)
 	}
-	rowsAffected, _ := updateResult.RowsAffected()
+	rowsAffected, err := updateResult.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return nil, fmt.Errorf("failed to set current permutation: deck not found")
 	}
