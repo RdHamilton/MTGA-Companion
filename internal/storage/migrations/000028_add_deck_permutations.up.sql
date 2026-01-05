@@ -9,8 +9,10 @@ CREATE TABLE deck_permutations (
     deck_id TEXT NOT NULL,
     parent_permutation_id INTEGER,          -- NULL for initial version, references parent for subsequent versions
 
-    -- Card snapshot at this version (JSON array of {card_id, quantity, is_sideboard})
+    -- Card snapshot at this version (JSON array of {card_id, quantity, board})
     cards TEXT NOT NULL,
+    -- Deterministic hash for detecting duplicate permutations (sorted by card_id, board)
+    card_hash TEXT NOT NULL,
 
     -- Version metadata
     version_number INTEGER NOT NULL DEFAULT 1,
@@ -43,12 +45,15 @@ CREATE INDEX idx_deck_permutations_created ON deck_permutations(deck_id, created
 -- Index for performance queries
 CREATE INDEX idx_deck_permutations_win_rate ON deck_permutations(deck_id, matches_won, matches_played);
 
+-- Index for detecting duplicate permutations within a deck
+CREATE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
+
 -- Add current_permutation_id to decks table to track which version is currently active
 ALTER TABLE decks ADD COLUMN current_permutation_id INTEGER REFERENCES deck_permutations(id);
 
 -- Create initial permutations for existing decks
 -- This ensures existing decks have at least one permutation entry
-INSERT INTO deck_permutations (deck_id, cards, version_number, matches_played, matches_won, games_played, games_won, created_at, last_played_at)
+INSERT INTO deck_permutations (deck_id, cards, card_hash, version_number, matches_played, matches_won, games_played, games_won, created_at, last_played_at)
 SELECT
     d.id,
     COALESCE(
@@ -58,8 +63,14 @@ SELECT
                 'quantity', dc.quantity,
                 'board', dc.board
             )
-        ) FROM deck_cards dc WHERE dc.deck_id = d.id),
+        ) FROM deck_cards dc WHERE dc.deck_id = d.id ORDER BY dc.card_id, dc.board),
         '[]'
+    ),
+    -- Deterministic hash: sorted card_id:quantity:board pairs joined
+    COALESCE(
+        (SELECT group_concat(dc.card_id || ':' || dc.quantity || ':' || dc.board, '|')
+         FROM deck_cards dc WHERE dc.deck_id = d.id ORDER BY dc.card_id, dc.board),
+        ''
     ),
     1,
     d.matches_played,

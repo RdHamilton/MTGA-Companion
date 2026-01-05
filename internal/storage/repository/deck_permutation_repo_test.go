@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +67,7 @@ func setupPermutationTestDB(t *testing.T) *sql.DB {
 			deck_id TEXT NOT NULL,
 			parent_permutation_id INTEGER,
 			cards TEXT NOT NULL,
+			card_hash TEXT NOT NULL,
 			version_number INTEGER NOT NULL DEFAULT 1,
 			version_name TEXT,
 			change_summary TEXT,
@@ -80,6 +84,7 @@ func setupPermutationTestDB(t *testing.T) *sql.DB {
 		CREATE INDEX idx_deck_permutations_deck_id ON deck_permutations(deck_id);
 		CREATE INDEX idx_deck_permutations_parent ON deck_permutations(parent_permutation_id);
 		CREATE INDEX idx_deck_permutations_created ON deck_permutations(deck_id, created_at DESC);
+		CREATE INDEX idx_deck_permutations_hash ON deck_permutations(deck_id, card_hash);
 
 		-- Insert a default test account
 		INSERT INTO accounts (id, name, is_default, created_at, updated_at)
@@ -91,6 +96,24 @@ func setupPermutationTestDB(t *testing.T) *sql.DB {
 	}
 
 	return db
+}
+
+// testComputeCardHash generates a deterministic hash for test cards.
+func testComputeCardHash(cards []models.DeckPermutationCard) string {
+	sorted := make([]models.DeckPermutationCard, len(cards))
+	copy(sorted, cards)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].CardID != sorted[j].CardID {
+			return sorted[i].CardID < sorted[j].CardID
+		}
+		return sorted[i].Board < sorted[j].Board
+	})
+
+	var parts []string
+	for _, card := range sorted {
+		parts = append(parts, fmt.Sprintf("%d:%d:%s", card.CardID, card.Quantity, card.Board))
+	}
+	return strings.Join(parts, "|")
 }
 
 // createTestDeck creates a test deck with cards.
@@ -145,11 +168,13 @@ func TestDeckPermutationRepository_Create(t *testing.T) {
 		{CardID: 101, Quantity: 4, Board: "main"},
 	}
 	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
 
 	versionName := "Initial Version"
 	perm := &models.DeckPermutation{
 		DeckID:        "deck-1",
 		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
 		VersionNumber: 1,
 		VersionName:   &versionName,
 		CreatedAt:     time.Now(),
@@ -185,6 +210,10 @@ func TestDeckPermutationRepository_Create(t *testing.T) {
 	if *retrieved.VersionName != "Initial Version" {
 		t.Errorf("expected version_name 'Initial Version', got '%s'", *retrieved.VersionName)
 	}
+
+	if retrieved.CardHash != cardHash {
+		t.Errorf("expected card_hash '%s', got '%s'", cardHash, retrieved.CardHash)
+	}
 }
 
 func TestDeckPermutationRepository_GetByDeckID(t *testing.T) {
@@ -204,10 +233,12 @@ func TestDeckPermutationRepository_GetByDeckID(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		cards := []models.DeckPermutationCard{{CardID: 100 + i, Quantity: 4, Board: "main"}}
 		cardsJSON, _ := json.Marshal(cards)
+		cardHash := testComputeCardHash(cards)
 
 		perm := &models.DeckPermutation{
 			DeckID:        "deck-1",
 			Cards:         string(cardsJSON),
+			CardHash:      cardHash,
 			VersionNumber: i,
 			CreatedAt:     time.Now().Add(time.Duration(i) * time.Hour),
 		}
@@ -251,10 +282,12 @@ func TestDeckPermutationRepository_GetLatest(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		cards := []models.DeckPermutationCard{{CardID: 100, Quantity: i, Board: "main"}}
 		cardsJSON, _ := json.Marshal(cards)
+		cardHash := testComputeCardHash(cards)
 
 		perm := &models.DeckPermutation{
 			DeckID:        "deck-1",
 			Cards:         string(cardsJSON),
+			CardHash:      cardHash,
 			VersionNumber: i,
 			CreatedAt:     time.Now().Add(time.Duration(i) * time.Hour),
 		}
@@ -295,10 +328,12 @@ func TestDeckPermutationRepository_SetAndGetCurrent(t *testing.T) {
 	for i := 1; i <= 2; i++ {
 		cards := []models.DeckPermutationCard{{CardID: 100, Quantity: i, Board: "main"}}
 		cardsJSON, _ := json.Marshal(cards)
+		cardHash := testComputeCardHash(cards)
 
 		perm := &models.DeckPermutation{
 			DeckID:        "deck-1",
 			Cards:         string(cardsJSON),
+			CardHash:      cardHash,
 			VersionNumber: i,
 			CreatedAt:     time.Now().Add(time.Duration(i) * time.Hour),
 		}
@@ -328,6 +363,104 @@ func TestDeckPermutationRepository_SetAndGetCurrent(t *testing.T) {
 	}
 }
 
+func TestDeckPermutationRepository_SetCurrentPermutation_Validation(t *testing.T) {
+	db := setupPermutationTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	// Create two separate decks
+	createTestDeck(t, db, "deck-1", "Test Deck 1")
+	createTestDeck(t, db, "deck-2", "Test Deck 2")
+
+	repo := NewDeckPermutationRepository(db)
+	ctx := context.Background()
+
+	// Create a permutation for deck-1
+	cards := []models.DeckPermutationCard{{CardID: 100, Quantity: 4, Board: "main"}}
+	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
+
+	perm := &models.DeckPermutation{
+		DeckID:        "deck-1",
+		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
+		VersionNumber: 1,
+		CreatedAt:     time.Now(),
+	}
+	if err := repo.Create(ctx, perm); err != nil {
+		t.Fatalf("failed to create permutation: %v", err)
+	}
+
+	// Try to set deck-1's permutation as current for deck-2 - should fail
+	err := repo.SetCurrentPermutation(ctx, "deck-2", perm.ID)
+	if err == nil {
+		t.Error("expected error when setting permutation from different deck")
+	}
+
+	expectedErr := fmt.Sprintf("permutation %d does not belong to deck deck-2", perm.ID)
+	if err.Error() != expectedErr {
+		t.Errorf("expected error '%s', got '%s'", expectedErr, err.Error())
+	}
+}
+
+func TestDeckPermutationRepository_GetByCardHash(t *testing.T) {
+	db := setupPermutationTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	createTestDeck(t, db, "deck-1", "Test Deck")
+
+	repo := NewDeckPermutationRepository(db)
+	ctx := context.Background()
+
+	cards := []models.DeckPermutationCard{
+		{CardID: 100, Quantity: 4, Board: "main"},
+		{CardID: 101, Quantity: 4, Board: "main"},
+	}
+	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
+
+	perm := &models.DeckPermutation{
+		DeckID:        "deck-1",
+		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
+		VersionNumber: 1,
+		CreatedAt:     time.Now(),
+	}
+	if err := repo.Create(ctx, perm); err != nil {
+		t.Fatalf("failed to create permutation: %v", err)
+	}
+
+	// Find by card hash
+	found, err := repo.GetByCardHash(ctx, "deck-1", cardHash)
+	if err != nil {
+		t.Fatalf("failed to get by card hash: %v", err)
+	}
+
+	if found == nil {
+		t.Fatal("expected to find permutation by card hash")
+	}
+
+	if found.ID != perm.ID {
+		t.Errorf("expected permutation ID %d, got %d", perm.ID, found.ID)
+	}
+
+	// Search with different hash should return nil
+	notFound, err := repo.GetByCardHash(ctx, "deck-1", "different-hash")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if notFound != nil {
+		t.Error("expected nil for non-existent hash")
+	}
+}
+
 func TestDeckPermutationRepository_UpdatePerformance(t *testing.T) {
 	db := setupPermutationTestDB(t)
 	defer func() {
@@ -343,10 +476,12 @@ func TestDeckPermutationRepository_UpdatePerformance(t *testing.T) {
 
 	cards := []models.DeckPermutationCard{{CardID: 100, Quantity: 4, Board: "main"}}
 	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
 
 	perm := &models.DeckPermutation{
 		DeckID:        "deck-1",
 		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
 		VersionNumber: 1,
 		CreatedAt:     time.Now(),
 	}
@@ -418,10 +553,12 @@ func TestDeckPermutationRepository_GetDiff(t *testing.T) {
 		{CardID: 102, Quantity: 3, Board: "main"},
 	}
 	cardsJSON1, _ := json.Marshal(cards1)
+	cardHash1 := testComputeCardHash(cards1)
 
 	perm1 := &models.DeckPermutation{
 		DeckID:        "deck-1",
 		Cards:         string(cardsJSON1),
+		CardHash:      cardHash1,
 		VersionNumber: 1,
 		CreatedAt:     time.Now(),
 	}
@@ -439,11 +576,13 @@ func TestDeckPermutationRepository_GetDiff(t *testing.T) {
 		{CardID: 103, Quantity: 3, Board: "main"},
 	}
 	cardsJSON2, _ := json.Marshal(cards2)
+	cardHash2 := testComputeCardHash(cards2)
 
 	perm2 := &models.DeckPermutation{
 		DeckID:              "deck-1",
 		ParentPermutationID: &perm1.ID,
 		Cards:               string(cardsJSON2),
+		CardHash:            cardHash2,
 		VersionNumber:       2,
 		CreatedAt:           time.Now().Add(time.Hour),
 	}
@@ -521,6 +660,10 @@ func TestDeckPermutationRepository_CreateFromCurrentDeck(t *testing.T) {
 		t.Errorf("expected version name 'v1 - Anti-Aggro', got '%s'", *perm.VersionName)
 	}
 
+	if perm.CardHash == "" {
+		t.Error("expected card_hash to be set")
+	}
+
 	// Parse the cards JSON and verify
 	var cards []models.DeckPermutationCard
 	if err := json.Unmarshal([]byte(perm.Cards), &cards); err != nil {
@@ -540,6 +683,53 @@ func TestDeckPermutationRepository_CreateFromCurrentDeck(t *testing.T) {
 
 	if current.ID != perm.ID {
 		t.Errorf("expected current permutation to be %d, got %d", perm.ID, current.ID)
+	}
+}
+
+func TestDeckPermutationRepository_CreateFromCurrentDeck_ReturnsExisting(t *testing.T) {
+	db := setupPermutationTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	createTestDeck(t, db, "deck-1", "Test Deck")
+
+	repo := NewDeckPermutationRepository(db)
+	ctx := context.Background()
+
+	// Create first permutation
+	versionName1 := "v1"
+	perm1, err := repo.CreateFromCurrentDeck(ctx, "deck-1", &versionName1, nil)
+	if err != nil {
+		t.Fatalf("failed to create first permutation: %v", err)
+	}
+
+	// Create second permutation with same cards - should return existing
+	versionName2 := "v2"
+	perm2, err := repo.CreateFromCurrentDeck(ctx, "deck-1", &versionName2, nil)
+	if err != nil {
+		t.Fatalf("failed to create second permutation: %v", err)
+	}
+
+	// Should return the same permutation (same card_hash)
+	if perm2.ID != perm1.ID {
+		t.Errorf("expected same permutation ID %d, got %d", perm1.ID, perm2.ID)
+	}
+
+	// Version name should still be from the original
+	if *perm2.VersionName != "v1" {
+		t.Errorf("expected version name 'v1', got '%s'", *perm2.VersionName)
+	}
+
+	// Check that only one permutation exists
+	perms, err := repo.GetByDeckID(ctx, "deck-1")
+	if err != nil {
+		t.Fatalf("failed to get permutations: %v", err)
+	}
+	if len(perms) != 1 {
+		t.Errorf("expected 1 permutation, got %d", len(perms))
 	}
 }
 
@@ -569,10 +759,12 @@ func TestDeckPermutationRepository_GetNextVersionNumber(t *testing.T) {
 	// Create a permutation
 	cards := []models.DeckPermutationCard{{CardID: 100, Quantity: 4, Board: "main"}}
 	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
 
 	perm := &models.DeckPermutation{
 		DeckID:        "deck-1",
 		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
 		VersionNumber: 1,
 		CreatedAt:     time.Now(),
 	}
@@ -606,10 +798,12 @@ func TestDeckPermutationRepository_Delete(t *testing.T) {
 
 	cards := []models.DeckPermutationCard{{CardID: 100, Quantity: 4, Board: "main"}}
 	cardsJSON, _ := json.Marshal(cards)
+	cardHash := testComputeCardHash(cards)
 
 	perm := &models.DeckPermutation{
 		DeckID:        "deck-1",
 		Cards:         string(cardsJSON),
+		CardHash:      cardHash,
 		VersionNumber: 1,
 		CreatedAt:     time.Now(),
 	}
@@ -648,12 +842,14 @@ func TestDeckPermutationRepository_GetAllPerformance(t *testing.T) {
 
 	// Create multiple permutations with different performance
 	for i := 1; i <= 3; i++ {
-		cards := []models.DeckPermutationCard{{CardID: 100, Quantity: i, Board: "main"}}
+		cards := []models.DeckPermutationCard{{CardID: 100 + i, Quantity: i, Board: "main"}}
 		cardsJSON, _ := json.Marshal(cards)
+		cardHash := testComputeCardHash(cards)
 
 		perm := &models.DeckPermutation{
 			DeckID:        "deck-1",
 			Cards:         string(cardsJSON),
+			CardHash:      cardHash,
 			VersionNumber: i,
 			MatchesPlayed: i * 10,
 			MatchesWon:    i * 5,

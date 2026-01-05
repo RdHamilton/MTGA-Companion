@@ -507,6 +507,7 @@ type DeckPermutation struct {
 	DeckID              string
 	ParentPermutationID *int    // NULL for initial version
 	Cards               string  // JSON array of {card_id, quantity, board}
+	CardHash            string  // Deterministic hash for detecting duplicate permutations
 	VersionNumber       int     // Sequential version number
 	VersionName         *string // Optional user-defined name like "Anti-Aggro Variant"
 	ChangeSummary       *string // Auto-generated or user description of changes
