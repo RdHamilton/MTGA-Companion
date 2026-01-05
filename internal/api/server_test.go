@@ -131,6 +131,8 @@ func TestServer_NewDaemonEventForwarder_UsesServerHub(t *testing.T) {
 	server := NewServer(nil, nil, facades)
 
 	// Start the hub so it can process broadcasts
+	// Note: The hub doesn't have a Stop method, but this is acceptable in tests
+	// as the goroutine will be cleaned up when the test process ends.
 	go server.wsHub.Run()
 
 	// Create a test HTTP server using the hub's WebSocket handler
@@ -145,8 +147,22 @@ func TestServer_NewDaemonEventForwarder_UsesServerHub(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// Give time for client registration
-	time.Sleep(50 * time.Millisecond)
+	// Wait for client registration using deterministic polling instead of fixed sleep
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("Timeout waiting for client registration")
+		case <-ticker.C:
+			if server.wsHub.ClientCount() > 0 {
+				goto clientRegistered
+			}
+		}
+	}
+clientRegistered:
 
 	// Create a forwarder and forward an event
 	forwarder := server.NewDaemonEventForwarder()
@@ -157,7 +173,7 @@ func TestServer_NewDaemonEventForwarder_UsesServerHub(t *testing.T) {
 	forwarder.ForwardEvent(testEvent)
 
 	// Read the message from the WebSocket client
-	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, message, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read message from WebSocket: %v", err)
