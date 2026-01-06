@@ -2703,3 +2703,112 @@ func convertCardWithOwnership(c *recommendations.CardWithOwnership) *CardWithOwn
 		NeededCount:  c.NeededCount,
 	}
 }
+
+// IterativeBuildAroundRequest represents a request for iterative deck building suggestions.
+type IterativeBuildAroundRequest struct {
+	SeedCardID     int      `json:"seedCardID"`
+	DeckCardIDs    []int    `json:"deckCardIDs"`
+	MaxResults     int      `json:"maxResults,omitempty"`
+	BudgetMode     bool     `json:"budgetMode,omitempty"`
+	SetRestriction string   `json:"setRestriction,omitempty"`
+	AllowedSets    []string `json:"allowedSets,omitempty"`
+}
+
+// IterativeBuildAroundResponse contains suggestions for iterative deck building.
+type IterativeBuildAroundResponse struct {
+	Suggestions     []*CardWithOwnershipResponse `json:"suggestions"`
+	DeckAnalysis    *LiveDeckAnalysisResponse    `json:"deckAnalysis"`
+	SlotsRemaining  int                          `json:"slotsRemaining"`
+	LandSuggestions []*SuggestedLandResponse     `json:"landSuggestions"`
+}
+
+// LiveDeckAnalysisResponse provides real-time analysis of the deck being built.
+type LiveDeckAnalysisResponse struct {
+	ColorIdentity        []string    `json:"colorIdentity"`
+	Keywords             []string    `json:"keywords"`
+	Themes               []string    `json:"themes"`
+	CurrentCurve         map[int]int `json:"currentCurve"`
+	RecommendedLandCount int         `json:"recommendedLandCount"`
+	TotalCards           int         `json:"totalCards"`
+	InCollectionCount    int         `json:"inCollectionCount"`
+}
+
+// SuggestNextCards generates suggestions based on the current deck composition.
+// This is used for iterative deck building where users pick cards one-by-one.
+func (d *DeckFacade) SuggestNextCards(ctx context.Context, req *IterativeBuildAroundRequest) (*IterativeBuildAroundResponse, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Create seed deck builder
+	builder := recommendations.NewSeedDeckBuilder(
+		d.services.Storage.SetCardRepo(),
+		d.services.Storage.CollectionRepo(),
+		d.services.Storage.StandardRepo(),
+		d.services.CardService,
+	)
+
+	// Convert request
+	builderReq := &recommendations.IterativeBuildAroundRequest{
+		SeedCardID:     req.SeedCardID,
+		DeckCardIDs:    req.DeckCardIDs,
+		MaxResults:     req.MaxResults,
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+
+	result, err := builder.SuggestNextCards(ctx, builderReq)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to suggest cards: %v", err)}
+	}
+
+	// Convert to response type
+	return convertIterativeResponse(result), nil
+}
+
+// convertIterativeResponse converts the internal response to the API response type.
+func convertIterativeResponse(r *recommendations.IterativeBuildAroundResponse) *IterativeBuildAroundResponse {
+	if r == nil {
+		return nil
+	}
+
+	response := &IterativeBuildAroundResponse{
+		SlotsRemaining: r.SlotsRemaining,
+	}
+
+	// Convert suggestions
+	response.Suggestions = make([]*CardWithOwnershipResponse, 0, len(r.Suggestions))
+	for _, card := range r.Suggestions {
+		response.Suggestions = append(response.Suggestions, convertCardWithOwnership(card))
+	}
+
+	// Convert land suggestions
+	response.LandSuggestions = make([]*SuggestedLandResponse, 0, len(r.LandSuggestions))
+	for _, land := range r.LandSuggestions {
+		response.LandSuggestions = append(response.LandSuggestions, &SuggestedLandResponse{
+			CardID:   land.CardID,
+			Name:     land.Name,
+			Quantity: land.Quantity,
+			Color:    land.Color,
+		})
+	}
+
+	// Convert deck analysis
+	if r.DeckAnalysis != nil {
+		response.DeckAnalysis = &LiveDeckAnalysisResponse{
+			ColorIdentity:        r.DeckAnalysis.ColorIdentity,
+			Keywords:             r.DeckAnalysis.Keywords,
+			Themes:               r.DeckAnalysis.Themes,
+			CurrentCurve:         r.DeckAnalysis.CurrentCurve,
+			RecommendedLandCount: r.DeckAnalysis.RecommendedLandCount,
+			TotalCards:           r.DeckAnalysis.TotalCards,
+			InCollectionCount:    r.DeckAnalysis.InCollectionCount,
+		}
+	}
+
+	return response
+}

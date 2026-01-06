@@ -6,6 +6,7 @@ import BuildAroundSeedModal from './BuildAroundSeedModal';
 vi.mock('@/services/api', () => ({
   decks: {
     buildAroundSeed: vi.fn(),
+    suggestNextCards: vi.fn(),
   },
   cards: {
     searchCards: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('@/services/api', () => ({
 import { decks, cards } from '@/services/api';
 
 const mockBuildAroundSeed = vi.mocked(decks.buildAroundSeed);
+const mockSuggestNextCards = vi.mocked(decks.suggestNextCards);
 const mockSearchCards = vi.mocked(cards.searchCards);
 
 beforeEach(() => {
@@ -148,9 +150,9 @@ describe('BuildAroundSeedModal', () => {
     // Click on search result
     fireEvent.click(screen.getByText('Test Build Card'));
 
-    // Should show build button
+    // Should show build button (Quick Build for one-shot mode)
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
   });
 
@@ -187,7 +189,7 @@ describe('BuildAroundSeedModal', () => {
     expect(checkbox).toBeChecked();
   });
 
-  it('should build suggestions when button is clicked', async () => {
+  it('should build suggestions when Quick Build button is clicked', async () => {
     mockSearchCards.mockResolvedValue([
       {
         ArenaID: '12345',
@@ -257,11 +259,11 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Build Around Me'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
     // Click build button
-    fireEvent.click(screen.getByText('Build Around This Card'));
+    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
 
     await waitFor(() => {
       expect(mockBuildAroundSeed).toHaveBeenCalledWith({
@@ -278,7 +280,7 @@ describe('BuildAroundSeedModal', () => {
     });
   });
 
-  it('should show suggestions after build', async () => {
+  it('should show suggestions after Quick Build', async () => {
     mockSearchCards.mockResolvedValue([
       {
         ArenaID: '99999',
@@ -361,10 +363,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Seed Card'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Build Around This Card'));
+    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
 
     // Wait for suggestions to load - check that card names appear
     await waitFor(() => {
@@ -467,10 +469,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Ownership Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Build Around This Card'));
+    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
 
     await waitFor(() => {
       expect(screen.getByText('Own 3')).toBeInTheDocument();
@@ -558,10 +560,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Apply Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Build Around This Card'));
+    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
 
     await waitFor(() => {
       expect(screen.getByText('Apply to Current Deck')).toBeInTheDocument();
@@ -600,10 +602,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Error Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Build Around This Card'));
+    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
 
     await waitFor(() => {
       expect(screen.getByText('API Error')).toBeInTheDocument();
@@ -633,13 +635,335 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Clear Test Card'));
 
     await waitFor(() => {
-      expect(screen.getByText('Build Around This Card')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
     });
 
     // Click clear button
     fireEvent.click(screen.getByRole('button', { name: /clear/i }));
 
     // Build button should be gone
-    expect(screen.queryByText('Build Around This Card')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quick Build (Auto-fill Deck)')).not.toBeInTheDocument();
+  });
+
+  describe('Iterative Mode', () => {
+    const iterativeProps = {
+      isOpen: true,
+      onClose: vi.fn(),
+      onApplyDeck: vi.fn(),
+      onCardAdded: vi.fn(),
+      onFinishDeck: vi.fn(),
+      currentDeckCards: [],
+    };
+
+    it('should show Start Building button when iterative callbacks provided', async () => {
+      mockSearchCards.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Iterative Test',
+          ManaCost: '{W}',
+          Types: ['Creature'],
+          Colors: ['W'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Iterative' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Iterative Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Iterative Test'));
+
+      // Should show both buttons when iterative mode is available
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+        expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      });
+    });
+
+    it('should enter iterative mode when Start Building is clicked', async () => {
+      mockSearchCards.mockResolvedValue([
+        {
+          ArenaID: '54321',
+          Name: 'Start Build Card',
+          ManaCost: '{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [
+          {
+            cardID: 11111,
+            name: 'Suggestion 1',
+            manaCost: '{1}{U}',
+            cmc: 2,
+            colors: ['U'],
+            typeLine: 'Creature',
+            score: 0.9,
+            reasoning: 'Good synergy',
+            inCollection: true,
+            ownedCount: 4,
+            neededCount: 0,
+          },
+        ],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: ['Flying'],
+          themes: ['Control'],
+          currentCurve: { 2: 1 },
+          recommendedLandCount: 24,
+          totalCards: 1,
+          inCollectionCount: 1,
+        },
+        slotsRemaining: 59,
+        landSuggestions: [
+          { cardID: 81717, name: 'Island', quantity: 24, color: 'U' },
+        ],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Start' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Build Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Build Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      // Should show iterative mode UI
+      await waitFor(() => {
+        expect(screen.getByText(/Building:/)).toBeInTheDocument();
+        expect(screen.getByText('59 slots remaining')).toBeInTheDocument();
+      });
+
+      // Should call the API
+      expect(mockSuggestNextCards).toHaveBeenCalledWith({
+        seed_card_id: 54321,
+        deck_card_ids: [],
+        max_results: 15,
+        budget_mode: false,
+      });
+    });
+
+    it('should call onCardAdded when clicking a suggestion in iterative mode', async () => {
+      const onCardAdded = vi.fn();
+
+      mockSearchCards.mockResolvedValue([
+        {
+          ArenaID: '99999',
+          Name: 'Pick Cards Test',
+          ManaCost: '{G}',
+          Types: ['Creature'],
+          Colors: ['G'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      const mockCard = {
+        cardID: 22222,
+        name: 'Pickable Suggestion',
+        manaCost: '{1}{G}',
+        cmc: 2,
+        colors: ['G'],
+        typeLine: 'Creature',
+        score: 0.85,
+        reasoning: 'Synergy',
+        inCollection: true,
+        ownedCount: 4,
+        neededCount: 0,
+      };
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [mockCard],
+        deckAnalysis: {
+          colorIdentity: ['G'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(
+        <BuildAroundSeedModal
+          {...iterativeProps}
+          onCardAdded={onCardAdded}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Pick' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Pick Cards Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Pick Cards Test'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      // Wait for iterative mode to load - look for the clickable grid container
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Find the clickable suggestion card and click it
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      expect(suggestionCards.length).toBeGreaterThan(0);
+      fireEvent.click(suggestionCards[0]);
+
+      expect(onCardAdded).toHaveBeenCalledWith(mockCard);
+    });
+
+    it('should call onFinishDeck with land suggestions when Finish Deck is clicked', async () => {
+      const onFinishDeck = vi.fn();
+
+      mockSearchCards.mockResolvedValue([
+        {
+          ArenaID: '11111',
+          Name: 'Finish Deck Test',
+          ManaCost: '{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      const mockLands = [
+        { cardID: 81719, name: 'Mountain', quantity: 22, color: 'R' },
+      ];
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [],
+        deckAnalysis: {
+          colorIdentity: ['R'],
+          keywords: [],
+          themes: [],
+          currentCurve: { 1: 8, 2: 10, 3: 8, 4: 4, 5: 2 },
+          recommendedLandCount: 22,
+          totalCards: 32,
+          inCollectionCount: 32,
+        },
+        slotsRemaining: 28, // Less than 30 so Finish Deck is enabled
+        landSuggestions: mockLands,
+      });
+
+      render(
+        <BuildAroundSeedModal
+          {...iterativeProps}
+          onFinishDeck={onFinishDeck}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Finish' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Finish Deck Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Finish Deck Test'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      // Wait for iterative mode to load
+      await waitFor(() => {
+        expect(screen.getByText('28 slots remaining')).toBeInTheDocument();
+      });
+
+      // Click Finish Deck button
+      const finishButton = screen.getByText('Finish Deck (Add Lands)');
+      fireEvent.click(finishButton);
+
+      expect(onFinishDeck).toHaveBeenCalledWith(mockLands);
+    });
+
+    it('should display deck analysis in iterative mode', async () => {
+      mockSearchCards.mockResolvedValue([
+        {
+          ArenaID: '88888',
+          Name: 'Analysis Test',
+          ManaCost: '{B}{G}',
+          Types: ['Creature'],
+          Colors: ['B', 'G'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [],
+        deckAnalysis: {
+          colorIdentity: ['B', 'G'],
+          keywords: ['Deathtouch', 'Trample'],
+          themes: ['Graveyard', 'Ramp'],
+          currentCurve: { 1: 4, 2: 6, 3: 5, 4: 3 },
+          recommendedLandCount: 24,
+          totalCards: 18,
+          inCollectionCount: 15,
+        },
+        slotsRemaining: 42,
+        landSuggestions: [
+          { cardID: 81718, name: 'Swamp', quantity: 12, color: 'B' },
+          { cardID: 81720, name: 'Forest', quantity: 12, color: 'G' },
+        ],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Analysis' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Analysis Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Analysis Test'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      // Wait for analysis to load
+      await waitFor(() => {
+        expect(screen.getByText('Deck Analysis')).toBeInTheDocument();
+      });
+
+      // Check analysis content
+      expect(screen.getByText(/Total Cards: 18/)).toBeInTheDocument();
+      expect(screen.getByText(/Recommended Lands: 24/)).toBeInTheDocument();
+
+      // Check themes are displayed
+      expect(screen.getByText('Graveyard')).toBeInTheDocument();
+      expect(screen.getByText('Ramp')).toBeInTheDocument();
+    });
   });
 });

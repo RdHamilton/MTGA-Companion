@@ -378,3 +378,48 @@ export async function buildAroundSeed(
 ): Promise<BuildAroundSeedResponse> {
   return post<BuildAroundSeedResponse>('/decks/build-around', request);
 }
+
+/**
+ * Request for iterative deck building suggestions.
+ */
+export interface IterativeBuildAroundRequest {
+  seed_card_id: number;
+  deck_card_ids: number[];
+  max_results?: number;
+  budget_mode?: boolean;
+  set_restriction?: 'single' | 'multiple' | 'all';
+  allowed_sets?: string[];
+}
+
+/**
+ * Live analysis of the deck being built.
+ */
+export interface LiveDeckAnalysis {
+  colorIdentity: string[];
+  keywords: string[];
+  themes: string[];
+  currentCurve: Record<number, number>;
+  recommendedLandCount: number;
+  totalCards: number;
+  inCollectionCount: number;
+}
+
+/**
+ * Response from iterative build-around endpoint.
+ */
+export interface IterativeBuildAroundResponse {
+  suggestions: CardWithOwnership[];
+  deckAnalysis: LiveDeckAnalysis;
+  slotsRemaining: number;
+  landSuggestions: SuggestedLandResponse[];
+}
+
+/**
+ * Get next card suggestions for iterative deck building.
+ * Called as user picks cards one-by-one.
+ */
+export async function suggestNextCards(
+  request: IterativeBuildAroundRequest
+): Promise<IterativeBuildAroundResponse> {
+  return post<IterativeBuildAroundResponse>('/decks/build-around/suggest-next', request);
+}

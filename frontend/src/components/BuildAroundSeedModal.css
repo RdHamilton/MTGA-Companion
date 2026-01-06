@@ -483,3 +483,265 @@
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary, #fff);
 }
+
+/* Iterative Mode Styles */
+.build-around-modal.iterative-mode {
+  max-width: 1000px;
+}
+
+.iterative-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.slots-remaining {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary, #aaa);
+}
+
+/* Iterative Suggestions */
+.iterative-suggestions {
+  margin-bottom: 20px;
+}
+
+.iterative-suggestions h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+}
+
+.suggestions-clickable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.clickable-suggestion-card {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  background: rgba(255, 255, 255, 0.05);
+  aspect-ratio: 0.71;
+}
+
+.clickable-suggestion-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.clickable-suggestion-card .suggestion-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.clickable-suggestion-card .suggestion-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  gap: 8px;
+}
+
+.clickable-suggestion-card .suggestion-placeholder .card-name {
+  color: var(--text-primary, #fff);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.clickable-suggestion-card .suggestion-placeholder .card-mana {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.75rem;
+}
+
+.suggestion-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.suggestion-overlay .card-name {
+  color: var(--text-primary, #fff);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Live Deck Analysis */
+.live-deck-analysis {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.live-deck-analysis h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #fff);
+  font-size: 1rem;
+}
+
+.analysis-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+}
+
+.mana-curve-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.85rem;
+}
+
+.curve-pip {
+  padding: 2px 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
+  color: var(--accent-color, #6366f1);
+  font-size: 0.75rem;
+}
+
+/* Land Suggestions Preview */
+.land-suggestions-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.land-suggestions-preview h4 {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.875rem;
+}
+
+.land-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.land-item {
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  color: var(--text-primary, #fff);
+  font-size: 0.8rem;
+}
+
+/* Build Mode Buttons */
+.build-mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.build-button.primary {
+  background: var(--accent-color, #6366f1);
+}
+
+.build-button.primary:hover:not(:disabled) {
+  background: #5558e3;
+}
+
+.build-button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color, #333);
+}
+
+.build-button.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Current Deck Cards Section */
+.current-deck-cards {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.current-deck-cards h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #fff);
+  font-size: 0.9rem;
+}
+
+.deck-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deck-card-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.deck-card-item .card-quantity {
+  color: var(--accent-color, #6366f1);
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.deck-card-item .card-name {
+  flex: 1;
+  color: var(--text-primary, #fff);
+  font-size: 0.85rem;
+}
+
+.remove-card-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--error-color, #ef4444);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: bold;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.remove-card-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
