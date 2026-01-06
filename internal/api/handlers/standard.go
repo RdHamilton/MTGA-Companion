@@ -185,6 +185,18 @@ func validateDeckForStandard(cards []*models.DeckCard, legalities map[string]*mo
 			if basicLands[cardName] {
 				continue
 			}
+			// If card name is unavailable, we can't determine if it's a basic land
+			// Skip validation to avoid false positives
+			if cardName == "" {
+				var cardID int
+				_, _ = fmt.Sscanf(arenaID, "%d", &cardID)
+				result.Warnings = append(result.Warnings, models.ValidationWarning{
+					CardID:  cardID,
+					Type:    "unknown_card",
+					Details: fmt.Sprintf("Cannot validate 4-copy rule - card name unavailable (has %d copies)", count),
+				})
+				continue
+			}
 			result.IsLegal = false
 			var cardID int
 			_, _ = fmt.Sscanf(arenaID, "%d", &cardID) // Ignore error - cardID defaults to 0
