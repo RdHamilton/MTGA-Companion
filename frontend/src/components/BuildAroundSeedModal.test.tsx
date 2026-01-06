@@ -58,7 +58,7 @@ describe('BuildAroundSeedModal', () => {
       />
     );
 
-    const closeButton = screen.getByRole('button', { name: /×/ });
+    const closeButton = screen.getByRole('button', { name: /close dialog/i });
     fireEvent.click(closeButton);
 
     expect(onClose).toHaveBeenCalled();

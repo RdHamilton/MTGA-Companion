@@ -826,7 +826,7 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 	landSuggestions := s.suggestLandsForDeck(deckAnalysis)
 
 	// Build live deck analysis
-	liveAnalysis := s.buildLiveDeckAnalysis(deckAnalysis, collection)
+	liveAnalysis := s.buildLiveDeckAnalysis(deckAnalysis, collection, req.DeckCardIDs)
 
 	return &IterativeBuildAroundResponse{
 		Suggestions:     suggestions,
@@ -1183,7 +1183,7 @@ func (s *SeedDeckBuilder) suggestLandsForDeck(deckAnalysis *CollectiveDeckAnalys
 }
 
 // buildLiveDeckAnalysis builds real-time analysis for the response.
-func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnalysis, collection map[int]int) *LiveDeckAnalysis {
+func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnalysis, collection map[int]int, cardIDs []int) *LiveDeckAnalysis {
 	// Extract top colors
 	colors := make([]string, 0)
 	for color := range deckAnalysis.Colors {
@@ -1228,6 +1228,14 @@ func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnal
 		}
 	}
 
+	// Calculate how many deck cards are in the collection
+	inCollectionCount := 0
+	for _, cardID := range cardIDs {
+		if collection[cardID] > 0 {
+			inCollectionCount++
+		}
+	}
+
 	return &LiveDeckAnalysis{
 		ColorIdentity:        colors,
 		Keywords:             keywords,
@@ -1235,6 +1243,6 @@ func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnal
 		CurrentCurve:         deckAnalysis.ManaCurve,
 		RecommendedLandCount: recommendedLands,
 		TotalCards:           deckAnalysis.TotalCards,
-		InCollectionCount:    0, // Would need additional calculation
+		InCollectionCount:    inCollectionCount,
 	}
 }

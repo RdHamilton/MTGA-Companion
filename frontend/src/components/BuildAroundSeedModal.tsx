@@ -61,6 +61,18 @@ export default function BuildAroundSeedModal({
   // Map of cardID to card name for display purposes
   const [cardNameMap, setCardNameMap] = useState<Map<number, string>>(new Map());
 
+  // Define handleClose before useEffects that depend on it
+  const handleClose = useCallback(() => {
+    // Reset state
+    setIterativeMode(false);
+    setSeedCardId(null);
+    setIterativeSuggestions([]);
+    setDeckAnalysis(null);
+    setLandSuggestions([]);
+    setCardNameMap(new Map());
+    onClose();
+  }, [onClose]);
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => {
@@ -69,6 +81,18 @@ export default function BuildAroundSeedModal({
       }
     };
   }, []);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, handleClose]);
 
   // Fetch suggestions when in iterative mode and deck changes
   const fetchIterativeSuggestions = useCallback(async () => {
@@ -229,17 +253,6 @@ export default function BuildAroundSeedModal({
     }
   };
 
-  const handleClose = () => {
-    // Reset state
-    setIterativeMode(false);
-    setSeedCardId(null);
-    setIterativeSuggestions([]);
-    setDeckAnalysis(null);
-    setLandSuggestions([]);
-    setCardNameMap(new Map());
-    onClose();
-  };
-
   const handleClear = () => {
     setSearchQuery('');
     setSearchResults([]);
@@ -279,10 +292,16 @@ export default function BuildAroundSeedModal({
   if (iterativeMode && selectedCard) {
     return (
       <div className="build-around-overlay" onClick={handleClose}>
-        <div className="build-around-modal iterative-mode" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="build-around-modal iterative-mode"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="iterative-modal-title"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="build-around-header">
-            <h2>Building: {selectedCard.name}</h2>
-            <button className="close-button" onClick={handleClose}>
+            <h2 id="iterative-modal-title">Building: {selectedCard.name}</h2>
+            <button className="close-button" onClick={handleClose} aria-label="Close dialog">
               &times;
             </button>
           </div>
@@ -417,9 +436,13 @@ export default function BuildAroundSeedModal({
                 className="action-btn apply-btn"
                 onClick={handleFinishDeck}
                 disabled={slotsRemaining > 30}
+                title={slotsRemaining > 30 ? `Add at least ${slotsRemaining - 30} more cards before finishing` : 'Complete deck with lands'}
               >
                 Finish Deck (Add Lands)
               </button>
+              {slotsRemaining > 30 && (
+                <p className="helper-text">Add at least {slotsRemaining - 30} more cards to finish</p>
+              )}
               <button
                 className="action-btn cancel-btn"
                 onClick={handleClose}
@@ -436,10 +459,16 @@ export default function BuildAroundSeedModal({
   // Original seed selection UI
   return (
     <div className="build-around-overlay" onClick={handleClose}>
-      <div className="build-around-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="build-around-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="seed-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="build-around-header">
-          <h2>Build Around Card</h2>
-          <button className="close-button" onClick={handleClose}>
+          <h2 id="seed-modal-title">Build Around Card</h2>
+          <button className="close-button" onClick={handleClose} aria-label="Close dialog">
             &times;
           </button>
         </div>

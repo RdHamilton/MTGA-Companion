@@ -745,3 +745,11 @@
 .remove-card-btn:hover {
   background: rgba(239, 68, 68, 0.4);
 }
+
+/* Helper text for disabled buttons */
+.suggestions-actions .helper-text {
+  margin: 8px 0 0 0;
+  color: var(--warning-color, #f59e0b);
+  font-size: 0.85rem;
+  text-align: center;
+}
