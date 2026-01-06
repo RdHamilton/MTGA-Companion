@@ -266,7 +266,7 @@ func (r *gamePlayRepository) CreateSnapshots(ctx context.Context, snapshots []*m
 
 	for _, snapshot := range snapshots {
 		timestampStr := snapshot.Timestamp.UTC().Format("2006-01-02 15:04:05.999999")
-		result, err := stmt.ExecContext(ctx,
+		_, err := stmt.ExecContext(ctx,
 			snapshot.GameID,
 			snapshot.MatchID,
 			snapshot.TurnNumber,
@@ -284,9 +284,14 @@ func (r *gamePlayRepository) CreateSnapshots(ctx context.Context, snapshots []*m
 			return fmt.Errorf("failed to insert game state snapshot: %w", err)
 		}
 
-		id, err := result.LastInsertId()
+		// Query for the actual ID since LastInsertId is unreliable for upserts
+		var id int64
+		err = tx.QueryRowContext(ctx,
+			`SELECT id FROM game_state_snapshots WHERE game_id = ? AND turn_number = ?`,
+			snapshot.GameID, snapshot.TurnNumber,
+		).Scan(&id)
 		if err != nil {
-			return fmt.Errorf("failed to get last insert id: %w", err)
+			return fmt.Errorf("failed to get snapshot id: %w", err)
 		}
 		snapshot.ID = int(id)
 	}
