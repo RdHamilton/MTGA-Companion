@@ -304,3 +304,77 @@ export async function removeCard(request: {
 }): Promise<void> {
   await del(`/decks/${request.deck_id}/cards/${request.arena_id}?zone=${request.zone}`);
 }
+
+/**
+ * Request to build a deck around a seed card.
+ */
+export interface BuildAroundSeedRequest {
+  seed_card_id: number;
+  max_results?: number;
+  budget_mode?: boolean;
+  set_restriction?: 'single' | 'multiple' | 'all';
+  allowed_sets?: string[];
+}
+
+/**
+ * Card suggestion with ownership information.
+ */
+export interface CardWithOwnership {
+  cardID: number;
+  name: string;
+  manaCost?: string;
+  cmc: number;
+  colors: string[];
+  typeLine: string;
+  rarity?: string;
+  imageURI?: string;
+  score: number;
+  reasoning: string;
+  inCollection: boolean;
+  ownedCount: number;
+  neededCount: number;
+}
+
+/**
+ * Suggested land for a deck.
+ */
+export interface SuggestedLandResponse {
+  cardID: number;
+  name: string;
+  quantity: number;
+  color: string;
+}
+
+/**
+ * Analysis of seed deck suggestions.
+ */
+export interface SeedDeckAnalysis {
+  colorIdentity: string[];
+  keywords: string[];
+  themes: string[];
+  idealCurve: Record<number, number>;
+  suggestedLandCount: number;
+  totalCards: number;
+  inCollectionCount: number;
+  missingCount: number;
+  missingWildcardCost: Record<string, number>;
+}
+
+/**
+ * Response from build around seed endpoint.
+ */
+export interface BuildAroundSeedResponse {
+  seedCard: CardWithOwnership;
+  suggestions: CardWithOwnership[];
+  lands: SuggestedLandResponse[];
+  analysis: SeedDeckAnalysis;
+}
+
+/**
+ * Build a deck around a seed card.
+ */
+export async function buildAroundSeed(
+  request: BuildAroundSeedRequest
+): Promise<BuildAroundSeedResponse> {
+  return post<BuildAroundSeedResponse>('/decks/build-around', request);
+}

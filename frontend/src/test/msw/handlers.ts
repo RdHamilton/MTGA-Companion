@@ -247,6 +247,91 @@ export const handlers = [
       commander: 'legal',
     });
   }),
+
+  // Build around seed endpoint
+  http.post(`${API_BASE}/decks/build-around`, () => {
+    return successResponse({
+      seedCard: {
+        cardID: 12345,
+        name: 'Test Seed Card',
+        manaCost: '{2}{W}',
+        cmc: 3,
+        colors: ['W'],
+        typeLine: 'Creature - Human',
+        rarity: 'rare',
+        imageURI: 'https://example.com/card.jpg',
+        score: 1.0,
+        reasoning: 'This is your build-around card.',
+        inCollection: true,
+        ownedCount: 4,
+        neededCount: 0,
+      },
+      suggestions: [
+        {
+          cardID: 11111,
+          name: 'Suggested Card 1',
+          manaCost: '{1}{W}',
+          cmc: 2,
+          colors: ['W'],
+          typeLine: 'Creature - Soldier',
+          rarity: 'uncommon',
+          score: 0.85,
+          reasoning: 'Synergizes with your strategy',
+          inCollection: true,
+          ownedCount: 3,
+          neededCount: 1,
+        },
+        {
+          cardID: 22222,
+          name: 'Suggested Card 2',
+          manaCost: '{2}{W}',
+          cmc: 3,
+          colors: ['W'],
+          typeLine: 'Instant',
+          rarity: 'rare',
+          score: 0.78,
+          reasoning: 'Good curve fit',
+          inCollection: false,
+          ownedCount: 0,
+          neededCount: 4,
+        },
+      ],
+      lands: [
+        { cardID: 81716, name: 'Plains', quantity: 24, color: 'W' },
+      ],
+      analysis: {
+        colorIdentity: ['W'],
+        keywords: ['lifelink', 'vigilance'],
+        themes: ['tokens'],
+        idealCurve: { 1: 4, 2: 8, 3: 8, 4: 6, 5: 4, 6: 2 },
+        suggestedLandCount: 24,
+        totalCards: 60,
+        inCollectionCount: 40,
+        missingCount: 16,
+        missingWildcardCost: { rare: 8, uncommon: 4, common: 4 },
+      },
+    });
+  }),
+
+  // Card search endpoint
+  http.get(`${API_BASE}/cards`, ({ request }) => {
+    const url = new URL(request.url);
+    const name = url.searchParams.get('name') || '';
+    if (name.toLowerCase().includes('test')) {
+      return successResponse([
+        {
+          arenaID: 12345,
+          name: 'Test Card',
+          manaCost: '{2}{W}',
+          cmc: 3,
+          typeLine: 'Creature - Human',
+          colors: ['W'],
+          imageURI: 'https://example.com/test.jpg',
+        },
+      ]);
+    }
+    return successResponse([]);
+  }),
 ];
 
 /**

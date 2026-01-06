@@ -761,3 +761,42 @@ func (h *DeckHandler) ExportSuggestedDeck(w http.ResponseWriter, r *http.Request
 		"message":    "Use the suggestion data to export via frontend",
 	})
 }
+
+// BuildAroundSeedRequest represents a request to build a deck around a seed card.
+type BuildAroundSeedRequest struct {
+	SeedCardID     int      `json:"seed_card_id"`
+	MaxResults     int      `json:"max_results,omitempty"`
+	BudgetMode     bool     `json:"budget_mode,omitempty"`
+	SetRestriction string   `json:"set_restriction,omitempty"`
+	AllowedSets    []string `json:"allowed_sets,omitempty"`
+}
+
+// BuildAroundSeed generates deck suggestions based on a seed card.
+func (h *DeckHandler) BuildAroundSeed(w http.ResponseWriter, r *http.Request) {
+	var req BuildAroundSeedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.SeedCardID <= 0 {
+		response.BadRequest(w, errors.New("seed_card_id is required"))
+		return
+	}
+
+	guiReq := &gui.BuildAroundSeedRequest{
+		SeedCardID:     req.SeedCardID,
+		MaxResults:     req.MaxResults,
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+
+	result, err := h.facade.BuildAroundSeed(r.Context(), guiReq)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
+}

@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { decks, drafts } from '@/services/api';
+import type { CardWithOwnership, SuggestedLandResponse } from '@/services/api/decks';
 import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
 import SuggestDecksModal from '../components/SuggestDecksModal';
+import BuildAroundSeedModal from '../components/BuildAroundSeedModal';
 import './DeckBuilder.css';
 
 // Export deck to file using native file save dialog
@@ -34,6 +36,7 @@ export default function DeckBuilder() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [addingLands, setAddingLands] = useState(false);
   const [showSuggestDecks, setShowSuggestDecks] = useState(false);
+  const [showBuildAround, setShowBuildAround] = useState(false);
 
   // Load deck data
   useEffect(() => {
@@ -392,6 +395,54 @@ export default function DeckBuilder() {
     setStatistics(stats);
   };
 
+  const handleApplyBuildAround = async (suggestions: CardWithOwnership[], lands: SuggestedLandResponse[]) => {
+    if (!deck) return;
+
+    try {
+      // Clear existing cards first
+      for (const card of cards) {
+        await decks.removeCard({
+          deck_id: deck.ID,
+          arena_id: card.CardID,
+          zone: card.Board,
+        });
+      }
+
+      // Add suggested cards (4 copies each)
+      for (const card of suggestions.slice(0, 36)) { // Leave room for lands (60 - 24 lands = 36 spells)
+        await decks.addCard({
+          deck_id: deck.ID,
+          arena_id: card.cardID,
+          quantity: 4, // Default to 4 copies
+          zone: 'main',
+          is_sideboard: false,
+        });
+      }
+
+      // Add lands
+      for (const land of lands) {
+        await decks.addCard({
+          deck_id: deck.ID,
+          arena_id: land.cardID,
+          quantity: land.quantity,
+          zone: 'main',
+          is_sideboard: false,
+        });
+      }
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+    } catch (err) {
+      console.error('Failed to apply build-around suggestions:', err);
+      alert(err instanceof Error ? err.message : 'Failed to apply suggestions');
+    }
+  };
+
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(
     cards.map((card) => [
@@ -554,6 +605,15 @@ export default function DeckBuilder() {
               Suggest Decks
             </button>
           )}
+          {deck.Source !== 'draft' && (
+            <button
+              className="action-button build-around-btn"
+              title="Build a deck around a specific card"
+              onClick={() => setShowBuildAround(true)}
+            >
+              Build Around
+            </button>
+          )}
         </div>
       </div>
 
@@ -568,6 +628,13 @@ export default function DeckBuilder() {
           onDeckApplied={handleDeckApplied}
         />
       )}
+
+      {/* Build Around Seed Modal */}
+      <BuildAroundSeedModal
+        isOpen={showBuildAround}
+        onClose={() => setShowBuildAround(false)}
+        onApplyDeck={handleApplyBuildAround}
+      />
     </div>
   );
 }
