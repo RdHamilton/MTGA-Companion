@@ -734,13 +734,14 @@ test.describe('Data Pipeline - Log to UI', () => {
           // Click the deck and wait for navigation
           await nonDraftDeck.click();
 
-          // Wait for DeckBuilder to load (more reliable than URL pattern)
-          const deckBuilder = page.locator('.deck-builder');
-          await expect(deckBuilder).toBeVisible({ timeout: 15000 });
+          // Wait for DeckBuilder content to fully load (not just the loading state)
+          // The loading state also has class .deck-builder, so we wait for the content area
+          const deckBuilderContent = page.locator('.deck-builder-content');
+          await expect(deckBuilderContent).toBeVisible({ timeout: 15000 });
 
-          // Build Around button should exist
+          // Build Around button should exist for non-draft decks
           const buildAroundButton = page.locator('button.build-around-btn');
-          await expect(buildAroundButton).toBeVisible();
+          await expect(buildAroundButton).toBeVisible({ timeout: 5000 });
         }
       }
     });
@@ -766,15 +767,15 @@ test.describe('Data Pipeline - Log to UI', () => {
         if (hasDraft) {
           await draftDeck.click();
 
-          // Wait for DeckBuilder to load (more reliable than URL pattern)
-          const deckBuilder = page.locator('.deck-builder');
-          await expect(deckBuilder).toBeVisible({ timeout: 15000 });
+          // Wait for DeckBuilder content to fully load (not just the loading state)
+          const deckBuilderContent = page.locator('.deck-builder-content');
+          await expect(deckBuilderContent).toBeVisible({ timeout: 15000 });
 
           // Suggest Decks should be visible, Build Around should NOT be visible
           const suggestDecksButton = page.locator('button.suggest-decks-btn');
           const buildAroundButton = page.locator('button.build-around-btn');
 
-          await expect(suggestDecksButton).toBeVisible();
+          await expect(suggestDecksButton).toBeVisible({ timeout: 5000 });
           await expect(buildAroundButton).not.toBeVisible();
         }
       }
