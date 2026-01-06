@@ -137,7 +137,10 @@ func createTestMatch(t *testing.T, db *sql.DB, matchID string) int {
 		t.Fatalf("failed to create test game: %v", err)
 	}
 
-	gameID, _ := result.LastInsertId()
+	gameID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to get last insert id: %v", err)
+	}
 	return int(gameID)
 }
 
@@ -429,8 +432,14 @@ func TestGamePlayRepository_GetPlaysByGame(t *testing.T) {
 
 	// Create a second game for the same match
 	now := time.Now().UTC().Format("2006-01-02 15:04:05.999999")
-	result, _ := db.Exec(`INSERT INTO games (match_id, game_number, result, created_at) VALUES (?, 2, 'loss', ?)`, "match-007", now)
-	gameID2, _ := result.LastInsertId()
+	result, err := db.Exec(`INSERT INTO games (match_id, game_number, result, created_at) VALUES (?, 2, 'loss', ?)`, "match-007", now)
+	if err != nil {
+		t.Fatalf("failed to create second test game: %v", err)
+	}
+	gameID2, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to get last insert id for second game: %v", err)
+	}
 
 	repo := NewGamePlayRepository(db)
 	ctx := context.Background()

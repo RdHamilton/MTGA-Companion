@@ -22,8 +22,21 @@ func NewGamePlayHandler(storage *storage.Service) *GamePlayHandler {
 	return &GamePlayHandler{storage: storage}
 }
 
+// checkStorage validates the storage service is available.
+func (h *GamePlayHandler) checkStorage(w http.ResponseWriter) bool {
+	if h.storage == nil {
+		response.ServiceUnavailable(w, errors.New("storage service unavailable"))
+		return false
+	}
+	return true
+}
+
 // GetMatchPlays returns all plays for a specific match.
 func (h *GamePlayHandler) GetMatchPlays(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	matchID := chi.URLParam(r, "matchID")
 	if matchID == "" {
 		response.BadRequest(w, errors.New("match ID is required"))
@@ -43,8 +56,22 @@ func (h *GamePlayHandler) GetMatchPlays(w http.ResponseWriter, r *http.Request) 
 	response.Success(w, plays)
 }
 
+// TimelineEntryResponse is the API response format for timeline entries.
+// It splits plays by player type for easier frontend consumption.
+type TimelineEntryResponse struct {
+	Turn          int                       `json:"turn"`
+	ActivePlayer  string                    `json:"active_player"`
+	PlayerPlays   []*models.GamePlay        `json:"player_plays"`
+	OpponentPlays []*models.GamePlay        `json:"opponent_plays"`
+	Snapshot      *models.GameStateSnapshot `json:"snapshot,omitempty"`
+}
+
 // GetMatchTimeline returns plays organized by turn for a specific match.
 func (h *GamePlayHandler) GetMatchTimeline(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	matchID := chi.URLParam(r, "matchID")
 	if matchID == "" {
 		response.BadRequest(w, errors.New("match ID is required"))
@@ -57,15 +84,43 @@ func (h *GamePlayHandler) GetMatchTimeline(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if timeline == nil {
-		timeline = []*models.PlayTimelineEntry{}
+	// Transform backend model to frontend-expected format
+	result := make([]*TimelineEntryResponse, 0, len(timeline))
+	for _, entry := range timeline {
+		resp := &TimelineEntryResponse{
+			Turn:          entry.Turn,
+			ActivePlayer:  entry.Phase, // Use phase as active player indicator
+			PlayerPlays:   make([]*models.GamePlay, 0),
+			OpponentPlays: make([]*models.GamePlay, 0),
+			Snapshot:      entry.Snapshot,
+		}
+
+		// Split plays by player type
+		for _, play := range entry.Plays {
+			if play.PlayerType == models.PlayerTypePlayer {
+				resp.PlayerPlays = append(resp.PlayerPlays, play)
+			} else {
+				resp.OpponentPlays = append(resp.OpponentPlays, play)
+			}
+		}
+
+		// Determine active player from snapshot if available
+		if entry.Snapshot != nil && entry.Snapshot.ActivePlayer != "" {
+			resp.ActivePlayer = entry.Snapshot.ActivePlayer
+		}
+
+		result = append(result, resp)
 	}
 
-	response.Success(w, timeline)
+	response.Success(w, result)
 }
 
 // GetMatchOpponentCards returns cards observed from the opponent during a match.
 func (h *GamePlayHandler) GetMatchOpponentCards(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	matchID := chi.URLParam(r, "matchID")
 	if matchID == "" {
 		response.BadRequest(w, errors.New("match ID is required"))
@@ -87,6 +142,10 @@ func (h *GamePlayHandler) GetMatchOpponentCards(w http.ResponseWriter, r *http.R
 
 // GetMatchSnapshots returns game state snapshots for a specific match.
 func (h *GamePlayHandler) GetMatchSnapshots(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	matchID := chi.URLParam(r, "matchID")
 	if matchID == "" {
 		response.BadRequest(w, errors.New("match ID is required"))
@@ -128,6 +187,10 @@ func (h *GamePlayHandler) GetMatchSnapshots(w http.ResponseWriter, r *http.Reque
 
 // GetMatchPlaySummary returns a summary of plays for a match.
 func (h *GamePlayHandler) GetMatchPlaySummary(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	matchID := chi.URLParam(r, "matchID")
 	if matchID == "" {
 		response.BadRequest(w, errors.New("match ID is required"))
@@ -158,6 +221,10 @@ func (h *GamePlayHandler) GetMatchPlaySummary(w http.ResponseWriter, r *http.Req
 
 // GetPlaysByGame returns all plays for a specific game within a match.
 func (h *GamePlayHandler) GetPlaysByGame(w http.ResponseWriter, r *http.Request) {
+	if !h.checkStorage(w) {
+		return
+	}
+
 	gameIDStr := chi.URLParam(r, "gameID")
 	if gameIDStr == "" {
 		response.BadRequest(w, errors.New("game ID is required"))

@@ -192,7 +192,7 @@ func (r *gamePlayRepository) CreateSnapshot(ctx context.Context, snapshot *model
 
 	timestampStr := snapshot.Timestamp.UTC().Format("2006-01-02 15:04:05.999999")
 
-	result, err := r.db.ExecContext(ctx, query,
+	_, err := r.db.ExecContext(ctx, query,
 		snapshot.GameID,
 		snapshot.MatchID,
 		snapshot.TurnNumber,
@@ -210,9 +210,14 @@ func (r *gamePlayRepository) CreateSnapshot(ctx context.Context, snapshot *model
 		return fmt.Errorf("failed to create game state snapshot: %w", err)
 	}
 
-	id, err := result.LastInsertId()
+	// Query for the actual ID since LastInsertId is unreliable for upserts
+	var id int64
+	err = r.db.QueryRowContext(ctx,
+		`SELECT id FROM game_state_snapshots WHERE game_id = ? AND turn_number = ?`,
+		snapshot.GameID, snapshot.TurnNumber,
+	).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("failed to get last insert id: %w", err)
+		return fmt.Errorf("failed to get snapshot id: %w", err)
 	}
 	snapshot.ID = int(id)
 
@@ -304,7 +309,7 @@ func (r *gamePlayRepository) RecordOpponentCard(ctx context.Context, card *model
 			zone_observed = excluded.zone_observed
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
+	_, err := r.db.ExecContext(ctx, query,
 		card.GameID,
 		card.MatchID,
 		card.CardID,
@@ -317,9 +322,14 @@ func (r *gamePlayRepository) RecordOpponentCard(ctx context.Context, card *model
 		return fmt.Errorf("failed to record opponent card: %w", err)
 	}
 
-	id, err := result.LastInsertId()
+	// Query for the actual ID since LastInsertId is unreliable for upserts
+	var id int64
+	err = r.db.QueryRowContext(ctx,
+		`SELECT id FROM opponent_cards_observed WHERE game_id = ? AND card_id = ?`,
+		card.GameID, card.CardID,
+	).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("failed to get last insert id: %w", err)
+		return fmt.Errorf("failed to get opponent card id: %w", err)
 	}
 	card.ID = int(id)
 
@@ -466,36 +476,43 @@ func (r *gamePlayRepository) GetPlayTimeline(ctx context.Context, matchID string
 		return nil, err
 	}
 
-	// Build snapshot lookup by turn
-	snapshotByTurn := make(map[int]*models.GameStateSnapshot)
+	// Build snapshot lookup by game_id and turn to avoid collisions across games
+	type gameIDTurnKey struct {
+		GameID int
+		Turn   int
+	}
+	snapshotByGameTurn := make(map[gameIDTurnKey]*models.GameStateSnapshot)
 	for _, snapshot := range snapshots {
-		snapshotByTurn[snapshot.TurnNumber] = snapshot
+		key := gameIDTurnKey{GameID: snapshot.GameID, Turn: snapshot.TurnNumber}
+		snapshotByGameTurn[key] = snapshot
 	}
 
-	// Group plays by turn and phase
-	type turnPhaseKey struct {
-		Turn  int
-		Phase string
+	// Group plays by game_id, turn and phase
+	type gameTurnPhaseKey struct {
+		GameID int
+		Turn   int
+		Phase  string
 	}
-	playsByTurnPhase := make(map[turnPhaseKey][]*models.GamePlay)
-	var turnPhaseOrder []turnPhaseKey
+	playsByGameTurnPhase := make(map[gameTurnPhaseKey][]*models.GamePlay)
+	var turnPhaseOrder []gameTurnPhaseKey
 
 	for _, play := range plays {
-		key := turnPhaseKey{Turn: play.TurnNumber, Phase: play.Phase}
-		if _, exists := playsByTurnPhase[key]; !exists {
+		key := gameTurnPhaseKey{GameID: play.GameID, Turn: play.TurnNumber, Phase: play.Phase}
+		if _, exists := playsByGameTurnPhase[key]; !exists {
 			turnPhaseOrder = append(turnPhaseOrder, key)
 		}
-		playsByTurnPhase[key] = append(playsByTurnPhase[key], play)
+		playsByGameTurnPhase[key] = append(playsByGameTurnPhase[key], play)
 	}
 
 	// Build timeline entries
 	var timeline []*models.PlayTimelineEntry
 	for _, key := range turnPhaseOrder {
+		snapshotKey := gameIDTurnKey{GameID: key.GameID, Turn: key.Turn}
 		entry := &models.PlayTimelineEntry{
 			Turn:     key.Turn,
 			Phase:    key.Phase,
-			Plays:    playsByTurnPhase[key],
-			Snapshot: snapshotByTurn[key.Turn],
+			Plays:    playsByGameTurnPhase[key],
+			Snapshot: snapshotByGameTurn[snapshotKey],
 		}
 		timeline = append(timeline, entry)
 	}

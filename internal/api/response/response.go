@@ -76,6 +76,11 @@ func InternalError(w http.ResponseWriter, err error) {
 	Error(w, http.StatusInternalServerError, err)
 }
 
+// ServiceUnavailable writes a 503 Service Unavailable response.
+func ServiceUnavailable(w http.ResponseWriter, err error) {
+	Error(w, http.StatusServiceUnavailable, err)
+}
+
 // Paginated writes a paginated response.
 func Paginated(w http.ResponseWriter, data interface{}, page, pageSize, totalCount int) {
 	totalPages := (totalCount + pageSize - 1) / pageSize
