@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { decks, cards as cardsApi } from '@/services/api';
 import type { BuildAroundSeedResponse, CardWithOwnership, SuggestedLandResponse } from '@/services/api/decks';
 import './BuildAroundSeedModal.css';
@@ -32,29 +32,52 @@ export default function BuildAroundSeedModal({
   const [error, setError] = useState<string | null>(null);
   const [budgetMode, setBudgetMode] = useState(false);
   const [applying, setApplying] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSearch = useCallback(async (query: string) => {
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  const handleSearch = useCallback((query: string) => {
+    // Clear any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
 
-    setSearching(true);
-    try {
-      const results = await cardsApi.searchCards({ query, limit: 10 });
-      setSearchResults(results.map(card => ({
-        arenaID: parseInt(card.ArenaID, 10) || 0,
-        name: card.Name,
-        manaCost: card.ManaCost,
-        types: card.Types,
-        imageURI: card.ImageURL,
-        colors: card.Colors,
-      })));
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
+    // Debounce the API call by 300ms
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await cardsApi.searchCards({ query, limit: 10 });
+        // Filter out cards with invalid ArenaIDs to prevent duplicate keys
+        setSearchResults(
+          results
+            .filter(card => card.ArenaID && !isNaN(parseInt(card.ArenaID, 10)))
+            .map(card => ({
+              arenaID: parseInt(card.ArenaID, 10),
+              name: card.Name,
+              manaCost: card.ManaCost,
+              types: card.Types,
+              imageURI: card.ImageURL,
+              colors: card.Colors,
+            }))
+        );
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
   }, []);
 
   const handleSelectCard = (card: SearchResult) => {

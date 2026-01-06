@@ -642,20 +642,38 @@ func TestScoreAndRankCandidates(t *testing.T) {
 
 	result := builder.scoreAndRankCandidates(candidates, seedAnalysis)
 
-	// Should filter out low scoring cards (score < 0.3)
-	// Card 3 (off-color, high CMC, common) should be filtered
-	if len(result) > 2 {
-		// At least some filtering should occur for the off-color high-CMC common
-		foundOffColor := false
-		for _, sc := range result {
-			if sc.card.ArenaID == 3 {
-				foundOffColor = true
-				break
-			}
+	// Verify results are not empty (all cards should pass the 0.3 threshold)
+	if len(result) == 0 {
+		t.Error("expected at least one card to be included")
+	}
+
+	// Verify all 3 cards are included (even off-color gets neutral synergy/legality scores)
+	if len(result) != 3 {
+		t.Errorf("expected 3 cards to be included, got %d", len(result))
+	}
+
+	// Verify high score card (on-color, good CMC, rare) is ranked first
+	if len(result) > 0 && result[0].card.ArenaID != 1 {
+		t.Errorf("expected high score card (ArenaID=1) to be ranked first, got ArenaID=%d", result[0].card.ArenaID)
+	}
+
+	// Verify off-color card (ArenaID=3) is ranked last due to color mismatch
+	if len(result) >= 3 && result[len(result)-1].card.ArenaID != 3 {
+		t.Errorf("expected off-color card (ArenaID=3) to be ranked last, got ArenaID=%d", result[len(result)-1].card.ArenaID)
+	}
+
+	// Verify off-color card scores lower than on-color cards
+	var onColorScore, offColorScore float64
+	for _, sc := range result {
+		if sc.card.ArenaID == 1 {
+			onColorScore = sc.score
 		}
-		if foundOffColor {
-			t.Log("Note: Off-color card was included (may have synergy)")
+		if sc.card.ArenaID == 3 {
+			offColorScore = sc.score
 		}
+	}
+	if offColorScore >= onColorScore {
+		t.Errorf("off-color card (%.2f) should score lower than on-color card (%.2f)", offColorScore, onColorScore)
 	}
 
 	// Results should be sorted by score (descending)

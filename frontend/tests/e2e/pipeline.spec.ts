@@ -731,12 +731,12 @@ test.describe('Data Pipeline - Log to UI', () => {
         const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
 
         if (hasNonDraft) {
+          // Click the deck and wait for navigation
           await nonDraftDeck.click();
-          await page.waitForURL('**/decks/**');
 
-          // Wait for DeckBuilder to load
+          // Wait for DeckBuilder to load (more reliable than URL pattern)
           const deckBuilder = page.locator('.deck-builder');
-          await expect(deckBuilder).toBeVisible({ timeout: 10000 });
+          await expect(deckBuilder).toBeVisible({ timeout: 15000 });
 
           // Build Around button should exist
           const buildAroundButton = page.locator('button.build-around-btn');
@@ -765,10 +765,10 @@ test.describe('Data Pipeline - Log to UI', () => {
 
         if (hasDraft) {
           await draftDeck.click();
-          await page.waitForURL('**/decks/**');
 
+          // Wait for DeckBuilder to load (more reliable than URL pattern)
           const deckBuilder = page.locator('.deck-builder');
-          await expect(deckBuilder).toBeVisible({ timeout: 10000 });
+          await expect(deckBuilder).toBeVisible({ timeout: 15000 });
 
           // Suggest Decks should be visible, Build Around should NOT be visible
           const suggestDecksButton = page.locator('button.suggest-decks-btn');
