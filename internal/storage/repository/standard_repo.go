@@ -69,8 +69,15 @@ func (r *standardRepository) GetConfig(ctx context.Context) (*models.StandardCon
 	}
 
 	// Parse dates
-	config.NextRotationDate, _ = time.Parse("2006-01-02", nextRotationStr)
-	config.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+	var parseErr error
+	config.NextRotationDate, parseErr = time.Parse("2006-01-02", nextRotationStr)
+	if parseErr != nil {
+		return nil, fmt.Errorf("failed to parse next_rotation_date '%s': %w", nextRotationStr, parseErr)
+	}
+	config.UpdatedAt, parseErr = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+	if parseErr != nil {
+		return nil, fmt.Errorf("failed to parse updated_at '%s': %w", updatedAtStr, parseErr)
+	}
 
 	return &config, nil
 }

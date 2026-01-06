@@ -24,6 +24,7 @@ export * as quests from './quests';
 export * as meta from './meta';
 export * as settings from './settings';
 export * as standard from './standard';
+export * as gameplays from './gameplays';
 
 // Re-export commonly used types
 export type {
@@ -68,3 +69,11 @@ export type {
   RotationAffectedDeck,
   UpcomingRotation,
 } from './standard';
+
+export type {
+  GamePlay,
+  GameStateSnapshot,
+  OpponentCard,
+  PlayTimelineEntry,
+  GamePlaySummary,
+} from './gameplays';
