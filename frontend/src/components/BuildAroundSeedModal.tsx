@@ -58,6 +58,8 @@ export default function BuildAroundSeedModal({
   const [deckAnalysis, setDeckAnalysis] = useState<LiveDeckAnalysis | null>(null);
   const [slotsRemaining, setSlotsRemaining] = useState(60);
   const [landSuggestions, setLandSuggestions] = useState<SuggestedLandResponse[]>([]);
+  // Map of cardID to card name for display purposes
+  const [cardNameMap, setCardNameMap] = useState<Map<number, string>>(new Map());
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -196,6 +198,12 @@ export default function BuildAroundSeedModal({
   // Handle picking a card in iterative mode
   const handlePickCard = (card: CardWithOwnership) => {
     if (onCardAdded) {
+      // Store the card name for display
+      setCardNameMap(prev => {
+        const newMap = new Map(prev);
+        newMap.set(card.cardID, card.name);
+        return newMap;
+      });
       onCardAdded(card);
       // Suggestions will auto-refresh via useEffect when currentDeckCards changes
     }
@@ -228,6 +236,7 @@ export default function BuildAroundSeedModal({
     setIterativeSuggestions([]);
     setDeckAnalysis(null);
     setLandSuggestions([]);
+    setCardNameMap(new Map());
     onClose();
   };
 
@@ -241,6 +250,7 @@ export default function BuildAroundSeedModal({
     setSeedCardId(null);
     setIterativeSuggestions([]);
     setDeckAnalysis(null);
+    setCardNameMap(new Map());
   };
 
   if (!isOpen) return null;
@@ -342,7 +352,7 @@ export default function BuildAroundSeedModal({
                     .map(card => (
                       <div key={`${card.CardID}-${card.Board}`} className="deck-card-item">
                         <span className="card-quantity">{card.Quantity}x</span>
-                        <span className="card-name">{card.Name}</span>
+                        <span className="card-name">{cardNameMap.get(card.CardID) || `Card #${card.CardID}`}</span>
                         {onCardRemoved && (
                           <button
                             className="remove-card-btn"
