@@ -68,10 +68,9 @@ type GamePlayFilter struct {
 	ActionType *string // "play_card", "attack", "block", "land_drop", "mulligan"
 }
 
-// GamePlaySummary provides a summary of plays for a game.
+// GamePlaySummary provides aggregated play statistics at the match level (across all games).
 type GamePlaySummary struct {
 	MatchID           string
-	GameID            int
 	TotalPlays        int
 	PlayerPlays       int
 	OpponentPlays     int
