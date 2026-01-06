@@ -117,9 +117,15 @@ export default function DeckBuilder() {
         setCards(deckData.cards || []);
         setTags(deckData.tags || []);
 
-        // Load statistics
-        const stats = await decks.getDeckStatistics(deckData.deck.ID);
-        setStatistics(stats);
+        // Load statistics (may not exist for new decks)
+        try {
+          const stats = await decks.getDeckStatistics(deckData.deck.ID);
+          setStatistics(stats);
+        } catch (statsErr) {
+          // Statistics may not exist for new decks - this is OK
+          console.log('No statistics for deck (may be new):', statsErr);
+          setStatistics(null);
+        }
 
         // If this is a draft deck, get the draft card IDs
         if (deckData.deck.Source === 'draft' && deckData.deck.DraftEventID) {
