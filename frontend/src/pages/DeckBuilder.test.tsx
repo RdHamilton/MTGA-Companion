@@ -725,7 +725,7 @@ describe('DeckBuilder Component - Deck Creation from Draft', () => {
 
     // Mock card metadata lookup (not needed for empty deck, but good practice)
     mockCards.getCardByArenaId.mockImplementation((id: number) => {
-      return Promise.resolve(createMockSetCard({ ArenaID: id, Name: `Card ${id}` }));
+      return Promise.resolve(createMockSetCard({ ArenaID: String(id), Name: `Card ${id}` }));
     });
 
     render(<DeckBuilder />);

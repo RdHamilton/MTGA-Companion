@@ -24,6 +24,10 @@ async function getAllSetsCached(): Promise<gui.SetInfo[]> {
     allSetsCache = sets;
     allSetsCachePromise = null;
     return sets;
+  }).catch((err) => {
+    // Clear cache on failure so retry is possible
+    allSetsCachePromise = null;
+    throw err;
   });
 
   return allSetsCachePromise;
