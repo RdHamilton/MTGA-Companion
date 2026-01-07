@@ -10,6 +10,11 @@ import type {
 import { models } from '@/types/models';
 import './BuildAroundSeedModal.css';
 
+interface HoverPreview {
+  card: CardWithOwnership;
+  position: { x: number; y: number };
+}
+
 interface BuildAroundSeedModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -90,6 +95,8 @@ export default function BuildAroundSeedModal({
   const [landSuggestions, setLandSuggestions] = useState<SuggestedLandResponse[]>([]);
   // Map of cardID to card name for display purposes
   const [cardNameMap, setCardNameMap] = useState<Map<number, string>>(new Map());
+  // Hover preview for card magnification
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   // Ref to track if we've already attempted initial fetch (prevent infinite loops)
   const hasAttemptedFetch = useRef(false);
@@ -433,6 +440,28 @@ export default function BuildAroundSeedModal({
     return <span className="ownership-badge needed">Need {card.neededCount}</span>;
   };
 
+  // Render recommended copies badge
+  const renderCopyRecommendation = (card: CardWithOwnership) => {
+    const remaining = card.recommendedCopies - card.currentCopies;
+    if (remaining <= 0) return null;
+    if (card.currentCopies > 0) {
+      return <span className="copy-badge has-copies">+{remaining} more (have {card.currentCopies})</span>;
+    }
+    return <span className="copy-badge">{card.recommendedCopies}x recommended</span>;
+  };
+
+  // Handle card hover for preview
+  const handleCardHover = (card: CardWithOwnership, e: React.MouseEvent) => {
+    setHoverPreview({
+      card,
+      position: { x: e.clientX + 20, y: e.clientY - 100 },
+    });
+  };
+
+  const handleCardHoverEnd = () => {
+    setHoverPreview(null);
+  };
+
   // Iterative mode UI - show when in iterative mode (with selected card OR using deck cards as seed)
   if (iterativeMode && (selectedCard || useDeckCardsAsSeed)) {
     const modalTitle = selectedCard
@@ -489,8 +518,10 @@ export default function BuildAroundSeedModal({
                   {iterativeSuggestions.map(card => (
                     <div
                       key={card.cardID}
-                      className="clickable-suggestion-card"
+                      className={`clickable-suggestion-card ${card.currentCopies > 0 ? 'in-deck' : ''}`}
                       onClick={() => handlePickCard(card)}
+                      onMouseEnter={(e) => handleCardHover(card, e)}
+                      onMouseLeave={handleCardHoverEnd}
                     >
                       {card.imageURI ? (
                         <img src={card.imageURI} alt={card.name} className="suggestion-image" />
@@ -502,10 +533,54 @@ export default function BuildAroundSeedModal({
                       )}
                       <div className="suggestion-overlay">
                         <span className="card-name">{card.name}</span>
+                        {renderCopyRecommendation(card)}
                         {renderOwnershipBadge(card)}
                       </div>
+                      {card.currentCopies > 0 && (
+                        <div className="in-deck-badge">{card.currentCopies} in deck</div>
+                      )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Hover Preview */}
+            {hoverPreview && (
+              <div
+                className="card-hover-preview"
+                style={{
+                  position: 'fixed',
+                  top: Math.min(hoverPreview.position.y, window.innerHeight - 420),
+                  left: Math.min(hoverPreview.position.x, window.innerWidth - 280),
+                  zIndex: 10000,
+                }}
+              >
+                <div className="preview-card">
+                  {hoverPreview.card.imageURI && (
+                    <img
+                      src={hoverPreview.card.imageURI}
+                      alt={hoverPreview.card.name}
+                      className="preview-image"
+                    />
+                  )}
+                  <div className="preview-details">
+                    <h3 className="preview-name">{hoverPreview.card.name}</h3>
+                    <p className="preview-type">{hoverPreview.card.typeLine}</p>
+                    <div className="preview-stats">
+                      {hoverPreview.card.manaCost && (
+                        <span className="preview-mana">Mana: {hoverPreview.card.manaCost}</span>
+                      )}
+                      <span className="preview-score">Score: {(hoverPreview.card.score * 100).toFixed(0)}%</span>
+                    </div>
+                    <p className="preview-reasoning">{hoverPreview.card.reasoning}</p>
+                    <div className="preview-recommendation">
+                      <strong>Recommended: {hoverPreview.card.recommendedCopies} copies</strong>
+                      {hoverPreview.card.currentCopies > 0 && (
+                        <span> (have {hoverPreview.card.currentCopies})</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

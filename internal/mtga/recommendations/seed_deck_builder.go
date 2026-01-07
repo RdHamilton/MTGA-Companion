@@ -52,19 +52,21 @@ type SeedDeckBuilderResponse struct {
 
 // CardWithOwnership extends card info with ownership data.
 type CardWithOwnership struct {
-	CardID       int      `json:"cardID"`
-	Name         string   `json:"name"`
-	ManaCost     string   `json:"manaCost,omitempty"`
-	CMC          int      `json:"cmc"`
-	Colors       []string `json:"colors"`
-	TypeLine     string   `json:"typeLine"`
-	Rarity       string   `json:"rarity,omitempty"`
-	ImageURI     string   `json:"imageURI,omitempty"`
-	Score        float64  `json:"score"`
-	Reasoning    string   `json:"reasoning"`
-	InCollection bool     `json:"inCollection"`
-	OwnedCount   int      `json:"ownedCount"`
-	NeededCount  int      `json:"neededCount"`
+	CardID            int      `json:"cardID"`
+	Name              string   `json:"name"`
+	ManaCost          string   `json:"manaCost,omitempty"`
+	CMC               int      `json:"cmc"`
+	Colors            []string `json:"colors"`
+	TypeLine          string   `json:"typeLine"`
+	Rarity            string   `json:"rarity,omitempty"`
+	ImageURI          string   `json:"imageURI,omitempty"`
+	Score             float64  `json:"score"`
+	Reasoning         string   `json:"reasoning"`
+	InCollection      bool     `json:"inCollection"`
+	OwnedCount        int      `json:"ownedCount"`
+	NeededCount       int      `json:"neededCount"`
+	CurrentCopies     int      `json:"currentCopies"`     // Copies currently in deck
+	RecommendedCopies int      `json:"recommendedCopies"` // Recommended total copies (1-4)
 }
 
 // SeedDeckAnalysis provides analysis of the seed card and suggestions.
@@ -782,14 +784,18 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
 
-	// Create exclusion set (cards already in deck)
-	excludeSet := make(map[int]bool)
+	// Count copies of each card in deck (instead of excluding them)
+	deckCardCounts := make(map[int]int)
 	for _, cardID := range req.DeckCardIDs {
-		excludeSet[cardID] = true
+		deckCardCounts[cardID]++
 	}
-	// Also exclude seed card if provided (backwards compatibility)
-	if req.SeedCardID > 0 {
-		excludeSet[req.SeedCardID] = true
+
+	// Only exclude cards that already have 4 copies (can't add more)
+	excludeSet := make(map[int]bool)
+	for cardID, count := range deckCardCounts {
+		if count >= 4 {
+			excludeSet[cardID] = true
+		}
 	}
 
 	// Score candidates against the collective deck analysis
@@ -813,6 +819,12 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 
 	// Enrich with ownership
 	suggestions := s.enrichWithOwnership(scoredCards, collection)
+
+	// Add current deck counts and recommended copies to each card
+	for _, card := range suggestions {
+		card.CurrentCopies = deckCardCounts[card.CardID]
+		card.RecommendedCopies = s.calculateRecommendedCopies(card)
+	}
 
 	// Calculate slots remaining (60-card deck standard)
 	slotsRemaining := 60 - len(req.DeckCardIDs)
@@ -1310,4 +1322,53 @@ func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnal
 		TotalCards:           deckAnalysis.TotalCards,
 		InCollectionCount:    inCollectionCount,
 	}
+}
+
+// calculateRecommendedCopies determines optimal copy count (1-4) for a card.
+// Considers: legendary status, mana cost, card type, synergy score.
+func (s *SeedDeckBuilder) calculateRecommendedCopies(card *CardWithOwnership) int {
+	typeLine := strings.ToLower(card.TypeLine)
+
+	// Legendary cards: usually 2-3 copies (can't have multiples in play)
+	if strings.Contains(typeLine, "legendary") {
+		if card.CMC >= 5 {
+			return 2 // Expensive legendaries: 2 copies
+		}
+		return 3 // Cheaper legendaries: 3 copies for consistency
+	}
+
+	// Planeswalkers: usually 2-3 copies
+	if strings.Contains(typeLine, "planeswalker") {
+		if card.CMC >= 5 {
+			return 2
+		}
+		return 3
+	}
+
+	// High-synergy cards (score > 0.8): want full playsets
+	if card.Score > 0.8 {
+		return 4
+	}
+
+	// Expensive cards (5+ CMC): usually 2-3 copies
+	if card.CMC >= 5 {
+		return 2
+	}
+	if card.CMC == 4 {
+		return 3
+	}
+
+	// Instants and sorceries: usually 3-4 copies for consistency
+	if strings.Contains(typeLine, "instant") || strings.Contains(typeLine, "sorcery") {
+		if card.Score > 0.6 {
+			return 4
+		}
+		return 3
+	}
+
+	// Creatures and other permanents: 3-4 copies based on score
+	if card.Score > 0.6 {
+		return 4
+	}
+	return 3
 }

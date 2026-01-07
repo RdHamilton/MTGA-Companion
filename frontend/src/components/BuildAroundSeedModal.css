@@ -865,3 +865,111 @@
   font-size: 0.85rem;
   text-align: center;
 }
+
+/* Card Hover Preview */
+.card-hover-preview {
+  pointer-events: none;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.preview-card {
+  background: #1e1e1e;
+  border: 2px solid #4a9eff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  width: 260px;
+}
+
+.preview-image {
+  width: 100%;
+  display: block;
+  border-radius: 8px 8px 0 0;
+}
+
+.preview-details {
+  padding: 12px;
+}
+
+.preview-name {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.preview-type {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.preview-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.preview-mana {
+  color: #4a9eff;
+}
+
+.preview-score {
+  color: #10b981;
+}
+
+.preview-reasoning {
+  margin: 0 0 8px 0;
+  font-size: 0.8rem;
+  color: #aaa;
+  font-style: italic;
+}
+
+.preview-recommendation {
+  font-size: 0.85rem;
+  color: #f59e0b;
+}
+
+/* Copy recommendation badge */
+.copy-badge {
+  display: block;
+  font-size: 0.7rem;
+  color: #f59e0b;
+  margin-top: 2px;
+}
+
+.copy-badge.has-copies {
+  color: #10b981;
+}
+
+/* In-deck indicator */
+.clickable-suggestion-card.in-deck {
+  border: 2px solid #10b981;
+}
+
+.in-deck-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #10b981;
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.clickable-suggestion-card {
+  position: relative;
+}

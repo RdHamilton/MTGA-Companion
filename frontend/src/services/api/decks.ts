@@ -352,6 +352,8 @@ export interface CardWithOwnership {
   inCollection: boolean;
   ownedCount: number;
   neededCount: number;
+  currentCopies: number;     // Copies currently in deck
+  recommendedCopies: number; // Recommended total copies (1-4)
 }
 
 /**
