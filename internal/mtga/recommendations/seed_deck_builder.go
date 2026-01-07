@@ -823,7 +823,11 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 	// Add current deck counts and recommended copies to each card
 	for _, card := range suggestions {
 		card.CurrentCopies = deckCardCounts[card.CardID]
-		card.RecommendedCopies = s.calculateRecommendedCopies(card)
+		recommended := s.calculateRecommendedCopies(card)
+		if recommended < 1 {
+			recommended = 4 // Default to 4 if calculation fails
+		}
+		card.RecommendedCopies = recommended
 	}
 
 	// Calculate slots remaining (60-card deck standard)

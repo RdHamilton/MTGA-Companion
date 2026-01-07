@@ -442,12 +442,15 @@ export default function BuildAroundSeedModal({
 
   // Render recommended copies badge
   const renderCopyRecommendation = (card: CardWithOwnership) => {
-    const remaining = card.recommendedCopies - card.currentCopies;
+    // Default to 4 copies if backend doesn't provide recommendation
+    const recommended = card.recommendedCopies > 0 ? card.recommendedCopies : 4;
+    const current = card.currentCopies || 0;
+    const remaining = recommended - current;
     if (remaining <= 0) return null;
-    if (card.currentCopies > 0) {
-      return <span className="copy-badge has-copies">+{remaining} more (have {card.currentCopies})</span>;
+    if (current > 0) {
+      return <span className="copy-badge has-copies">+{remaining} more (have {current})</span>;
     }
-    return <span className="copy-badge">{card.recommendedCopies}x recommended</span>;
+    return <span className="copy-badge">{recommended}x recommended</span>;
   };
 
   // Handle card hover for preview
@@ -575,8 +578,8 @@ export default function BuildAroundSeedModal({
                     </div>
                     <p className="preview-reasoning">{hoverPreview.card.reasoning}</p>
                     <div className="preview-recommendation">
-                      <strong>Recommended: {hoverPreview.card.recommendedCopies} copies</strong>
-                      {hoverPreview.card.currentCopies > 0 && (
+                      <strong>Recommended: {hoverPreview.card.recommendedCopies > 0 ? hoverPreview.card.recommendedCopies : 4} copies</strong>
+                      {(hoverPreview.card.currentCopies || 0) > 0 && (
                         <span> (have {hoverPreview.card.currentCopies})</span>
                       )}
                     </div>
