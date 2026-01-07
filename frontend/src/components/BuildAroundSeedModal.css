@@ -955,21 +955,62 @@
 
 /* In-deck indicator */
 .clickable-suggestion-card.in-deck {
-  border: 2px solid #10b981;
+  border: 3px solid #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.clickable-suggestion-card.in-deck .suggestion-image {
+  opacity: 0.7;
+}
+
+.clickable-suggestion-card.in-deck::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.15) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .in-deck-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #10b981;
+  top: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.in-deck-badge::before {
+  content: '✓';
+  font-size: 0.9rem;
 }
 
 .clickable-suggestion-card {
   position: relative;
+}
+
+/* Highlight effect when hovering over in-deck card */
+.clickable-suggestion-card.in-deck:hover {
+  border-color: #34d399;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+}
+
+.clickable-suggestion-card.in-deck:hover .suggestion-image {
+  opacity: 0.85;
 }
