@@ -309,8 +309,12 @@ export default function DeckBuilder() {
       } catch {
         setStatistics(null);
       }
-    } catch {
-      // Silently ignore - card is likely at 4-copy limit
+    } catch (err) {
+      // Silently ignore 400 errors (validation errors like 4-copy limit)
+      // but log other errors for debugging
+      if (!(err instanceof ApiRequestError && err.status === 400)) {
+        console.error('Failed to add card:', err);
+      }
     }
   };
 
