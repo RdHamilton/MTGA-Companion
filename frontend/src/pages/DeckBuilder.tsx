@@ -676,7 +676,10 @@ export default function DeckBuilder() {
   };
 
   // Get current deck card IDs for iterative build-around mode
-  const currentDeckCardIDs = cards.map((card) => card.CardID);
+  // Expand based on quantity - backend expects duplicate entries for multiple copies
+  const currentDeckCardIDs = cards.flatMap((card) =>
+    Array(card.Quantity).fill(card.CardID)
+  );
 
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(

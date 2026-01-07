@@ -453,11 +453,35 @@ export default function BuildAroundSeedModal({
     return <span className="copy-badge">{recommended}x recommended</span>;
   };
 
-  // Handle card hover for preview
+  // Handle card hover for preview - position intelligently to stay on screen
   const handleCardHover = (card: CardWithOwnership, e: React.MouseEvent) => {
+    const previewHeight = 500; // Approximate height of preview card
+    const previewWidth = 280;
+
+    // Calculate position - show above cursor if near bottom of screen
+    let y = e.clientY - 100;
+    let x = e.clientX + 20;
+
+    // If preview would go off bottom, show above the cursor instead
+    if (y + previewHeight > window.innerHeight) {
+      y = e.clientY - previewHeight - 20;
+    }
+    // If still off top, just position at top
+    if (y < 10) {
+      y = 10;
+    }
+
+    // Keep within horizontal bounds
+    if (x + previewWidth > window.innerWidth) {
+      x = e.clientX - previewWidth - 20;
+    }
+    if (x < 10) {
+      x = 10;
+    }
+
     setHoverPreview({
       card,
-      position: { x: e.clientX + 20, y: e.clientY - 100 },
+      position: { x, y },
     });
   };
 
@@ -554,8 +578,8 @@ export default function BuildAroundSeedModal({
                 className="card-hover-preview"
                 style={{
                   position: 'fixed',
-                  top: Math.min(hoverPreview.position.y, window.innerHeight - 420),
-                  left: Math.min(hoverPreview.position.x, window.innerWidth - 280),
+                  top: hoverPreview.position.y,
+                  left: hoverPreview.position.x,
                   zIndex: 10000,
                 }}
               >
