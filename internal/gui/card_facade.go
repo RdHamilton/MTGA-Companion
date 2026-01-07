@@ -40,7 +40,7 @@ type SetInfo struct {
 	IconSVGURI *string `json:"iconSvgUri,omitempty"` // URL to the set symbol SVG (may be null)
 	SetType    *string `json:"setType,omitempty"`    // Type of set (may be null)
 	ReleasedAt *string `json:"releasedAt,omitempty"` // Release date (may be null for unreleased sets)
-	CardCount  int     `json:"cardCount"`            // Number of cards in set
+	CardCount  *int    `json:"cardCount,omitempty"`  // Number of cards in set (may be null)
 }
 
 // GetSetCards returns all cards for a set, fetching from Scryfall if not cached.

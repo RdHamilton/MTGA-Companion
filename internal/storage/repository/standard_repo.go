@@ -225,7 +225,9 @@ func (r *standardRepository) GetUpcomingRotation(ctx context.Context) (*models.U
 			}
 		}
 
-		totalRotatingCards += set.CardCount
+		if set.CardCount != nil {
+			totalRotatingCards += *set.CardCount
+		}
 		rotatingSets = append(rotatingSets, set)
 	}
 

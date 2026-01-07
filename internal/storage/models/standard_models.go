@@ -18,7 +18,7 @@ type StandardSet struct {
 	RotationDate      *string `json:"rotationDate,omitempty"`
 	IsStandardLegal   bool    `json:"isStandardLegal"`
 	IconSVGURI        *string `json:"iconSvgUri,omitempty"`
-	CardCount         int     `json:"cardCount"`
+	CardCount         *int    `json:"cardCount,omitempty"`
 	DaysUntilRotation *int    `json:"daysUntilRotation,omitempty"`
 	IsRotatingSoon    bool    `json:"isRotatingSoon"` // < 90 days until rotation
 }
