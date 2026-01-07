@@ -11,10 +11,10 @@ import (
 type Set struct {
 	Code            string
 	Name            string
-	ReleasedAt      string
+	ReleasedAt      *string // Date when set was released (may be NULL for unreleased sets)
 	CardCount       int
-	SetType         string
-	IconSVGURI      string
+	SetType         *string // Type of set (may be NULL)
+	IconSVGURI      *string // URL to the set symbol SVG (may be NULL)
 	CachedAt        time.Time
 	LastUpdated     time.Time
 	IsStandardLegal bool    // Whether the set is currently Standard-legal

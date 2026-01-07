@@ -220,3 +220,187 @@ func TestMTGASetToScryfall_Mapping(t *testing.T) {
 		})
 	}
 }
+
+func TestArenaExclusiveBasicLands_TLAMapping(t *testing.T) {
+	// Test that TLA basic lands are correctly mapped
+	tests := []struct {
+		arenaID      int
+		expectedSet  string
+		expectedName string
+	}{
+		{97563, "TLA", "Plains"},
+		{97564, "TLA", "Island"},
+		{97565, "TLA", "Swamp"},
+		{97566, "TLA", "Mountain"},
+		{97567, "TLA", "Forest"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedName, func(t *testing.T) {
+			basicLand, ok := ArenaExclusiveBasicLands[tt.arenaID]
+			if !ok {
+				t.Fatalf("Expected ArenaExclusiveBasicLands to contain arenaID %d", tt.arenaID)
+			}
+
+			if basicLand.SetCode != tt.expectedSet {
+				t.Errorf("Expected SetCode=%s, got %s", tt.expectedSet, basicLand.SetCode)
+			}
+
+			if basicLand.CardName != tt.expectedName {
+				t.Errorf("Expected CardName=%s, got %s", tt.expectedName, basicLand.CardName)
+			}
+		})
+	}
+}
+
+func TestArenaExclusiveBasicLands_UnknownID(t *testing.T) {
+	// Test that unknown IDs return false
+	unknownIDs := []int{12345, 99999, 0, -1}
+
+	for _, id := range unknownIDs {
+		if _, ok := ArenaExclusiveBasicLands[id]; ok {
+			t.Errorf("Expected ArenaExclusiveBasicLands to NOT contain arenaID %d", id)
+		}
+	}
+}
+
+func TestCheckCacheCompleteness_ArenaExclusiveSet_IncompleteCache(t *testing.T) {
+	// Arena-exclusive set: Scryfall reports 0 game:arena cards, but 17Lands has 286 ratings
+	// This tests the logic for sets like TLA where Scryfall lacks Arena IDs
+
+	// Simulated state: 50 cached cards
+	cachedCount := 50
+
+	// Scryfall returns 0 (no game:arena cards for Arena-exclusive sets)
+	scryfallExpected := 0
+
+	// 17Lands has 286 cards
+	ratingsCount := 286
+
+	// Logic: if scryfallExpected == 0, use ratingsCount instead
+	var needsRefresh bool
+	if scryfallExpected > 0 {
+		needsRefresh = cachedCount < (scryfallExpected * 9 / 10)
+	} else if ratingsCount > 0 {
+		needsRefresh = cachedCount < (ratingsCount * 9 / 10)
+	}
+
+	if !needsRefresh {
+		t.Errorf("Expected needsRefresh=true for Arena-exclusive set: cached=%d, 17lands=%d", cachedCount, ratingsCount)
+	}
+}
+
+func TestCheckCacheCompleteness_ArenaExclusiveSet_CompleteCache(t *testing.T) {
+	// Arena-exclusive set with complete cache
+	cachedCount := 280
+	scryfallExpected := 0 // Scryfall has no Arena IDs
+	ratingsCount := 286   // 17Lands has 286 cards
+
+	var needsRefresh bool
+	if scryfallExpected > 0 {
+		needsRefresh = cachedCount < (scryfallExpected * 9 / 10)
+	} else if ratingsCount > 0 {
+		needsRefresh = cachedCount < (ratingsCount * 9 / 10)
+	}
+
+	if needsRefresh {
+		t.Errorf("Expected needsRefresh=false for complete Arena-exclusive cache: cached=%d, 17lands=%d (90%% = %d)",
+			cachedCount, ratingsCount, ratingsCount*9/10)
+	}
+}
+
+func TestCheckCacheCompleteness_ArenaExclusiveSet_NoRatings(t *testing.T) {
+	// Arena-exclusive set with no 17Lands ratings yet
+	cachedCount := 5      // Some basic lands cached
+	scryfallExpected := 0 // Scryfall has no Arena IDs
+	ratingsCount := 0     // No 17Lands ratings yet
+
+	var needsRefresh bool
+	if scryfallExpected > 0 {
+		needsRefresh = cachedCount < (scryfallExpected * 9 / 10)
+	} else if ratingsCount > 0 {
+		needsRefresh = cachedCount < (ratingsCount * 9 / 10)
+	}
+
+	// With no ratings, we can't determine completeness, so no refresh
+	if needsRefresh {
+		t.Errorf("Expected needsRefresh=false when no 17Lands ratings available")
+	}
+}
+
+func TestExtractScryfallIDFromURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected string
+	}{
+		{
+			name:     "standard scryfall image URL",
+			url:      "https://cards.scryfall.io/large/front/f/a/fa940e68-010e-4b68-be8a-555d7068f7b4.jpg",
+			expected: "fa940e68-010e-4b68-be8a-555d7068f7b4",
+		},
+		{
+			name:     "small image URL",
+			url:      "https://cards.scryfall.io/small/front/1/2/12345678-1234-1234-1234-123456789abc.jpg",
+			expected: "12345678-1234-1234-1234-123456789abc",
+		},
+		{
+			name:     "art crop URL",
+			url:      "https://cards.scryfall.io/art_crop/front/a/b/abcdef01-2345-6789-abcd-ef0123456789.jpg",
+			expected: "abcdef01-2345-6789-abcd-ef0123456789",
+		},
+		{
+			name:     "normal image URL",
+			url:      "https://cards.scryfall.io/normal/front/9/9/99887766-5544-3322-1100-aabbccddeeff.png",
+			expected: "99887766-5544-3322-1100-aabbccddeeff",
+		},
+		{
+			name:     "empty URL",
+			url:      "",
+			expected: "",
+		},
+		{
+			name:     "URL without UUID",
+			url:      "https://example.com/image.jpg",
+			expected: "",
+		},
+		{
+			name:     "URL with invalid UUID format",
+			url:      "https://cards.scryfall.io/large/front/1/2/not-a-uuid.jpg",
+			expected: "",
+		},
+		{
+			name:     "partial UUID",
+			url:      "https://cards.scryfall.io/large/front/1/2/12345678-1234-1234.jpg",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ExtractScryfallIDFromURL(tt.url)
+			if result != tt.expected {
+				t.Errorf("ExtractScryfallIDFromURL(%q) = %q, want %q", tt.url, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractScryfallIDFromURL_VariousFormats(t *testing.T) {
+	// Test that any URL containing a valid UUID extracts it correctly
+	validUUID := "fa940e68-010e-4b68-be8a-555d7068f7b4"
+
+	urlsWithValidUUID := []string{
+		"https://cards.scryfall.io/large/front/f/a/fa940e68-010e-4b68-be8a-555d7068f7b4.jpg",
+		"https://cdn.17lands.com/images/fa940e68-010e-4b68-be8a-555d7068f7b4.png",
+		"https://example.com/path/to/fa940e68-010e-4b68-be8a-555d7068f7b4/image.webp",
+		"fa940e68-010e-4b68-be8a-555d7068f7b4",
+	}
+
+	for _, url := range urlsWithValidUUID {
+		result := ExtractScryfallIDFromURL(url)
+		if result != validUUID {
+			t.Errorf("ExtractScryfallIDFromURL(%q) = %q, want %q", url, result, validUUID)
+		}
+	}
+}

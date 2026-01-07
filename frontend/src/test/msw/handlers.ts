@@ -316,17 +316,17 @@ export const handlers = [
   // Card search endpoint
   http.get(`${API_BASE}/cards`, ({ request }) => {
     const url = new URL(request.url);
-    const name = url.searchParams.get('name') || '';
-    if (name.toLowerCase().includes('test')) {
+    const query = url.searchParams.get('q') || '';
+    if (query.toLowerCase().includes('test')) {
       return successResponse([
         {
-          arenaID: 12345,
-          name: 'Test Card',
-          manaCost: '{2}{W}',
-          cmc: 3,
-          typeLine: 'Creature - Human',
-          colors: ['W'],
-          imageURI: 'https://example.com/test.jpg',
+          ArenaID: '12345',
+          Name: 'Test Card',
+          ManaCost: '{2}{W}',
+          CMC: 3,
+          Types: ['Creature'],
+          Colors: ['W'],
+          ImageURL: 'https://example.com/test.jpg',
         },
       ]);
     }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -62,8 +63,11 @@ type DeckRepository interface {
 	// GetCards retrieves all cards in a deck.
 	GetCards(ctx context.Context, deckID string) ([]*models.DeckCard, error)
 
-	// RemoveCard removes a card from a deck.
+	// RemoveCard decrements the quantity of a card in a deck by 1.
 	RemoveCard(ctx context.Context, deckID string, cardID int, board string) error
+
+	// RemoveAllCopies removes all copies of a card from a deck.
+	RemoveAllCopies(ctx context.Context, deckID string, cardID int, board string) error
 
 	// ClearCards removes all cards from a deck.
 	ClearCards(ctx context.Context, deckID string) error
@@ -307,7 +311,7 @@ func (r *deckRepository) DeleteBySourceExcluding(ctx context.Context, accountID 
 
 	query := fmt.Sprintf(
 		`DELETE FROM decks WHERE account_id = ? AND source = ? AND id NOT IN (%s)`,
-		joinStrings(placeholders, ", "),
+		strings.Join(placeholders, ", "),
 	)
 
 	result, err := r.db.ExecContext(ctx, query, args...)
@@ -319,13 +323,13 @@ func (r *deckRepository) DeleteBySourceExcluding(ctx context.Context, accountID 
 	return int(affected), nil
 }
 
-// AddCard adds a card to a deck.
+// AddCard adds a card to a deck. If the card already exists, increments the quantity.
 func (r *deckRepository) AddCard(ctx context.Context, card *models.DeckCard) error {
 	query := `
 		INSERT INTO deck_cards (deck_id, card_id, quantity, board, from_draft_pick)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(deck_id, card_id, board) DO UPDATE SET
-			quantity = excluded.quantity,
+			quantity = quantity + excluded.quantity,
 			from_draft_pick = excluded.from_draft_pick
 	`
 
@@ -400,8 +404,42 @@ func (r *deckRepository) GetCards(ctx context.Context, deckID string) ([]*models
 	return cards, nil
 }
 
-// RemoveCard removes a card from a deck.
+// RemoveCard decrements the quantity of a card in a deck by 1.
+// If the quantity reaches 0, the card is removed from the deck.
 func (r *deckRepository) RemoveCard(ctx context.Context, deckID string, cardID int, board string) error {
+	// First, decrement the quantity
+	updateQuery := `
+		UPDATE deck_cards
+		SET quantity = quantity - 1
+		WHERE deck_id = ? AND card_id = ? AND board = ? AND quantity > 0
+	`
+
+	result, err := r.db.ExecContext(ctx, updateQuery, deckID, cardID, board)
+	if err != nil {
+		return fmt.Errorf("failed to decrement card quantity: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("card not found in deck or quantity already 0")
+	}
+
+	// Delete any rows where quantity is now 0
+	deleteQuery := `DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ? AND board = ? AND quantity <= 0`
+	_, err = r.db.ExecContext(ctx, deleteQuery, deckID, cardID, board)
+	if err != nil {
+		return fmt.Errorf("failed to clean up zero quantity card: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveAllCopies removes all copies of a card from a deck.
+func (r *deckRepository) RemoveAllCopies(ctx context.Context, deckID string, cardID int, board string) error {
 	query := `DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ? AND board = ?`
 
 	_, err := r.db.ExecContext(ctx, query, deckID, cardID, board)

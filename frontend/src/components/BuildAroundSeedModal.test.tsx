@@ -9,7 +9,7 @@ vi.mock('@/services/api', () => ({
     suggestNextCards: vi.fn(),
   },
   cards: {
-    searchCards: vi.fn(),
+    searchCardsWithCollection: vi.fn(),
   },
 }));
 
@@ -17,7 +17,7 @@ import { decks, cards } from '@/services/api';
 
 const mockBuildAroundSeed = vi.mocked(decks.buildAroundSeed);
 const mockSuggestNextCards = vi.mocked(decks.suggestNextCards);
-const mockSearchCards = vi.mocked(cards.searchCards);
+const mockSearchCardsWithCollection = vi.mocked(cards.searchCardsWithCollection);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -83,7 +83,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should search for cards when typing in search input', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '12345',
         Name: 'Test Card',
@@ -100,12 +100,12 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.change(searchInput, { target: { value: 'Test' } });
 
     await waitFor(() => {
-      expect(mockSearchCards).toHaveBeenCalledWith({ query: 'Test', limit: 10 });
+      expect(mockSearchCardsWithCollection).toHaveBeenCalledWith('Test', undefined, 50);
     });
   });
 
   it('should display search results', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '12345',
         Name: 'Sheoldred',
@@ -127,7 +127,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should select a card and show build options', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '12345',
         Name: 'Test Build Card',
@@ -157,7 +157,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should toggle budget mode checkbox', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '12345',
         Name: 'Test Card',
@@ -190,7 +190,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should build suggestions when Quick Build button is clicked', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '12345',
         Name: 'Build Around Me',
@@ -281,7 +281,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should show suggestions after Quick Build', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '99999',
         Name: 'Seed Card',
@@ -390,7 +390,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should show ownership badges correctly', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '55555',
         Name: 'Ownership Test',
@@ -483,7 +483,7 @@ describe('BuildAroundSeedModal', () => {
   it('should call onApplyDeck when apply button is clicked', async () => {
     const onApplyDeck = vi.fn();
 
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '22222',
         Name: 'Apply Test',
@@ -578,7 +578,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should show error message on API failure', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '66666',
         Name: 'Error Test',
@@ -613,7 +613,7 @@ describe('BuildAroundSeedModal', () => {
   });
 
   it('should clear selection when clear button is clicked', async () => {
-    mockSearchCards.mockResolvedValue([
+    mockSearchCardsWithCollection.mockResolvedValue([
       {
         ArenaID: '77777',
         Name: 'Clear Test Card',
@@ -645,6 +645,166 @@ describe('BuildAroundSeedModal', () => {
     expect(screen.queryByText('Quick Build (Auto-fill Deck)')).not.toBeInTheDocument();
   });
 
+  describe('Search Filters', () => {
+    it('should filter search results by color when color button is clicked', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        { ArenaID: '1', Name: 'White Card', Types: ['Creature'], Colors: ['W'], ImageURL: '' },
+        { ArenaID: '2', Name: 'Blue Card', Types: ['Creature'], Colors: ['U'], ImageURL: '' },
+        { ArenaID: '3', Name: 'Red Card', Types: ['Creature'], Colors: ['R'], ImageURL: '' },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      // Search for cards
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Card' } });
+
+      // Wait for all results to appear
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.getByText('Blue Card')).toBeInTheDocument();
+        expect(screen.getByText('Red Card')).toBeInTheDocument();
+      });
+
+      // Click the White color filter button
+      const whiteButton = screen.getByTitle('White');
+      fireEvent.click(whiteButton);
+
+      // Only White Card should be visible now
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.queryByText('Blue Card')).not.toBeInTheDocument();
+        expect(screen.queryByText('Red Card')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should filter search results by type when type button is clicked', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        { ArenaID: '1', Name: 'Test Creature', Types: ['Creature'], Colors: ['W'], ImageURL: '' },
+        { ArenaID: '2', Name: 'Test Instant', Types: ['Instant'], Colors: ['U'], ImageURL: '' },
+        { ArenaID: '3', Name: 'Test Sorcery', Types: ['Sorcery'], Colors: ['R'], ImageURL: '' },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      // Search for cards
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Test' } });
+
+      // Wait for all results to appear
+      await waitFor(() => {
+        expect(screen.getByText('Test Creature')).toBeInTheDocument();
+        expect(screen.getByText('Test Instant')).toBeInTheDocument();
+        expect(screen.getByText('Test Sorcery')).toBeInTheDocument();
+      });
+
+      // Click the Creature type filter button (shows as "Crea")
+      const creatureButton = screen.getByText('Crea');
+      fireEvent.click(creatureButton);
+
+      // Only Creature should be visible now
+      await waitFor(() => {
+        expect(screen.getByText('Test Creature')).toBeInTheDocument();
+        expect(screen.queryByText('Test Instant')).not.toBeInTheDocument();
+        expect(screen.queryByText('Test Sorcery')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should show no results when filter excludes all cards', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        { ArenaID: '1', Name: 'White Card', Types: ['Creature'], Colors: ['W'], ImageURL: '' },
+        { ArenaID: '2', Name: 'Blue Card', Types: ['Creature'], Colors: ['U'], ImageURL: '' },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      // Search for cards
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Card' } });
+
+      // Wait for results
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+      });
+
+      // Click Red color filter (no red cards in results)
+      const redButton = screen.getByTitle('Red');
+      fireEvent.click(redButton);
+
+      // No cards should be visible
+      await waitFor(() => {
+        expect(screen.queryByText('White Card')).not.toBeInTheDocument();
+        expect(screen.queryByText('Blue Card')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should allow multiple color filters (OR logic)', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        { ArenaID: '1', Name: 'White Card', Types: ['Creature'], Colors: ['W'], ImageURL: '' },
+        { ArenaID: '2', Name: 'Blue Card', Types: ['Creature'], Colors: ['U'], ImageURL: '' },
+        { ArenaID: '3', Name: 'Red Card', Types: ['Creature'], Colors: ['R'], ImageURL: '' },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      // Search for cards
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Card' } });
+
+      // Wait for results
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+      });
+
+      // Click White and Blue color filters
+      fireEvent.click(screen.getByTitle('White'));
+      fireEvent.click(screen.getByTitle('Blue'));
+
+      // White and Blue cards should be visible, Red should not
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.getByText('Blue Card')).toBeInTheDocument();
+        expect(screen.queryByText('Red Card')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should toggle filter off when clicked again', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        { ArenaID: '1', Name: 'White Card', Types: ['Creature'], Colors: ['W'], ImageURL: '' },
+        { ArenaID: '2', Name: 'Blue Card', Types: ['Creature'], Colors: ['U'], ImageURL: '' },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      // Search for cards
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Card' } });
+
+      // Wait for results
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.getByText('Blue Card')).toBeInTheDocument();
+      });
+
+      // Click White to filter
+      fireEvent.click(screen.getByTitle('White'));
+
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.queryByText('Blue Card')).not.toBeInTheDocument();
+      });
+
+      // Click White again to remove filter
+      fireEvent.click(screen.getByTitle('White'));
+
+      // Both cards should be visible again
+      await waitFor(() => {
+        expect(screen.getByText('White Card')).toBeInTheDocument();
+        expect(screen.getByText('Blue Card')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Iterative Mode', () => {
     const iterativeProps = {
       isOpen: true,
@@ -656,7 +816,7 @@ describe('BuildAroundSeedModal', () => {
     };
 
     it('should show Start Building button when iterative callbacks provided', async () => {
-      mockSearchCards.mockResolvedValue([
+      mockSearchCardsWithCollection.mockResolvedValue([
         {
           ArenaID: '12345',
           Name: 'Iterative Test',
@@ -686,7 +846,7 @@ describe('BuildAroundSeedModal', () => {
     });
 
     it('should enter iterative mode when Start Building is clicked', async () => {
-      mockSearchCards.mockResolvedValue([
+      mockSearchCardsWithCollection.mockResolvedValue([
         {
           ArenaID: '54321',
           Name: 'Start Build Card',
@@ -763,7 +923,7 @@ describe('BuildAroundSeedModal', () => {
     it('should call onCardAdded when clicking a suggestion in iterative mode', async () => {
       const onCardAdded = vi.fn();
 
-      mockSearchCards.mockResolvedValue([
+      mockSearchCardsWithCollection.mockResolvedValue([
         {
           ArenaID: '99999',
           Name: 'Pick Cards Test',
@@ -841,7 +1001,7 @@ describe('BuildAroundSeedModal', () => {
     it('should call onFinishDeck with land suggestions when Finish Deck is clicked', async () => {
       const onFinishDeck = vi.fn();
 
-      mockSearchCards.mockResolvedValue([
+      mockSearchCardsWithCollection.mockResolvedValue([
         {
           ArenaID: '11111',
           Name: 'Finish Deck Test',
@@ -906,7 +1066,7 @@ describe('BuildAroundSeedModal', () => {
     });
 
     it('should display deck analysis in iterative mode', async () => {
-      mockSearchCards.mockResolvedValue([
+      mockSearchCardsWithCollection.mockResolvedValue([
         {
           ArenaID: '88888',
           Name: 'Analysis Test',

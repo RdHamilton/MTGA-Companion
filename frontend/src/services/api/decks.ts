@@ -290,12 +290,20 @@ export async function addCard(request: {
   quantity: number;
   zone: string;
   is_sideboard: boolean;
+  from_draft?: boolean;
 }): Promise<void> {
-  await post(`/decks/${request.deck_id}/cards`, request);
+  // Map frontend field names to backend expected field names
+  const body = {
+    card_id: request.arena_id,
+    quantity: request.quantity,
+    board: request.zone,
+    from_draft: request.from_draft ?? false,
+  };
+  await post(`/decks/${request.deck_id}/cards`, body);
 }
 
 /**
- * Remove a card from a deck.
+ * Remove one copy of a card from a deck (decrements quantity by 1).
  */
 export async function removeCard(request: {
   deck_id: string;
@@ -303,6 +311,17 @@ export async function removeCard(request: {
   zone: string;
 }): Promise<void> {
   await del(`/decks/${request.deck_id}/cards/${request.arena_id}?zone=${request.zone}`);
+}
+
+/**
+ * Remove all copies of a card from a deck.
+ */
+export async function removeAllCopies(request: {
+  deck_id: string;
+  arena_id: number;
+  zone: string;
+}): Promise<void> {
+  await del(`/decks/${request.deck_id}/cards/${request.arena_id}/all?zone=${request.zone}`);
 }
 
 /**
@@ -381,10 +400,12 @@ export async function buildAroundSeed(
 
 /**
  * Request for iterative deck building suggestions.
+ * The API analyzes ALL deck cards collectively to find commonalities
+ * (colors, themes, keywords) and suggests cards that complement the deck.
  */
 export interface IterativeBuildAroundRequest {
-  seed_card_id: number;
-  deck_card_ids: number[];
+  seed_card_id?: number;      // Optional - API analyzes all deck cards collectively
+  deck_card_ids: number[];    // Required - all cards currently in the deck
   max_results?: number;
   budget_mode?: boolean;
   set_restriction?: 'single' | 'multiple' | 'all';

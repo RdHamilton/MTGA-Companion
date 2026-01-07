@@ -87,6 +87,66 @@ func (c *Client) fetchCardsByNamesBatch(ctx context.Context, names []string) ([]
 	return c.doCollectionRequest(ctx, identifiers)
 }
 
+// GetCardsByScryfallIDs fetches multiple cards by their Scryfall UUIDs using the batch /cards/collection endpoint.
+// This is the most reliable lookup method when you have Scryfall IDs (e.g., extracted from 17Lands image URLs).
+// Automatically handles batching if more than 75 cards are requested.
+// Returns found cards, not-found IDs, and any error.
+func (c *Client) GetCardsByScryfallIDs(ctx context.Context, scryfallIDs []string) ([]Card, []string, error) {
+	if len(scryfallIDs) == 0 {
+		return []Card{}, nil, nil
+	}
+
+	var allCards []Card
+	var allNotFound []string
+
+	// Process in batches of MaxBatchSize (75)
+	for i := 0; i < len(scryfallIDs); i += MaxBatchSize {
+		end := i + MaxBatchSize
+		if end > len(scryfallIDs) {
+			end = len(scryfallIDs)
+		}
+		batch := scryfallIDs[i:end]
+
+		cards, notFound, err := c.fetchCardsByScryfallIDsBatch(ctx, batch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch batch %d-%d: %w", i, end, err)
+		}
+		allCards = append(allCards, cards...)
+		allNotFound = append(allNotFound, notFound...)
+	}
+
+	return allCards, allNotFound, nil
+}
+
+// fetchCardsByScryfallIDsBatch fetches a single batch of cards by Scryfall ID from /cards/collection.
+func (c *Client) fetchCardsByScryfallIDsBatch(ctx context.Context, scryfallIDs []string) ([]Card, []string, error) {
+	// Wait for rate limiter
+	if err := c.rateLimiter.Wait(ctx); err != nil {
+		return nil, nil, fmt.Errorf("rate limiter error: %w", err)
+	}
+
+	// Build identifiers using Scryfall ID
+	identifiers := make([]CardIdentifier, len(scryfallIDs))
+	for i, id := range scryfallIDs {
+		identifiers[i] = CardIdentifier{ID: id}
+	}
+
+	cards, notFoundIDs, err := c.doCollectionRequestWithIdentifiers(ctx, identifiers)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Convert CardIdentifiers to strings (IDs) for the notFound list
+	notFound := make([]string, 0, len(notFoundIDs))
+	for _, id := range notFoundIDs {
+		if id.ID != "" {
+			notFound = append(notFound, id.ID)
+		}
+	}
+
+	return cards, notFound, nil
+}
+
 // GetCardsBySetAndNumbers fetches multiple cards by set code and collector number.
 // This is the most reliable batch lookup method.
 // Automatically handles batching if more than 75 cards are requested.

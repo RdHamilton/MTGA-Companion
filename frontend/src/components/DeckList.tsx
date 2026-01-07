@@ -10,7 +10,9 @@ interface DeckListProps {
   cards: models.DeckCard[];
   tags?: models.DeckTag[];
   statistics?: gui.DeckStatistics;
+  onAddCard?: (cardID: number, board: string) => void;
   onRemoveCard?: (cardID: number, board: string) => void;
+  onRemoveAllCopies?: (cardID: number, board: string) => void;
   onCardHover?: (card: models.SetCard) => void;
 }
 
@@ -55,17 +57,25 @@ const getCardName = (cardID: number, metadata?: models.SetCard): string => {
   return `Unknown Card ${cardID}`;
 };
 
+interface HoverPreview {
+  card: models.SetCard;
+  position: { x: number; y: number };
+}
+
 export default function DeckList({
   deck,
   cards,
   tags = [],
   statistics,
+  onAddCard,
   onRemoveCard,
+  onRemoveAllCopies,
   onCardHover,
 }: DeckListProps) {
   const [cardsWithMetadata, setCardsWithMetadata] = useState<CardWithMetadata[]>([]);
   const [loading, setLoading] = useState(cards.length > 0);
   const [showSideboard, setShowSideboard] = useState(false);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   // Load card metadata for all cards
   useEffect(() => {
@@ -202,6 +212,24 @@ export default function DeckList({
     ].filter((item) => item.value > 0);
   }, [statistics]);
 
+  const handleCardMouseEnter = (card: CardWithMetadata, event: React.MouseEvent) => {
+    if (card.metadata) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      setHoverPreview({
+        card: card.metadata,
+        position: {
+          x: rect.right + 10,
+          y: rect.top,
+        },
+      });
+      onCardHover?.(card.metadata);
+    }
+  };
+
+  const handleCardMouseLeave = () => {
+    setHoverPreview(null);
+  };
+
   const renderCardGroup = (title: string, cards: CardWithMetadata[], count: number) => {
     if (count === 0) return null;
 
@@ -216,29 +244,59 @@ export default function DeckList({
             <div
               key={`${card.deckCard.CardID}-${card.deckCard.Board}`}
               className="deck-card"
-              onMouseEnter={() => card.metadata && onCardHover?.(card.metadata)}
-              title={card.metadata?.Name || `Card ${card.deckCard.CardID}`}
+              onMouseEnter={(e) => handleCardMouseEnter(card, e)}
+              onMouseLeave={handleCardMouseLeave}
             >
-              <span className="card-quantity">{card.deckCard.Quantity}x</span>
-              <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
-              {card.metadata?.SetCode && (
-                <span className="card-set-symbol">
-                  <SetSymbol
-                    setCode={card.metadata.SetCode}
-                    size="small"
-                    rarity={card.metadata.Rarity?.toLowerCase() as 'common' | 'uncommon' | 'rare' | 'mythic' | undefined}
+              {card.metadata?.ImageURLSmall && (
+                <div className="card-image-wrapper">
+                  <img
+                    src={card.metadata.ImageURLSmall}
+                    alt={card.metadata.Name}
+                    className="card-image"
+                    loading="lazy"
                   />
-                </span>
+                  <span className="card-quantity-badge">{card.deckCard.Quantity}x</span>
+                </div>
               )}
-              {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
-              {onRemoveCard && (
-                <button
-                  className="remove-card-btn"
-                  onClick={() => onRemoveCard(card.deckCard.CardID, card.deckCard.Board)}
-                  title="Remove card"
-                >
-                  ×
-                </button>
+              {!card.metadata?.ImageURLSmall && (
+                <div className="card-image-placeholder">
+                  <span className="card-quantity-badge">{card.deckCard.Quantity}x</span>
+                  <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
+                </div>
+              )}
+              <div className="card-info">
+                <span className="card-name">{getCardName(card.deckCard.CardID, card.metadata)}</span>
+              </div>
+              {(onAddCard || onRemoveCard || onRemoveAllCopies) && (
+                <div className="card-actions">
+                  {onAddCard && (
+                    <button
+                      className="card-action-btn add-btn"
+                      onClick={() => onAddCard(card.deckCard.CardID, card.deckCard.Board)}
+                      title="Add one copy"
+                    >
+                      +
+                    </button>
+                  )}
+                  {onRemoveCard && (
+                    <button
+                      className="card-action-btn remove-btn"
+                      onClick={() => onRemoveCard(card.deckCard.CardID, card.deckCard.Board)}
+                      title="Remove one copy"
+                    >
+                      −
+                    </button>
+                  )}
+                  {onRemoveAllCopies && (
+                    <button
+                      className="card-action-btn remove-all-btn"
+                      onClick={() => onRemoveAllCopies(card.deckCard.CardID, card.deckCard.Board)}
+                      title="Remove all copies"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -385,14 +443,36 @@ export default function DeckList({
                     </span>
                   )}
                   {card.metadata?.ManaCost && <span className="card-mana">{card.metadata.ManaCost}</span>}
-                  {onRemoveCard && (
-                    <button
-                      className="remove-card-btn"
-                      onClick={() => onRemoveCard(card.deckCard.CardID, card.deckCard.Board)}
-                      title="Remove card"
-                    >
-                      ×
-                    </button>
+                  {(onAddCard || onRemoveCard || onRemoveAllCopies) && (
+                    <div className="card-actions">
+                      {onAddCard && (
+                        <button
+                          className="card-action-btn add-btn"
+                          onClick={() => onAddCard(card.deckCard.CardID, card.deckCard.Board)}
+                          title="Add one copy"
+                        >
+                          +
+                        </button>
+                      )}
+                      {onRemoveCard && (
+                        <button
+                          className="card-action-btn remove-btn"
+                          onClick={() => onRemoveCard(card.deckCard.CardID, card.deckCard.Board)}
+                          title="Remove one copy"
+                        >
+                          −
+                        </button>
+                      )}
+                      {onRemoveAllCopies && (
+                        <button
+                          className="card-action-btn remove-all-btn"
+                          onClick={() => onRemoveAllCopies(card.deckCard.CardID, card.deckCard.Board)}
+                          title="Remove all copies"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -404,6 +484,47 @@ export default function DeckList({
       {cards.length === 0 && (
         <div className="empty-deck">
           <p>No cards in deck yet. Use the card search to add cards.</p>
+        </div>
+      )}
+
+      {/* Hover Preview */}
+      {hoverPreview && (
+        <div
+          className="card-hover-preview"
+          style={{
+            position: 'fixed',
+            left: Math.min(hoverPreview.position.x, window.innerWidth - 280),
+            top: 80,
+            zIndex: 1000,
+          }}
+        >
+          <div className="preview-card">
+            {hoverPreview.card.ImageURL && (
+              <img
+                src={hoverPreview.card.ImageURL}
+                alt={hoverPreview.card.Name}
+                className="preview-image"
+              />
+            )}
+            <div className="preview-details">
+              <h3 className="preview-name">{hoverPreview.card.Name}</h3>
+              <p className="preview-type">{hoverPreview.card.TypeLine || hoverPreview.card.Types?.join(' ')}</p>
+              <div className="preview-stats">
+                {hoverPreview.card.ManaCost && (
+                  <span className="preview-mana">Mana: {hoverPreview.card.ManaCost}</span>
+                )}
+                {hoverPreview.card.Power && hoverPreview.card.Toughness && (
+                  <span className="preview-pt">{hoverPreview.card.Power}/{hoverPreview.card.Toughness}</span>
+                )}
+              </div>
+              {hoverPreview.card.Text && (
+                <p className="preview-text">{hoverPreview.card.Text}</p>
+              )}
+              <p className="preview-set">
+                {hoverPreview.card.SetCode?.toUpperCase()} • {hoverPreview.card.Rarity}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { decks, cards as cardsApi } from '@/services/api';
 import type {
   BuildAroundSeedResponse,
@@ -19,6 +19,8 @@ interface BuildAroundSeedModalProps {
   onFinishDeck?: (lands: SuggestedLandResponse[]) => void;
   currentDeckCards?: number[];
   deckCards?: models.DeckCard[];
+  /** When true, skips seed selection and uses current deck cards directly */
+  useDeckCardsAsSeed?: boolean;
 }
 
 interface SearchResult {
@@ -28,6 +30,24 @@ interface SearchResult {
   types?: string[];
   imageURI?: string;
   colors?: string[];
+  cmc?: number;
+}
+
+interface ColorFilter {
+  W: boolean;
+  U: boolean;
+  B: boolean;
+  R: boolean;
+  G: boolean;
+}
+
+interface TypeFilter {
+  creature: boolean;
+  instant: boolean;
+  sorcery: boolean;
+  enchantment: boolean;
+  artifact: boolean;
+  planeswalker: boolean;
 }
 
 export default function BuildAroundSeedModal({
@@ -39,9 +59,10 @@ export default function BuildAroundSeedModal({
   onFinishDeck,
   currentDeckCards = [],
   deckCards = [],
+  useDeckCardsAsSeed = false,
 }: BuildAroundSeedModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [rawSearchResults, setRawSearchResults] = useState<SearchResult[]>([]); // Unfiltered results from API
   const [selectedCard, setSelectedCard] = useState<SearchResult | null>(null);
   const [suggestions, setSuggestions] = useState<BuildAroundSeedResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,6 +71,15 @@ export default function BuildAroundSeedModal({
   const [budgetMode, setBudgetMode] = useState(false);
   const [applying, setApplying] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Filter state
+  const [colorFilter, setColorFilter] = useState<ColorFilter>({
+    W: false, U: false, B: false, R: false, G: false,
+  });
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>({
+    creature: false, instant: false, sorcery: false,
+    enchantment: false, artifact: false, planeswalker: false,
+  });
 
   // Iterative mode state
   const [iterativeMode, setIterativeMode] = useState(false);
@@ -61,6 +91,50 @@ export default function BuildAroundSeedModal({
   // Map of cardID to card name for display purposes
   const [cardNameMap, setCardNameMap] = useState<Map<number, string>>(new Map());
 
+  // Ref to track if we've already attempted initial fetch (prevent infinite loops)
+  const hasAttemptedFetch = useRef(false);
+
+  // Track which card IDs we've already fetched names for
+  const fetchedCardIdsRef = useRef<Set<number>>(new Set());
+
+  // Fetch card names for deck cards when modal opens
+  useEffect(() => {
+    if (!isOpen || deckCards.length === 0) return;
+
+    const fetchCardNames = async () => {
+      // Get card IDs that we haven't fetched yet
+      const missingCardIds = deckCards
+        .map(c => c.CardID)
+        .filter(id => !fetchedCardIdsRef.current.has(id));
+
+      if (missingCardIds.length === 0) return;
+
+      // Mark these as being fetched
+      missingCardIds.forEach(id => fetchedCardIdsRef.current.add(id));
+
+      try {
+        // Fetch card details for each missing card in parallel
+        const cardPromises = missingCardIds.map(id => cardsApi.getCardByArenaId(id));
+        const cards = await Promise.all(cardPromises);
+
+        // Update the card name map
+        setCardNameMap(prev => {
+          const newMap = new Map(prev);
+          cards.forEach(card => {
+            if (card && card.ArenaID) {
+              newMap.set(parseInt(card.ArenaID, 10), card.Name);
+            }
+          });
+          return newMap;
+        });
+      } catch (err) {
+        console.error('Failed to fetch card names:', err);
+      }
+    };
+
+    fetchCardNames();
+  }, [isOpen, deckCards]);
+
   // Define handleClose before useEffects that depend on it
   const handleClose = useCallback(() => {
     // Reset state
@@ -70,6 +144,9 @@ export default function BuildAroundSeedModal({
     setDeckAnalysis(null);
     setLandSuggestions([]);
     setCardNameMap(new Map());
+    setError(null);
+    hasAttemptedFetch.current = false; // Reset for next open
+    fetchedCardIdsRef.current = new Set(); // Reset fetched card IDs
     onClose();
   }, [onClose]);
 
@@ -96,12 +173,15 @@ export default function BuildAroundSeedModal({
 
   // Fetch suggestions when in iterative mode and deck changes
   const fetchIterativeSuggestions = useCallback(async () => {
-    if (!seedCardId || !iterativeMode) return;
+    if (!iterativeMode) return;
+    // Either need a seed card OR using deck cards mode
+    if (!seedCardId && !useDeckCardsAsSeed) return;
+    if (currentDeckCards.length === 0) return;
 
     setLoading(true);
     try {
       const response: IterativeBuildAroundResponse = await decks.suggestNextCards({
-        seed_card_id: seedCardId,
+        seed_card_id: seedCardId || undefined, // Optional - API analyzes all deck cards
         deck_card_ids: currentDeckCards,
         max_results: 15,
         budget_mode: budgetMode,
@@ -116,15 +196,79 @@ export default function BuildAroundSeedModal({
     } finally {
       setLoading(false);
     }
-  }, [seedCardId, currentDeckCards, budgetMode, iterativeMode]);
+  }, [seedCardId, currentDeckCards, budgetMode, iterativeMode, useDeckCardsAsSeed]);
 
   // Debounced fetch when deck changes in iterative mode
   useEffect(() => {
-    if (!iterativeMode || !seedCardId) return;
+    if (!iterativeMode) return;
+    // Need either seed card or deck cards mode
+    if (!seedCardId && !useDeckCardsAsSeed) return;
 
     const timer = setTimeout(fetchIterativeSuggestions, 300);
     return () => clearTimeout(timer);
-  }, [currentDeckCards, iterativeMode, seedCardId, fetchIterativeSuggestions]);
+  }, [currentDeckCards, iterativeMode, seedCardId, useDeckCardsAsSeed, fetchIterativeSuggestions]);
+
+  // Auto-start iterative mode when useDeckCardsAsSeed is true and modal opens
+  useEffect(() => {
+    if (!isOpen || !useDeckCardsAsSeed || currentDeckCards.length === 0) return;
+    if (iterativeMode) return; // Already in iterative mode
+    if (hasAttemptedFetch.current) return; // Already attempted, don't retry on error
+
+    // Mark that we've attempted the fetch
+    hasAttemptedFetch.current = true;
+
+    // No seed card needed - the API analyzes ALL deck cards collectively
+    setIterativeMode(true);
+    setLoading(true);
+    setError(null);
+
+    // Fetch suggestions based on collective analysis of all deck cards
+    const fetchSuggestions = async () => {
+      try {
+        const response = await decks.suggestNextCards({
+          deck_card_ids: currentDeckCards,
+          max_results: 15,
+          budget_mode: budgetMode,
+        });
+
+        setIterativeSuggestions(response.suggestions);
+        setDeckAnalysis(response.deckAnalysis);
+        setSlotsRemaining(response.slotsRemaining);
+        setLandSuggestions(response.landSuggestions);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to get suggestions');
+        setIterativeMode(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [isOpen, useDeckCardsAsSeed, currentDeckCards, budgetMode, iterativeMode]);
+
+  // Filtered search results - derived from raw results and current filter state
+  const searchResults = useMemo(() => {
+    const activeColors = Object.entries(colorFilter).filter(([, v]) => v).map(([k]) => k);
+    const activeTypes = Object.entries(typeFilter).filter(([, v]) => v).map(([k]) => k);
+
+    return rawSearchResults.filter(card => {
+      // Color filter: if any color selected, card must have at least one of them
+      if (activeColors.length > 0) {
+        const cardColors = card.colors || [];
+        const hasMatchingColor = activeColors.some(c => cardColors.includes(c));
+        if (!hasMatchingColor) return false;
+      }
+
+      // Type filter: if any type selected, card must have at least one of them
+      if (activeTypes.length > 0) {
+        const typeLine = (card.types || []).join(' ').toLowerCase();
+        const hasMatchingType = activeTypes.some(t => typeLine.includes(t));
+        if (!hasMatchingType) return false;
+      }
+
+      return true;
+    });
+  }, [rawSearchResults, colorFilter, typeFilter]);
 
   const handleSearch = useCallback((query: string) => {
     if (debounceRef.current) {
@@ -132,28 +276,29 @@ export default function BuildAroundSeedModal({
     }
 
     if (query.length < 2) {
-      setSearchResults([]);
+      setRawSearchResults([]);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await cardsApi.searchCards({ query, limit: 10 });
-        setSearchResults(
-          results
-            .filter(card => card.ArenaID && !isNaN(parseInt(card.ArenaID, 10)))
-            .map(card => ({
-              arenaID: parseInt(card.ArenaID, 10),
-              name: card.Name,
-              manaCost: card.ManaCost,
-              types: card.Types,
-              imageURI: card.ImageURL,
-              colors: card.Colors,
-            }))
-        );
+        // Use searchCardsWithCollection for better results (includes all cards, not just exact matches)
+        const results = await cardsApi.searchCardsWithCollection(query, undefined, 50);
+        const mapped = results
+          .filter(card => card.ArenaID && !isNaN(parseInt(card.ArenaID, 10)))
+          .map(card => ({
+            arenaID: parseInt(card.ArenaID, 10),
+            name: card.Name,
+            manaCost: card.ManaCost,
+            types: card.Types,
+            imageURI: card.ImageURL,
+            colors: card.Colors,
+            cmc: card.CMC,
+          }));
+        setRawSearchResults(mapped);
       } catch {
-        setSearchResults([]);
+        setRawSearchResults([]);
       } finally {
         setSearching(false);
       }
@@ -163,7 +308,7 @@ export default function BuildAroundSeedModal({
   const handleSelectCard = (card: SearchResult) => {
     setSelectedCard(card);
     setSearchQuery(card.name);
-    setSearchResults([]);
+    setRawSearchResults([]);
     setSuggestions(null);
   };
 
@@ -255,7 +400,7 @@ export default function BuildAroundSeedModal({
 
   const handleClear = () => {
     setSearchQuery('');
-    setSearchResults([]);
+    setRawSearchResults([]);
     setSelectedCard(null);
     setSuggestions(null);
     setError(null);
@@ -288,8 +433,12 @@ export default function BuildAroundSeedModal({
     return <span className="ownership-badge needed">Need {card.neededCount}</span>;
   };
 
-  // Iterative mode UI
-  if (iterativeMode && selectedCard) {
+  // Iterative mode UI - show when in iterative mode (with selected card OR using deck cards as seed)
+  if (iterativeMode && (selectedCard || useDeckCardsAsSeed)) {
+    const modalTitle = selectedCard
+      ? `Building: ${selectedCard.name}`
+      : `Build Around Your Deck (${currentDeckCards.length} cards)`;
+
     return (
       <div className="build-around-overlay" onClick={handleClose}>
         <div
@@ -300,7 +449,7 @@ export default function BuildAroundSeedModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="build-around-header">
-            <h2 id="iterative-modal-title">Building: {selectedCard.name}</h2>
+            <h2 id="iterative-modal-title">{modalTitle}</h2>
             <button className="close-button" onClick={handleClose} aria-label="Close dialog">
               &times;
             </button>
@@ -402,17 +551,21 @@ export default function BuildAroundSeedModal({
                     ))}
                   </div>
                 )}
-                {/* Mana Curve */}
-                <div className="mana-curve-mini">
-                  <span>Curve: </span>
-                  {Object.entries(deckAnalysis.currentCurve)
-                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                    .map(([cmc, count]) => (
-                      <span key={cmc} className="curve-pip">
-                        {cmc}:{count}
-                      </span>
-                    ))}
-                </div>
+                {/* Mana Curve - shows count of cards at each mana cost */}
+                {Object.keys(deckAnalysis.currentCurve).length > 0 && (
+                  <div className="mana-curve-simple">
+                    <span className="curve-label">Mana Curve:</span>
+                    <div className="curve-items">
+                      {Object.entries(deckAnalysis.currentCurve)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([cmc, count]) => (
+                          <span key={cmc} className="curve-item">
+                            {cmc}-drop: {count}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -492,6 +645,39 @@ export default function BuildAroundSeedModal({
                   Clear
                 </button>
               )}
+            </div>
+
+            {/* Filters - clicking toggles filter, useMemo automatically re-filters results */}
+            <div className="seed-search-filters">
+              <div className="filter-row">
+                <span className="filter-label">Colors:</span>
+                <div className="color-filter-buttons">
+                  {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => (
+                    <button
+                      key={color}
+                      className={`color-filter-btn mana-${color.toLowerCase()} ${colorFilter[color] ? 'active' : ''}`}
+                      onClick={() => setColorFilter(prev => ({ ...prev, [color]: !prev[color] }))}
+                      title={color === 'W' ? 'White' : color === 'U' ? 'Blue' : color === 'B' ? 'Black' : color === 'R' ? 'Red' : 'Green'}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="filter-row">
+                <span className="filter-label">Types:</span>
+                <div className="type-filter-buttons">
+                  {(['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'planeswalker'] as const).map((type) => (
+                    <button
+                      key={type}
+                      className={`type-filter-btn ${typeFilter[type] ? 'active' : ''}`}
+                      onClick={() => setTypeFilter(prev => ({ ...prev, [type]: !prev[type] }))}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1, 4)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Search Results Dropdown */}

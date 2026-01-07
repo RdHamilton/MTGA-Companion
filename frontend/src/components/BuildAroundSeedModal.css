@@ -17,8 +17,9 @@
   background: var(--bg-primary, #1a1a2e);
   border-radius: 12px;
   width: 90%;
-  max-width: 900px;
-  max-height: 85vh;
+  max-width: 700px;
+  max-height: 90vh;
+  min-height: 500px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -42,7 +43,7 @@
 
 /* Content area */
 .build-around-content {
-  padding: 20px;
+  padding: 16px 20px;
   overflow-y: auto;
   flex: 1;
 }
@@ -50,7 +51,88 @@
 /* Search Section */
 .search-section {
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+/* Seed Search Filters */
+.seed-search-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.seed-search-filters .filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.seed-search-filters .filter-label {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.8rem;
+  min-width: 50px;
+}
+
+.color-filter-buttons,
+.type-filter-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.color-filter-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: bold;
+  transition: all 0.15s;
+  opacity: 0.5;
+}
+
+.color-filter-btn:hover {
+  opacity: 0.8;
+}
+
+.color-filter-btn.active {
+  opacity: 1;
+  border-color: var(--accent-color, #6366f1);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+}
+
+.color-filter-btn.mana-w { background: #f9faf4; color: #333; }
+.color-filter-btn.mana-u { background: #0e68ab; color: #fff; }
+.color-filter-btn.mana-b { background: #150b00; color: #fff; border-color: #444; }
+.color-filter-btn.mana-b.active { border-color: var(--accent-color, #6366f1); }
+.color-filter-btn.mana-r { background: #d3202a; color: #fff; }
+.color-filter-btn.mana-g { background: #00733e; color: #fff; }
+
+.type-filter-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #333);
+  background: transparent;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.type-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #fff);
+}
+
+.type-filter-btn.active {
+  background: var(--accent-color, #6366f1);
+  border-color: var(--accent-color, #6366f1);
+  color: #fff;
 }
 
 .search-input-container {
@@ -157,11 +239,11 @@
 .selected-card-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px;
+  gap: 12px;
+  padding: 16px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .selected-card {
@@ -171,14 +253,14 @@
 }
 
 .card-image {
-  width: 150px;
+  width: 120px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .card-placeholder {
-  width: 150px;
-  height: 210px;
+  width: 120px;
+  height: 168px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   display: flex;
@@ -186,7 +268,8 @@
   justify-content: center;
   color: var(--text-secondary, #aaa);
   text-align: center;
-  padding: 16px;
+  padding: 12px;
+  font-size: 0.9rem;
 }
 
 .selected-card-info h3 {
@@ -615,21 +698,44 @@
   font-size: 0.9rem;
 }
 
-.mana-curve-mini {
+/* Simplified mana curve display */
+.mana-curve-simple {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
   color: var(--text-secondary, #aaa);
   font-size: 0.85rem;
+  margin-top: 8px;
 }
 
-.curve-pip {
-  padding: 2px 6px;
+.curve-label {
+  color: var(--text-secondary, #aaa);
+  font-weight: 500;
+}
+
+.curve-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.curve-item {
   background: rgba(99, 102, 241, 0.15);
-  border-radius: 4px;
   color: var(--accent-color, #6366f1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Card mana cost in deck list */
+.card-mana-cost {
+  font-family: monospace;
   font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  margin-left: auto;
+  padding-right: 8px;
 }
 
 /* Land Suggestions Preview */
@@ -663,9 +769,15 @@
 /* Build Mode Buttons */
 .build-mode-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 12px;
+}
+
+.build-mode-buttons .build-button {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 0.9rem;
 }
 
 .build-button.primary {

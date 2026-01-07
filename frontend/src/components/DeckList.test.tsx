@@ -238,22 +238,36 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} />);
 
       await waitFor(() => {
+        // Card quantity badge shows quantity
         expect(screen.getByText('4x')).toBeInTheDocument();
-        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+        // Card name appears in card-info section (may appear multiple times due to image placeholder)
+        expect(screen.getAllByText('Lightning Bolt').length).toBeGreaterThan(0);
       });
     });
 
-    it('should display mana cost when available', async () => {
+    it('should display mana cost in hover preview when available', async () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard()];
-      const mockCard = createMockSetCard({ ManaCost: '{2}{R}' });
+      const mockCard = createMockSetCard({ ManaCost: '{2}{R}', ImageURL: 'https://example.com/card.jpg' });
 
       mockCards.getCardByArenaId.mockResolvedValue(mockCard);
 
       render(<DeckList deck={deck} cards={cards} />);
 
+      // Wait for cards to load (default mock name is "Test Card")
       await waitFor(() => {
-        expect(screen.getByText('{2}{R}')).toBeInTheDocument();
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
+      });
+
+      // Hover over the card to show preview
+      const deckCard = screen.getAllByText('Test Card')[0].closest('.deck-card');
+      if (deckCard) {
+        await userEvent.hover(deckCard);
+      }
+
+      // Mana cost should appear in the hover preview
+      await waitFor(() => {
+        expect(screen.getByText(/Mana:.*\{2\}\{R\}/)).toBeInTheDocument();
       });
     });
 
@@ -292,7 +306,8 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Plains')).toBeInTheDocument();
+        // Plains name may appear multiple times (placeholder + card-info)
+        expect(screen.getAllByText('Plains').length).toBeGreaterThan(0);
         expect(screen.getByText('Lands')).toBeInTheDocument();
       });
     });
@@ -306,7 +321,8 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Unknown Card 99999')).toBeInTheDocument();
+        // Unknown card name may appear multiple times (placeholder + card-info)
+        expect(screen.getAllByText('Unknown Card 99999').length).toBeGreaterThan(0);
       });
     });
   });
@@ -454,7 +470,7 @@ describe('DeckList Component', () => {
   });
 
   describe('Card Interactions', () => {
-    it('should call onRemoveCard when remove button clicked', async () => {
+    it('should call onRemoveCard when remove one button clicked', async () => {
       const onRemoveCard = vi.fn();
       const deck = createMockDeck();
       const cards = [createMockDeckCard({ CardID: 12345, Board: 'main' })];
@@ -466,17 +482,62 @@ describe('DeckList Component', () => {
 
       // Wait for card to load first
       await waitFor(() => {
-        expect(screen.getByText('Test Card')).toBeInTheDocument();
+        // Card name may appear multiple times (placeholder + card-info)
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
       });
 
-      // Then find and click remove button (button content is "×")
-      const removeButton = screen.getByRole('button', { name: '×' });
+      // Then find and click remove one button (button content is "−")
+      const removeButton = screen.getByRole('button', { name: '−' });
       await userEvent.click(removeButton);
 
       expect(onRemoveCard).toHaveBeenCalledWith(12345, 'main');
     });
 
-    it('should not display remove buttons when onRemoveCard not provided', async () => {
+    it('should call onRemoveAllCopies when remove all button clicked', async () => {
+      const onRemoveAllCopies = vi.fn();
+      const deck = createMockDeck();
+      const cards = [createMockDeckCard({ CardID: 12345, Board: 'main' })];
+      const mockCard = createMockSetCard({ ArenaID: '12345', Name: 'Test Card' });
+
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
+
+      render(<DeckList deck={deck} cards={cards} onRemoveAllCopies={onRemoveAllCopies} />);
+
+      // Wait for card to load first
+      await waitFor(() => {
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
+      });
+
+      // Then find and click remove all button (button content is "×")
+      const removeAllButton = screen.getByRole('button', { name: '×' });
+      await userEvent.click(removeAllButton);
+
+      expect(onRemoveAllCopies).toHaveBeenCalledWith(12345, 'main');
+    });
+
+    it('should call onAddCard when add button clicked', async () => {
+      const onAddCard = vi.fn();
+      const deck = createMockDeck();
+      const cards = [createMockDeckCard({ CardID: 12345, Board: 'main' })];
+      const mockCard = createMockSetCard({ ArenaID: '12345', Name: 'Test Card' });
+
+      mockCards.getCardByArenaId.mockResolvedValue(mockCard);
+
+      render(<DeckList deck={deck} cards={cards} onAddCard={onAddCard} />);
+
+      // Wait for card to load first
+      await waitFor(() => {
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
+      });
+
+      // Then find and click add button (button content is "+")
+      const addButton = screen.getByRole('button', { name: '+' });
+      await userEvent.click(addButton);
+
+      expect(onAddCard).toHaveBeenCalledWith(12345, 'main');
+    });
+
+    it('should not display action buttons when no callbacks provided', async () => {
       const deck = createMockDeck();
       const cards = [createMockDeckCard()];
 
@@ -485,6 +546,8 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} />);
 
       await waitFor(() => {
+        expect(screen.queryByRole('button', { name: '+' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '−' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '×' })).not.toBeInTheDocument();
       });
     });
@@ -500,10 +563,12 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} onCardHover={onCardHover} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Test Card')).toBeInTheDocument();
+        // Card name may appear multiple times (placeholder + card-info)
+        expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
       });
 
-      const cardElement = screen.getByText('Test Card').closest('.deck-card');
+      // Find the deck-card element directly
+      const cardElement = screen.getAllByText('Test Card')[0].closest('.deck-card');
       if (cardElement) {
         await userEvent.hover(cardElement);
       }
@@ -521,10 +586,12 @@ describe('DeckList Component', () => {
       render(<DeckList deck={deck} cards={cards} onCardHover={onCardHover} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Unknown Card 99999')).toBeInTheDocument();
+        // Unknown card name may appear multiple times (placeholder + card-info)
+        expect(screen.getAllByText('Unknown Card 99999').length).toBeGreaterThan(0);
       });
 
-      const cardElement = screen.getByText('Unknown Card 99999').closest('.deck-card');
+      // Find the deck-card element directly
+      const cardElement = screen.getAllByText('Unknown Card 99999')[0].closest('.deck-card');
       if (cardElement) {
         await userEvent.hover(cardElement);
       }
@@ -581,12 +648,13 @@ describe('DeckList Component', () => {
         expect(creatureSection).toBeInTheDocument();
 
         if (creatureSection) {
-          const cardNames = within(creatureSection).getAllByText(/Aardvark|Bear|Zebra/);
-          expect(cardNames).toHaveLength(3);
+          // Get card names from the card-info section only (not the placeholder)
+          const cardInfoElements = creatureSection.querySelectorAll('.card-info .card-name');
+          expect(cardInfoElements).toHaveLength(3);
           // Should be sorted by CMC (2, 2, 3) then alphabetically (Aardvark, Bear, Zebra)
-          expect(cardNames[0]).toHaveTextContent('Aardvark');
-          expect(cardNames[1]).toHaveTextContent('Bear');
-          expect(cardNames[2]).toHaveTextContent('Zebra');
+          expect(cardInfoElements[0]).toHaveTextContent('Aardvark');
+          expect(cardInfoElements[1]).toHaveTextContent('Bear');
+          expect(cardInfoElements[2]).toHaveTextContent('Zebra');
         }
       });
     });

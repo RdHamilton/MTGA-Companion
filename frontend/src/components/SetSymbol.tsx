@@ -3,9 +3,35 @@ import { cards } from '@/services/api';
 import { gui } from '@/types/models';
 import './SetSymbol.css';
 
-// Get set info by code from the full list
+// Module-level cache for the full sets list (prevents repeated API calls)
+let allSetsCache: gui.SetInfo[] | null = null;
+let allSetsCachePromise: Promise<gui.SetInfo[]> | null = null;
+
+// Get all sets, using module-level cache
+async function getAllSetsCached(): Promise<gui.SetInfo[]> {
+  // Return cached data if available
+  if (allSetsCache) {
+    return allSetsCache;
+  }
+
+  // If a fetch is already in progress, wait for it
+  if (allSetsCachePromise) {
+    return allSetsCachePromise;
+  }
+
+  // Start a new fetch and cache the promise to prevent duplicate calls
+  allSetsCachePromise = cards.getAllSetInfo().then((sets) => {
+    allSetsCache = sets;
+    allSetsCachePromise = null;
+    return sets;
+  });
+
+  return allSetsCachePromise;
+}
+
+// Get set info by code from the cached full list
 async function getSetInfo(setCode: string): Promise<gui.SetInfo> {
-  const sets = await cards.getAllSetInfo();
+  const sets = await getAllSetsCached();
   const set = sets.find((s) => s.code === setCode);
   if (!set) {
     throw new Error(`Set not found: ${setCode}`);
@@ -27,6 +53,8 @@ const setInfoCache = new Map<string, gui.SetInfo | null>();
 // eslint-disable-next-line react-refresh/only-export-components
 export function clearSetInfoCache(): void {
   setInfoCache.clear();
+  allSetsCache = null;
+  allSetsCachePromise = null;
 }
 
 const SetSymbol = memo(({ setCode, size = 'medium', rarity, showTooltip = true }: SetSymbolProps) => {

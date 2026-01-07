@@ -433,13 +433,13 @@ export default function CardSearch({
         </div>
       </div>
 
-      {/* Results */}
-      <div className="search-results">
-        {loading && <div className="loading">Searching...</div>}
-        {error && <div className="error">{error}</div>}
+      {/* Results - using inline styles only (no CSS classes) */}
+      <div style={{ background: '#252525', borderRadius: '6px', padding: '1rem', marginTop: '1rem' }}>
+        {loading && <div style={{ textAlign: 'center', padding: '2rem', color: '#aaa' }}>Searching...</div>}
+        {error && <div style={{ textAlign: 'center', padding: '2rem', color: '#ff6b6b' }}>{error}</div>}
 
         {!loading && !error && filteredCards.length === 0 && (
-          <div className="no-results">
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#aaa' }}>
             {isDraftDeck
               ? searchTerm
                 ? 'No cards match your search in draft pool'
@@ -453,8 +453,10 @@ export default function CardSearch({
         )}
 
         {!loading && !error && filteredCards.length > 0 && (
-          <div className="card-list">
-            <div className="result-count">{filteredCards.length} cards found</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ color: '#aaa', fontSize: '0.875rem', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #333' }}>
+              {filteredCards.length} cards found
+            </div>
             {filteredCards.map((card) => {
               const arenaID = parseInt(card.ArenaID);
               const inDeck = getCardInDeck(arenaID);
@@ -463,16 +465,33 @@ export default function CardSearch({
               const ownedQuantity = card.ownedQuantity || 0;
 
               return (
-                <div key={`${card.ArenaID}-${card.SetCode}`} className={`card-result ${inDeck ? 'in-deck' : ''}`}>
-                  {card.ImageURL && <img src={card.ImageURL} alt={card.Name} className="card-image" />}
-                  <div className="card-info">
-                    <div className="card-name">{card.Name}</div>
-                    <div className="card-type">{(card.Types || []).join(' — ')}</div>
-                    {card.ManaCost && <div className="card-mana-cost">{card.ManaCost}</div>}
-                    <div className="card-stats">
+                <div
+                  key={`${card.ArenaID}-${card.SetCode}`}
+                  style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    padding: '1rem',
+                    background: inDeck ? 'rgba(74, 158, 255, 0.1)' : '#2a2a2a',
+                    borderRadius: '6px',
+                    border: inDeck ? '2px solid #4a9eff' : '2px solid transparent',
+                    position: 'relative'
+                  }}
+                >
+                  {card.ImageURL && (
+                    <img
+                      src={card.ImageURL}
+                      alt={card.Name}
+                      style={{ width: '120px', height: 'auto', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 600, color: '#fff' }}>{card.Name}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#aaa' }}>{(card.Types || []).join(' — ')}</div>
+                    {card.ManaCost && <div style={{ fontSize: '0.875rem', color: '#4a9eff', fontFamily: 'Courier New, monospace' }}>{card.ManaCost}</div>}
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#aaa', marginTop: 'auto' }}>
                       <span>CMC: {card.CMC}</span>
                       {card.SetCode && (
-                        <span className="card-set">
+                        <span>
                           <SetSymbol
                             setCode={card.SetCode}
                             size="small"
@@ -481,40 +500,38 @@ export default function CardSearch({
                         </span>
                       )}
                       {isDraftDeck && (
-                        <span className="available-quantity">
+                        <span style={{ color: '#4a9eff', fontWeight: 600 }}>
                           Available: {available - inDeckQuantity} / {available}
                         </span>
                       )}
                       {!isDraftDeck && ownedQuantity > 0 && (
-                        <span className="owned-quantity">{ownedQuantity}x owned</span>
+                        <span style={{ color: '#4caf50', fontWeight: 600 }}>{ownedQuantity}x owned</span>
                       )}
                       {!isDraftDeck && ownedQuantity === 0 && (
-                        <span className="not-owned">Not owned</span>
+                        <span style={{ color: '#888', fontStyle: 'italic' }}>Not owned</span>
                       )}
                     </div>
                   </div>
-                  <div className="card-actions">
+                  <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                     {inDeck && (
-                      <div className="in-deck-info">
-                        <span className="in-deck-badge">
-                          {inDeck.quantity}x in {inDeck.board}
-                        </span>
-                      </div>
+                      <span style={{ background: 'rgba(74, 158, 255, 0.2)', color: '#4a9eff', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid #4a9eff' }}>
+                        {inDeck.quantity}x in {inDeck.board}
+                      </span>
                     )}
                     {(!isDraftDeck || inDeckQuantity < available) && (
                       <button
-                        className="add-button"
                         onClick={() => handleAddCard(card, 1)}
                         title={`Add to ${selectedBoard}`}
+                        style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', minWidth: '100px', background: '#4caf50', color: '#fff' }}
                       >
                         + Add
                       </button>
                     )}
                     {inDeck && (
                       <button
-                        className="remove-button"
                         onClick={() => handleRemoveCard(card)}
                         title="Remove from deck"
+                        style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', minWidth: '100px', background: '#f44336', color: '#fff' }}
                       >
                         - Remove
                       </button>

@@ -15,7 +15,8 @@ export interface ApiResponse<T> {
 
 export interface ApiError {
   error: string;
-  code?: string;
+  message?: string;
+  code?: number | string;
   details?: string;
 }
 
@@ -44,10 +45,10 @@ export function getApiConfig(): ApiConfig {
  */
 export class ApiRequestError extends Error {
   public readonly status: number;
-  public readonly code?: string;
+  public readonly code?: number | string;
   public readonly details?: string;
 
-  constructor(message: string, status: number, code?: string, details?: string) {
+  constructor(message: string, status: number, code?: number | string, details?: string) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
@@ -91,8 +92,10 @@ async function request<T>(
       } catch {
         errorData = { error: response.statusText || 'Request failed' };
       }
+      // Use message field if available (contains actual error details), otherwise use error field
+      const errorMessage = errorData.message || errorData.error;
       throw new ApiRequestError(
-        errorData.error,
+        errorMessage,
         response.status,
         errorData.code,
         errorData.details

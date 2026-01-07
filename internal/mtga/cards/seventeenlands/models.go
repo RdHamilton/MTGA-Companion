@@ -9,6 +9,10 @@ type CardRating struct {
 	Color  string `json:"color"`
 	Rarity string `json:"rarity"`
 
+	// Image URLs (contain Scryfall ID in path)
+	URL     string `json:"url"`      // Front face image URL from Scryfall
+	URLBack string `json:"url_back"` // Back face image URL (for DFCs)
+
 	// MTGA identifiers
 	MTGAID int `json:"mtga_id,omitempty"` // May not always be present
 

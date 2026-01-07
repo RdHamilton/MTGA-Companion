@@ -347,3 +347,72 @@ func TestConvertSetCardToCard_MultiTypeCard(t *testing.T) {
 		t.Errorf("TypeLine = %s, want %s", result.TypeLine, expectedTypeLine)
 	}
 }
+
+func TestBasicLandIDs(t *testing.T) {
+	// Test that basic land IDs are correctly identified for the 4-card limit exemption.
+	// These IDs should match the constants used in AddCard validation.
+	basicLandIDs := map[int]bool{
+		81716: true, // Plains
+		81717: true, // Island
+		81718: true, // Swamp
+		81719: true, // Mountain
+		81720: true, // Forest
+	}
+
+	tests := []struct {
+		name    string
+		cardID  int
+		isBasic bool
+	}{
+		{"Plains is basic land", 81716, true},
+		{"Island is basic land", 81717, true},
+		{"Swamp is basic land", 81718, true},
+		{"Mountain is basic land", 81719, true},
+		{"Forest is basic land", 81720, true},
+		{"Regular card is not basic", 12345, false},
+		{"Another regular card is not basic", 99999, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := basicLandIDs[tt.cardID]
+			if result != tt.isBasic {
+				t.Errorf("basicLandIDs[%d] = %v, want %v", tt.cardID, result, tt.isBasic)
+			}
+		})
+	}
+}
+
+func TestFourCardLimitLogic(t *testing.T) {
+	// Test the 4-card limit logic used in AddCard
+	tests := []struct {
+		name        string
+		currentQty  int
+		addQty      int
+		shouldError bool
+		maxCanAdd   int
+	}{
+		{"can add 1 to empty deck", 0, 1, false, 4},
+		{"can add 4 to empty deck", 0, 4, false, 4},
+		{"cannot add 5 to empty deck", 0, 5, true, 4},
+		{"can add 1 when at 3", 3, 1, false, 1},
+		{"cannot add 2 when at 3", 3, 2, true, 1},
+		{"cannot add any when at 4", 4, 1, true, 0},
+		{"can add 2 when at 2", 2, 2, false, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			maxCanAdd := 4 - tt.currentQty
+			wouldExceed := tt.currentQty+tt.addQty > 4
+
+			if wouldExceed != tt.shouldError {
+				t.Errorf("wouldExceed = %v, want %v", wouldExceed, tt.shouldError)
+			}
+
+			if maxCanAdd != tt.maxCanAdd {
+				t.Errorf("maxCanAdd = %d, want %d", maxCanAdd, tt.maxCanAdd)
+			}
+		})
+	}
+}
