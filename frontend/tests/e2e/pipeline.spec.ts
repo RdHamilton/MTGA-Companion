@@ -707,6 +707,90 @@ test.describe('Data Pipeline - Log to UI', () => {
     });
   });
 
+  test.describe('DeckBuilder Pipeline', () => {
+    test('should show Build Around button for non-draft decks (#767)', async ({ page }) => {
+      await page.click('a[href="/decks"]');
+      await page.waitForURL('**/decks');
+
+      // Wait for decks to load
+      const decksPage = page.locator('.decks-page');
+      await expect(decksPage).toBeVisible({ timeout: 10000 });
+
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasDecks = await deckCard.first().isVisible();
+
+      if (hasDecks) {
+        // Find non-draft deck (Standard, Historic, Explorer, etc.)
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format').filter({ hasNotText: 'Limited' })
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          // Click the deck and wait for navigation
+          await nonDraftDeck.click();
+
+          // Wait for DeckBuilder to load - could be content or error state
+          const deckBuilderContent = page.locator('.deck-builder-content');
+          const errorState = page.locator('.deck-builder.error-state');
+          await expect(deckBuilderContent.or(errorState)).toBeVisible({ timeout: 15000 });
+
+          // Only check for Build Around button if deck loaded successfully
+          const deckLoaded = await deckBuilderContent.isVisible();
+          if (deckLoaded) {
+            // Build Around button should exist for non-draft decks
+            const buildAroundButton = page.locator('button.build-around-btn');
+            await expect(buildAroundButton).toBeVisible({ timeout: 5000 });
+          }
+        }
+      }
+    });
+
+    test('should show Suggest Decks button for draft decks', async ({ page }) => {
+      await page.click('a[href="/decks"]');
+      await page.waitForURL('**/decks');
+
+      const decksPage = page.locator('.decks-page');
+      await expect(decksPage).toBeVisible({ timeout: 10000 });
+
+      const deckCard = page.locator('.deck-card');
+      const hasDecks = await deckCard.first().isVisible().catch(() => false);
+
+      if (hasDecks) {
+        // Find draft/limited deck
+        const draftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:has-text("Limited")')
+        }).first();
+
+        const hasDraft = await draftDeck.isVisible().catch(() => false);
+
+        if (hasDraft) {
+          await draftDeck.click();
+
+          // Wait for DeckBuilder to load - could be content or error state
+          const deckBuilderContent = page.locator('.deck-builder-content');
+          const errorState = page.locator('.deck-builder.error-state');
+          await expect(deckBuilderContent.or(errorState)).toBeVisible({ timeout: 15000 });
+
+          // Only check for buttons if deck loaded successfully
+          const deckLoaded = await deckBuilderContent.isVisible();
+          if (deckLoaded) {
+            // Suggest Decks should be visible, Build Around should NOT be visible
+            const suggestDecksButton = page.locator('button.suggest-decks-btn');
+            const buildAroundButton = page.locator('button.build-around-btn');
+
+            await expect(suggestDecksButton).toBeVisible({ timeout: 5000 });
+            await expect(buildAroundButton).not.toBeVisible();
+          }
+        }
+      }
+    });
+  });
+
   test.describe('Data Consistency', () => {
     test('should not show error states when log data is present', async ({ page }) => {
       // Check Match History (default page)

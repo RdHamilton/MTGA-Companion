@@ -301,4 +301,141 @@ describe('DeckBuilder Component - Export and Validate', () => {
       expect(validateButton).toHaveAttribute('title', 'Validate deck');
     });
   });
+
+  describe('Build Around Functionality', () => {
+    it('should NOT show Build Around button for draft decks', async () => {
+      const mockDeck = createMockDeck({ Source: 'draft', DraftEventID: 'draft-123' });
+      const mockCards = [createMockDeckCard()];
+      const mockStats = createMockDeckStatistics();
+
+      mockDecks.getDeck.mockResolvedValue({
+        deck: mockDeck,
+        cards: mockCards,
+        tags: [],
+      });
+      mockDecks.getDeckStatistics.mockResolvedValue(mockStats);
+
+      render(<DeckBuilder />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+
+      // Build Around should NOT be visible for draft decks
+      expect(screen.queryByRole('button', { name: /Build Around/i })).not.toBeInTheDocument();
+      // But Suggest Decks should be visible for draft decks
+      expect(screen.getByRole('button', { name: /Suggest Decks/i })).toBeInTheDocument();
+    });
+
+    it('should show Build Around button for non-draft decks', async () => {
+      const mockDeck = createMockDeck({ Source: 'constructed', DraftEventID: '' });
+      const mockCards = [createMockDeckCard()];
+      const mockStats = createMockDeckStatistics();
+
+      mockDecks.getDeck.mockResolvedValue({
+        deck: mockDeck,
+        cards: mockCards,
+        tags: [],
+      });
+      mockDecks.getDeckStatistics.mockResolvedValue(mockStats);
+
+      render(<DeckBuilder />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+
+      // Build Around should be visible for non-draft decks
+      expect(screen.getByRole('button', { name: /Build Around/i })).toBeInTheDocument();
+      // Suggest Decks should NOT be visible for non-draft decks
+      expect(screen.queryByRole('button', { name: /Suggest Decks/i })).not.toBeInTheDocument();
+    });
+
+    it('should open Build Around modal when button is clicked', async () => {
+      const mockDeck = createMockDeck({ Source: 'constructed', DraftEventID: '' });
+      const mockCards = [createMockDeckCard()];
+      const mockStats = createMockDeckStatistics();
+
+      mockDecks.getDeck.mockResolvedValue({
+        deck: mockDeck,
+        cards: mockCards,
+        tags: [],
+      });
+      mockDecks.getDeckStatistics.mockResolvedValue(mockStats);
+
+      render(<DeckBuilder />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+
+      // Click Build Around button
+      const buildAroundButton = screen.getByRole('button', { name: /Build Around/i });
+      await userEvent.click(buildAroundButton);
+
+      // Modal should be open (check for modal heading)
+      await waitFor(() => {
+        expect(screen.getByText('Build Around Card')).toBeInTheDocument();
+      });
+    });
+
+    it('should close Build Around modal when close button is clicked', async () => {
+      const mockDeck = createMockDeck({ Source: 'constructed', DraftEventID: '' });
+      const mockCards = [createMockDeckCard()];
+      const mockStats = createMockDeckStatistics();
+
+      mockDecks.getDeck.mockResolvedValue({
+        deck: mockDeck,
+        cards: mockCards,
+        tags: [],
+      });
+      mockDecks.getDeckStatistics.mockResolvedValue(mockStats);
+
+      render(<DeckBuilder />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+
+      // Open modal
+      const buildAroundButton = screen.getByRole('button', { name: /Build Around/i });
+      await userEvent.click(buildAroundButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Build Around Card')).toBeInTheDocument();
+      });
+
+      // Close modal using close button (within the modal header)
+      const modal = document.querySelector('.build-around-modal');
+      const closeButton = modal!.querySelector('.close-button') as HTMLButtonElement;
+      await userEvent.click(closeButton);
+
+      // Modal should be closed
+      await waitFor(() => {
+        expect(screen.queryByText('Build Around Card')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should have correct title on Build Around button', async () => {
+      const mockDeck = createMockDeck({ Source: 'constructed', DraftEventID: '' });
+      const mockCards = [createMockDeckCard()];
+      const mockStats = createMockDeckStatistics();
+
+      mockDecks.getDeck.mockResolvedValue({
+        deck: mockDeck,
+        cards: mockCards,
+        tags: [],
+      });
+      mockDecks.getDeckStatistics.mockResolvedValue(mockStats);
+
+      render(<DeckBuilder />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+
+      const buildAroundButton = screen.getByRole('button', { name: /Build Around/i });
+      expect(buildAroundButton).toHaveAttribute('title', 'Build a deck around a specific card');
+    });
+  });
 });

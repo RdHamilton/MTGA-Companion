@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { decks, drafts } from '@/services/api';
+import type { CardWithOwnership, SuggestedLandResponse } from '@/services/api/decks';
 import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
 import SuggestDecksModal from '../components/SuggestDecksModal';
+import BuildAroundSeedModal from '../components/BuildAroundSeedModal';
 import './DeckBuilder.css';
 
 // Export deck to file using native file save dialog
@@ -34,6 +36,7 @@ export default function DeckBuilder() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [addingLands, setAddingLands] = useState(false);
   const [showSuggestDecks, setShowSuggestDecks] = useState(false);
+  const [showBuildAround, setShowBuildAround] = useState(false);
 
   // Load deck data
   useEffect(() => {
@@ -114,9 +117,15 @@ export default function DeckBuilder() {
         setCards(deckData.cards || []);
         setTags(deckData.tags || []);
 
-        // Load statistics
-        const stats = await decks.getDeckStatistics(deckData.deck.ID);
-        setStatistics(stats);
+        // Load statistics (may not exist for new decks)
+        try {
+          const stats = await decks.getDeckStatistics(deckData.deck.ID);
+          setStatistics(stats);
+        } catch (statsErr) {
+          // Statistics may not exist for new decks - this is OK
+          console.log('No statistics for deck (may be new):', statsErr);
+          setStatistics(null);
+        }
 
         // If this is a draft deck, get the draft card IDs
         if (deckData.deck.Source === 'draft' && deckData.deck.DraftEventID) {
@@ -392,6 +401,152 @@ export default function DeckBuilder() {
     setStatistics(stats);
   };
 
+  const handleApplyBuildAround = async (suggestions: CardWithOwnership[], lands: SuggestedLandResponse[]) => {
+    if (!deck) return;
+
+    try {
+      // Clear existing cards first
+      for (const card of cards) {
+        await decks.removeCard({
+          deck_id: deck.ID,
+          arena_id: card.CardID,
+          zone: card.Board,
+        });
+      }
+
+      // Add suggested cards (4 copies each, up to 36 total cards)
+      // 60 card deck - 24 lands = 36 spell slots, so max 9 unique cards × 4 copies = 36
+      let cardsAdded = 0;
+      for (const card of suggestions) {
+        if (cardsAdded >= 36) break; // Leave room for lands
+        const quantity = Math.min(4, 36 - cardsAdded);
+        await decks.addCard({
+          deck_id: deck.ID,
+          arena_id: card.cardID,
+          quantity,
+          zone: 'main',
+          is_sideboard: false,
+        });
+        cardsAdded += quantity;
+      }
+
+      // Add lands
+      for (const land of lands) {
+        await decks.addCard({
+          deck_id: deck.ID,
+          arena_id: land.cardID,
+          quantity: land.quantity,
+          zone: 'main',
+          is_sideboard: false,
+        });
+      }
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+    } catch (err) {
+      console.error('Failed to apply build-around suggestions:', err);
+      alert(err instanceof Error ? err.message : 'Failed to apply suggestions');
+    }
+  };
+
+  // Handle adding a single card in iterative build-around mode
+  const handleBuildAroundCardAdded = async (card: CardWithOwnership) => {
+    if (!deck) return;
+
+    try {
+      // Check if deck is already at 60 cards (excluding lands for now, lands added at finish)
+      const currentMainboard = statistics?.totalMainboard || 0;
+      if (currentMainboard >= 60) {
+        alert('Deck is already at 60 cards!');
+        return;
+      }
+
+      // Add 1 copy at a time for granular control
+      await decks.addCard({
+        deck_id: deck.ID,
+        arena_id: card.cardID,
+        quantity: 1,
+        zone: 'main',
+        is_sideboard: false,
+      });
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+    } catch (err) {
+      console.error('Failed to add card:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add card');
+    }
+  };
+
+  // Handle removing a card in iterative build-around mode
+  const handleBuildAroundCardRemoved = async (cardId: number) => {
+    if (!deck) return;
+
+    try {
+      // Remove 1 copy at a time
+      await decks.removeCard({
+        deck_id: deck.ID,
+        arena_id: cardId,
+        zone: 'main',
+      });
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+    } catch (err) {
+      console.error('Failed to remove card:', err);
+      alert(err instanceof Error ? err.message : 'Failed to remove card');
+    }
+  };
+
+  // Handle finishing deck in iterative build-around mode
+  const handleBuildAroundFinishDeck = async (lands: SuggestedLandResponse[]) => {
+    if (!deck) return;
+
+    try {
+      // Add suggested lands
+      for (const land of lands) {
+        await decks.addCard({
+          deck_id: deck.ID,
+          arena_id: land.cardID,
+          quantity: land.quantity,
+          zone: 'main',
+          is_sideboard: false,
+        });
+      }
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+
+      setShowBuildAround(false);
+    } catch (err) {
+      console.error('Failed to finish deck:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add lands');
+    }
+  };
+
+  // Get current deck card IDs for iterative build-around mode
+  const currentDeckCardIDs = cards.map((card) => card.CardID);
+
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(
     cards.map((card) => [
@@ -554,6 +709,15 @@ export default function DeckBuilder() {
               Suggest Decks
             </button>
           )}
+          {deck.Source !== 'draft' && (
+            <button
+              className="action-button build-around-btn"
+              title="Build a deck around a specific card"
+              onClick={() => setShowBuildAround(true)}
+            >
+              Build Around
+            </button>
+          )}
         </div>
       </div>
 
@@ -568,6 +732,18 @@ export default function DeckBuilder() {
           onDeckApplied={handleDeckApplied}
         />
       )}
+
+      {/* Build Around Seed Modal */}
+      <BuildAroundSeedModal
+        isOpen={showBuildAround}
+        onClose={() => setShowBuildAround(false)}
+        onApplyDeck={handleApplyBuildAround}
+        onCardAdded={handleBuildAroundCardAdded}
+        onCardRemoved={handleBuildAroundCardRemoved}
+        onFinishDeck={handleBuildAroundFinishDeck}
+        currentDeckCards={currentDeckCardIDs}
+        deckCards={cards}
+      />
     </div>
   );
 }
