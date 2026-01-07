@@ -50,23 +50,41 @@ type SeedDeckBuilderResponse struct {
 	Analysis        *SeedDeckAnalysis    `json:"analysis"`
 }
 
+// ScoreBreakdown provides detailed scoring factors for a card suggestion.
+type ScoreBreakdown struct {
+	ColorFit float64 `json:"colorFit"` // 0.0-1.0, weight: 25%
+	CurveFit float64 `json:"curveFit"` // 0.0-1.0, weight: 20%
+	Synergy  float64 `json:"synergy"`  // 0.0-1.0, weight: 30%
+	Quality  float64 `json:"quality"`  // 0.0-1.0, weight: 15%
+	Overall  float64 `json:"overall"`  // Final weighted score
+}
+
+// SynergyDetail describes a specific synergy between a card and the deck.
+type SynergyDetail struct {
+	Type        string `json:"type"`        // "keyword", "theme", "creature_type"
+	Name        string `json:"name"`        // e.g., "flying", "tokens", "Elf"
+	Description string `json:"description"` // e.g., "Matches 3 other flying creatures"
+}
+
 // CardWithOwnership extends card info with ownership data.
 type CardWithOwnership struct {
-	CardID            int      `json:"cardID"`
-	Name              string   `json:"name"`
-	ManaCost          string   `json:"manaCost,omitempty"`
-	CMC               int      `json:"cmc"`
-	Colors            []string `json:"colors"`
-	TypeLine          string   `json:"typeLine"`
-	Rarity            string   `json:"rarity,omitempty"`
-	ImageURI          string   `json:"imageURI,omitempty"`
-	Score             float64  `json:"score"`
-	Reasoning         string   `json:"reasoning"`
-	InCollection      bool     `json:"inCollection"`
-	OwnedCount        int      `json:"ownedCount"`
-	NeededCount       int      `json:"neededCount"`
-	CurrentCopies     int      `json:"currentCopies"`     // Copies currently in deck
-	RecommendedCopies int      `json:"recommendedCopies"` // Recommended total copies (1-4)
+	CardID            int             `json:"cardID"`
+	Name              string          `json:"name"`
+	ManaCost          string          `json:"manaCost,omitempty"`
+	CMC               int             `json:"cmc"`
+	Colors            []string        `json:"colors"`
+	TypeLine          string          `json:"typeLine"`
+	Rarity            string          `json:"rarity,omitempty"`
+	ImageURI          string          `json:"imageURI,omitempty"`
+	Score             float64         `json:"score"`
+	Reasoning         string          `json:"reasoning"`
+	InCollection      bool            `json:"inCollection"`
+	OwnedCount        int             `json:"ownedCount"`
+	NeededCount       int             `json:"neededCount"`
+	CurrentCopies     int             `json:"currentCopies"`     // Copies currently in deck
+	RecommendedCopies int             `json:"recommendedCopies"` // Recommended total copies (1-4)
+	ScoreBreakdown    *ScoreBreakdown `json:"scoreBreakdown,omitempty"`
+	SynergyDetails    []SynergyDetail `json:"synergyDetails,omitempty"`
 }
 
 // SeedDeckAnalysis provides analysis of the seed card and suggestions.
@@ -324,7 +342,7 @@ func (s *SeedDeckBuilder) scoreAndRankCandidates(candidates []*cards.Card, seedA
 	scored := make([]*scoredCard, 0, len(candidates))
 
 	for _, card := range candidates {
-		score, reasoning := s.scoreCardForSeed(card, seedAnalysis)
+		score, reasoning, breakdown, synergyDetails := s.scoreCardForSeed(card, seedAnalysis)
 
 		// Skip cards with very low scores
 		if score < 0.3 {
@@ -332,9 +350,11 @@ func (s *SeedDeckBuilder) scoreAndRankCandidates(candidates []*cards.Card, seedA
 		}
 
 		scored = append(scored, &scoredCard{
-			card:      card,
-			score:     score,
-			reasoning: reasoning,
+			card:           card,
+			score:          score,
+			reasoning:      reasoning,
+			scoreBreakdown: breakdown,
+			synergyDetails: synergyDetails,
 		})
 	}
 
@@ -347,8 +367,10 @@ func (s *SeedDeckBuilder) scoreAndRankCandidates(candidates []*cards.Card, seedA
 }
 
 // scoreCardForSeed calculates how well a card fits with the seed card.
-func (s *SeedDeckBuilder) scoreCardForSeed(card *cards.Card, seedAnalysis *SeedCardAnalysis) (float64, string) {
+// Returns the overall score, reasoning text, score breakdown, and synergy details.
+func (s *SeedDeckBuilder) scoreCardForSeed(card *cards.Card, seedAnalysis *SeedCardAnalysis) (float64, string, *ScoreBreakdown, []SynergyDetail) {
 	reasons := make([]string, 0)
+	synergyDetails := make([]SynergyDetail, 0)
 
 	// Factor 1: Color Compatibility (25%)
 	colorScore := s.scoreColorCompatibility(card, seedAnalysis)
@@ -362,8 +384,9 @@ func (s *SeedDeckBuilder) scoreCardForSeed(card *cards.Card, seedAnalysis *SeedC
 		reasons = append(reasons, fmt.Sprintf("good curve fit at %d CMC", int(card.CMC)))
 	}
 
-	// Factor 3: Synergy with Seed (30%)
-	synergyScore := s.scoreSynergyWithSeed(card, seedAnalysis)
+	// Factor 3: Synergy with Seed (30%) - now captures synergy details
+	synergyScore, cardSynergyDetails := s.scoreSynergyWithSeedDetailed(card, seedAnalysis)
+	synergyDetails = append(synergyDetails, cardSynergyDetails...)
 	if synergyScore >= 0.7 {
 		reasons = append(reasons, "synergizes with your strategy")
 	}
@@ -388,6 +411,15 @@ func (s *SeedDeckBuilder) scoreCardForSeed(card *cards.Card, seedAnalysis *SeedC
 		(legalityScore * 0.05) +
 		(playabilityScore * 0.05)
 
+	// Build score breakdown
+	breakdown := &ScoreBreakdown{
+		ColorFit: colorScore,
+		CurveFit: curveScore,
+		Synergy:  synergyScore,
+		Quality:  qualityScore,
+		Overall:  score,
+	}
+
 	// Build reasoning string
 	reasoning := "This card "
 	if len(reasons) == 0 {
@@ -405,7 +437,7 @@ func (s *SeedDeckBuilder) scoreCardForSeed(card *cards.Card, seedAnalysis *SeedC
 		reasoning += "."
 	}
 
-	return score, reasoning
+	return score, reasoning, breakdown, synergyDetails
 }
 
 // scoreColorCompatibility scores how well a card's colors match the seed.
@@ -479,8 +511,15 @@ func (s *SeedDeckBuilder) scoreManaCurveFit(card *cards.Card) float64 {
 
 // scoreSynergyWithSeed scores synergy between a card and the seed.
 func (s *SeedDeckBuilder) scoreSynergyWithSeed(card *cards.Card, seedAnalysis *SeedCardAnalysis) float64 {
+	score, _ := s.scoreSynergyWithSeedDetailed(card, seedAnalysis)
+	return score
+}
+
+// scoreSynergyWithSeedDetailed scores synergy and returns detailed synergy information.
+func (s *SeedDeckBuilder) scoreSynergyWithSeedDetailed(card *cards.Card, seedAnalysis *SeedCardAnalysis) (float64, []SynergyDetail) {
 	synergy := 0.0
 	synergyCount := 0
+	details := make([]SynergyDetail, 0)
 
 	// Extract card keywords
 	var cardKeywords []KeywordInfo
@@ -490,10 +529,17 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeed(card *cards.Card, seedAnalysis *S
 
 	// Keyword synergy
 	if len(cardKeywords) > 0 && len(seedAnalysis.Keywords) > 0 {
-		keywordSynergy := CalculateKeywordSynergy(seedAnalysis.Keywords, cardKeywords)
+		keywordSynergy, matchedKeywords := CalculateKeywordSynergyDetailed(seedAnalysis.Keywords, cardKeywords)
 		if keywordSynergy > 0 {
 			synergy += keywordSynergy
 			synergyCount++
+			for _, kw := range matchedKeywords {
+				details = append(details, SynergyDetail{
+					Type:        "keyword",
+					Name:        kw,
+					Description: fmt.Sprintf("Shares %s with seed card", kw),
+				})
+			}
 		}
 	}
 
@@ -505,6 +551,11 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeed(card *cards.Card, seedAnalysis *S
 				if cardType == seedType {
 					synergy += 0.8 // Strong tribal synergy
 					synergyCount++
+					details = append(details, SynergyDetail{
+						Type:        "creature_type",
+						Name:        cardType,
+						Description: fmt.Sprintf("%s tribal synergy", cardType),
+					})
 					break
 				}
 			}
@@ -522,11 +573,16 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeed(card *cards.Card, seedAnalysis *S
 		if cardThemes[seedTheme] {
 			synergy += 0.7
 			synergyCount++
+			details = append(details, SynergyDetail{
+				Type:        "theme",
+				Name:        seedTheme,
+				Description: fmt.Sprintf("Supports %s theme", seedTheme),
+			})
 		}
 	}
 
 	if synergyCount == 0 {
-		return 0.5 // Neutral score
+		return 0.5, details // Neutral score
 	}
 
 	avgSynergy := synergy / float64(synergyCount)
@@ -534,7 +590,7 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeed(card *cards.Card, seedAnalysis *S
 		avgSynergy = 1.0
 	}
 
-	return avgSynergy
+	return avgSynergy, details
 }
 
 // scoreCardQuality scores intrinsic card quality based on rarity.
@@ -595,19 +651,21 @@ func (s *SeedDeckBuilder) enrichWithOwnership(scored []*scoredCard, collection m
 		}
 
 		card := &CardWithOwnership{
-			CardID:       sc.card.ArenaID,
-			Name:         sc.card.Name,
-			ManaCost:     manaCost,
-			CMC:          int(sc.card.CMC),
-			Colors:       sc.card.Colors,
-			TypeLine:     sc.card.TypeLine,
-			Rarity:       sc.card.Rarity,
-			ImageURI:     imageURI,
-			Score:        sc.score,
-			Reasoning:    sc.reasoning,
-			InCollection: owned > 0,
-			OwnedCount:   owned,
-			NeededCount:  needed,
+			CardID:         sc.card.ArenaID,
+			Name:           sc.card.Name,
+			ManaCost:       manaCost,
+			CMC:            int(sc.card.CMC),
+			Colors:         sc.card.Colors,
+			TypeLine:       sc.card.TypeLine,
+			Rarity:         sc.card.Rarity,
+			ImageURI:       imageURI,
+			Score:          sc.score,
+			Reasoning:      sc.reasoning,
+			InCollection:   owned > 0,
+			OwnedCount:     owned,
+			NeededCount:    needed,
+			ScoreBreakdown: sc.scoreBreakdown,
+			SynergyDetails: sc.synergyDetails,
 		}
 
 		result = append(result, card)
@@ -988,7 +1046,7 @@ func (s *SeedDeckBuilder) scoreAndRankForDeck(candidates []*cards.Card, deckAnal
 			continue
 		}
 
-		score, reasoning := s.scoreCardForDeck(card, deckAnalysis)
+		score, reasoning, breakdown, synergyDetails := s.scoreCardForDeck(card, deckAnalysis)
 
 		// Skip cards with very low scores
 		if score < 0.3 {
@@ -996,9 +1054,11 @@ func (s *SeedDeckBuilder) scoreAndRankForDeck(candidates []*cards.Card, deckAnal
 		}
 
 		scored = append(scored, &scoredCard{
-			card:      card,
-			score:     score,
-			reasoning: reasoning,
+			card:           card,
+			score:          score,
+			reasoning:      reasoning,
+			scoreBreakdown: breakdown,
+			synergyDetails: synergyDetails,
 		})
 	}
 
@@ -1011,8 +1071,10 @@ func (s *SeedDeckBuilder) scoreAndRankForDeck(candidates []*cards.Card, deckAnal
 }
 
 // scoreCardForDeck calculates how well a card fits with the current deck.
-func (s *SeedDeckBuilder) scoreCardForDeck(card *cards.Card, deckAnalysis *CollectiveDeckAnalysis) (float64, string) {
+// Returns the overall score, reasoning text, score breakdown, and synergy details.
+func (s *SeedDeckBuilder) scoreCardForDeck(card *cards.Card, deckAnalysis *CollectiveDeckAnalysis) (float64, string, *ScoreBreakdown, []SynergyDetail) {
 	reasons := make([]string, 0)
+	synergyDetails := make([]SynergyDetail, 0)
 
 	// Factor 1: Color Compatibility (25%)
 	colorScore := s.scoreColorForDeck(card, deckAnalysis)
@@ -1026,8 +1088,9 @@ func (s *SeedDeckBuilder) scoreCardForDeck(card *cards.Card, deckAnalysis *Colle
 		reasons = append(reasons, fmt.Sprintf("fills curve gap at %d CMC", int(card.CMC)))
 	}
 
-	// Factor 3: Synergy with Deck (30%)
-	synergyScore := s.scoreSynergyWithDeck(card, deckAnalysis)
+	// Factor 3: Synergy with Deck (30%) - now captures synergy details
+	synergyScore, cardSynergyDetails := s.scoreSynergyWithDeckDetailed(card, deckAnalysis)
+	synergyDetails = append(synergyDetails, cardSynergyDetails...)
 	if synergyScore >= 0.7 {
 		reasons = append(reasons, "synergizes with deck strategy")
 	}
@@ -1052,6 +1115,15 @@ func (s *SeedDeckBuilder) scoreCardForDeck(card *cards.Card, deckAnalysis *Colle
 		(legalityScore * 0.05) +
 		(playabilityScore * 0.05)
 
+	// Build score breakdown
+	breakdown := &ScoreBreakdown{
+		ColorFit: colorScore,
+		CurveFit: curveScore,
+		Synergy:  synergyScore,
+		Quality:  qualityScore,
+		Overall:  score,
+	}
+
 	// Build reasoning string
 	reasoning := "This card "
 	if len(reasons) == 0 {
@@ -1069,7 +1141,7 @@ func (s *SeedDeckBuilder) scoreCardForDeck(card *cards.Card, deckAnalysis *Colle
 		reasoning += "."
 	}
 
-	return score, reasoning
+	return score, reasoning, breakdown, synergyDetails
 }
 
 // scoreColorForDeck scores color compatibility against the deck's established colors.
@@ -1145,10 +1217,11 @@ func (s *SeedDeckBuilder) scoreCurveGapFilling(card *cards.Card, deckAnalysis *C
 	return 0.5 + (needRatio * 0.5)
 }
 
-// scoreSynergyWithDeck scores synergy between a card and the deck's themes.
-func (s *SeedDeckBuilder) scoreSynergyWithDeck(card *cards.Card, deckAnalysis *CollectiveDeckAnalysis) float64 {
+// scoreSynergyWithDeckDetailed scores synergy and returns detailed synergy information.
+func (s *SeedDeckBuilder) scoreSynergyWithDeckDetailed(card *cards.Card, deckAnalysis *CollectiveDeckAnalysis) (float64, []SynergyDetail) {
 	synergy := 0.0
 	synergyCount := 0
+	details := make([]SynergyDetail, 0)
 
 	// Extract card keywords
 	var cardKeywords []KeywordInfo
@@ -1158,10 +1231,17 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeck(card *cards.Card, deckAnalysis *C
 
 	// Keyword synergy with deck
 	if len(cardKeywords) > 0 && len(deckAnalysis.Keywords) > 0 {
-		keywordSynergy := CalculateKeywordSynergy(deckAnalysis.Keywords, cardKeywords)
+		keywordSynergy, matchedKeywords := CalculateKeywordSynergyDetailed(deckAnalysis.Keywords, cardKeywords)
 		if keywordSynergy > 0 {
 			synergy += keywordSynergy
 			synergyCount++
+			for _, kw := range matchedKeywords {
+				details = append(details, SynergyDetail{
+					Type:        "keyword",
+					Name:        kw,
+					Description: fmt.Sprintf("Shares %s with deck cards", kw),
+				})
+			}
 		}
 	}
 
@@ -1169,9 +1249,14 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeck(card *cards.Card, deckAnalysis *C
 	if containsTypeInTypeLine(card.TypeLine, "Creature") && len(deckAnalysis.CreatureTypes) > 0 {
 		cardCreatureTypes := extractCreatureTypesFromLine(card.TypeLine)
 		for cardType := range cardCreatureTypes {
-			if deckAnalysis.CreatureTypes[cardType] > 0 {
+			if count := deckAnalysis.CreatureTypes[cardType]; count > 0 {
 				synergy += 0.8 // Strong tribal synergy
 				synergyCount++
+				details = append(details, SynergyDetail{
+					Type:        "creature_type",
+					Name:        cardType,
+					Description: fmt.Sprintf("%s tribal - matches %d cards in deck", cardType, count),
+				})
 				break
 			}
 		}
@@ -1180,15 +1265,20 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeck(card *cards.Card, deckAnalysis *C
 	// Theme synergy
 	for _, kw := range cardKeywords {
 		if kw.Category == CategoryTheme {
-			if deckAnalysis.Themes[kw.Keyword] > 0 {
+			if count := deckAnalysis.Themes[kw.Keyword]; count > 0 {
 				synergy += 0.7
 				synergyCount++
+				details = append(details, SynergyDetail{
+					Type:        "theme",
+					Name:        kw.Keyword,
+					Description: fmt.Sprintf("Supports %s theme (%d cards)", kw.Keyword, count),
+				})
 			}
 		}
 	}
 
 	if synergyCount == 0 {
-		return 0.5 // Neutral score
+		return 0.5, details // Neutral score
 	}
 
 	avgSynergy := synergy / float64(synergyCount)
@@ -1196,7 +1286,7 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeck(card *cards.Card, deckAnalysis *C
 		avgSynergy = 1.0
 	}
 
-	return avgSynergy
+	return avgSynergy, details
 }
 
 // suggestLandsForDeck generates land suggestions based on current deck colors and size.

@@ -142,9 +142,11 @@ var basicLandsByColor = map[string]struct {
 
 // scoredCard holds a card with its calculated score.
 type scoredCard struct {
-	card      *cards.Card
-	score     float64
-	reasoning string
+	card           *cards.Card
+	score          float64
+	reasoning      string
+	scoreBreakdown *ScoreBreakdown
+	synergyDetails []SynergyDetail
 }
 
 // SuggestDecks generates all viable deck suggestions for a draft pool.

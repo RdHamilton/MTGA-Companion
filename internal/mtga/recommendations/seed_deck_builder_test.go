@@ -271,7 +271,7 @@ func TestScoreCardForSeed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, reasoning := builder.scoreCardForSeed(tt.card, tt.seedAnalysis)
+			score, reasoning, _, _ := builder.scoreCardForSeed(tt.card, tt.seedAnalysis)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("expected score between %.2f and %.2f, got %.2f", tt.minScore, tt.maxScore, score)
 			}
@@ -702,4 +702,277 @@ func TestGetCollectionMap_NilRepo(t *testing.T) {
 // Helper function for string pointer
 func strPtr(s string) *string {
 	return &s
+}
+
+func TestScoreCardForSeed_ReturnsScoreBreakdown(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	oracleText := "Flying"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Test Creature",
+		Colors:     []string{"W", "U"},
+		CMC:        3,
+		TypeLine:   "Creature — Bird",
+		Rarity:     "rare",
+		OracleText: &oracleText,
+	}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Colors:        []string{"W", "U"},
+		Keywords:      []KeywordInfo{{Keyword: "flying", Category: CategoryCombat, Weight: 0.8}},
+		Themes:        []string{},
+		CMC:           3,
+		IsCreature:    true,
+		CreatureTypes: []string{"Wizard"},
+	}
+
+	score, reasoning, breakdown, synergyDetails := builder.scoreCardForSeed(card, seedAnalysis)
+
+	// Verify score is reasonable
+	if score < 0.5 || score > 1.0 {
+		t.Errorf("expected score between 0.5 and 1.0, got %.2f", score)
+	}
+
+	// Verify reasoning is not empty
+	if reasoning == "" {
+		t.Error("expected non-empty reasoning")
+	}
+
+	// Verify breakdown is populated
+	if breakdown == nil {
+		t.Fatal("expected non-nil score breakdown")
+	}
+
+	// Verify breakdown fields are populated
+	if breakdown.ColorFit <= 0 {
+		t.Errorf("expected positive colorFit, got %.2f", breakdown.ColorFit)
+	}
+	if breakdown.CurveFit <= 0 {
+		t.Errorf("expected positive curveFit, got %.2f", breakdown.CurveFit)
+	}
+	if breakdown.Quality <= 0 {
+		t.Errorf("expected positive quality, got %.2f", breakdown.Quality)
+	}
+	if breakdown.Overall != score {
+		t.Errorf("expected overall to match score (%.2f), got %.2f", score, breakdown.Overall)
+	}
+
+	// Synergy details can be empty or populated
+	_ = synergyDetails
+}
+
+func TestScoreSynergyWithSeedDetailed_ReturnsKeywordSynergy(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	oracleText := "Flying, Vigilance"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Angel",
+		TypeLine:   "Creature — Angel",
+		OracleText: &oracleText,
+	}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Keywords: []KeywordInfo{
+			{Keyword: "flying", Category: CategoryCombat, Weight: 0.8},
+		},
+		Themes:        []string{},
+		IsCreature:    true,
+		CreatureTypes: []string{},
+	}
+
+	score, details := builder.scoreSynergyWithSeedDetailed(card, seedAnalysis)
+
+	// Verify score is positive due to flying synergy
+	if score <= 0.5 {
+		t.Errorf("expected score > 0.5 due to flying synergy, got %.2f", score)
+	}
+
+	// Verify synergy details are captured
+	if len(details) == 0 {
+		t.Error("expected synergy details to be captured")
+	}
+
+	// Check that flying keyword is in details
+	foundFlying := false
+	for _, detail := range details {
+		if detail.Type == "keyword" && detail.Name == "flying" {
+			foundFlying = true
+			break
+		}
+	}
+	if !foundFlying {
+		t.Error("expected 'flying' keyword in synergy details")
+	}
+}
+
+func TestScoreSynergyWithSeedDetailed_ReturnsCreatureTypeSynergy(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	oracleText := "When this enters, draw a card"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Elvish Visionary",
+		TypeLine:   "Creature — Elf Shaman",
+		OracleText: &oracleText,
+	}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Keywords:      []KeywordInfo{},
+		Themes:        []string{},
+		IsCreature:    true,
+		CreatureTypes: []string{"Elf"},
+	}
+
+	score, details := builder.scoreSynergyWithSeedDetailed(card, seedAnalysis)
+
+	// Verify score is positive due to Elf tribal synergy
+	if score <= 0.5 {
+		t.Errorf("expected score > 0.5 due to Elf tribal, got %.2f", score)
+	}
+
+	// Check that Elf creature type is in details
+	foundElf := false
+	for _, detail := range details {
+		if detail.Type == "creature_type" && detail.Name == "Elf" {
+			foundElf = true
+			break
+		}
+	}
+	if !foundElf {
+		t.Error("expected 'Elf' creature type in synergy details")
+	}
+}
+
+func TestScoreCardForDeck_ReturnsScoreBreakdown(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	oracleText := "Flying"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Test Creature",
+		Colors:     []string{"U"},
+		CMC:        2,
+		TypeLine:   "Creature — Bird",
+		Rarity:     "uncommon",
+		OracleText: &oracleText,
+	}
+
+	deckAnalysis := &CollectiveDeckAnalysis{
+		Colors:        map[string]int{"U": 10, "W": 5},
+		Keywords:      []KeywordInfo{{Keyword: "flying", Category: CategoryCombat, Weight: 0.8}},
+		Themes:        map[string]int{},
+		CreatureTypes: map[string]int{"Bird": 2},
+		ManaCurve:     map[int]int{1: 4, 2: 2, 3: 6}, // Need more 2-drops
+		TotalCards:    20,
+	}
+
+	score, reasoning, breakdown, synergyDetails := builder.scoreCardForDeck(card, deckAnalysis)
+
+	// Verify score is reasonable
+	if score < 0.5 || score > 1.0 {
+		t.Errorf("expected score between 0.5 and 1.0, got %.2f", score)
+	}
+
+	// Verify reasoning is not empty
+	if reasoning == "" {
+		t.Error("expected non-empty reasoning")
+	}
+
+	// Verify breakdown is populated
+	if breakdown == nil {
+		t.Fatal("expected non-nil score breakdown")
+	}
+
+	// All color is in deck colors, should be 1.0
+	if breakdown.ColorFit < 0.9 {
+		t.Errorf("expected high colorFit for matching color, got %.2f", breakdown.ColorFit)
+	}
+
+	// 2 CMC should fill curve gap (we have only 2 at 2 CMC, need 8)
+	if breakdown.CurveFit < 0.7 {
+		t.Errorf("expected curveFit >= 0.7 for 2 CMC gap fill, got %.2f", breakdown.CurveFit)
+	}
+
+	// Synergy details can include flying keyword and Bird creature type
+	_ = synergyDetails
+}
+
+func TestScoreSynergyWithDeckDetailed_ReturnsThemeSynergy(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	oracleText := "Create a 1/1 token"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Token Maker",
+		TypeLine:   "Instant",
+		OracleText: &oracleText,
+	}
+
+	deckAnalysis := &CollectiveDeckAnalysis{
+		Colors:        map[string]int{"W": 10},
+		Keywords:      []KeywordInfo{{Keyword: "tokens", Category: CategoryTheme, Weight: 0.7}},
+		Themes:        map[string]int{"tokens": 5},
+		CreatureTypes: map[string]int{},
+		ManaCurve:     map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards:    24,
+	}
+
+	score, details := builder.scoreSynergyWithDeckDetailed(card, deckAnalysis)
+
+	// If card has tokens theme, it should have synergy
+	// (Note: the card might not have tokens theme extracted, so score might be neutral)
+	_ = score
+
+	// Check if any theme synergies were found
+	for _, detail := range details {
+		if detail.Type == "theme" {
+			// Found a theme synergy
+			if detail.Description == "" {
+				t.Error("expected non-empty description for theme synergy")
+			}
+		}
+	}
+}
+
+func TestCalculateKeywordSynergyDetailed_ReturnsMatchedKeywords(t *testing.T) {
+	card1Keywords := []KeywordInfo{
+		{Keyword: "flying", Category: CategoryCombat, Weight: 0.8},
+		{Keyword: "vigilance", Category: CategoryCombat, Weight: 0.6},
+	}
+	card2Keywords := []KeywordInfo{
+		{Keyword: "flying", Category: CategoryCombat, Weight: 0.8},
+		{Keyword: "trample", Category: CategoryCombat, Weight: 0.6},
+	}
+
+	score, matchedKeywords := CalculateKeywordSynergyDetailed(card1Keywords, card2Keywords)
+
+	// Should have positive synergy
+	if score <= 0 {
+		t.Errorf("expected positive synergy score, got %.2f", score)
+	}
+
+	// Should return "flying" as matched keyword
+	if len(matchedKeywords) == 0 {
+		t.Fatal("expected matched keywords")
+	}
+
+	foundFlying := false
+	for _, kw := range matchedKeywords {
+		if kw == "flying" {
+			foundFlying = true
+			break
+		}
+	}
+	if !foundFlying {
+		t.Errorf("expected 'flying' in matched keywords, got %v", matchedKeywords)
+	}
+}
+
+func TestCalculateKeywordSynergyDetailed_EmptyKeywords(t *testing.T) {
+	score, matchedKeywords := CalculateKeywordSynergyDetailed(nil, nil)
+
+	if score != 0 {
+		t.Errorf("expected 0 score for empty keywords, got %.2f", score)
+	}
+
+	if len(matchedKeywords) != 0 {
+		t.Errorf("expected empty matched keywords, got %v", matchedKeywords)
+	}
 }

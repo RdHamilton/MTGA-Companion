@@ -1157,8 +1157,18 @@ func containsPattern(text, pattern string) bool {
 // CalculateKeywordSynergy calculates synergy score between two cards based on shared keywords.
 // Returns a score from 0.0 to 1.0.
 func CalculateKeywordSynergy(card1Keywords, card2Keywords []KeywordInfo) float64 {
+	score, _ := CalculateKeywordSynergyDetailed(card1Keywords, card2Keywords)
+	return score
+}
+
+// CalculateKeywordSynergyDetailed calculates synergy score and returns matched keywords.
+// Returns a score from 0.0 to 1.0 and a list of matched keyword names.
+func CalculateKeywordSynergyDetailed(card1Keywords, card2Keywords []KeywordInfo) (float64, []string) {
+	matchedKeywords := make([]string, 0)
+	seenKeywords := make(map[string]bool)
+
 	if len(card1Keywords) == 0 || len(card2Keywords) == 0 {
-		return 0.0
+		return 0.0, matchedKeywords
 	}
 
 	// Build lookup for card1 keywords by category
@@ -1177,6 +1187,11 @@ func CalculateKeywordSynergy(card1Keywords, card2Keywords []KeywordInfo) float64
 				// Exact match - use average of weights
 				totalSynergy += (kw1.Weight + kw2.Weight) / 2
 				matchCount++
+				// Track matched keyword (only add once)
+				if !seenKeywords[kw1.Keyword] {
+					matchedKeywords = append(matchedKeywords, kw1.Keyword)
+					seenKeywords[kw1.Keyword] = true
+				}
 			}
 		}
 
@@ -1193,7 +1208,7 @@ func CalculateKeywordSynergy(card1Keywords, card2Keywords []KeywordInfo) float64
 	}
 
 	if matchCount == 0 {
-		return 0.0
+		return 0.0, matchedKeywords
 	}
 
 	// Normalize by the number of possible matches
@@ -1202,9 +1217,9 @@ func CalculateKeywordSynergy(card1Keywords, card2Keywords []KeywordInfo) float64
 
 	// Clamp to 0.0-1.0
 	if normalized > 1.0 {
-		return 1.0
+		return 1.0, matchedKeywords
 	}
-	return normalized
+	return normalized, matchedKeywords
 }
 
 // extractCreatureTypes extracts creature types from type line and adds to the map.
