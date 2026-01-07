@@ -920,7 +920,7 @@ describe('BuildAroundSeedModal', () => {
       });
     });
 
-    it('should call onCardAdded when clicking a suggestion in iterative mode', async () => {
+    it('should open copy selection modal when clicking a suggestion in iterative mode', async () => {
       const onCardAdded = vi.fn();
 
       mockSearchCardsWithCollection.mockResolvedValue([
@@ -946,6 +946,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       };
 
       mockSuggestNextCards.mockResolvedValue({
@@ -990,12 +992,110 @@ describe('BuildAroundSeedModal', () => {
         expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
       });
 
-      // Find the clickable suggestion card and click it
+      // Find the clickable suggestion card and click it to open copy modal
       const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
       expect(suggestionCards.length).toBeGreaterThan(0);
       fireEvent.click(suggestionCards[0]);
 
+      // Copy selection modal should open
+      await waitFor(() => {
+        expect(screen.getByText(/Add Pickable Suggestion/)).toBeInTheDocument();
+      });
+
+      // Click the +1 button to add one copy
+      const addOneButton = screen.getByRole('button', { name: /\+1/i });
+      fireEvent.click(addOneButton);
+
+      // onCardAdded should be called once
+      expect(onCardAdded).toHaveBeenCalledTimes(1);
       expect(onCardAdded).toHaveBeenCalledWith(mockCard);
+    });
+
+    it('should add multiple copies when selecting higher count in copy modal', async () => {
+      const onCardAdded = vi.fn();
+
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '88888',
+          Name: 'Multi Copy Test',
+          ManaCost: '{R}',
+          Types: ['Instant'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      const mockCard = {
+        cardID: 33333,
+        name: 'Multi Copy Card',
+        manaCost: '{R}',
+        cmc: 1,
+        colors: ['R'],
+        typeLine: 'Instant',
+        score: 0.9,
+        reasoning: 'High synergy',
+        inCollection: true,
+        ownedCount: 4,
+        neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
+      };
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [mockCard],
+        deckAnalysis: {
+          colorIdentity: ['R'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(
+        <BuildAroundSeedModal
+          {...iterativeProps}
+          onCardAdded={onCardAdded}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Multi' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Multi Copy Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Multi Copy Test'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.click(suggestionCards[0]);
+
+      // Wait for copy modal
+      await waitFor(() => {
+        expect(screen.getByText(/Add Multi Copy Card/)).toBeInTheDocument();
+      });
+
+      // Click the +4 button
+      const addFourButton = screen.getByRole('button', { name: /\+4/i });
+      fireEvent.click(addFourButton);
+
+      // onCardAdded should be called 4 times
+      expect(onCardAdded).toHaveBeenCalledTimes(4);
     });
 
     it('should call onFinishDeck with land suggestions when Finish Deck is clicked', async () => {

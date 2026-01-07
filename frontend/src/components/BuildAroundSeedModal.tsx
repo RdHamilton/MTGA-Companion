@@ -97,6 +97,8 @@ export default function BuildAroundSeedModal({
   const [cardNameMap, setCardNameMap] = useState<Map<number, string>>(new Map());
   // Hover preview for card magnification
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  // Copy selection modal state
+  const [copyModalCard, setCopyModalCard] = useState<CardWithOwnership | null>(null);
 
   // Ref to track if we've already attempted initial fetch (prevent infinite loops)
   const hasAttemptedFetch = useRef(false);
@@ -371,8 +373,14 @@ export default function BuildAroundSeedModal({
     }
   };
 
-  // Handle picking a card in iterative mode
+  // Handle clicking a card - open copy selection modal
   const handlePickCard = (card: CardWithOwnership) => {
+    setCopyModalCard(card);
+    setHoverPreview(null); // Hide hover preview when modal opens
+  };
+
+  // Handle adding copies from the modal
+  const handleAddCopies = (card: CardWithOwnership, count: number) => {
     if (onCardAdded) {
       // Store the card name for display
       setCardNameMap(prev => {
@@ -380,9 +388,12 @@ export default function BuildAroundSeedModal({
         newMap.set(card.cardID, card.name);
         return newMap;
       });
-      onCardAdded(card);
-      // Suggestions will auto-refresh via useEffect when currentDeckCards changes
+      // Add the specified number of copies
+      for (let i = 0; i < count; i++) {
+        onCardAdded(card);
+      }
     }
+    setCopyModalCard(null); // Close modal
   };
 
   // Handle finishing the deck
@@ -608,6 +619,53 @@ export default function BuildAroundSeedModal({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Copy Selection Modal */}
+            {copyModalCard && (
+              <div className="copy-modal-overlay" onClick={() => setCopyModalCard(null)}>
+                <div className="copy-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="copy-modal-header">
+                    <h3>Add {copyModalCard.name}</h3>
+                    <button className="close-button" onClick={() => setCopyModalCard(null)}>&times;</button>
+                  </div>
+                  <div className="copy-modal-content">
+                    {copyModalCard.imageURI && (
+                      <img src={copyModalCard.imageURI} alt={copyModalCard.name} className="copy-modal-image" />
+                    )}
+                    <div className="copy-modal-info">
+                      <p className="copy-modal-type">{copyModalCard.typeLine}</p>
+                      <p className="copy-modal-reasoning">{copyModalCard.reasoning}</p>
+                      <div className="copy-modal-stats">
+                        <span>In deck: {copyModalCard.currentCopies || 0}</span>
+                        <span>Recommended: {copyModalCard.recommendedCopies > 0 ? copyModalCard.recommendedCopies : 4}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="copy-modal-actions">
+                    <span className="copy-modal-label">Add copies:</span>
+                    {[1, 2, 3, 4].map(count => {
+                      const current = copyModalCard.currentCopies || 0;
+                      const maxCanAdd = 4 - current;
+                      const disabled = count > maxCanAdd;
+                      return (
+                        <button
+                          key={count}
+                          className={`copy-count-btn ${count === 1 ? 'primary' : ''}`}
+                          onClick={() => handleAddCopies(copyModalCard, count)}
+                          disabled={disabled}
+                          title={disabled ? `Already have ${current} copies` : `Add ${count} ${count === 1 ? 'copy' : 'copies'}`}
+                        >
+                          +{count}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button className="copy-modal-cancel" onClick={() => setCopyModalCard(null)}>
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
