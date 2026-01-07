@@ -10,6 +10,7 @@ vi.mock('@/services/api', () => ({
   },
   cards: {
     searchCardsWithCollection: vi.fn(),
+    getCardByArenaId: vi.fn(),
   },
 }));
 
@@ -18,6 +19,7 @@ import { decks, cards } from '@/services/api';
 const mockBuildAroundSeed = vi.mocked(decks.buildAroundSeed);
 const mockSuggestNextCards = vi.mocked(decks.suggestNextCards);
 const mockSearchCardsWithCollection = vi.mocked(cards.searchCardsWithCollection);
+const mockGetCardByArenaId = vi.mocked(cards.getCardByArenaId);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -1224,6 +1226,414 @@ describe('BuildAroundSeedModal', () => {
       // Check themes are displayed
       expect(screen.getByText('Graveyard')).toBeInTheDocument();
       expect(screen.getByText('Ramp')).toBeInTheDocument();
+    });
+  });
+
+  describe('Copy Selection Modal', () => {
+    const iterativeProps = {
+      isOpen: true,
+      onClose: vi.fn(),
+      onApplyDeck: vi.fn(),
+      onCardAdded: vi.fn(),
+      onCardRemoved: vi.fn(),
+      onFinishDeck: vi.fn(),
+      currentDeckCards: [],
+      deckCards: [],
+    };
+
+    // Helper to navigate to iterative mode and open copy modal
+    // Must set up mocks BEFORE calling this
+    const enterIterativeModeAndOpenCopyModal = async (cardName: string) => {
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Test' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Seed Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Test Seed Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.click(suggestionCards[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`Add ${cardName}`))).toBeInTheDocument();
+      });
+    };
+
+    it('should close copy modal when cancel button is clicked', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 44444,
+          name: 'Suggested Card',
+          manaCost: '{1}{U}',
+          cmc: 2,
+          colors: ['U'],
+          typeLine: 'Creature - Wizard',
+          score: 0.75,
+          reasoning: 'Good color match',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      await enterIterativeModeAndOpenCopyModal('Suggested Card');
+
+      // Click the cancel button inside the copy modal (not the main modal's cancel)
+      const copyModal = document.querySelector('.copy-modal');
+      expect(copyModal).not.toBeNull();
+      const cancelButton = copyModal!.querySelector('.copy-modal-cancel') as HTMLButtonElement;
+      expect(cancelButton).not.toBeNull();
+      fireEvent.click(cancelButton);
+
+      // Copy modal should close
+      await waitFor(() => {
+        expect(screen.queryByText(/Add Suggested Card/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('should close copy modal when clicking overlay', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 44444,
+          name: 'Suggested Card',
+          manaCost: '{1}{U}',
+          cmc: 2,
+          colors: ['U'],
+          typeLine: 'Creature - Wizard',
+          score: 0.75,
+          reasoning: 'Good color match',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      await enterIterativeModeAndOpenCopyModal('Suggested Card');
+
+      // Click the overlay (background)
+      const overlay = document.querySelector('.copy-modal-overlay');
+      expect(overlay).not.toBeNull();
+      fireEvent.click(overlay!);
+
+      // Modal should close
+      await waitFor(() => {
+        expect(screen.queryByText(/Add Suggested Card/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('should display card info in copy modal', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 44444,
+          name: 'Suggested Card',
+          manaCost: '{1}{U}',
+          cmc: 2,
+          colors: ['U'],
+          typeLine: 'Creature - Wizard',
+          score: 0.75,
+          reasoning: 'Good color match',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      await enterIterativeModeAndOpenCopyModal('Suggested Card');
+
+      // Check card info is displayed
+      expect(screen.getByText('Creature - Wizard')).toBeInTheDocument();
+      expect(screen.getByText('Good color match')).toBeInTheDocument();
+      expect(screen.getByText(/In deck: 0/)).toBeInTheDocument();
+      expect(screen.getByText(/Recommended: 4/)).toBeInTheDocument();
+    });
+
+    it('should disable copy buttons when they would exceed 4 copies', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 55555,
+          name: 'Card With Copies',
+          manaCost: '{U}',
+          cmc: 1,
+          colors: ['U'],
+          typeLine: 'Instant',
+          score: 0.8,
+          reasoning: 'Great fit',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 2, // Already have 2 copies
+          recommendedCopies: 4,
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 2,
+          inCollectionCount: 2,
+        },
+        slotsRemaining: 58,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      await enterIterativeModeAndOpenCopyModal('Card With Copies');
+
+      // +1 and +2 should be enabled (2 + 1 = 3, 2 + 2 = 4)
+      const addOneButton = screen.getByRole('button', { name: /\+1/i });
+      const addTwoButton = screen.getByRole('button', { name: /\+2/i });
+      expect(addOneButton).not.toBeDisabled();
+      expect(addTwoButton).not.toBeDisabled();
+
+      // +3 and +4 should be disabled (would exceed 4)
+      const addThreeButton = screen.getByRole('button', { name: /\+3/i });
+      const addFourButton = screen.getByRole('button', { name: /\+4/i });
+      expect(addThreeButton).toBeDisabled();
+      expect(addFourButton).toBeDisabled();
+    });
+
+    it('should show in-deck badge for cards already in deck', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 66666,
+          name: 'Card Already In Deck',
+          manaCost: '{U}{U}',
+          cmc: 2,
+          colors: ['U'],
+          typeLine: 'Creature',
+          score: 0.7,
+          reasoning: 'Synergy',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 3,
+          recommendedCopies: 4,
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 3,
+          inCollectionCount: 3,
+        },
+        slotsRemaining: 57,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Test' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Seed Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Test Seed Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Check for in-deck badge
+      expect(screen.getByText('3 in deck')).toBeInTheDocument();
+
+      // Card should have in-deck class
+      const suggestionCard = document.querySelector('.clickable-suggestion-card.in-deck');
+      expect(suggestionCard).not.toBeNull();
+    });
+
+    it('should call onCardRemoved when remove button is clicked', async () => {
+      const onCardRemoved = vi.fn();
+
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Test Seed Card',
+          ManaCost: '{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [],
+        deckAnalysis: {
+          colorIdentity: ['R'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 2,
+          inCollectionCount: 2,
+        },
+        slotsRemaining: 58,
+        landSuggestions: [],
+      });
+
+      // Mock getCardByArenaId for card name lookup
+      mockGetCardByArenaId.mockResolvedValue({
+        ArenaID: '77777',
+        Name: 'Removable Card',
+      } as any);
+
+      render(
+        <BuildAroundSeedModal
+          {...iterativeProps}
+          onCardRemoved={onCardRemoved}
+          deckCards={[{ CardID: 77777, Quantity: 2, Board: 'main' } as any]}
+          currentDeckCards={[77777, 77777]}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Test' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Seed Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Test Seed Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      // Wait for deck cards section to load
+      await waitFor(() => {
+        expect(screen.getByText(/Current Deck/)).toBeInTheDocument();
+      });
+
+      // Find and click remove button
+      const removeButton = screen.getByRole('button', { name: /−/i });
+      fireEvent.click(removeButton);
+
+      expect(onCardRemoved).toHaveBeenCalledWith(77777);
     });
   });
 });

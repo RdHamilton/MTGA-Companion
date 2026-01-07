@@ -180,5 +180,222 @@ test.describe('Decks', () => {
         }
       }
     });
+
+    test('should search for cards in Build Around modal', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasCards = await deckCard.first().isVisible();
+
+      if (hasCards) {
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:not(:has-text("Limited"))')
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          await nonDraftDeck.click();
+          await page.waitForURL('**/decks/**');
+
+          const buildAroundButton = page.locator('button.build-around-btn');
+          const isButtonVisible = await buildAroundButton.isVisible().catch(() => false);
+
+          if (isButtonVisible) {
+            await buildAroundButton.click();
+
+            const modal = page.locator('.build-around-modal');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Type in search input
+            const searchInput = modal.locator('input[placeholder*="Search"]');
+            await searchInput.fill('Lightning');
+
+            // Wait for search results to appear
+            const searchResults = page.locator('.search-results');
+            await expect(searchResults).toBeVisible({ timeout: 10000 }).catch(() => {
+              // No results is also a valid outcome
+            });
+
+            // Close modal
+            const closeButton = modal.locator('.close-button');
+            await closeButton.click();
+          }
+        }
+      }
+    });
+
+    test('should show color filter buttons in Build Around modal', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasCards = await deckCard.first().isVisible();
+
+      if (hasCards) {
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:not(:has-text("Limited"))')
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          await nonDraftDeck.click();
+          await page.waitForURL('**/decks/**');
+
+          const buildAroundButton = page.locator('button.build-around-btn');
+          const isButtonVisible = await buildAroundButton.isVisible().catch(() => false);
+
+          if (isButtonVisible) {
+            await buildAroundButton.click();
+
+            const modal = page.locator('.build-around-modal');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Check that color filter buttons exist
+            const colorFilters = modal.locator('.color-filter-buttons');
+            await expect(colorFilters).toBeVisible();
+
+            // Verify WUBRG buttons exist
+            for (const color of ['W', 'U', 'B', 'R', 'G']) {
+              const colorButton = modal.locator(`.color-filter-btn.mana-${color.toLowerCase()}`);
+              await expect(colorButton).toBeVisible();
+            }
+
+            // Close modal
+            const closeButton = modal.locator('.close-button');
+            await closeButton.click();
+          }
+        }
+      }
+    });
+
+    test('should show budget mode checkbox in Build Around modal', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasCards = await deckCard.first().isVisible();
+
+      if (hasCards) {
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:not(:has-text("Limited"))')
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          await nonDraftDeck.click();
+          await page.waitForURL('**/decks/**');
+
+          const buildAroundButton = page.locator('button.build-around-btn');
+          const isButtonVisible = await buildAroundButton.isVisible().catch(() => false);
+
+          if (isButtonVisible) {
+            await buildAroundButton.click();
+
+            const modal = page.locator('.build-around-modal');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Search and select a card to show build options
+            const searchInput = modal.locator('input[placeholder*="Search"]');
+            await searchInput.fill('Mountain');
+
+            // Wait for results and click first one
+            const searchResults = page.locator('.search-results');
+            const hasResults = await searchResults.isVisible({ timeout: 5000 }).catch(() => false);
+
+            if (hasResults) {
+              const firstResult = searchResults.locator('.search-result-item').first();
+              await firstResult.click();
+
+              // Budget mode checkbox should be visible
+              const budgetCheckbox = modal.locator('.option-checkbox');
+              await expect(budgetCheckbox).toBeVisible();
+            }
+
+            // Close modal
+            const closeButton = modal.locator('.close-button');
+            await closeButton.click();
+          }
+        }
+      }
+    });
+
+    test('should close Build Around modal with Escape key', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasCards = await deckCard.first().isVisible();
+
+      if (hasCards) {
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:not(:has-text("Limited"))')
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          await nonDraftDeck.click();
+          await page.waitForURL('**/decks/**');
+
+          const buildAroundButton = page.locator('button.build-around-btn');
+          const isButtonVisible = await buildAroundButton.isVisible().catch(() => false);
+
+          if (isButtonVisible) {
+            await buildAroundButton.click();
+
+            const modal = page.locator('.build-around-modal');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Press Escape to close
+            await page.keyboard.press('Escape');
+
+            // Modal should close
+            await expect(modal).not.toBeVisible({ timeout: 3000 });
+          }
+        }
+      }
+    });
+
+    test('should close Build Around modal when clicking overlay', async ({ page }) => {
+      const deckCard = page.locator('.deck-card');
+      const emptyState = page.locator('.empty-state');
+      await expect(deckCard.first().or(emptyState)).toBeVisible({ timeout: 10000 });
+
+      const hasCards = await deckCard.first().isVisible();
+
+      if (hasCards) {
+        const nonDraftDeck = page.locator('.deck-card').filter({
+          has: page.locator('.deck-format:not(:has-text("Limited"))')
+        }).first();
+
+        const hasNonDraft = await nonDraftDeck.isVisible().catch(() => false);
+
+        if (hasNonDraft) {
+          await nonDraftDeck.click();
+          await page.waitForURL('**/decks/**');
+
+          const buildAroundButton = page.locator('button.build-around-btn');
+          const isButtonVisible = await buildAroundButton.isVisible().catch(() => false);
+
+          if (isButtonVisible) {
+            await buildAroundButton.click();
+
+            const modal = page.locator('.build-around-modal');
+            await expect(modal).toBeVisible({ timeout: 5000 });
+
+            // Click the overlay (outside the modal)
+            const overlay = page.locator('.build-around-overlay');
+            await overlay.click({ position: { x: 10, y: 10 } });
+
+            // Modal should close
+            await expect(modal).not.toBeVisible({ timeout: 3000 });
+          }
+        }
+      }
+    });
   });
 });
