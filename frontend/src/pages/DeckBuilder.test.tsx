@@ -542,7 +542,7 @@ describe('DeckBuilder Component - Deck Creation from Draft', () => {
 
     // Mock card metadata lookup
     mockCards.getCardByArenaId.mockImplementation((id: number) => {
-      return Promise.resolve(createMockSetCard({ ArenaID: id, Name: `Card ${id}` }));
+      return Promise.resolve(createMockSetCard({ ArenaID: String(id), Name: `Card ${id}` }));
     });
 
     render(<DeckBuilder />);
@@ -615,7 +615,7 @@ describe('DeckBuilder Component - Deck Creation from Draft', () => {
 
     // Mock card metadata lookup
     mockCards.getCardByArenaId.mockImplementation((id: number) => {
-      return Promise.resolve(createMockSetCard({ ArenaID: id, Name: `Card ${id}` }));
+      return Promise.resolve(createMockSetCard({ ArenaID: String(id), Name: `Card ${id}` }));
     });
 
     render(<DeckBuilder />);
@@ -664,7 +664,7 @@ describe('DeckBuilder Component - Deck Creation from Draft', () => {
 
     // Mock card metadata lookup
     mockCards.getCardByArenaId.mockImplementation((id: number) => {
-      return Promise.resolve(createMockSetCard({ ArenaID: id, Name: `Card ${id}` }));
+      return Promise.resolve(createMockSetCard({ ArenaID: String(id), Name: `Card ${id}` }));
     });
 
     render(<DeckBuilder />);
@@ -777,7 +777,7 @@ describe('DeckBuilder Component - Deck Creation from Draft', () => {
 
     // Mock card metadata lookup
     mockCards.getCardByArenaId.mockImplementation((id: number) => {
-      return Promise.resolve(createMockSetCard({ ArenaID: id, Name: `Card ${id}` }));
+      return Promise.resolve(createMockSetCard({ ArenaID: String(id), Name: `Card ${id}` }));
     });
 
     // Spy on console.error

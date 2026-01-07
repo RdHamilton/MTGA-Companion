@@ -216,6 +216,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       },
       suggestions: [
         {
@@ -230,6 +232,8 @@ describe('BuildAroundSeedModal', () => {
           inCollection: true,
           ownedCount: 2,
           neededCount: 2,
+          currentCopies: 0,
+          recommendedCopies: 4,
         },
       ],
       lands: [
@@ -307,6 +311,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       },
       suggestions: [
         {
@@ -321,6 +327,8 @@ describe('BuildAroundSeedModal', () => {
           inCollection: false,
           ownedCount: 0,
           neededCount: 4,
+          currentCopies: 0,
+          recommendedCopies: 4,
         },
         {
           cardID: 77777,
@@ -334,6 +342,8 @@ describe('BuildAroundSeedModal', () => {
           inCollection: true,
           ownedCount: 2,
           neededCount: 2,
+          currentCopies: 0,
+          recommendedCopies: 4,
         },
       ],
       lands: [
@@ -416,6 +426,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       },
       suggestions: [
         {
@@ -430,6 +442,8 @@ describe('BuildAroundSeedModal', () => {
           inCollection: true,
           ownedCount: 3,
           neededCount: 1,
+          currentCopies: 0,
+          recommendedCopies: 4,
         },
         {
           cardID: 33333,
@@ -443,6 +457,8 @@ describe('BuildAroundSeedModal', () => {
           inCollection: false,
           ownedCount: 0,
           neededCount: 4,
+          currentCopies: 0,
+          recommendedCopies: 4,
         },
       ],
       lands: [],
@@ -509,6 +525,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       },
     ];
 
@@ -529,6 +547,8 @@ describe('BuildAroundSeedModal', () => {
         inCollection: true,
         ownedCount: 4,
         neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
       },
       suggestions: mockSuggestions,
       lands: mockLands,
@@ -873,6 +893,8 @@ describe('BuildAroundSeedModal', () => {
             inCollection: true,
             ownedCount: 4,
             neededCount: 0,
+            currentCopies: 0,
+            recommendedCopies: 4,
           },
         ],
         deckAnalysis: {

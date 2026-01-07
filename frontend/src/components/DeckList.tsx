@@ -508,7 +508,7 @@ export default function DeckList({
             )}
             <div className="preview-details">
               <h3 className="preview-name">{hoverPreview.card.Name}</h3>
-              <p className="preview-type">{hoverPreview.card.TypeLine || hoverPreview.card.Types?.join(' ')}</p>
+              <p className="preview-type">{hoverPreview.card.Types?.join(' ') || ''}</p>
               <div className="preview-stats">
                 {hoverPreview.card.ManaCost && (
                   <span className="preview-mana">Mana: {hoverPreview.card.ManaCost}</span>
