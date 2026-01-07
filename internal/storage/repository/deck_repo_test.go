@@ -474,11 +474,11 @@ func TestDeckRepository_AddCard(t *testing.T) {
 		t.Errorf("expected FromDraftPick false, got %v", cards[0].FromDraftPick)
 	}
 
-	// Test upsert (update quantity)
+	// Test increment behavior (AddCard increments quantity on conflict)
 	card.Quantity = 3
 	err = repo.AddCard(ctx, card)
 	if err != nil {
-		t.Fatalf("failed to update card: %v", err)
+		t.Fatalf("failed to add more copies: %v", err)
 	}
 
 	cards, err = repo.GetCards(ctx, "deck-1")
@@ -487,11 +487,12 @@ func TestDeckRepository_AddCard(t *testing.T) {
 	}
 
 	if len(cards) != 1 {
-		t.Errorf("expected still 1 card after upsert, got %d", len(cards))
+		t.Errorf("expected still 1 card after adding more copies, got %d", len(cards))
 	}
 
-	if cards[0].Quantity != 3 {
-		t.Errorf("expected quantity 3 after upsert, got %d", cards[0].Quantity)
+	// Original 4 + 3 more = 7 total
+	if cards[0].Quantity != 7 {
+		t.Errorf("expected quantity 7 after adding 3 more copies (4+3), got %d", cards[0].Quantity)
 	}
 }
 
@@ -537,13 +538,93 @@ func TestDeckRepository_RemoveCard(t *testing.T) {
 		t.Fatalf("failed to add card: %v", err)
 	}
 
-	// Remove the card
+	// Remove one copy - should decrement to 3
 	err = repo.RemoveCard(ctx, "deck-1", 12345, "main")
 	if err != nil {
 		t.Fatalf("failed to remove card: %v", err)
 	}
 
-	// Verify it was removed
+	// Verify quantity decremented to 3
+	cards, err := repo.GetCards(ctx, "deck-1")
+	if err != nil {
+		t.Fatalf("failed to get cards: %v", err)
+	}
+
+	if len(cards) != 1 {
+		t.Errorf("expected 1 card after decrement, got %d", len(cards))
+	}
+	if cards[0].Quantity != 3 {
+		t.Errorf("expected quantity 3 after decrement, got %d", cards[0].Quantity)
+	}
+
+	// Remove 3 more copies to reach 0
+	for i := 0; i < 3; i++ {
+		err = repo.RemoveCard(ctx, "deck-1", 12345, "main")
+		if err != nil {
+			t.Fatalf("failed to remove card (iteration %d): %v", i, err)
+		}
+	}
+
+	// Verify card is completely removed when quantity reaches 0
+	cards, err = repo.GetCards(ctx, "deck-1")
+	if err != nil {
+		t.Fatalf("failed to get cards: %v", err)
+	}
+
+	if len(cards) != 0 {
+		t.Errorf("expected 0 cards after all removed, got %d", len(cards))
+	}
+}
+
+func TestDeckRepository_RemoveAllCopies(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create a deck and add a card
+	deck := &models.Deck{
+		ID:            "deck-1",
+		AccountID:     1,
+		Name:          "Test Deck",
+		Format:        "Standard",
+		Source:        "constructed",
+		MatchesPlayed: 0,
+		MatchesWon:    0,
+		GamesPlayed:   0,
+		GamesWon:      0,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+	}
+
+	err := repo.Create(ctx, deck)
+	if err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+
+	card := &models.DeckCard{
+		DeckID:        "deck-1",
+		CardID:        12345,
+		Quantity:      4,
+		Board:         "main",
+		FromDraftPick: false,
+	}
+
+	err = repo.AddCard(ctx, card)
+	if err != nil {
+		t.Fatalf("failed to add card: %v", err)
+	}
+
+	// Remove all copies at once
+	err = repo.RemoveAllCopies(ctx, "deck-1", 12345, "main")
+	if err != nil {
+		t.Fatalf("failed to remove all copies: %v", err)
+	}
+
+	// Verify all copies removed
 	cards, err := repo.GetCards(ctx, "deck-1")
 	if err != nil {
 		t.Fatalf("failed to get cards: %v", err)

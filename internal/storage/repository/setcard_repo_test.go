@@ -466,3 +466,209 @@ func TestSetCardRepository_GetAllCardSetInfo_EmptyDB(t *testing.T) {
 		t.Errorf("expected 0 card infos, got %d", len(infos))
 	}
 }
+
+func TestSetCardRepository_SearchCards_ByName(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert cards
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "TLA", ArenaID: "12345", Name: "Firebending Lesson", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "common", Text: "Deal 3 damage to any target.", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12346", Name: "Lightning Bolt", Types: []string{"Instant"}, Colors: []string{"R"}, Rarity: "common", Text: "Lightning Bolt deals 3 damage to any target.", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12347", Name: "Counterspell", Types: []string{"Instant"}, Colors: []string{"U"}, Rarity: "common", Text: "Counter target spell.", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	// Search by name
+	results, err := repo.SearchCards(ctx, "Firebending", nil, 50)
+	if err != nil {
+		t.Fatalf("failed to search cards: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for 'Firebending', got %d", len(results))
+	}
+
+	if len(results) > 0 && results[0].Name != "Firebending Lesson" {
+		t.Errorf("expected 'Firebending Lesson', got '%s'", results[0].Name)
+	}
+}
+
+func TestSetCardRepository_SearchCards_ByOracleText(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert cards with oracle text containing "firebending" keyword
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "TLA", ArenaID: "12345", Name: "Firebending Lesson", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "common", Text: "Firebending (You may cast this spell during combat.)", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12346", Name: "Avatar's Wrath", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "rare", Text: "Firebending (You may cast this spell during combat.) Deal 5 damage to any target.", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12347", Name: "Flame Strike", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "uncommon", Text: "Firebending (You may cast this spell during combat.) Deal 2 damage to each creature.", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12348", Name: "Counterspell", Types: []string{"Instant"}, Colors: []string{"U"}, Rarity: "common", Text: "Counter target spell.", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	// Search for "firebending" - should match by oracle text
+	results, err := repo.SearchCards(ctx, "firebending", nil, 50)
+	if err != nil {
+		t.Fatalf("failed to search cards: %v", err)
+	}
+
+	// Should find 3 cards (one by name, two only by oracle text)
+	if len(results) != 3 {
+		t.Errorf("expected 3 results for 'firebending', got %d", len(results))
+	}
+
+	// Verify name matches come first (prioritized)
+	if len(results) > 0 && results[0].Name != "Firebending Lesson" {
+		t.Errorf("expected 'Firebending Lesson' first (name match priority), got '%s'", results[0].Name)
+	}
+}
+
+func TestSetCardRepository_SearchCards_NamePrioritizedOverText(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert cards where one matches by name and one only by text
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "TLA", ArenaID: "12345", Name: "Zuko's Revenge", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "rare", Text: "Firebending (You may cast this spell during combat.)", FetchedAt: now},
+		{SetCode: "TLA", ArenaID: "12346", Name: "Firebending Master", Types: []string{"Creature"}, Colors: []string{"R"}, Rarity: "uncommon", Text: "When Firebending Master enters, deal 2 damage to any target.", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	results, err := repo.SearchCards(ctx, "Firebending", nil, 50)
+	if err != nil {
+		t.Fatalf("failed to search cards: %v", err)
+	}
+
+	// Both should be found
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+
+	// "Firebending Master" should come first because it matches by name
+	if len(results) >= 2 {
+		if results[0].Name != "Firebending Master" {
+			t.Errorf("expected 'Firebending Master' first (name match), got '%s'", results[0].Name)
+		}
+		if results[1].Name != "Zuko's Revenge" {
+			t.Errorf("expected 'Zuko's Revenge' second (text match), got '%s'", results[1].Name)
+		}
+	}
+}
+
+func TestSetCardRepository_SearchCards_WithSetFilter(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert cards in different sets
+	now := time.Now()
+	cards := []*models.SetCard{
+		{SetCode: "TLA", ArenaID: "12345", Name: "Fire Spell", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "common", Text: "Firebending action.", FetchedAt: now},
+		{SetCode: "ONE", ArenaID: "12346", Name: "Burn Card", Types: []string{"Sorcery"}, Colors: []string{"R"}, Rarity: "common", Text: "Another firebending spell.", FetchedAt: now},
+	}
+
+	for _, card := range cards {
+		if err := repo.SaveCard(ctx, card); err != nil {
+			t.Fatalf("failed to save card: %v", err)
+		}
+	}
+
+	// Search with set filter
+	results, err := repo.SearchCards(ctx, "firebending", []string{"TLA"}, 50)
+	if err != nil {
+		t.Fatalf("failed to search cards: %v", err)
+	}
+
+	// Should only find 1 card (from TLA set)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for TLA filter, got %d", len(results))
+	}
+
+	if len(results) > 0 && results[0].SetCode != "TLA" {
+		t.Errorf("expected card from TLA set, got %s", results[0].SetCode)
+	}
+}
+
+func TestSetCardRepository_SearchCards_EmptyResults(t *testing.T) {
+	db := setupSetCardTestDB(t)
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Error closing database: %v", err)
+		}
+	}()
+
+	repo := NewSetCardRepository(db)
+	ctx := context.Background()
+
+	// Insert a card
+	now := time.Now()
+	card := &models.SetCard{
+		SetCode:   "TLA",
+		ArenaID:   "12345",
+		Name:      "Test Card",
+		Types:     []string{"Creature"},
+		Colors:    []string{"W"},
+		Rarity:    "common",
+		Text:      "This is a test card.",
+		FetchedAt: now,
+	}
+	if err := repo.SaveCard(ctx, card); err != nil {
+		t.Fatalf("failed to save card: %v", err)
+	}
+
+	// Search for something that doesn't exist
+	results, err := repo.SearchCards(ctx, "nonexistent", nil, 50)
+	if err != nil {
+		t.Fatalf("failed to search cards: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}

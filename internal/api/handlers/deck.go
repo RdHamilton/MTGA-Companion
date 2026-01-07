@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -401,6 +402,12 @@ func (h *DeckHandler) AddCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.facade.AddCard(r.Context(), deckID, req.CardID, req.Quantity, req.Board, req.FromDraft); err != nil {
+		// Check if this is a validation error (like 4-card limit)
+		var appErr *gui.AppError
+		if errors.As(err, &appErr) {
+			response.BadRequest(w, err)
+			return
+		}
 		response.InternalError(w, err)
 		return
 	}
@@ -408,13 +415,8 @@ func (h *DeckHandler) AddCard(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, map[string]string{"status": "success"})
 }
 
-// RemoveCardRequest represents a request to remove a card from a deck.
-type RemoveCardRequest struct {
-	CardID int    `json:"card_id"`
-	Board  string `json:"board"`
-}
-
 // RemoveCard removes a card from a deck.
+// DELETE /decks/{deckID}/cards/{cardID}?zone=main
 func (h *DeckHandler) RemoveCard(w http.ResponseWriter, r *http.Request) {
 	deckID := chi.URLParam(r, "deckID")
 	if deckID == "" {
@@ -422,17 +424,58 @@ func (h *DeckHandler) RemoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req RemoveCardRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, errors.New("invalid request body"))
+	cardIDStr := chi.URLParam(r, "cardID")
+	if cardIDStr == "" {
+		response.BadRequest(w, errors.New("card ID is required"))
 		return
 	}
 
-	if req.Board == "" {
-		req.Board = "main"
+	cardID, err := strconv.Atoi(cardIDStr)
+	if err != nil {
+		response.BadRequest(w, errors.New("invalid card ID"))
+		return
 	}
 
-	if err := h.facade.RemoveCard(r.Context(), deckID, req.CardID, req.Board); err != nil {
+	board := r.URL.Query().Get("zone")
+	if board == "" {
+		board = "main"
+	}
+
+	if err := h.facade.RemoveCard(r.Context(), deckID, cardID, board); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.NoContent(w)
+}
+
+// RemoveAllCopies removes all copies of a card from a deck.
+// DELETE /decks/{deckID}/cards/{cardID}/all?zone=main
+func (h *DeckHandler) RemoveAllCopies(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	cardIDStr := chi.URLParam(r, "cardID")
+	if cardIDStr == "" {
+		response.BadRequest(w, errors.New("card ID is required"))
+		return
+	}
+
+	cardID, err := strconv.Atoi(cardIDStr)
+	if err != nil {
+		response.BadRequest(w, errors.New("invalid card ID"))
+		return
+	}
+
+	board := r.URL.Query().Get("zone")
+	if board == "" {
+		board = "main"
+	}
+
+	if err := h.facade.RemoveAllCopies(r.Context(), deckID, cardID, board); err != nil {
 		response.InternalError(w, err)
 		return
 	}
@@ -820,8 +863,9 @@ func (h *DeckHandler) SuggestNextCards(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.SeedCardID <= 0 {
-		response.BadRequest(w, errors.New("seed_card_id is required"))
+	// seed_card_id is optional - if not provided, analyze deck cards collectively
+	if req.SeedCardID <= 0 && len(req.DeckCardIDs) == 0 {
+		response.BadRequest(w, errors.New("either seed_card_id or deck_card_ids is required"))
 		return
 	}
 

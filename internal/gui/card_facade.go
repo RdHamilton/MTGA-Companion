@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,12 +35,12 @@ type CardRatingWithTier struct {
 // SetInfo contains information about a Magic set including the icon URL.
 // Used by the frontend to display set symbols.
 type SetInfo struct {
-	Code       string `json:"code"`       // Set code (e.g., "DSK", "BLB")
-	Name       string `json:"name"`       // Full set name (e.g., "Duskmourn: House of Horror")
-	IconSVGURI string `json:"iconSvgUri"` // URL to the set symbol SVG
-	SetType    string `json:"setType"`    // Type of set (e.g., "expansion", "core")
-	ReleasedAt string `json:"releasedAt"` // Release date
-	CardCount  int    `json:"cardCount"`  // Number of cards in set
+	Code       string  `json:"code"`                 // Set code (e.g., "DSK", "BLB")
+	Name       string  `json:"name"`                 // Full set name (e.g., "Duskmourn: House of Horror")
+	IconSVGURI *string `json:"iconSvgUri,omitempty"` // URL to the set symbol SVG (may be null)
+	SetType    *string `json:"setType,omitempty"`    // Type of set (may be null)
+	ReleasedAt *string `json:"releasedAt,omitempty"` // Release date (may be null for unreleased sets)
+	CardCount  *int    `json:"cardCount,omitempty"`  // Number of cards in set (may be null)
 }
 
 // GetSetCards returns all cards for a set, fetching from Scryfall if not cached.
@@ -186,6 +187,7 @@ func (c *CardFacade) GetDatasetSource(ctx context.Context, setCode string, draft
 }
 
 // GetCardByArenaID returns a card by its Arena ID.
+// If the card is not in the local database, it will attempt to fetch from Scryfall.
 func (c *CardFacade) GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error) {
 	if c.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
@@ -193,19 +195,44 @@ func (c *CardFacade) GetCardByArenaID(ctx context.Context, arenaID string) (*mod
 
 	log.Printf("[GetCardByArenaID] Looking up card with ArenaID: %s", arenaID)
 
+	// First, try local database
 	card, err := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
 	if err != nil {
 		log.Printf("[GetCardByArenaID] Error looking up card %s: %v", arenaID, err)
 		return nil, &AppError{Message: fmt.Sprintf("Failed to get card: %v", err)}
 	}
 
-	if card == nil {
-		log.Printf("[GetCardByArenaID] Card %s not found in database", arenaID)
-		return nil, nil
+	if card != nil {
+		log.Printf("[GetCardByArenaID] Found card %s in database: Name=%s", arenaID, card.Name)
+		return card, nil
 	}
 
-	log.Printf("[GetCardByArenaID] Found card %s: Name=%s", arenaID, card.Name)
-	return card, nil
+	// Card not in database - try fetching from Scryfall
+	log.Printf("[GetCardByArenaID] Card %s not found in database, attempting Scryfall fetch...", arenaID)
+
+	if c.services.SetFetcher != nil {
+		// Convert arenaID string to int for FetchCardByArenaID
+		var arenaIDInt int
+		if _, err := fmt.Sscanf(arenaID, "%d", &arenaIDInt); err != nil {
+			log.Printf("[GetCardByArenaID] Invalid arenaID format %s: %v", arenaID, err)
+			return nil, nil
+		}
+
+		// Use FetchCardByArenaID which fetches from Scryfall and handles basic land fallbacks
+		fetchedCard, fetchErr := c.services.SetFetcher.FetchCardByArenaID(ctx, arenaIDInt)
+		if fetchErr != nil {
+			log.Printf("[GetCardByArenaID] Failed to fetch card %s from Scryfall: %v", arenaID, fetchErr)
+			// Return nil without error - card simply doesn't exist
+			return nil, nil
+		}
+		if fetchedCard != nil {
+			log.Printf("[GetCardByArenaID] Successfully fetched card %s from Scryfall: Name=%s", arenaID, fetchedCard.Name)
+			return fetchedCard, nil
+		}
+	}
+
+	log.Printf("[GetCardByArenaID] Card %s not found in database or Scryfall", arenaID)
+	return nil, nil
 }
 
 // GetCardRatings returns all card ratings for a set and draft format with tier information.
@@ -389,6 +416,19 @@ func (c *CardFacade) SearchCards(ctx context.Context, query string, setCodes []s
 		return []*models.SetCard{}, nil
 	}
 
+	// Ensure specified sets are fetched/refreshed before searching
+	// This handles Arena-exclusive sets like TLA that need special fetching
+	if len(setCodes) > 0 && c.services.SetFetcher != nil {
+		for _, setCode := range setCodes {
+			// FetchAndCacheSet will check cache completeness and refresh if needed
+			_, err := c.services.SetFetcher.FetchAndCacheSet(ctx, setCode)
+			if err != nil {
+				log.Printf("[SearchCards] Warning: Failed to ensure set %s is cached: %v", setCode, err)
+				// Continue anyway - partial data is better than none
+			}
+		}
+	}
+
 	var cards []*models.SetCard
 	err := storage.RetryOnBusy(func() error {
 		var err error
@@ -411,12 +451,28 @@ type CardWithOwned struct {
 // SearchCardsWithCollection searches for cards and includes collection ownership information.
 // If collectionOnly is true, only returns cards that are in the collection.
 func (c *CardFacade) SearchCardsWithCollection(ctx context.Context, query string, setCodes []string, limit int, collectionOnly bool) ([]*CardWithOwned, error) {
+	log.Printf("[SearchCardsWithCollection] Called with query=%q, setCodes=%v, limit=%d, collectionOnly=%t", query, setCodes, limit, collectionOnly)
+
 	if c.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
 	if query == "" {
 		return []*CardWithOwned{}, nil
+	}
+
+	// Ensure specified sets are fetched/refreshed before searching
+	// This handles Arena-exclusive sets like TLA that need special fetching
+	log.Printf("[SearchCardsWithCollection] SetFetcher is nil: %t", c.services.SetFetcher == nil)
+	if len(setCodes) > 0 && c.services.SetFetcher != nil {
+		for _, setCode := range setCodes {
+			// FetchAndCacheSet will check cache completeness and refresh if needed
+			_, err := c.services.SetFetcher.FetchAndCacheSet(ctx, setCode)
+			if err != nil {
+				log.Printf("[SearchCardsWithCollection] Warning: Failed to ensure set %s is cached: %v", setCode, err)
+				// Continue anyway - partial data is better than none
+			}
+		}
 	}
 
 	// First, search for cards
@@ -505,23 +561,22 @@ func (c *CardFacade) GetCollectionQuantities(ctx context.Context, arenaIDs []int
 }
 
 // GetAllSetInfo returns information about all known sets.
-// Falls back to set_cards table if sets table is empty.
+// Merges sets from: Scryfall sets table, cached set_cards, and 17Lands ratings.
 func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {
 	if c.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}
 
-	// First try the sets table (populated from Scryfall)
+	// Collect all set codes from multiple sources
+	setInfoMap := make(map[string]*SetInfo)
+
+	// Source 1: Sets table (populated from Scryfall - has full metadata)
 	sets, err := c.services.Storage.GetAllSets(ctx)
 	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get all sets: %v", err)}
-	}
-
-	// If we have sets from the main table, use them
-	if len(sets) > 0 {
-		result := make([]*SetInfo, len(sets))
-		for i, set := range sets {
-			result[i] = &SetInfo{
+		log.Printf("[GetAllSetInfo] Warning: Failed to get sets from sets table: %v", err)
+	} else {
+		for _, set := range sets {
+			setInfoMap[set.Code] = &SetInfo{
 				Code:       set.Code,
 				Name:       set.Name,
 				IconSVGURI: set.IconSVGURI,
@@ -530,23 +585,51 @@ func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {
 				CardCount:  set.CardCount,
 			}
 		}
-		return result, nil
 	}
 
-	// Fallback: get unique set codes from set_cards table
+	// Source 2: Cached set_cards (may have sets not in main table)
 	cachedSets, err := c.services.Storage.SetCardRepo().GetCachedSets(ctx)
 	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get cached sets: %v", err)}
-	}
-
-	// Build set info from cached set codes (name defaults to uppercase code)
-	result := make([]*SetInfo, len(cachedSets))
-	for i, code := range cachedSets {
-		result[i] = &SetInfo{
-			Code: code,
-			Name: strings.ToUpper(code), // Use uppercase code as name fallback
+		log.Printf("[GetAllSetInfo] Warning: Failed to get cached sets: %v", err)
+	} else {
+		for _, code := range cachedSets {
+			if _, exists := setInfoMap[code]; !exists {
+				setInfoMap[code] = &SetInfo{
+					Code: code,
+					Name: strings.ToUpper(code),
+				}
+			}
 		}
 	}
+
+	// Source 3: Sets with 17Lands ratings (for Arena-exclusive sets like TLA)
+	ratingsRepo := c.services.Storage.DraftRatingsRepo()
+	if ratingsRepo != nil {
+		ratingSets, err := ratingsRepo.GetSetsWithRatings(ctx)
+		if err != nil {
+			log.Printf("[GetAllSetInfo] Warning: Failed to get sets with ratings: %v", err)
+		} else {
+			for _, code := range ratingSets {
+				if _, exists := setInfoMap[code]; !exists {
+					setInfoMap[code] = &SetInfo{
+						Code: code,
+						Name: strings.ToUpper(code),
+					}
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]*SetInfo, 0, len(setInfoMap))
+	for _, info := range setInfoMap {
+		result = append(result, info)
+	}
+
+	// Sort by code for consistent ordering
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Code < result[j].Code
+	})
 
 	return result, nil
 }

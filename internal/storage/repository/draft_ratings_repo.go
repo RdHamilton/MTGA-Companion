@@ -48,6 +48,9 @@ type DraftRatingsRepository interface {
 	GetStatisticsStaleness(ctx context.Context, staleAgeSeconds int) (*StatisticsStaleness, error)
 	GetStaleSets(ctx context.Context, staleAgeSeconds int) ([]string, error)
 	GetStaleStats(ctx context.Context, staleAgeSeconds int) ([]*StaleStatItem, error)
+
+	// GetSetsWithRatings returns all unique set codes that have ratings data.
+	GetSetsWithRatings(ctx context.Context) ([]string, error)
 }
 
 // StatisticsStaleness contains counts of fresh/stale statistics.
@@ -143,8 +146,8 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 	cardStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO draft_card_ratings (
 			set_code, draft_format, arena_id, name, color, rarity,
-			gihwr, ohwr, alsa, ata, gih_count, data_source, cached_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			gihwr, ohwr, alsa, ata, gih_count, data_source, cached_at, url, url_back
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(set_code, draft_format, arena_id) DO UPDATE SET
 			name = excluded.name,
 			color = excluded.color,
@@ -155,7 +158,9 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 			ata = excluded.ata,
 			gih_count = excluded.gih_count,
 			data_source = excluded.data_source,
-			cached_at = excluded.cached_at
+			cached_at = excluded.cached_at,
+			url = excluded.url,
+			url_back = excluded.url_back
 	`)
 	if err != nil {
 		return err
@@ -180,6 +185,8 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 			card.GIH,
 			dataSource,
 			cachedAt,
+			card.URL,
+			card.URLBack,
 		)
 		if err != nil {
 			return err
@@ -223,7 +230,7 @@ func (r *draftRatingsRepository) SaveSetRatings(ctx context.Context, setCode, dr
 // GetCardRatings retrieves cached card ratings for a set.
 func (r *draftRatingsRepository) GetCardRatings(ctx context.Context, setCode, draftFormat string) ([]seventeenlands.CardRating, time.Time, error) {
 	query := `
-		SELECT arena_id, name, color, rarity, gihwr, ohwr, alsa, ata, gih_count, cached_at
+		SELECT arena_id, name, color, rarity, gihwr, ohwr, alsa, ata, gih_count, cached_at, url, url_back
 		FROM draft_card_ratings
 		WHERE set_code = ? AND draft_format = ?
 		ORDER BY gihwr DESC
@@ -241,6 +248,7 @@ func (r *draftRatingsRepository) GetCardRatings(ctx context.Context, setCode, dr
 
 	for rows.Next() {
 		var rating seventeenlands.CardRating
+		var url, urlBack sql.NullString
 		err := rows.Scan(
 			&rating.MTGAID,
 			&rating.Name,
@@ -252,9 +260,17 @@ func (r *draftRatingsRepository) GetCardRatings(ctx context.Context, setCode, dr
 			&rating.ATA,
 			&rating.GIH,
 			&cachedAt,
+			&url,
+			&urlBack,
 		)
 		if err != nil {
 			return nil, time.Time{}, err
+		}
+		if url.Valid {
+			rating.URL = url.String
+		}
+		if urlBack.Valid {
+			rating.URLBack = urlBack.String
 		}
 		ratings = append(ratings, rating)
 	}
@@ -798,4 +814,25 @@ func (r *draftRatingsRepository) GetStaleStats(ctx context.Context, staleAgeSeco
 	}
 
 	return items, rows.Err()
+}
+
+// GetSetsWithRatings returns all unique set codes that have ratings data.
+func (r *draftRatingsRepository) GetSetsWithRatings(ctx context.Context) ([]string, error) {
+	query := `SELECT DISTINCT set_code FROM draft_card_ratings ORDER BY set_code`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sets []string
+	for rows.Next() {
+		var setCode string
+		if err := rows.Scan(&setCode); err != nil {
+			continue
+		}
+		sets = append(sets, setCode)
+	}
+
+	return sets, rows.Err()
 }

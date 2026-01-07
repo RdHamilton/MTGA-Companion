@@ -783,10 +783,8 @@ describe('CardSearch Component', () => {
       await waitFor(() => {
         // Multiple cards with same name may be rendered, use getAllByText
         expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
-        // Multiple badges may exist, check any of them
-        const badges = document.querySelectorAll('.in-deck-badge');
-        expect(badges.length).toBeGreaterThan(0);
-        expect(badges[0]?.textContent).toBe('2x in main');
+        // Look for badge text showing quantity in deck (using inline styles now)
+        expect(screen.getAllByText(/2x in main/).length).toBeGreaterThan(0);
       });
 
       // Button has text "- Remove" with title "Remove from deck" - may be multiple, click first
@@ -815,11 +813,8 @@ describe('CardSearch Component', () => {
       await waitFor(() => {
         // Multiple cards with same name may be rendered
         expect(screen.getAllByText('Test Card').length).toBeGreaterThan(0);
-        // Text is broken into multiple nodes, so use a function matcher
-        // There may be multiple badges, we just need at least one
-        const badges = document.querySelectorAll('.in-deck-badge');
-        expect(badges.length).toBeGreaterThan(0);
-        expect(badges[0]?.textContent).toBe('3x in sideboard');
+        // Look for badge text showing quantity in deck (using inline styles now)
+        expect(screen.getAllByText(/3x in sideboard/).length).toBeGreaterThan(0);
       });
     });
 
@@ -869,10 +864,8 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        // Multiple cards may be rendered, check any available-quantity element
-        const quantities = document.querySelectorAll('.available-quantity');
-        expect(quantities.length).toBeGreaterThan(0);
-        expect(quantities[0]?.textContent).toBe('Available: 2 / 3');
+        // Look for available quantity text (using inline styles now)
+        expect(screen.getAllByText(/Available: 2 \/ 3/).length).toBeGreaterThan(0);
       });
     });
   });
@@ -945,11 +938,8 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        // The type display is in a .card-type div
-        const typeElements = screen.getAllByText(/Creature/);
-        const cardTypeElement = typeElements.find(el => el.classList.contains('card-type'));
-        expect(cardTypeElement).toBeInTheDocument();
-        expect(cardTypeElement?.textContent).toBe('Creature — Human');
+        // Look for the type text (using inline styles now, types joined with em-dash)
+        expect(screen.getByText('Creature — Human')).toBeInTheDocument();
       });
     });
 
@@ -987,10 +977,203 @@ describe('CardSearch Component', () => {
       );
 
       await waitFor(() => {
-        // CMC text may be broken into nodes, so check the element content
-        const cardStats = document.querySelector('.card-stats');
-        expect(cardStats).toBeInTheDocument();
-        expect(cardStats?.textContent).toContain('CMC: 5');
+        // Look for CMC text (using inline styles now)
+        expect(screen.getByText('CMC: 5')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Search Results Display with Inline Styles', () => {
+    it('should display search results in a scrollable container', async () => {
+      const card = { ...createMockSetCard({ ArenaID: '123', Name: 'Firebending Lesson' }), ownedQuantity: 2 };
+      mockCards.searchCardsWithCollection.mockResolvedValue([card]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'firebending');
+
+      await waitFor(() => {
+        expect(screen.getByText('Firebending Lesson')).toBeInTheDocument();
+      });
+    });
+
+    it('should display card image with correct src and alt attributes', async () => {
+      const card = {
+        ...createMockSetCard({
+          ArenaID: '123',
+          Name: 'Firebending Lesson',
+          ImageURL: 'https://cards.scryfall.io/firebending.jpg',
+        }),
+        ownedQuantity: 2,
+      };
+      mockCards.searchCardsWithCollection.mockResolvedValue([card]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'firebending');
+
+      await waitFor(() => {
+        const image = screen.getByAltText('Firebending Lesson');
+        expect(image).toBeInTheDocument();
+        expect(image).toHaveAttribute('src', 'https://cards.scryfall.io/firebending.jpg');
+      });
+    });
+
+    it('should display multiple search results with correct count', async () => {
+      const cards = [
+        { ...createMockSetCard({ ArenaID: '1', Name: 'Fire Bolt' }), ownedQuantity: 4 },
+        { ...createMockSetCard({ ArenaID: '2', Name: 'Fire Elemental' }), ownedQuantity: 2 },
+        { ...createMockSetCard({ ArenaID: '3', Name: 'Fireball' }), ownedQuantity: 0 },
+      ];
+      mockCards.searchCardsWithCollection.mockResolvedValue(cards);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'fire');
+
+      await waitFor(() => {
+        expect(screen.getByText('3 cards found')).toBeInTheDocument();
+        expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
+        expect(screen.getByText('Fire Elemental')).toBeInTheDocument();
+        expect(screen.getByText('Fireball')).toBeInTheDocument();
+      });
+    });
+
+    it('should show owned quantity with correct styling', async () => {
+      const ownedCard = { ...createMockSetCard({ ArenaID: '1', Name: 'Owned Card' }), ownedQuantity: 4 };
+      const notOwnedCard = { ...createMockSetCard({ ArenaID: '2', Name: 'Unowned Card' }), ownedQuantity: 0 };
+      mockCards.searchCardsWithCollection.mockResolvedValue([ownedCard, notOwnedCard]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'card');
+
+      await waitFor(() => {
+        expect(screen.getByText('4x owned')).toBeInTheDocument();
+        expect(screen.getByText('Not owned')).toBeInTheDocument();
+      });
+    });
+
+    it('should display add and remove buttons for cards in deck', async () => {
+      const card = { ...createMockSetCard({ ArenaID: '123', Name: 'Test Card' }), ownedQuantity: 4 };
+      mockCards.searchCardsWithCollection.mockResolvedValue([card]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      const existingCards = new Map([[123, { quantity: 2, board: 'main' }]]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={existingCards}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'test');
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Card')).toBeInTheDocument();
+        expect(screen.getByText(/2x in main/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /\+ Add/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /- Remove/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should call onAddCard when add button is clicked in constructed mode', async () => {
+      const card = { ...createMockSetCard({ ArenaID: '456', Name: 'Searchable Card' }), ownedQuantity: 4 };
+      mockCards.searchCardsWithCollection.mockResolvedValue([card]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+      await userEvent.type(searchInput, 'searchable');
+
+      await waitFor(() => {
+        expect(screen.getByText('Searchable Card')).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByRole('button', { name: /\+ Add/i });
+      await userEvent.click(addButton);
+
+      expect(mockOnAddCard).toHaveBeenCalledWith(456, 1, 'main');
+    });
+
+    it('should debounce search input to prevent excessive API calls', async () => {
+      mockCards.searchCardsWithCollection.mockResolvedValue([]);
+      mockCards.getAllSetInfo.mockResolvedValue([]);
+
+      render(
+        <CardSearch
+          isDraftDeck={false}
+          draftCardIDs={[]}
+          existingCards={new Map()}
+          onAddCard={mockOnAddCard}
+          onRemoveCard={mockOnRemoveCard}
+        />
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search cards (min 2 characters)...');
+
+      // Type quickly - should debounce
+      await userEvent.type(searchInput, 'fire');
+
+      // Wait for debounce (300ms)
+      await waitFor(() => {
+        // Should only call once after debounce, not for each character
+        expect(mockCards.searchCardsWithCollection).toHaveBeenCalledTimes(1);
+        expect(mockCards.searchCardsWithCollection).toHaveBeenCalledWith('fire', [], 100);
       });
     });
   });

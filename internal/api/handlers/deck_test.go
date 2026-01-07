@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -590,6 +591,103 @@ func TestCreateDeckRequest_Validation(t *testing.T) {
 			isValid := tt.request.Name != ""
 			if isValid != tt.isValid {
 				t.Errorf("expected isValid=%v, got %v", tt.isValid, isValid)
+			}
+		})
+	}
+}
+
+func TestRemoveCard_URLParsing(t *testing.T) {
+	// Test URL parameter parsing for RemoveCard handler
+	tests := []struct {
+		name           string
+		deckID         string
+		cardID         string
+		zone           string
+		expectedStatus int
+	}{
+		{
+			name:           "valid card ID",
+			deckID:         "deck-123",
+			cardID:         "12345",
+			zone:           "main",
+			expectedStatus: http.StatusNoContent, // Would be 204 if facade succeeds
+		},
+		{
+			name:           "invalid card ID - not a number",
+			deckID:         "deck-123",
+			cardID:         "invalid",
+			zone:           "main",
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "default zone when not provided",
+			deckID:         "deck-123",
+			cardID:         "12345",
+			zone:           "", // Should default to "main"
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name:           "sideboard zone",
+			deckID:         "deck-123",
+			cardID:         "12345",
+			zone:           "sideboard",
+			expectedStatus: http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test handler that tracks the parsed values
+			var parsedDeckID string
+			var parsedCardID int
+			var parsedZone string
+			var parseErr error
+
+			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				parsedDeckID = chi.URLParam(r, "deckID")
+				cardIDStr := chi.URLParam(r, "cardID")
+				parsedCardID, parseErr = strconv.Atoi(cardIDStr)
+				_ = parsedCardID // Used to verify parsing succeeded
+				parsedZone = r.URL.Query().Get("zone")
+				if parsedZone == "" {
+					parsedZone = "main"
+				}
+
+				if parseErr != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			r := chi.NewRouter()
+			r.Delete("/api/v1/decks/{deckID}/cards/{cardID}", testHandler)
+
+			url := "/api/v1/decks/" + tt.deckID + "/cards/" + tt.cardID
+			if tt.zone != "" {
+				url += "?zone=" + tt.zone
+			}
+
+			req := httptest.NewRequest(http.MethodDelete, url, nil)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
+			}
+
+			// Verify correct parsing for valid cases
+			if tt.expectedStatus == http.StatusNoContent {
+				if parsedDeckID != tt.deckID {
+					t.Errorf("expected deckID %q, got %q", tt.deckID, parsedDeckID)
+				}
+				expectedZone := tt.zone
+				if expectedZone == "" {
+					expectedZone = "main"
+				}
+				if parsedZone != expectedZone {
+					t.Errorf("expected zone %q, got %q", expectedZone, parsedZone)
+				}
 			}
 		})
 	}

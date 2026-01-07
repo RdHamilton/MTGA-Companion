@@ -74,7 +74,17 @@ func (r *standardRepository) GetConfig(ctx context.Context) (*models.StandardCon
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse next_rotation_date '%s': %w", nextRotationStr, parseErr)
 	}
-	config.UpdatedAt, parseErr = time.Parse("2006-01-02 15:04:05", updatedAtStr)
+	// Try multiple time formats for updated_at
+	for _, layout := range []string{
+		time.RFC3339,           // "2006-01-02T15:04:05Z07:00" - ISO 8601
+		"2006-01-02 15:04:05",  // SQLite default format
+		"2006-01-02T15:04:05Z", // ISO 8601 UTC
+	} {
+		config.UpdatedAt, parseErr = time.Parse(layout, updatedAtStr)
+		if parseErr == nil {
+			break
+		}
+	}
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse updated_at '%s': %w", updatedAtStr, parseErr)
 	}
@@ -215,7 +225,9 @@ func (r *standardRepository) GetUpcomingRotation(ctx context.Context) (*models.U
 			}
 		}
 
-		totalRotatingCards += set.CardCount
+		if set.CardCount != nil {
+			totalRotatingCards += *set.CardCount
+		}
 		rotatingSets = append(rotatingSets, set)
 	}
 

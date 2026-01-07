@@ -15,48 +15,47 @@ describe('cards API', () => {
   });
 
   describe('searchCards', () => {
-    it('should call post with search request', async () => {
+    it('should call get with query parameters', async () => {
       const mockCards = [{ name: 'Lightning Bolt' }];
-      vi.mocked(post).mockResolvedValue(mockCards);
+      vi.mocked(get).mockResolvedValue(mockCards);
 
       const result = await cards.searchCards({ query: 'lightning' });
 
-      expect(post).toHaveBeenCalledWith('/cards/search', { query: 'lightning' });
+      expect(get).toHaveBeenCalledWith('/cards?q=lightning');
       expect(result).toEqual(mockCards);
     });
 
-    it('should include all search parameters', async () => {
-      vi.mocked(post).mockResolvedValue([]);
+    it('should include set_code and limit in query parameters', async () => {
+      vi.mocked(get).mockResolvedValue([]);
 
       await cards.searchCards({
         query: 'bolt',
         set_code: 'MKM',
-        colors: ['R'],
-        types: ['Instant'],
-        rarity: 'common',
         limit: 20,
       });
 
-      expect(post).toHaveBeenCalledWith('/cards/search', {
-        query: 'bolt',
-        set_code: 'MKM',
-        colors: ['R'],
-        types: ['Instant'],
-        rarity: 'common',
-        limit: 20,
-      });
+      expect(get).toHaveBeenCalledWith('/cards?q=bolt&set=MKM&limit=20');
     });
   });
 
   describe('getCardByArenaId', () => {
-    it('should call get with correct path', async () => {
+    it('should call get with correct path (no /arena/ prefix)', async () => {
       const mockCard = { name: 'Opt', arena_id: 12345 };
       vi.mocked(get).mockResolvedValue(mockCard);
 
       const result = await cards.getCardByArenaId(12345);
 
-      expect(get).toHaveBeenCalledWith('/cards/arena/12345');
+      // Backend route is /cards/{cardID}, NOT /cards/arena/{cardID}
+      expect(get).toHaveBeenCalledWith('/cards/12345');
       expect(result).toEqual(mockCard);
+    });
+
+    it('should correctly format different arena IDs', async () => {
+      vi.mocked(get).mockResolvedValue({ name: 'Test Card' });
+
+      await cards.getCardByArenaId(97326);
+
+      expect(get).toHaveBeenCalledWith('/cards/97326');
     });
   });
 
@@ -131,7 +130,7 @@ describe('cards API', () => {
 
       expect(post).toHaveBeenCalledWith('/cards/search-with-collection', {
         query: 'lightning',
-        sets: ['MKM'],
+        set_codes: ['MKM'],
         limit: 50,
       });
       expect(result).toEqual(mockCards);
@@ -144,7 +143,7 @@ describe('cards API', () => {
 
       expect(post).toHaveBeenCalledWith('/cards/search-with-collection', {
         query: 'bolt',
-        sets: undefined,
+        set_codes: undefined,
         limit: undefined,
       });
     });

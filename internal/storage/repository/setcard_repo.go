@@ -380,8 +380,9 @@ func (r *setCardRepository) DeleteSet(ctx context.Context, setCode string) error
 	return err
 }
 
-// SearchCards searches for cards by name across all cached sets.
+// SearchCards searches for cards by name or oracle text across all cached sets.
 // If setCodes is empty, searches all sets. Returns up to limit results.
+// Cards matching by name are prioritized over those matching only by text.
 func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCodes []string, limit int) ([]*models.SetCard, error) {
 	if limit <= 0 {
 		limit = 50 // Default limit
@@ -392,6 +393,7 @@ func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCo
 
 	var sqlQuery string
 	var args []interface{}
+	searchPattern := "%" + query + "%"
 
 	if len(setCodes) > 0 {
 		// Build placeholders for IN clause
@@ -404,23 +406,28 @@ func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCo
 			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
 				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
 			FROM set_cards
-			WHERE name LIKE ? AND set_code IN (` + joinStrings(placeholders, ",") + `)
-			ORDER BY name
+			WHERE (name LIKE ? OR text LIKE ?) AND set_code IN (` + joinStrings(placeholders, ",") + `)
+			ORDER BY
+				CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
+				name
 			LIMIT ?
 		`
-		// Prepend the name query, append the limit
-		args = append([]interface{}{"%" + query + "%"}, args...)
-		args = append(args, limit)
+		// Prepend the search patterns, append the limit
+		// Arguments: searchPattern (name), searchPattern (text), setCodes..., searchPattern (ORDER BY), limit
+		args = append([]interface{}{searchPattern, searchPattern}, args...)
+		args = append(args, searchPattern, limit)
 	} else {
 		sqlQuery = `
 			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
 				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
 			FROM set_cards
-			WHERE name LIKE ?
-			ORDER BY name
+			WHERE name LIKE ? OR text LIKE ?
+			ORDER BY
+				CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
+				name
 			LIMIT ?
 		`
-		args = []interface{}{"%" + query + "%", limit}
+		args = []interface{}{searchPattern, searchPattern, searchPattern, limit}
 	}
 
 	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)

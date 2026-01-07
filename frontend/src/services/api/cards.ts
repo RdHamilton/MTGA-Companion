@@ -25,16 +25,25 @@ export interface CardSearchRequest {
 
 /**
  * Search for cards.
+ * Uses GET with query parameters as the backend expects.
  */
 export async function searchCards(request: CardSearchRequest): Promise<SetCard[]> {
-  return post<SetCard[]>('/cards/search', request);
+  const params = new URLSearchParams();
+  params.set('q', request.query);
+  if (request.set_code) {
+    params.set('set', request.set_code);
+  }
+  if (request.limit) {
+    params.set('limit', request.limit.toString());
+  }
+  return get<SetCard[]>(`/cards?${params.toString()}`);
 }
 
 /**
  * Get a card by Arena ID.
  */
 export async function getCardByArenaId(arenaId: number): Promise<SetCard> {
-  return get<SetCard>(`/cards/arena/${arenaId}`);
+  return get<SetCard>(`/cards/${arenaId}`);
 }
 
 /**
@@ -97,7 +106,7 @@ export async function searchCardsWithCollection(
 ): Promise<CardWithCollection[]> {
   return post<CardWithCollection[]>('/cards/search-with-collection', {
     query,
-    sets,
+    set_codes: sets,
     limit,
   });
 }

@@ -52,19 +52,21 @@ type SeedDeckBuilderResponse struct {
 
 // CardWithOwnership extends card info with ownership data.
 type CardWithOwnership struct {
-	CardID       int      `json:"cardID"`
-	Name         string   `json:"name"`
-	ManaCost     string   `json:"manaCost,omitempty"`
-	CMC          int      `json:"cmc"`
-	Colors       []string `json:"colors"`
-	TypeLine     string   `json:"typeLine"`
-	Rarity       string   `json:"rarity,omitempty"`
-	ImageURI     string   `json:"imageURI,omitempty"`
-	Score        float64  `json:"score"`
-	Reasoning    string   `json:"reasoning"`
-	InCollection bool     `json:"inCollection"`
-	OwnedCount   int      `json:"ownedCount"`
-	NeededCount  int      `json:"neededCount"`
+	CardID            int      `json:"cardID"`
+	Name              string   `json:"name"`
+	ManaCost          string   `json:"manaCost,omitempty"`
+	CMC               int      `json:"cmc"`
+	Colors            []string `json:"colors"`
+	TypeLine          string   `json:"typeLine"`
+	Rarity            string   `json:"rarity,omitempty"`
+	ImageURI          string   `json:"imageURI,omitempty"`
+	Score             float64  `json:"score"`
+	Reasoning         string   `json:"reasoning"`
+	InCollection      bool     `json:"inCollection"`
+	OwnedCount        int      `json:"ownedCount"`
+	NeededCount       int      `json:"neededCount"`
+	CurrentCopies     int      `json:"currentCopies"`     // Copies currently in deck
+	RecommendedCopies int      `json:"recommendedCopies"` // Recommended total copies (1-4)
 }
 
 // SeedDeckAnalysis provides analysis of the seed card and suggestions.
@@ -94,8 +96,8 @@ type SeedCardAnalysis struct {
 
 // IterativeBuildAroundRequest represents a request for iterative deck building suggestions.
 type IterativeBuildAroundRequest struct {
-	SeedCardID     int      `json:"seedCardID"`     // Original seed card
-	DeckCardIDs    []int    `json:"deckCardIDs"`    // All cards currently in deck
+	SeedCardID     int      `json:"seedCardID"`     // Optional - original seed card (ignored if DeckCardIDs provided)
+	DeckCardIDs    []int    `json:"deckCardIDs"`    // All cards currently in deck (required)
 	MaxResults     int      `json:"maxResults"`     // Default: 15
 	BudgetMode     bool     `json:"budgetMode"`     // Only collection cards
 	SetRestriction string   `json:"setRestriction"` // "single", "multiple", "all"
@@ -752,13 +754,14 @@ func (s *SeedDeckBuilder) buildSeedCardResponse(seedAnalysis *SeedCardAnalysis, 
 }
 
 // SuggestNextCards generates suggestions based on the current deck composition.
-// This is used for iterative deck building where users pick cards one-by-one.
+// This analyzes ALL cards in the deck collectively to find commonalities and
+// suggests cards that complement the deck's colors, themes, and mana curve.
 func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBuildAroundRequest) (*IterativeBuildAroundResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is nil")
 	}
-	if req.SeedCardID <= 0 {
-		return nil, fmt.Errorf("seed card ID is required")
+	if len(req.DeckCardIDs) == 0 {
+		return nil, fmt.Errorf("deck must have at least one card")
 	}
 
 	// Apply defaults
@@ -769,32 +772,33 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 		req.SetRestriction = "all"
 	}
 
-	// Get seed card analysis (for set restriction handling)
-	seedAnalysis, err := s.analyzeSeedCard(ctx, req.SeedCardID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to analyze seed card: %w", err)
-	}
-
-	// Analyze current deck collectively
+	// Analyze current deck collectively - this determines colors, themes, keywords, etc.
 	deckAnalysis, err := s.analyzeDeckCards(ctx, req.DeckCardIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze deck: %w", err)
 	}
 
-	// Get candidate cards
-	candidates, err := s.getCandidatesForIterative(ctx, req, seedAnalysis)
+	// Get candidate cards from all standard-legal sets
+	candidates, err := s.getCandidatesFromDeckAnalysis(ctx, req, deckAnalysis)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
 
-	// Create exclusion set (cards already in deck)
-	excludeSet := make(map[int]bool)
+	// Count copies of each card in deck (instead of excluding them)
+	deckCardCounts := make(map[int]int)
 	for _, cardID := range req.DeckCardIDs {
-		excludeSet[cardID] = true
+		deckCardCounts[cardID]++
 	}
-	excludeSet[req.SeedCardID] = true
 
-	// Score candidates against the collective deck
+	// Only exclude cards that already have 4 copies (can't add more)
+	excludeSet := make(map[int]bool)
+	for cardID, count := range deckCardCounts {
+		if count >= 4 {
+			excludeSet[cardID] = true
+		}
+	}
+
+	// Score candidates against the collective deck analysis
 	scoredCards := s.scoreAndRankForDeck(candidates, deckAnalysis, excludeSet)
 
 	// Get collection ownership
@@ -815,6 +819,16 @@ func (s *SeedDeckBuilder) SuggestNextCards(ctx context.Context, req *IterativeBu
 
 	// Enrich with ownership
 	suggestions := s.enrichWithOwnership(scoredCards, collection)
+
+	// Add current deck counts and recommended copies to each card
+	for _, card := range suggestions {
+		card.CurrentCopies = deckCardCounts[card.CardID]
+		recommended := s.calculateRecommendedCopies(card)
+		if recommended < 1 {
+			recommended = 4 // Default to 4 if calculation fails
+		}
+		card.RecommendedCopies = recommended
+	}
 
 	// Calculate slots remaining (60-card deck standard)
 	slotsRemaining := 60 - len(req.DeckCardIDs)
@@ -886,15 +900,82 @@ func (s *SeedDeckBuilder) analyzeDeckCards(ctx context.Context, cardIDs []int) (
 	return analysis, nil
 }
 
-// getCandidatesForIterative retrieves candidate cards for iterative building.
-func (s *SeedDeckBuilder) getCandidatesForIterative(ctx context.Context, req *IterativeBuildAroundRequest, seedAnalysis *SeedCardAnalysis) ([]*cards.Card, error) {
-	// Reuse existing getCandidates logic with adapted request
-	legacyReq := &SeedDeckBuilderRequest{
-		SeedCardID:     req.SeedCardID,
-		SetRestriction: req.SetRestriction,
-		AllowedSets:    req.AllowedSets,
+// getCandidatesFromDeckAnalysis retrieves candidate cards based on the deck's collective analysis.
+// This fetches cards from standard-legal sets that match the deck's established colors.
+func (s *SeedDeckBuilder) getCandidatesFromDeckAnalysis(ctx context.Context, req *IterativeBuildAroundRequest, deckAnalysis *CollectiveDeckAnalysis) ([]*cards.Card, error) {
+	var candidates []*cards.Card
+
+	// Get standard-legal sets
+	standardSets, err := s.standardRepo.GetStandardSets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get standard sets: %w", err)
 	}
-	return s.getCandidates(ctx, legacyReq, seedAnalysis)
+
+	// If no standard sets defined, fallback to all cached sets
+	if len(standardSets) == 0 {
+		cachedSets, err := s.setCardRepo.GetCachedSets(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cached sets: %w", err)
+		}
+		for _, setCode := range cachedSets {
+			setCards, err := s.getCardsFromSet(ctx, setCode)
+			if err != nil {
+				continue // Skip sets that fail
+			}
+			candidates = append(candidates, setCards...)
+		}
+	} else {
+		// Get cards from all standard sets
+		for _, set := range standardSets {
+			setCards, err := s.getCardsFromSet(ctx, set.Code)
+			if err != nil {
+				continue // Skip sets that fail
+			}
+			candidates = append(candidates, setCards...)
+		}
+	}
+
+	// Filter out cards that don't match the deck's colors (colorless always allowed)
+	deckColors := deckAnalysis.Colors
+	if len(deckColors) > 0 {
+		filtered := make([]*cards.Card, 0, len(candidates))
+		for _, card := range candidates {
+			// Colorless cards always fit
+			if len(card.Colors) == 0 {
+				filtered = append(filtered, card)
+				continue
+			}
+
+			// Check if card has at least one color that matches deck
+			hasMatchingColor := false
+			for _, cardColor := range card.Colors {
+				if deckColors[cardColor] > 0 {
+					hasMatchingColor = true
+					break
+				}
+			}
+
+			if hasMatchingColor {
+				filtered = append(filtered, card)
+			}
+		}
+		candidates = filtered
+	}
+
+	// Filter out deck cards
+	excludeSet := make(map[int]bool)
+	for _, cardID := range req.DeckCardIDs {
+		excludeSet[cardID] = true
+	}
+
+	finalCandidates := make([]*cards.Card, 0, len(candidates))
+	for _, card := range candidates {
+		if !excludeSet[card.ArenaID] {
+			finalCandidates = append(finalCandidates, card)
+		}
+	}
+
+	return finalCandidates, nil
 }
 
 // scoreAndRankForDeck scores candidates against the collective deck analysis.
@@ -1245,4 +1326,53 @@ func (s *SeedDeckBuilder) buildLiveDeckAnalysis(deckAnalysis *CollectiveDeckAnal
 		TotalCards:           deckAnalysis.TotalCards,
 		InCollectionCount:    inCollectionCount,
 	}
+}
+
+// calculateRecommendedCopies determines optimal copy count (1-4) for a card.
+// Considers: legendary status, mana cost, card type, synergy score.
+func (s *SeedDeckBuilder) calculateRecommendedCopies(card *CardWithOwnership) int {
+	typeLine := strings.ToLower(card.TypeLine)
+
+	// Legendary cards: usually 2-3 copies (can't have multiples in play)
+	if strings.Contains(typeLine, "legendary") {
+		if card.CMC >= 5 {
+			return 2 // Expensive legendaries: 2 copies
+		}
+		return 3 // Cheaper legendaries: 3 copies for consistency
+	}
+
+	// Planeswalkers: usually 2-3 copies
+	if strings.Contains(typeLine, "planeswalker") {
+		if card.CMC >= 5 {
+			return 2
+		}
+		return 3
+	}
+
+	// High-synergy cards (score > 0.8): want full playsets
+	if card.Score > 0.8 {
+		return 4
+	}
+
+	// Expensive cards (5+ CMC): usually 2-3 copies
+	if card.CMC >= 5 {
+		return 2
+	}
+	if card.CMC == 4 {
+		return 3
+	}
+
+	// Instants and sorceries: usually 3-4 copies for consistency
+	if strings.Contains(typeLine, "instant") || strings.Contains(typeLine, "sorcery") {
+		if card.Score > 0.6 {
+			return 4
+		}
+		return 3
+	}
+
+	// Creatures and other permanents: 3-4 copies based on score
+	if card.Score > 0.6 {
+		return 4
+	}
+	return 3
 }

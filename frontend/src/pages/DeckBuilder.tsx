@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { decks, drafts } from '@/services/api';
 import type { CardWithOwnership, SuggestedLandResponse } from '@/services/api/decks';
+import { ApiRequestError } from '@/services/apiClient';
 import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
 import DeckList from '../components/DeckList';
@@ -52,7 +53,17 @@ export default function DeckBuilder() {
           deckData = await decks.getDeck(deckID);
         } else if (draftEventID) {
           // Load by draft event ID, create if doesn't exist
-          deckData = await decks.getDeckByDraftEvent(draftEventID);
+          try {
+            deckData = await decks.getDeckByDraftEvent(draftEventID);
+          } catch (fetchErr) {
+            // 404 means no deck exists yet - we'll create one below
+            // Any other error should be re-thrown
+            if (fetchErr instanceof ApiRequestError && fetchErr.status === 404) {
+              deckData = null;
+            } else {
+              throw fetchErr;
+            }
+          }
 
           if (!deckData || !deckData.deck) {
             // No deck exists yet - create one from draft picks
@@ -90,7 +101,36 @@ export default function DeckBuilder() {
                 draft_event_id: draftEventID,
               });
 
-              // Load the newly created deck
+              // Load draft picks and add them to the new deck
+              const picks = await drafts.getDraftPicks(draftEventID);
+              if (picks && picks.length > 0) {
+                // Count occurrences of each card (draft can have multiple copies)
+                const cardCounts = new Map<number, number>();
+                for (const pick of picks) {
+                  const cardID = parseInt(pick.CardID, 10);
+                  if (!isNaN(cardID)) {
+                    cardCounts.set(cardID, (cardCounts.get(cardID) || 0) + 1);
+                  }
+                }
+
+                // Add each card to the deck
+                for (const [cardID, quantity] of cardCounts) {
+                  try {
+                    await decks.addCard({
+                      deck_id: newDeck.ID,
+                      arena_id: cardID,
+                      quantity,
+                      zone: 'main',
+                      is_sideboard: false,
+                      from_draft: true,
+                    });
+                  } catch (addErr) {
+                    console.error(`Failed to add card ${cardID} to deck:`, addErr);
+                  }
+                }
+              }
+
+              // Load the newly created deck (now with cards)
               deckData = await decks.getDeck(newDeck.ID);
             } catch (createErr) {
               setError(createErr instanceof Error ? createErr.message : 'Failed to create deck from draft');
@@ -159,25 +199,38 @@ export default function DeckBuilder() {
   const handleAddCard = async (cardID: number, quantity: number, board: 'main' | 'sideboard') => {
     if (!deck) return;
 
-    await decks.addCard({
-      deck_id: deck.ID,
-      arena_id: cardID,
-      quantity,
-      zone: board,
-      is_sideboard: board === 'sideboard',
-    });
+    try {
+      await decks.addCard({
+        deck_id: deck.ID,
+        arena_id: cardID,
+        quantity,
+        zone: board,
+        is_sideboard: board === 'sideboard',
+      });
 
-    // Reload deck data
-    const deckData = await decks.getDeck(deck.ID);
-    setCards(deckData.cards || []);
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
 
-    // Reload statistics
-    const stats = await decks.getDeckStatistics(deck.ID);
-    setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        // Statistics may not exist for new decks - this is OK
+        setStatistics(null);
+      }
 
-    // Reload recommendations after adding a card
-    if (deckData.cards && deckData.cards.length >= 3) {
-      loadRecommendations();
+      // Reload recommendations after adding a card
+      if (deckData.cards && deckData.cards.length >= 3) {
+        loadRecommendations();
+      }
+    } catch (err) {
+      // Silently ignore 400 errors (validation errors like 4-copy limit)
+      // but log other errors for debugging
+      if (!(err instanceof ApiRequestError && err.status === 400)) {
+        console.error('Failed to add card:', err);
+      }
     }
   };
 
@@ -195,11 +248,73 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to remove card');
+    }
+  };
+
+  const handleRemoveAllCopies = async (cardID: number, board: string) => {
+    if (!deck) return;
+
+    try {
+      await decks.removeAllCopies({
+        deck_id: deck.ID,
+        arena_id: cardID,
+        zone: board,
+      });
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to remove all copies');
+    }
+  };
+
+  const handleAddOneCard = async (cardID: number, board: string) => {
+    if (!deck) return;
+
+    try {
+      await decks.addCard({
+        deck_id: deck.ID,
+        arena_id: cardID,
+        quantity: 1,
+        zone: board,
+        is_sideboard: board === 'sideboard',
+      });
+
+      // Reload deck data
+      const deckData = await decks.getDeck(deck.ID);
+      setCards(deckData.cards || []);
+
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
+    } catch (err) {
+      // Silently ignore 400 errors (validation errors like 4-copy limit)
+      // but log other errors for debugging
+      if (!(err instanceof ApiRequestError && err.status === 400)) {
+        console.error('Failed to add card:', err);
+      }
     }
   };
 
@@ -345,9 +460,13 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
 
       console.log(`Successfully added ${landsNeeded} lands!`);
       window.alert(`Added ${landsNeeded} suggested lands to your deck!`);
@@ -396,9 +515,13 @@ export default function DeckBuilder() {
     setCards(deckData.cards || []);
     setTags(deckData.tags || []);
 
-    // Reload statistics
-    const stats = await decks.getDeckStatistics(deck.ID);
-    setStatistics(stats);
+    // Reload statistics (may not exist for new/small decks)
+    try {
+      const stats = await decks.getDeckStatistics(deck.ID);
+      setStatistics(stats);
+    } catch {
+      setStatistics(null);
+    }
   };
 
   const handleApplyBuildAround = async (suggestions: CardWithOwnership[], lands: SuggestedLandResponse[]) => {
@@ -445,9 +568,13 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
     } catch (err) {
       console.error('Failed to apply build-around suggestions:', err);
       alert(err instanceof Error ? err.message : 'Failed to apply suggestions');
@@ -479,9 +606,13 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
     } catch (err) {
       console.error('Failed to add card:', err);
       alert(err instanceof Error ? err.message : 'Failed to add card');
@@ -504,9 +635,13 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
     } catch (err) {
       console.error('Failed to remove card:', err);
       alert(err instanceof Error ? err.message : 'Failed to remove card');
@@ -533,9 +668,13 @@ export default function DeckBuilder() {
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
 
-      // Reload statistics
-      const stats = await decks.getDeckStatistics(deck.ID);
-      setStatistics(stats);
+      // Reload statistics (may not exist for new/small decks)
+      try {
+        const stats = await decks.getDeckStatistics(deck.ID);
+        setStatistics(stats);
+      } catch {
+        setStatistics(null);
+      }
 
       setShowBuildAround(false);
     } catch (err) {
@@ -545,7 +684,10 @@ export default function DeckBuilder() {
   };
 
   // Get current deck card IDs for iterative build-around mode
-  const currentDeckCardIDs = cards.map((card) => card.CardID);
+  // Expand based on quantity - backend expects duplicate entries for multiple copies
+  const currentDeckCardIDs = cards.flatMap((card) =>
+    Array(card.Quantity).fill(card.CardID)
+  );
 
   // Create a map of existing cards for CardSearch
   const existingCardsMap = new Map(
@@ -617,7 +759,9 @@ export default function DeckBuilder() {
             cards={cards}
             tags={tags}
             statistics={statistics ?? undefined}
+            onAddCard={handleAddOneCard}
             onRemoveCard={handleRemoveCard}
+            onRemoveAllCopies={handleRemoveAllCopies}
           />
         </div>
 
@@ -712,7 +856,8 @@ export default function DeckBuilder() {
           {deck.Source !== 'draft' && (
             <button
               className="action-button build-around-btn"
-              title="Build a deck around a specific card"
+              title={cards.length === 0 ? 'Add cards to your deck first' : 'Get suggestions based on current deck cards'}
+              disabled={cards.length === 0}
               onClick={() => setShowBuildAround(true)}
             >
               Build Around
@@ -743,6 +888,7 @@ export default function DeckBuilder() {
         onFinishDeck={handleBuildAroundFinishDeck}
         currentDeckCards={currentDeckCardIDs}
         deckCards={cards}
+        useDeckCardsAsSeed={cards.length > 0}
       />
     </div>
   );

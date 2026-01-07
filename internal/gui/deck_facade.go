@@ -396,18 +396,18 @@ func (d *DeckFacade) AddCard(ctx context.Context, deckID string, cardID, quantit
 		return &AppError{Message: "Deck not found"}
 	}
 
+	// Check if this is a basic land (basic lands have no quantity limits)
+	basicLandIDs := map[int]bool{
+		81716: true, // Plains
+		81717: true, // Island
+		81718: true, // Swamp
+		81719: true, // Mountain
+		81720: true, // Forest
+	}
+
 	// If this is a draft deck, validate that the card is from the draft
 	// Exception: Basic lands are always allowed (they have unlimited availability)
 	if deck.Source == "draft" && deck.DraftEventID != nil {
-		// Check if this is a basic land (basic lands are always allowed)
-		basicLandIDs := map[int]bool{
-			81716: true, // Plains
-			81717: true, // Island
-			81718: true, // Swamp
-			81719: true, // Mountain
-			81720: true, // Forest
-		}
-
 		if !basicLandIDs[cardID] {
 			// Not a basic land, so validate it's in the draft pool
 			var draftCards []int
@@ -432,6 +432,36 @@ func (d *DeckFacade) AddCard(ctx context.Context, deckID string, cardID, quantit
 			if !cardInDraft {
 				return &AppError{Message: "Card not in draft pool - draft decks can only contain cards from the associated draft"}
 			}
+		}
+	}
+
+	// Enforce 4-card limit (unless basic land)
+	if !basicLandIDs[cardID] {
+		var deckCards []*models.DeckCard
+		err = storage.RetryOnBusy(func() error {
+			var err error
+			deckCards, err = d.services.Storage.DeckRepo().GetCards(ctx, deckID)
+			return err
+		})
+		if err != nil {
+			return &AppError{Message: fmt.Sprintf("Failed to get deck cards: %v", err)}
+		}
+
+		// Find current quantity of this card in the deck
+		currentQty := 0
+		for _, dc := range deckCards {
+			if dc.CardID == cardID {
+				currentQty += dc.Quantity
+			}
+		}
+
+		// Check if adding would exceed 4-card limit
+		if currentQty+quantity > 4 {
+			maxCanAdd := 4 - currentQty
+			if maxCanAdd <= 0 {
+				return &AppError{Message: fmt.Sprintf("Cannot add more copies - card already at 4-copy limit (current: %d)", currentQty)}
+			}
+			return &AppError{Message: fmt.Sprintf("Cannot add %d copies - would exceed 4-copy limit (current: %d, max can add: %d)", quantity, currentQty, maxCanAdd)}
 		}
 	}
 
@@ -490,7 +520,38 @@ func (d *DeckFacade) RemoveCard(ctx context.Context, deckID string, cardID int, 
 		})
 	}
 
-	log.Printf("Removed card %d from deck %s", cardID, deckID)
+	log.Printf("Removed 1 copy of card %d from deck %s", cardID, deckID)
+	return nil
+}
+
+// RemoveAllCopies removes all copies of a card from a deck.
+func (d *DeckFacade) RemoveAllCopies(ctx context.Context, deckID string, cardID int, board string) error {
+	if d.services.Storage == nil {
+		return &AppError{Message: "Database not initialized"}
+	}
+
+	err := storage.RetryOnBusy(func() error {
+		return d.services.Storage.DeckRepo().RemoveAllCopies(ctx, deckID, cardID, board)
+	})
+	if err != nil {
+		return &AppError{Message: fmt.Sprintf("Failed to remove all copies from deck: %v", err)}
+	}
+
+	// Update deck modified timestamp
+	var deck *models.Deck
+	err = storage.RetryOnBusy(func() error {
+		var err error
+		deck, err = d.services.Storage.DeckRepo().GetByID(ctx, deckID)
+		return err
+	})
+	if err == nil && deck != nil {
+		deck.ModifiedAt = time.Now()
+		_ = storage.RetryOnBusy(func() error {
+			return d.services.Storage.DeckRepo().Update(ctx, deck)
+		})
+	}
+
+	log.Printf("Removed all copies of card %d from deck %s", cardID, deckID)
 	return nil
 }
 

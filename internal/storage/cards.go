@@ -11,14 +11,14 @@ import (
 type Set struct {
 	Code            string
 	Name            string
-	ReleasedAt      string
-	CardCount       int
-	SetType         string
-	IconSVGURI      string
-	CachedAt        time.Time
-	LastUpdated     time.Time
-	IsStandardLegal bool    // Whether the set is currently Standard-legal
-	RotationDate    *string // Date when set rotates out of Standard (ISO 8601)
+	ReleasedAt      *string    // Date when set was released (may be NULL for unreleased sets)
+	CardCount       *int       // Number of cards in set (may be NULL)
+	SetType         *string    // Type of set (may be NULL)
+	IconSVGURI      *string    // URL to the set symbol SVG (may be NULL)
+	CachedAt        *time.Time // When set was cached (may be NULL)
+	LastUpdated     *time.Time // When set was last updated (may be NULL)
+	IsStandardLegal bool       // Whether the set is currently Standard-legal
+	RotationDate    *string    // Date when set rotates out of Standard (ISO 8601)
 }
 
 // SaveSet saves or updates a set in the database.

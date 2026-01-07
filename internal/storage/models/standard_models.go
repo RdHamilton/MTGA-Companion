@@ -14,11 +14,11 @@ type StandardConfig struct {
 type StandardSet struct {
 	Code              string  `json:"code"`
 	Name              string  `json:"name"`
-	ReleasedAt        string  `json:"releasedAt"`
+	ReleasedAt        *string `json:"releasedAt,omitempty"`
 	RotationDate      *string `json:"rotationDate,omitempty"`
 	IsStandardLegal   bool    `json:"isStandardLegal"`
-	IconSVGURI        string  `json:"iconSvgUri"`
-	CardCount         int     `json:"cardCount"`
+	IconSVGURI        *string `json:"iconSvgUri,omitempty"`
+	CardCount         *int    `json:"cardCount,omitempty"`
 	DaysUntilRotation *int    `json:"daysUntilRotation,omitempty"`
 	IsRotatingSoon    bool    `json:"isRotatingSoon"` // < 90 days until rotation
 }
