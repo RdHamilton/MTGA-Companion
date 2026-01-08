@@ -965,12 +965,26 @@ var themePatterns = []struct {
 	{"mill", "mill", CategoryTheme, 0.8},
 	{"self-mill", "mill", CategoryTheme, 0.9},
 
-	// Sacrifice themes
+	// Sacrifice themes (aristocrats)
 	{"sacrifice a", "sacrifice", CategoryTheme, 0.9},
 	{"sacrifice another", "sacrifice", CategoryTheme, 0.9},
 	{"sacrificed", "sacrifice", CategoryTheme, 0.8},
 	{"when.*dies", "death triggers", CategoryTheme, 0.8},
 	{"whenever.*dies", "death triggers", CategoryTheme, 0.8},
+	{"whenever another creature you control dies", "death payoff", CategoryTheme, 0.95},
+	{"whenever a creature you control dies", "death payoff", CategoryTheme, 0.9},
+	{"whenever a nontoken creature", "death triggers", CategoryTheme, 0.85},
+	{"sacrifice a token", "token sacrifice", CategoryTheme, 0.9},
+	{"sacrifices a token", "token sacrifice", CategoryTheme, 0.9},
+	{"when you sacrifice", "sacrifice payoff", CategoryTheme, 0.9},
+	{"whenever you sacrifice", "sacrifice payoff", CategoryTheme, 0.9},
+	{"whenever you sacrifice a", "sacrifice payoff", CategoryTheme, 0.9},
+	{"as an additional cost", "sacrifice", CategoryTheme, 0.7},
+	{"blood token", "blood tokens", CategoryTheme, 0.8},
+	{"food token", "food tokens", CategoryTheme, 0.8},
+	{"treasure token", "treasure tokens", CategoryTheme, 0.8},
+	{"clue token", "clue tokens", CategoryTheme, 0.8},
+	{"map token", "map tokens", CategoryTheme, 0.8},
 
 	// Draw/card advantage
 	{"draw a card", "card draw", CategoryTheme, 0.7},
@@ -979,6 +993,13 @@ var themePatterns = []struct {
 	{"draw three", "card draw", CategoryTheme, 0.9},
 	{"scry", "scry", CategoryTheme, 0.6},
 	{"surveil", "surveil", CategoryTheme, 0.7},
+
+	// Second card drawn triggers (e.g., Jolrael, Teferi's Ageless Insight)
+	{"whenever you draw your second card", "second draw", CategoryTheme, 0.9},
+	{"draw your second card", "second draw", CategoryTheme, 0.9},
+	{"draw an additional card", "card advantage", CategoryTheme, 0.8},
+	{"you may draw an additional card", "card advantage", CategoryTheme, 0.8},
+	{"draw two additional cards", "card advantage", CategoryTheme, 0.9},
 
 	// Life themes
 	{"gain life", "lifegain", CategoryTheme, 0.7},
@@ -1012,15 +1033,27 @@ var themePatterns = []struct {
 	{"{t},", "tap abilities", CategoryActivated, 0.7},
 	{"tap:", "tap abilities", CategoryActivated, 0.7},
 
-	// Spell themes
+	// Spell themes (prowess/magecraft)
 	{"instant or sorcery", "spells matter", CategoryTheme, 0.8},
 	{"noncreature spell", "spells matter", CategoryTheme, 0.8},
+	{"whenever you cast a noncreature spell", "spells matter", CategoryTheme, 0.9},
+	{"whenever you cast an instant or sorcery", "spells matter", CategoryTheme, 0.9},
+	{"whenever you cast your first instant or sorcery", "spells matter", CategoryTheme, 0.85},
+	{"magecraft", "spells matter", CategoryTheme, 0.9},
+	{"copy target instant or sorcery", "spell copy", CategoryTheme, 0.8},
+	{"copy that spell", "spell copy", CategoryTheme, 0.8},
 
 	// Artifact/enchantment themes
 	{"artifact you control", "artifacts matter", CategoryTheme, 0.8},
 	{"enchantment you control", "enchantments matter", CategoryTheme, 0.8},
 	{"aura", "auras", CategoryTheme, 0.7},
 	{"equipment", "equipment", CategoryTheme, 0.7},
+	{"whenever an artifact enters", "artifacts ETB", CategoryTheme, 0.85},
+	{"whenever an artifact enters the battlefield", "artifacts ETB", CategoryTheme, 0.9},
+	{"whenever an artifact leaves", "artifacts matter", CategoryTheme, 0.8},
+	{"whenever an artifact or creature you control", "artifacts matter", CategoryTheme, 0.8},
+	{"whenever an enchantment enters", "enchantments ETB", CategoryTheme, 0.85},
+	{"whenever an enchantment enters the battlefield", "enchantments ETB", CategoryTheme, 0.9},
 
 	// Power/toughness manipulation
 	{"gets +", "pump", CategoryTheme, 0.6},
@@ -1033,6 +1066,57 @@ var themePatterns = []struct {
 	{"deals.*damage to", "damage", CategoryTheme, 0.7},
 	{"fight", "fight", CategoryTheme, 0.7},
 	{"bite", "fight", CategoryTheme, 0.7},
+
+	// Discard themes
+	{"discard a card", "discard", CategoryTheme, 0.7},
+	{"discards a card", "discard", CategoryTheme, 0.7},
+	{"whenever you discard", "discard payoff", CategoryTheme, 0.85},
+	{"whenever a player discards", "discard payoff", CategoryTheme, 0.8},
+	{"discard your hand", "discard", CategoryTheme, 0.8},
+	{"discarded this turn", "discard payoff", CategoryTheme, 0.8},
+
+	// Blink/flicker
+	{"exile.*then return", "blink", CategoryTheme, 0.9},
+	{"exile target creature you control, then return", "blink", CategoryTheme, 0.9},
+	{"exile it, then return", "blink", CategoryTheme, 0.85},
+	{"exile up to one", "blink", CategoryTheme, 0.8},
+
+	// Creature-specific themes
+	{"whenever a creature you control attacks", "go wide", CategoryTheme, 0.85},
+	{"whenever one or more creatures you control", "go wide", CategoryTheme, 0.8},
+	{"creatures you control get", "anthem", CategoryTheme, 0.9},
+	{"other creatures you control get", "anthem", CategoryTheme, 0.9},
+	{"creatures you control have", "anthem", CategoryTheme, 0.85},
+
+	// Landfall
+	{"whenever a land enters the battlefield under your control", "landfall", CategoryTheme, 0.9},
+	{"landfall", "landfall", CategoryTheme, 0.9},
+
+	// Mana themes
+	{"add one mana", "mana ramp", CategoryTheme, 0.6},
+	{"add two mana", "mana ramp", CategoryTheme, 0.7},
+	{"search your library for a.*land", "land ramp", CategoryTheme, 0.8},
+	{"search your library for a basic land", "land ramp", CategoryTheme, 0.8},
+
+	// Historic (legendary/artifact/saga)
+	{"historic", "historic", CategoryTheme, 0.7},
+	{"legendary", "legends matter", CategoryTheme, 0.6},
+	{"whenever you cast a legendary", "legends matter", CategoryTheme, 0.85},
+
+	// Type-specific triggers
+	{"whenever another.*enters", "type ETB", CategoryTheme, 0.75},
+	{"for each creature you control", "go wide", CategoryTheme, 0.85},
+	{"equal to the number of creatures you control", "go wide", CategoryTheme, 0.85},
+
+	// Protection/control
+	{"can't be countered", "uncounterable", CategoryTheme, 0.7},
+	{"this spell can't be countered", "uncounterable", CategoryTheme, 0.7},
+	{"counter target spell", "control", CategoryTheme, 0.8},
+	{"return target", "bounce", CategoryTheme, 0.7},
+
+	// Energy
+	{"energy counter", "energy", CategoryTheme, 0.9},
+	{"{e}", "energy", CategoryTheme, 0.9},
 }
 
 // extractKeywordsFromText extracts keywords from card text using sophisticated pattern matching.
