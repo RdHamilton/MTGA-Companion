@@ -85,7 +85,7 @@ export async function getRecentChanges(limit?: number): Promise<CollectionChange
  * Get missing cards for a set.
  */
 export async function getMissingCardsForSet(setCode: string): Promise<CollectionCard[]> {
-  return get<CollectionCard[]>(`/collection/sets/${setCode}/missing`);
+  return get<CollectionCard[]>(`/collection/missing/${setCode}`);
 }
 
 /**

@@ -116,7 +116,8 @@ describe('cards API', () => {
 
       const result = await cards.getColorRatings('MKM', 'PremierDraft');
 
-      expect(get).toHaveBeenCalledWith('/cards/color-ratings/MKM/PremierDraft');
+      // Backend route is /cards/ratings/{setCode}/colors (format param not used in path)
+      expect(get).toHaveBeenCalledWith('/cards/ratings/MKM/colors');
       expect(result).toEqual(mockRatings);
     });
   });

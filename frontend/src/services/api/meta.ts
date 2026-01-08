@@ -62,7 +62,7 @@ export async function identifyArchetype(
  */
 export async function getTierArchetypes(format: string, tier: number): Promise<gui.ArchetypeInfo[]> {
   const params = new URLSearchParams({ format, tier: tier.toString() });
-  return get<gui.ArchetypeInfo[]>(`/meta/archetypes/tier?${params.toString()}`);
+  return get<gui.ArchetypeInfo[]>(`/meta/tier?${params.toString()}`);
 }
 
 /**
