@@ -267,8 +267,10 @@ func TestAnalyzeDeckPackages_PartialPackage(t *testing.T) {
 
 	analyses := AnalyzeDeckPackages(deckCards)
 
+	foundAristocrats := false
 	for _, analysis := range analyses {
 		if analysis.Package.Name == "Aristocrats" {
+			foundAristocrats = true
 			// Should have missing roles
 			if len(analysis.MissingRoles) == 0 {
 				t.Error("Expected Aristocrats to have missing roles")
@@ -277,8 +279,11 @@ func TestAnalyzeDeckPackages_PartialPackage(t *testing.T) {
 			if analysis.Completeness >= 1.0 {
 				t.Errorf("Expected Aristocrats completeness < 1.0, got %.2f", analysis.Completeness)
 			}
-			return
+			break
 		}
+	}
+	if !foundAristocrats {
+		t.Error("Expected to find Aristocrats package in analysis")
 	}
 }
 
@@ -349,14 +354,19 @@ func TestGetMissingRoleSuggestion(t *testing.T) {
 
 	analyses := AnalyzeDeckPackages(deckCards)
 
+	foundQualifying := false
 	for _, analysis := range analyses {
 		if analysis.Package.Name == "Aristocrats" && analysis.Completeness >= 0.5 {
+			foundQualifying = true
 			suggestion := GetMissingRoleSuggestion(&analysis)
 			if suggestion == "" {
 				t.Error("Expected suggestion for partially complete package")
 			}
-			return
+			break
 		}
+	}
+	if !foundQualifying {
+		t.Error("Expected to find Aristocrats package with completeness >= 0.5")
 	}
 }
 
