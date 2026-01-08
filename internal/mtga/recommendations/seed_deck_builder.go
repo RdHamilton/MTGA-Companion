@@ -1245,7 +1245,7 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeckDetailed(card *cards.Card, deckAna
 		}
 	}
 
-	// Creature type synergy (tribal)
+	// Creature type synergy (tribal) - count ALL matching types for multi-type creatures
 	if containsTypeInTypeLine(card.TypeLine, "Creature") && len(deckAnalysis.CreatureTypes) > 0 {
 		cardCreatureTypes := extractCreatureTypesFromLine(card.TypeLine)
 		for cardType := range cardCreatureTypes {
@@ -1257,7 +1257,7 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeckDetailed(card *cards.Card, deckAna
 					Name:        cardType,
 					Description: fmt.Sprintf("%s tribal - matches %d cards in deck", cardType, count),
 				})
-				break
+				// No break - continue checking all creature types for multi-type synergy
 			}
 		}
 	}

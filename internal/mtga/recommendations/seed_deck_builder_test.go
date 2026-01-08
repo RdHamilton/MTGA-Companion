@@ -976,3 +976,106 @@ func TestCalculateKeywordSynergyDetailed_EmptyKeywords(t *testing.T) {
 		t.Errorf("expected empty matched keywords, got %v", matchedKeywords)
 	}
 }
+
+func TestScoreSynergyWithDeckDetailed_MultiTypeCreature(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	// Multi-type creature: Cat Warrior
+	card := &cards.Card{
+		ArenaID:  12345,
+		Name:     "Cat Warrior",
+		TypeLine: "Creature — Cat Warrior",
+	}
+
+	// Deck has both Cat and Warrior creatures
+	deckAnalysis := &CollectiveDeckAnalysis{
+		Colors:   map[string]int{"G": 10},
+		Keywords: nil,
+		Themes:   map[string]int{},
+		CreatureTypes: map[string]int{
+			"Cat":     3, // 3 cats in deck
+			"Warrior": 2, // 2 warriors in deck
+		},
+		ManaCurve:  map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards: 24,
+	}
+
+	score, details := builder.scoreSynergyWithDeckDetailed(card, deckAnalysis)
+
+	// Score should be higher than neutral (0.5) due to tribal synergies
+	if score <= 0.5 {
+		t.Errorf("expected score > 0.5 for multi-type tribal synergy, got %.2f", score)
+	}
+
+	// Should have TWO creature type synergy details - one for Cat, one for Warrior
+	creatureTypeDetails := 0
+	foundCat := false
+	foundWarrior := false
+	for _, detail := range details {
+		if detail.Type == "creature_type" {
+			creatureTypeDetails++
+			if detail.Name == "Cat" {
+				foundCat = true
+			}
+			if detail.Name == "Warrior" {
+				foundWarrior = true
+			}
+		}
+	}
+
+	if creatureTypeDetails != 2 {
+		t.Errorf("expected 2 creature type synergy details for multi-type creature, got %d", creatureTypeDetails)
+	}
+
+	if !foundCat {
+		t.Error("expected Cat tribal synergy detail")
+	}
+
+	if !foundWarrior {
+		t.Error("expected Warrior tribal synergy detail")
+	}
+}
+
+func TestScoreSynergyWithDeckDetailed_SingleTypeCreature(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	// Single-type creature: Cat only
+	card := &cards.Card{
+		ArenaID:  12345,
+		Name:     "Savannah Lions",
+		TypeLine: "Creature — Cat",
+	}
+
+	// Deck has both Cat and Warrior creatures
+	deckAnalysis := &CollectiveDeckAnalysis{
+		Colors:   map[string]int{"W": 10},
+		Keywords: nil,
+		Themes:   map[string]int{},
+		CreatureTypes: map[string]int{
+			"Cat":     3, // 3 cats in deck
+			"Warrior": 2, // 2 warriors in deck
+		},
+		ManaCurve:  map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards: 24,
+	}
+
+	score, details := builder.scoreSynergyWithDeckDetailed(card, deckAnalysis)
+
+	// Score should be higher than neutral (0.5) due to Cat synergy
+	if score <= 0.5 {
+		t.Errorf("expected score > 0.5 for Cat tribal synergy, got %.2f", score)
+	}
+
+	// Should have exactly ONE creature type synergy detail (Cat only)
+	creatureTypeDetails := 0
+	for _, detail := range details {
+		if detail.Type == "creature_type" {
+			creatureTypeDetails++
+			if detail.Name != "Cat" {
+				t.Errorf("expected Cat synergy detail, got %s", detail.Name)
+			}
+		}
+	}
+
+	if creatureTypeDetails != 1 {
+		t.Errorf("expected 1 creature type synergy detail for single-type creature, got %d", creatureTypeDetails)
+	}
+}
