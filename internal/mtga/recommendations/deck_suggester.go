@@ -148,8 +148,8 @@ type scoredCard struct {
 	card           *cards.Card
 	score          float64
 	reasoning      string
-	scoreBreakdown *ScoreBreakdown  // Used by Build Around, nil in draft suggestions
-	synergyDetails []SynergyDetail  // Used by Build Around, nil in draft suggestions
+	scoreBreakdown *ScoreBreakdown // Used by Build Around, nil in draft suggestions
+	synergyDetails []SynergyDetail // Used by Build Around, nil in draft suggestions
 }
 
 // SuggestDecks generates all viable deck suggestions for a draft pool.
