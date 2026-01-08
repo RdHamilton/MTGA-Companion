@@ -238,7 +238,7 @@ export async function getDeckPerformance(deckId: string): Promise<DeckPerformanc
  * Validate a draft deck.
  */
 export async function validateDraftDeck(deckId: string): Promise<boolean> {
-  const result = await post<{ valid: boolean }>(`/decks/${deckId}/validate`);
+  const result = await get<{ valid: boolean }>(`/decks/${deckId}/validate-draft`);
   return result.valid;
 }
 
@@ -246,7 +246,7 @@ export async function validateDraftDeck(deckId: string): Promise<boolean> {
  * Apply a suggested deck to an existing deck.
  */
 export async function applySuggestedDeck(deckId: string, suggestion: SuggestedDeckResponse): Promise<void> {
-  await post(`/decks/${deckId}/apply-suggestion`, suggestion);
+  await post(`/decks/apply-suggestion`, { deck_id: deckId, suggestion });
 }
 
 /**
