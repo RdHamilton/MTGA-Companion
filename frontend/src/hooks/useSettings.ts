@@ -18,6 +18,9 @@ interface SettingsState {
   metaTop8Enabled: boolean;
   metaWeight: number;
   personalWeight: number;
+  // Rotation Settings
+  rotationNotificationsEnabled: boolean;
+  rotationNotificationThreshold: number; // Days before rotation to notify
   // State
   isLoading: boolean;
   isSaving: boolean;
@@ -38,6 +41,9 @@ interface UseSettingsReturn extends SettingsState {
   setMetaTop8Enabled: (value: boolean) => void;
   setMetaWeight: (value: number) => void;
   setPersonalWeight: (value: number) => void;
+  // Rotation Settings setters
+  setRotationNotificationsEnabled: (value: boolean) => void;
+  setRotationNotificationThreshold: (value: number) => void;
   // Actions
   saveSettings: () => Promise<boolean>;
   resetToDefaults: () => void;
@@ -60,6 +66,9 @@ const defaultSettings: Omit<SettingsState, 'isLoading' | 'isSaving' | 'error'> =
   metaTop8Enabled: true,
   metaWeight: 0.3,
   personalWeight: 0.2,
+  // Rotation defaults
+  rotationNotificationsEnabled: true,
+  rotationNotificationThreshold: 30, // Notify 30 days before rotation
 };
 
 export function useSettings(): UseSettingsReturn {
@@ -92,6 +101,11 @@ export function useSettings(): UseSettingsReturn {
           metaTop8Enabled: backendSettings.metaTop8Enabled ?? defaultSettings.metaTop8Enabled,
           metaWeight: backendSettings.metaWeight ?? defaultSettings.metaWeight,
           personalWeight: backendSettings.personalWeight ?? defaultSettings.personalWeight,
+          // Rotation settings
+          rotationNotificationsEnabled:
+            backendSettings.rotationNotificationsEnabled ?? defaultSettings.rotationNotificationsEnabled,
+          rotationNotificationThreshold:
+            backendSettings.rotationNotificationThreshold ?? defaultSettings.rotationNotificationThreshold,
           isLoading: false,
           isSaving: false,
           error: null,
@@ -161,6 +175,15 @@ export function useSettings(): UseSettingsReturn {
     setSettings((prev) => ({ ...prev, personalWeight: value }));
   }, []);
 
+  // Rotation setters
+  const setRotationNotificationsEnabled = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, rotationNotificationsEnabled: value }));
+  }, []);
+
+  const setRotationNotificationThreshold = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, rotationNotificationThreshold: value }));
+  }, []);
+
   // Save settings to backend
   const saveSettings = useCallback(async (): Promise<boolean> => {
     try {
@@ -181,6 +204,9 @@ export function useSettings(): UseSettingsReturn {
         metaTop8Enabled: settings.metaTop8Enabled,
         metaWeight: settings.metaWeight,
         personalWeight: settings.personalWeight,
+        // Rotation settings
+        rotationNotificationsEnabled: settings.rotationNotificationsEnabled,
+        rotationNotificationThreshold: settings.rotationNotificationThreshold,
       };
       await settingsApi.updateSettings(settingsToSave);
       setSettings((prev) => ({ ...prev, isSaving: false }));
@@ -219,6 +245,9 @@ export function useSettings(): UseSettingsReturn {
     setMetaTop8Enabled,
     setMetaWeight,
     setPersonalWeight,
+    // Rotation setters
+    setRotationNotificationsEnabled,
+    setRotationNotificationThreshold,
     // Actions
     saveSettings,
     resetToDefaults,

@@ -599,17 +599,29 @@ func (d *DraftFacade) GetDraftGrade(ctx context.Context, sessionID string) (*gra
 		return nil, nil
 	}
 
-	// Return stored grade
-	return &grading.DraftGrade{
-		OverallGrade:         *session.OverallGrade,
-		OverallScore:         *session.OverallScore,
-		PickQualityScore:     *session.PickQualityScore,
-		ColorDisciplineScore: *session.ColorDisciplineScore,
-		DeckCompositionScore: *session.DeckCompositionScore,
-		StrategicScore:       *session.StrategicScore,
-		// Best/worst picks and suggestions would need to be recalculated
-		// or stored separately - for now just return the scores
-	}, nil
+	// Build grade with nil checks for optional fields
+	grade := &grading.DraftGrade{
+		OverallGrade: *session.OverallGrade,
+	}
+
+	// Safely set optional score fields
+	if session.OverallScore != nil {
+		grade.OverallScore = *session.OverallScore
+	}
+	if session.PickQualityScore != nil {
+		grade.PickQualityScore = *session.PickQualityScore
+	}
+	if session.ColorDisciplineScore != nil {
+		grade.ColorDisciplineScore = *session.ColorDisciplineScore
+	}
+	if session.DeckCompositionScore != nil {
+		grade.DeckCompositionScore = *session.DeckCompositionScore
+	}
+	if session.StrategicScore != nil {
+		grade.StrategicScore = *session.StrategicScore
+	}
+
+	return grade, nil
 }
 
 // PredictDraftWinRate calculates and stores the win rate prediction for a draft session

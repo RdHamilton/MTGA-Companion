@@ -12,6 +12,10 @@ describe('AppPreferencesSection', () => {
     onShowNotificationsChange: vi.fn(),
     theme: 'dark',
     onThemeChange: vi.fn(),
+    rotationNotificationsEnabled: true,
+    onRotationNotificationsEnabledChange: vi.fn(),
+    rotationNotificationThreshold: 30,
+    onRotationNotificationThresholdChange: vi.fn(),
   };
 
   it('renders section title', () => {
@@ -27,16 +31,16 @@ describe('AppPreferencesSection', () => {
 
     it('displays current theme value', () => {
       render(<AppPreferencesSection {...defaultProps} theme="dark" />);
-      const select = screen.getByRole('combobox');
-      expect(select).toHaveValue('dark');
+      const selects = screen.getAllByRole('combobox');
+      expect(selects[0]).toHaveValue('dark');
     });
 
     it('calls onThemeChange when theme changes', () => {
       const onThemeChange = vi.fn();
       render(<AppPreferencesSection {...defaultProps} onThemeChange={onThemeChange} />);
 
-      const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'light' } });
+      const selects = screen.getAllByRole('combobox');
+      fireEvent.change(selects[0], { target: { value: 'light' } });
 
       expect(onThemeChange).toHaveBeenCalledWith('light');
     });
@@ -143,6 +147,92 @@ describe('AppPreferencesSection', () => {
       fireEvent.click(checkbox);
 
       expect(onShowNotificationsChange).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('rotation notifications', () => {
+    it('renders rotation notifications subsection', () => {
+      render(<AppPreferencesSection {...defaultProps} />);
+      expect(screen.getByText('Standard Rotation')).toBeInTheDocument();
+    });
+
+    it('renders rotation notifications toggle', () => {
+      render(<AppPreferencesSection {...defaultProps} />);
+      expect(screen.getByText('Rotation notifications')).toBeInTheDocument();
+    });
+
+    it('shows toggle as checked when rotationNotificationsEnabled is true', () => {
+      render(<AppPreferencesSection {...defaultProps} rotationNotificationsEnabled={true} />);
+      const checkbox = screen.getAllByRole('checkbox')[2];
+      expect(checkbox).toBeChecked();
+    });
+
+    it('shows toggle as unchecked when rotationNotificationsEnabled is false', () => {
+      render(<AppPreferencesSection {...defaultProps} rotationNotificationsEnabled={false} />);
+      const checkbox = screen.getAllByRole('checkbox')[2];
+      expect(checkbox).not.toBeChecked();
+    });
+
+    it('calls onRotationNotificationsEnabledChange when toggled', () => {
+      const onRotationNotificationsEnabledChange = vi.fn();
+      render(
+        <AppPreferencesSection
+          {...defaultProps}
+          rotationNotificationsEnabled={true}
+          onRotationNotificationsEnabledChange={onRotationNotificationsEnabledChange}
+        />
+      );
+
+      const checkbox = screen.getAllByRole('checkbox')[2];
+      fireEvent.click(checkbox);
+
+      expect(onRotationNotificationsEnabledChange).toHaveBeenCalledWith(false);
+    });
+
+    it('does not show notification timing when rotationNotificationsEnabled is false', () => {
+      render(<AppPreferencesSection {...defaultProps} rotationNotificationsEnabled={false} />);
+      expect(screen.queryByText('Notification timing')).not.toBeInTheDocument();
+    });
+
+    it('shows notification timing when rotationNotificationsEnabled is true', () => {
+      render(<AppPreferencesSection {...defaultProps} rotationNotificationsEnabled={true} />);
+      expect(screen.getByText('Notification timing')).toBeInTheDocument();
+    });
+
+    it('displays current threshold value', () => {
+      render(
+        <AppPreferencesSection
+          {...defaultProps}
+          rotationNotificationsEnabled={true}
+          rotationNotificationThreshold={60}
+        />
+      );
+      const selects = screen.getAllByRole('combobox');
+      expect(selects[1]).toHaveValue('60');
+    });
+
+    it('calls onRotationNotificationThresholdChange when changed', () => {
+      const onRotationNotificationThresholdChange = vi.fn();
+      render(
+        <AppPreferencesSection
+          {...defaultProps}
+          rotationNotificationsEnabled={true}
+          onRotationNotificationThresholdChange={onRotationNotificationThresholdChange}
+        />
+      );
+
+      const selects = screen.getAllByRole('combobox');
+      fireEvent.change(selects[1], { target: { value: '90' } });
+
+      expect(onRotationNotificationThresholdChange).toHaveBeenCalledWith(90);
+    });
+
+    it('has all threshold options', () => {
+      render(<AppPreferencesSection {...defaultProps} rotationNotificationsEnabled={true} />);
+      expect(screen.getByText('7 days before rotation')).toBeInTheDocument();
+      expect(screen.getByText('30 days before rotation')).toBeInTheDocument();
+      expect(screen.getByText('60 days before rotation')).toBeInTheDocument();
+      expect(screen.getByText('90 days before rotation')).toBeInTheDocument();
     });
   });
 });

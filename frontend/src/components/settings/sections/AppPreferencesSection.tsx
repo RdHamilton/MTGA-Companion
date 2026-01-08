@@ -9,6 +9,11 @@ export interface AppPreferencesSectionProps {
   onShowNotificationsChange: (value: boolean) => void;
   theme: string;
   onThemeChange: (value: string) => void;
+  // Rotation settings
+  rotationNotificationsEnabled: boolean;
+  onRotationNotificationsEnabledChange: (value: boolean) => void;
+  rotationNotificationThreshold: number;
+  onRotationNotificationThresholdChange: (value: number) => void;
 }
 
 export function AppPreferencesSection({
@@ -20,6 +25,10 @@ export function AppPreferencesSection({
   onShowNotificationsChange,
   theme,
   onThemeChange,
+  rotationNotificationsEnabled,
+  onRotationNotificationsEnabledChange,
+  rotationNotificationThreshold,
+  onRotationNotificationThresholdChange,
 }: AppPreferencesSectionProps) {
   return (
     <div className="settings-section">
@@ -68,6 +77,30 @@ export function AppPreferencesSection({
         checked={showNotifications}
         onChange={onShowNotificationsChange}
       />
+
+      <h3 className="subsection-title">Standard Rotation</h3>
+
+      <SettingToggle
+        label="Rotation notifications"
+        description="Get notified when your Standard decks have cards rotating out"
+        checked={rotationNotificationsEnabled}
+        onChange={onRotationNotificationsEnabledChange}
+      />
+
+      {rotationNotificationsEnabled && (
+        <SettingSelect
+          label="Notification timing"
+          description="When to start showing rotation warnings"
+          value={rotationNotificationThreshold.toString()}
+          onChange={(value) => onRotationNotificationThresholdChange(parseInt(value))}
+          options={[
+            { value: '7', label: '7 days before rotation' },
+            { value: '30', label: '30 days before rotation' },
+            { value: '60', label: '60 days before rotation' },
+            { value: '90', label: '90 days before rotation' },
+          ]}
+        />
+      )}
     </div>
   );
 }

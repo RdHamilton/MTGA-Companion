@@ -48,7 +48,9 @@ export namespace gui {
 	    metaTop8Enabled: boolean;
 	    metaWeight: number;
 	    personalWeight: number;
-	
+	    rotationNotificationsEnabled: boolean;
+	    rotationNotificationThreshold: number;
+
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
 	    }
@@ -69,6 +71,8 @@ export namespace gui {
 	        this.metaTop8Enabled = source["metaTop8Enabled"];
 	        this.metaWeight = source["metaWeight"];
 	        this.personalWeight = source["personalWeight"];
+	        this.rotationNotificationsEnabled = source["rotationNotificationsEnabled"];
+	        this.rotationNotificationThreshold = source["rotationNotificationThreshold"];
 	    }
 	}
 	export class DeckArchetypeAnalysis {
