@@ -37,6 +37,10 @@ func TestNewHub(t *testing.T) {
 	if hub.done == nil {
 		t.Error("Hub done channel is nil")
 	}
+
+	if hub.stopped {
+		t.Error("Hub should not be stopped initially")
+	}
 }
 
 func TestHub_ClientCount(t *testing.T) {
@@ -351,6 +355,47 @@ func TestHub_Stop_Idempotent(t *testing.T) {
 		t.Fatal("Hub did not stop within timeout")
 	}
 
-	// Note: Calling Stop() twice would panic (closing a closed channel)
-	// This is acceptable behavior - callers should only call Stop() once
+	// Calling Stop() multiple times should not panic (idempotent)
+	hub.Stop()
+	hub.Stop()
+	hub.Stop()
+}
+
+func TestHub_IsStopped(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	if hub.IsStopped() {
+		t.Error("Expected IsStopped() to be false before Stop()")
+	}
+
+	hub.Stop()
+
+	// Give time for stop to propagate
+	time.Sleep(50 * time.Millisecond)
+
+	if !hub.IsStopped() {
+		t.Error("Expected IsStopped() to be true after Stop()")
+	}
+}
+
+func TestHub_BroadcastEvent_AfterStop(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	hub.Stop()
+
+	// Give time for stop to propagate
+	time.Sleep(50 * time.Millisecond)
+
+	// BroadcastEvent should return false after stop
+	event := Event{
+		Type: "test:event",
+		Data: map[string]interface{}{"key": "value"},
+	}
+
+	result := hub.BroadcastEvent(event)
+	if result {
+		t.Error("Expected BroadcastEvent to return false after Stop()")
+	}
 }

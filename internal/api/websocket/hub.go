@@ -64,6 +64,12 @@ type Hub struct {
 	// Signal to stop the hub.
 	done chan struct{}
 
+	// Ensures Stop() is idempotent.
+	stopOnce sync.Once
+
+	// Indicates hub has been stopped.
+	stopped bool
+
 	// Mutex for thread-safe client operations.
 	mu sync.RWMutex
 }
@@ -86,10 +92,12 @@ func (h *Hub) Run() {
 		case <-h.done:
 			// Clean up all clients before exiting
 			h.mu.Lock()
+			h.stopped = true
 			for client := range h.clients {
+				// Delete from map first to prevent other paths from accessing
+				delete(h.clients, client)
 				close(client.send)
 			}
-			h.clients = make(map[*Client]bool)
 			h.mu.Unlock()
 			log.Println("WebSocket hub stopped")
 			return
@@ -129,14 +137,29 @@ func (h *Hub) Run() {
 }
 
 // BroadcastEvent broadcasts an event to all connected clients.
-func (h *Hub) BroadcastEvent(event Event) {
+// Returns false if the hub has been stopped.
+func (h *Hub) BroadcastEvent(event Event) bool {
+	h.mu.RLock()
+	stopped := h.stopped
+	h.mu.RUnlock()
+
+	if stopped {
+		return false
+	}
+
 	data, err := json.Marshal(event)
 	if err != nil {
 		log.Printf("Error marshaling WebSocket event: %v", err)
-		return
+		return false
 	}
 
-	h.broadcast <- data
+	// Use non-blocking send to avoid blocking if hub is stopping
+	select {
+	case h.broadcast <- data:
+		return true
+	case <-h.done:
+		return false
+	}
 }
 
 // ClientCount returns the number of connected clients.
@@ -147,12 +170,32 @@ func (h *Hub) ClientCount() int {
 }
 
 // Stop gracefully stops the hub and cleans up all client connections.
+// Safe to call multiple times - subsequent calls are no-ops.
 func (h *Hub) Stop() {
-	close(h.done)
+	h.stopOnce.Do(func() {
+		close(h.done)
+	})
+}
+
+// IsStopped returns true if the hub has been stopped.
+func (h *Hub) IsStopped() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.stopped
 }
 
 // ServeWs handles WebSocket requests from clients.
+// Returns immediately if the hub has been stopped.
 func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
+	h.mu.RLock()
+	stopped := h.stopped
+	h.mu.RUnlock()
+
+	if stopped {
+		http.Error(w, "WebSocket hub is not running", http.StatusServiceUnavailable)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
@@ -164,17 +207,30 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 		conn: conn,
 		send: make(chan []byte, 256),
 	}
-	h.register <- client
 
-	// Start goroutines for reading and writing
-	go client.writePump()
-	go client.readPump()
+	// Use non-blocking send to avoid blocking if hub stops during registration
+	select {
+	case h.register <- client:
+		// Start goroutines for reading and writing
+		go client.writePump()
+		go client.readPump()
+	case <-h.done:
+		// Hub stopped, close connection
+		if err := conn.Close(); err != nil {
+			log.Printf("WebSocket close error: %v", err)
+		}
+	}
 }
 
 // readPump pumps messages from the WebSocket connection to the hub.
 func (c *Client) readPump() {
 	defer func() {
-		c.hub.unregister <- c
+		// Use non-blocking send to avoid blocking if hub has stopped
+		select {
+		case c.hub.unregister <- c:
+		case <-c.hub.done:
+			// Hub already stopped, client cleanup handled there
+		}
 		if err := c.conn.Close(); err != nil {
 			log.Printf("WebSocket close error: %v", err)
 		}
