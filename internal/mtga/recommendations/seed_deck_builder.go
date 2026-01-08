@@ -554,47 +554,65 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeedDetailed(card *cards.Card, seedAna
 		}
 		isCardChangeling := IsChangeling(cardOracleText)
 
-		for cardType := range cardCreatureTypes {
+		// If changeling, card matches ALL seed creature types
+		if isCardChangeling {
 			for _, seedType := range seedAnalysis.CreatureTypes {
-				if cardType == seedType || isCardChangeling {
-					// Get tribal weight multiplier from database
-					tribalWeight := GetTribalSynergyWeight(seedType)
-					baseSynergy := 0.8 * tribalWeight
+				tribalWeight := GetTribalSynergyWeight(seedType)
+				baseSynergy := 0.8 * tribalWeight
+				synergy += baseSynergy
+				synergyCount++
+				details = append(details, SynergyDetail{
+					Type:        "creature_type",
+					Name:        seedType,
+					Description: fmt.Sprintf("Changeling - counts as %s", seedType),
+				})
+			}
+		} else {
+			// Normal creature type matching
+			for cardType := range cardCreatureTypes {
+				for _, seedType := range seedAnalysis.CreatureTypes {
+					if cardType == seedType {
+						// Get tribal weight multiplier from database
+						tribalWeight := GetTribalSynergyWeight(seedType)
+						baseSynergy := 0.8 * tribalWeight
 
-					synergy += baseSynergy
-					synergyCount++
+						synergy += baseSynergy
+						synergyCount++
 
-					description := fmt.Sprintf("%s tribal synergy", seedType)
-					if IsStrongTribalSupport(seedType) {
-						description = fmt.Sprintf("%s tribal synergy (strong support)", seedType)
+						description := fmt.Sprintf("%s tribal synergy", seedType)
+						if IsStrongTribalSupport(seedType) {
+							description = fmt.Sprintf("%s tribal synergy (strong support)", seedType)
+						}
+
+						details = append(details, SynergyDetail{
+							Type:        "creature_type",
+							Name:        seedType,
+							Description: description,
+						})
+						break
 					}
-					if isCardChangeling && cardType != seedType {
-						description = fmt.Sprintf("Changeling - counts as %s", seedType)
-					}
-
-					details = append(details, SynergyDetail{
-						Type:        "creature_type",
-						Name:        seedType,
-						Description: description,
-					})
-					break
 				}
 			}
 		}
 
 		// Check for related creature types (e.g., Druid synergizes with Elf)
-		for cardType := range cardCreatureTypes {
-			for _, seedType := range seedAnalysis.CreatureTypes {
-				relatedTypes := GetRelatedTypes(seedType)
-				for _, related := range relatedTypes {
-					if cardType == related {
-						synergy += 0.5 // Weaker synergy for related types
-						synergyCount++
-						details = append(details, SynergyDetail{
-							Type:        "creature_type",
-							Name:        cardType,
-							Description: fmt.Sprintf("%s synergizes with %s tribe", cardType, seedType),
-						})
+		if !isCardChangeling {
+			for cardType := range cardCreatureTypes {
+				for _, seedType := range seedAnalysis.CreatureTypes {
+					if cardType == seedType {
+						continue // Already handled above
+					}
+					relatedTypes := GetRelatedTypes(seedType)
+					for _, related := range relatedTypes {
+						if cardType == related {
+							synergy += 0.5 // Weaker synergy for related types
+							synergyCount++
+							details = append(details, SynergyDetail{
+								Type:        "creature_type",
+								Name:        cardType,
+								Description: fmt.Sprintf("%s synergizes with %s tribe", cardType, seedType),
+							})
+						}
 					}
 				}
 			}
