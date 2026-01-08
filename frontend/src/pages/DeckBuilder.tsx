@@ -12,6 +12,8 @@ import RecommendationCard from '../components/RecommendationCard';
 import SuggestDecksModal from '../components/SuggestDecksModal';
 import BuildAroundSeedModal from '../components/BuildAroundSeedModal';
 import LegalityBanner from '../components/LegalityBanner';
+import DeckNotesPanel from '../components/DeckNotesPanel';
+import ImprovementSuggestionsPanel from '../components/ImprovementSuggestionsPanel';
 import './DeckBuilder.css';
 
 // Export deck to file using native file save dialog
@@ -41,6 +43,8 @@ export default function DeckBuilder() {
   const [showSuggestDecks, setShowSuggestDecks] = useState(false);
   const [showBuildAround, setShowBuildAround] = useState(false);
   const [showLegalityBanner, setShowLegalityBanner] = useState(true);
+  const [showNotesPanel, setShowNotesPanel] = useState(false);
+  const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
 
   // Deck validation for legality checking
   const {
@@ -836,6 +840,26 @@ export default function DeckBuilder() {
             )}
           </div>
         )}
+
+        {/* Notes Panel (toggleable) */}
+        {showNotesPanel && (
+          <div className="notes-panel-container">
+            <DeckNotesPanel
+              deckId={deck.ID}
+              onClose={() => setShowNotesPanel(false)}
+            />
+          </div>
+        )}
+
+        {/* Improvement Suggestions Panel (toggleable) */}
+        {showSuggestionsPanel && (
+          <div className="suggestions-panel-container">
+            <ImprovementSuggestionsPanel
+              deckId={deck.ID}
+              onClose={() => setShowSuggestionsPanel(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Quick Actions Footer */}
@@ -871,6 +895,20 @@ export default function DeckBuilder() {
           </button>
           <button className="action-button" title="Validate deck" onClick={handleValidateDeck}>
             ✓ Validate
+          </button>
+          <button
+            className={`action-button ${showNotesPanel ? 'active' : ''}`}
+            title="View and add notes for this deck"
+            onClick={() => setShowNotesPanel(!showNotesPanel)}
+          >
+            Notes
+          </button>
+          <button
+            className={`action-button ${showSuggestionsPanel ? 'active' : ''}`}
+            title="View improvement suggestions based on your play patterns"
+            onClick={() => setShowSuggestionsPanel(!showSuggestionsPanel)}
+          >
+            Insights
           </button>
           {deck.Source === 'draft' && deck.DraftEventID && (
             <button

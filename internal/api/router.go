@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/handlers"
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/analysis"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
@@ -262,6 +263,39 @@ func (s *Server) setupRoutes() {
 			r.Post("/models/pull", llmHandler.PullModel)
 			r.Post("/test", llmHandler.TestGeneration)
 		})
+
+		// Notes and Suggestions routes
+		if s.services != nil && s.services.Storage != nil {
+			notesRepo := s.services.Storage.NewNotesRepo()
+			suggRepo := s.services.Storage.NewSuggestionRepo()
+			playRepo := s.services.Storage.NewGamePlayRepo()
+			matchRepo := s.services.Storage.NewMatchRepo()
+			playAnalyzer := analysis.NewPlayAnalyzer(playRepo, matchRepo)
+			suggGenerator := analysis.NewSuggestionGenerator(playAnalyzer, suggRepo)
+			notesHandler := handlers.NewNotesHandler(notesRepo, suggRepo, suggGenerator)
+
+			// Deck notes routes
+			r.Route("/decks/{deckID}/notes", func(r chi.Router) {
+				r.Get("/", notesHandler.GetDeckNotes)
+				r.Post("/", notesHandler.CreateDeckNote)
+				r.Get("/{noteID}", notesHandler.GetDeckNote)
+				r.Put("/{noteID}", notesHandler.UpdateDeckNote)
+				r.Delete("/{noteID}", notesHandler.DeleteDeckNote)
+			})
+
+			// Deck suggestions routes
+			r.Route("/decks/{deckID}/suggestions", func(r chi.Router) {
+				r.Get("/", notesHandler.GetDeckSuggestions)
+				r.Post("/generate", notesHandler.GenerateSuggestions)
+			})
+
+			// Match notes routes
+			r.Get("/matches/{matchID}/notes", notesHandler.GetMatchNotes)
+			r.Put("/matches/{matchID}/notes", notesHandler.UpdateMatchNotes)
+
+			// Suggestion dismiss route
+			r.Put("/suggestions/{suggestionID}/dismiss", notesHandler.DismissSuggestion)
+		}
 	})
 }
 

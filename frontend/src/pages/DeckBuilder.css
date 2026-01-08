@@ -462,3 +462,19 @@
 .recommendations-list::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Notes and Suggestions Panel Containers */
+.notes-panel-container,
+.suggestions-panel-container {
+  flex: 0 0 350px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+@media (max-width: 1200px) {
+  .notes-panel-container,
+  .suggestions-panel-container {
+    flex: 1 1 100%;
+    max-height: none;
+  }
+}

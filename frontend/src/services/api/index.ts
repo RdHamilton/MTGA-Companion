@@ -25,6 +25,7 @@ export * as meta from './meta';
 export * as settings from './settings';
 export * as standard from './standard';
 export * as gameplays from './gameplays';
+export * as notes from './notes';
 
 // Re-export commonly used types
 export type {
@@ -77,3 +78,15 @@ export type {
   PlayTimelineEntry,
   GamePlaySummary,
 } from './gameplays';
+
+export type {
+  DeckNote,
+  MatchNotes,
+  ImprovementSuggestion,
+  NoteCategory,
+  SuggestionType,
+  SuggestionPriority,
+  CreateDeckNoteRequest,
+  UpdateDeckNoteRequest,
+  UpdateMatchNotesRequest,
+} from './notes';
