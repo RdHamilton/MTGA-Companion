@@ -1390,3 +1390,388 @@
   color: var(--text-secondary, #888);
   margin-top: 2px;
 }
+
+/* ==========================================
+   Complete Deck Generation Styles (Issue #774)
+   ========================================== */
+
+/* Archetype Selector Mode */
+.build-around-modal.archetype-selector-mode {
+  max-width: 600px;
+}
+
+.seed-card-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.seed-card-preview h3 {
+  margin: 0;
+  color: var(--text-primary, #fff);
+  font-size: 1.1rem;
+}
+
+.seed-preview-image {
+  width: 150px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.archetype-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.archetype-instructions {
+  margin: 0;
+  color: var(--text-secondary, #aaa);
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.archetype-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.archetype-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid var(--border-color, #333);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.archetype-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent-color, #6366f1);
+  transform: translateY(-2px);
+}
+
+.archetype-btn.aggro:hover {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.archetype-btn.midrange:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.archetype-btn.control:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.archetype-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.archetype-info {
+  flex: 1;
+}
+
+.archetype-info h4 {
+  margin: 0 0 4px 0;
+  color: var(--text-primary, #fff);
+  font-size: 1.1rem;
+}
+
+.archetype-info p {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.archetype-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.archetype-stats span {
+  font-size: 0.75rem;
+  color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.archetype-options-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+/* Generated Deck Mode */
+.build-around-modal.generated-deck-mode {
+  max-width: 900px;
+}
+
+/* Strategy Panel */
+.strategy-panel {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.strategy-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.strategy-header h3 {
+  margin: 0;
+  color: var(--text-primary, #fff);
+  font-size: 1.2rem;
+}
+
+.strategy-summary {
+  margin: 0 0 16px 0;
+  color: var(--text-primary, #fff);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.strategy-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.strategy-section {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.strategy-section h4 {
+  margin: 0 0 8px 0;
+  color: var(--accent-color, #6366f1);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.strategy-section p {
+  margin: 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.key-cards-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.key-card-tag {
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.pros-cons-list {
+  margin: 0;
+  padding: 0 0 0 16px;
+  list-style: none;
+}
+
+.pros-cons-list li {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+  position: relative;
+}
+
+.pros-cons-list li::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.strength-item::before {
+  background: #10b981;
+}
+
+.weakness-item::before {
+  background: #ef4444;
+}
+
+/* Generated Deck Stats */
+.generated-deck-stats {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Curve Visualization */
+.curve-visualization {
+  border-top: 1px solid var(--border-color, #333);
+  padding-top: 16px;
+}
+
+.curve-visualization h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.875rem;
+}
+
+.curve-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  height: 120px;
+  padding-bottom: 24px;
+}
+
+.curve-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.curve-bar-wrapper .curve-bar {
+  width: 32px;
+  background: linear-gradient(to top, var(--accent-color, #6366f1), #818cf8);
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 8px;
+  transition: height 0.3s ease;
+}
+
+.curve-count {
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px;
+}
+
+.curve-cmc {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Generated Deck Lists */
+.generated-deck-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.deck-list-section {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.deck-list-section h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.875rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.deck-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.deck-list-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+.deck-list-card .card-quantity {
+  color: var(--accent-color, #6366f1);
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.deck-list-card .card-name {
+  flex: 1;
+  color: var(--text-primary, #fff);
+  font-size: 0.85rem;
+}
+
+.deck-list-card .card-mana {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.deck-list-card.land-card {
+  background: rgba(139, 69, 19, 0.1);
+}
+
+/* Secondary and Tertiary Button Styles */
+.action-btn.secondary-btn {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-color, #6366f1);
+  border: 1px solid var(--accent-color, #6366f1);
+}
+
+.action-btn.secondary-btn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.build-button.tertiary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, #444);
+  color: var(--text-secondary, #aaa);
+}
+
+.build-button.tertiary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #fff);
+}

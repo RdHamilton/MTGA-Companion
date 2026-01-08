@@ -6,9 +6,13 @@ import type {
   SuggestedLandResponse,
   IterativeBuildAroundResponse,
   LiveDeckAnalysis,
+  GenerateCompleteDeckResponse,
+  ArchetypeProfile,
 } from '@/services/api/decks';
 import { models } from '@/types/models';
 import './BuildAroundSeedModal.css';
+
+type ArchetypeKey = 'aggro' | 'midrange' | 'control';
 
 interface HoverPreview {
   card: CardWithOwnership;
@@ -108,6 +112,13 @@ export default function BuildAroundSeedModal({
   // Track which card IDs we've already fetched names for
   const fetchedCardIdsRef = useRef<Set<number>>(new Set());
 
+  // Complete deck generation state (Issue #774)
+  const [showArchetypeSelector, setShowArchetypeSelector] = useState(false);
+  const [selectedArchetype, setSelectedArchetype] = useState<ArchetypeKey | null>(null);
+  const [archetypeProfiles, setArchetypeProfiles] = useState<Record<string, ArchetypeProfile> | null>(null);
+  const [generatedDeck, setGeneratedDeck] = useState<GenerateCompleteDeckResponse | null>(null);
+  const [generating, setGenerating] = useState(false);
+
   // Fetch card names for deck cards when modal opens
   useEffect(() => {
     if (!isOpen || deckCards.length === 0) return;
@@ -158,6 +169,11 @@ export default function BuildAroundSeedModal({
     setError(null);
     hasAttemptedFetch.current = false; // Reset for next open
     fetchedCardIdsRef.current = new Set(); // Reset fetched card IDs
+    // Reset complete deck generation state
+    setShowArchetypeSelector(false);
+    setSelectedArchetype(null);
+    setGeneratedDeck(null);
+    setGenerating(false);
     onClose();
   }, [onClose]);
 
@@ -429,6 +445,82 @@ export default function BuildAroundSeedModal({
     setIterativeSuggestions([]);
     setDeckAnalysis(null);
     setCardNameMap(new Map());
+    // Reset complete deck generation state
+    setShowArchetypeSelector(false);
+    setSelectedArchetype(null);
+    setGeneratedDeck(null);
+  };
+
+  // Show archetype selector for Quick Generate (Issue #774)
+  const handleShowArchetypeSelector = async () => {
+    setShowArchetypeSelector(true);
+    setError(null);
+    // Fetch archetype profiles if not already loaded
+    if (!archetypeProfiles) {
+      try {
+        const profiles = await decks.getArchetypeProfiles();
+        setArchetypeProfiles(profiles);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load archetypes');
+      }
+    }
+  };
+
+  // Generate complete deck with selected archetype
+  const handleGenerateCompleteDeck = async (archetype: ArchetypeKey) => {
+    if (!selectedCard) return;
+
+    setSelectedArchetype(archetype);
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const response = await decks.generateCompleteDeck({
+        seed_card_id: selectedCard.arenaID,
+        archetype,
+        budget_mode: budgetMode,
+      });
+      setGeneratedDeck(response);
+      setShowArchetypeSelector(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate deck');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Apply generated deck to the current deck
+  const handleApplyGeneratedDeck = () => {
+    if (!generatedDeck) return;
+
+    // Convert spells and lands to the format expected by onApplyDeck
+    const spellSuggestions: CardWithOwnership[] = generatedDeck.spells.map(spell => ({
+      cardID: spell.cardID,
+      name: spell.name,
+      manaCost: spell.manaCost,
+      cmc: spell.cmc,
+      colors: spell.colors,
+      typeLine: spell.typeLine,
+      rarity: spell.rarity,
+      imageURI: spell.imageURI,
+      score: spell.score,
+      reasoning: spell.reasoning,
+      inCollection: spell.inCollection,
+      ownedCount: spell.ownedCount,
+      neededCount: spell.inCollection ? 0 : spell.quantity,
+      currentCopies: 0,
+      recommendedCopies: spell.quantity,
+    }));
+
+    const landSuggestions: SuggestedLandResponse[] = generatedDeck.lands.map(land => ({
+      cardID: land.cardID,
+      name: land.name,
+      quantity: land.quantity,
+      color: land.colors.join(''),
+    }));
+
+    onApplyDeck(spellSuggestions, landSuggestions);
+    handleClose();
   };
 
   if (!isOpen) return null;
@@ -885,6 +977,343 @@ export default function BuildAroundSeedModal({
     );
   }
 
+  // Generated deck result view (Issue #774)
+  if (generatedDeck && selectedCard) {
+    return (
+      <div className="build-around-overlay" onClick={handleClose}>
+        <div
+          className="build-around-modal generated-deck-mode"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="generated-deck-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="build-around-header">
+            <h2 id="generated-deck-title">
+              Generated {selectedArchetype?.charAt(0).toUpperCase()}{selectedArchetype?.slice(1)} Deck
+            </h2>
+            <button className="close-button" onClick={handleClose} aria-label="Close dialog">
+              &times;
+            </button>
+          </div>
+
+          <div className="build-around-content">
+            {/* Strategy Panel */}
+            <div className="strategy-panel">
+              <div className="strategy-header">
+                <h3>Deck Strategy</h3>
+                {renderColorPips(generatedDeck.analysis.colorDistribution
+                  ? Object.keys(generatedDeck.analysis.colorDistribution)
+                  : [])}
+              </div>
+              <p className="strategy-summary">{generatedDeck.strategy.summary}</p>
+              <div className="strategy-sections">
+                <div className="strategy-section">
+                  <h4>Game Plan</h4>
+                  <p>{generatedDeck.strategy.gamePlan}</p>
+                </div>
+                <div className="strategy-section">
+                  <h4>Mulligan Guide</h4>
+                  <p>{generatedDeck.strategy.mulligan}</p>
+                </div>
+                {generatedDeck.strategy.keyCards.length > 0 && (
+                  <div className="strategy-section">
+                    <h4>Key Cards</h4>
+                    <div className="key-cards-list">
+                      {generatedDeck.strategy.keyCards.map((card, i) => (
+                        <span key={i} className="key-card-tag">{card}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {generatedDeck.strategy.strengths.length > 0 && (
+                  <div className="strategy-section">
+                    <h4>Strengths</h4>
+                    <ul className="pros-cons-list">
+                      {generatedDeck.strategy.strengths.map((s, i) => (
+                        <li key={i} className="strength-item">{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {generatedDeck.strategy.weaknesses.length > 0 && (
+                  <div className="strategy-section">
+                    <h4>Weaknesses</h4>
+                    <ul className="pros-cons-list">
+                      {generatedDeck.strategy.weaknesses.map((w, i) => (
+                        <li key={i} className="weakness-item">{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Deck Analysis Stats */}
+            <div className="generated-deck-stats">
+              <div className="stat-row">
+                <div className="stat">
+                  <span className="stat-value">{generatedDeck.analysis.totalCards}</span>
+                  <span className="stat-label">Total Cards</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-value">{generatedDeck.analysis.spellCount}</span>
+                  <span className="stat-label">Spells</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-value">{generatedDeck.analysis.landCount}</span>
+                  <span className="stat-label">Lands</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-value">{generatedDeck.analysis.averageCMC.toFixed(2)}</span>
+                  <span className="stat-label">Avg CMC</span>
+                </div>
+              </div>
+
+              {/* Mana Curve Visualization */}
+              <div className="curve-visualization">
+                <h4>Mana Curve</h4>
+                <div className="curve-bars">
+                  {Object.entries(generatedDeck.analysis.curveDistribution)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([cmc, count]) => (
+                      <div key={cmc} className="curve-bar-wrapper">
+                        <div
+                          className="curve-bar"
+                          style={{ height: `${Math.min(count * 8, 100)}px` }}
+                        >
+                          <span className="curve-count">{count}</span>
+                        </div>
+                        <span className="curve-cmc">{cmc}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Wildcard Cost */}
+              {generatedDeck.analysis.missingCount > 0 && (
+                <div className="wildcard-cost">
+                  <span className="cost-label">Wildcards needed:</span>
+                  {Object.entries(generatedDeck.analysis.missingWildcardCost || {}).map(([rarity, count]) => (
+                    count > 0 && (
+                      <span key={rarity} className={`wildcard-badge ${rarity}`}>
+                        {count} {rarity}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Deck Lists */}
+            <div className="generated-deck-lists">
+              {/* Creatures */}
+              <div className="deck-list-section">
+                <h4>Creatures ({generatedDeck.spells.filter(s => s.typeLine.toLowerCase().includes('creature')).reduce((sum, s) => sum + s.quantity, 0)})</h4>
+                <div className="deck-card-list">
+                  {generatedDeck.spells
+                    .filter(s => s.typeLine.toLowerCase().includes('creature'))
+                    .sort((a, b) => a.cmc - b.cmc)
+                    .map(spell => (
+                      <div key={spell.cardID} className="deck-list-card">
+                        <span className="card-quantity">{spell.quantity}x</span>
+                        <span className="card-name">{spell.name}</span>
+                        <span className="card-mana">{spell.manaCost}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Non-Creature Spells */}
+              <div className="deck-list-section">
+                <h4>Spells ({generatedDeck.spells.filter(s => !s.typeLine.toLowerCase().includes('creature')).reduce((sum, s) => sum + s.quantity, 0)})</h4>
+                <div className="deck-card-list">
+                  {generatedDeck.spells
+                    .filter(s => !s.typeLine.toLowerCase().includes('creature'))
+                    .sort((a, b) => a.cmc - b.cmc)
+                    .map(spell => (
+                      <div key={spell.cardID} className="deck-list-card">
+                        <span className="card-quantity">{spell.quantity}x</span>
+                        <span className="card-name">{spell.name}</span>
+                        <span className="card-mana">{spell.manaCost}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Lands */}
+              <div className="deck-list-section">
+                <h4>Lands ({generatedDeck.lands.reduce((sum, l) => sum + l.quantity, 0)})</h4>
+                <div className="deck-card-list">
+                  {generatedDeck.lands.map(land => (
+                    <div key={land.cardID} className="deck-list-card land-card">
+                      <span className="card-quantity">{land.quantity}x</span>
+                      <span className="card-name">{land.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="suggestions-actions">
+              <button
+                className="action-btn apply-btn"
+                onClick={handleApplyGeneratedDeck}
+              >
+                Apply Deck
+              </button>
+              <button
+                className="action-btn secondary-btn"
+                onClick={() => {
+                  setGeneratedDeck(null);
+                  setShowArchetypeSelector(true);
+                }}
+              >
+                Try Different Archetype
+              </button>
+              <button
+                className="action-btn cancel-btn"
+                onClick={handleClose}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Archetype selector view (Issue #774)
+  if (showArchetypeSelector && selectedCard) {
+    return (
+      <div className="build-around-overlay" onClick={handleClose}>
+        <div
+          className="build-around-modal archetype-selector-mode"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="archetype-selector-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="build-around-header">
+            <h2 id="archetype-selector-title">Choose Deck Archetype</h2>
+            <button className="close-button" onClick={handleClose} aria-label="Close dialog">
+              &times;
+            </button>
+          </div>
+
+          <div className="build-around-content">
+            {/* Selected Seed Card Preview */}
+            <div className="seed-card-preview">
+              <h3>Building around: {selectedCard.name}</h3>
+              {selectedCard.imageURI && (
+                <img src={selectedCard.imageURI} alt={selectedCard.name} className="seed-preview-image" />
+              )}
+            </div>
+
+            {/* Error State */}
+            {error && (
+              <div className="build-around-error">
+                <p>{error}</p>
+              </div>
+            )}
+
+            {/* Loading */}
+            {generating && (
+              <div className="loading-indicator">
+                Generating your {selectedArchetype} deck...
+              </div>
+            )}
+
+            {/* Archetype Options */}
+            {!generating && (
+              <div className="archetype-options">
+                <p className="archetype-instructions">Select a deck style to generate a complete 60-card deck:</p>
+
+                <div className="archetype-buttons">
+                  {/* Aggro */}
+                  <button
+                    className="archetype-btn aggro"
+                    onClick={() => handleGenerateCompleteDeck('aggro')}
+                  >
+                    <div className="archetype-icon">⚡</div>
+                    <div className="archetype-info">
+                      <h4>Aggro</h4>
+                      <p>{archetypeProfiles?.aggro?.description || 'Fast, aggressive deck that aims to win quickly with cheap threats.'}</p>
+                      <div className="archetype-stats">
+                        <span>20 lands</span>
+                        <span>70% creatures</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Midrange */}
+                  <button
+                    className="archetype-btn midrange"
+                    onClick={() => handleGenerateCompleteDeck('midrange')}
+                  >
+                    <div className="archetype-icon">⚖️</div>
+                    <div className="archetype-info">
+                      <h4>Midrange</h4>
+                      <p>{archetypeProfiles?.midrange?.description || 'Balanced deck that can play offense or defense as needed.'}</p>
+                      <div className="archetype-stats">
+                        <span>24 lands</span>
+                        <span>55% creatures</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Control */}
+                  <button
+                    className="archetype-btn control"
+                    onClick={() => handleGenerateCompleteDeck('control')}
+                  >
+                    <div className="archetype-icon">🛡️</div>
+                    <div className="archetype-info">
+                      <h4>Control</h4>
+                      <p>{archetypeProfiles?.control?.description || 'Reactive deck that answers threats and wins with powerful finishers.'}</p>
+                      <div className="archetype-stats">
+                        <span>26 lands</span>
+                        <span>25% creatures</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Budget Mode Toggle */}
+                <div className="archetype-options-footer">
+                  <label className="option-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={budgetMode}
+                      onChange={(e) => setBudgetMode(e.target.checked)}
+                    />
+                    <span>Budget Mode (only cards in collection)</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Back Button */}
+            <div className="suggestions-actions">
+              <button
+                className="action-btn cancel-btn"
+                onClick={() => {
+                  setShowArchetypeSelector(false);
+                  setSelectedArchetype(null);
+                }}
+                disabled={generating}
+              >
+                Back to Card Selection
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Original seed selection UI
   return (
     <div className="build-around-overlay" onClick={handleClose}>
@@ -1012,9 +1441,17 @@ export default function BuildAroundSeedModal({
 
               {/* Build Mode Buttons */}
               <div className="build-mode-buttons">
+                {/* Quick Generate - Complete 60-card deck (Issue #774) */}
+                <button
+                  className="build-button primary"
+                  onClick={handleShowArchetypeSelector}
+                  disabled={loading}
+                >
+                  Quick Generate (60-Card Deck)
+                </button>
                 {onCardAdded && onFinishDeck && (
                   <button
-                    className="build-button primary"
+                    className="build-button secondary"
                     onClick={handleStartBuilding}
                     disabled={loading}
                   >
@@ -1022,11 +1459,11 @@ export default function BuildAroundSeedModal({
                   </button>
                 )}
                 <button
-                  className="build-button secondary"
+                  className="build-button tertiary"
                   onClick={handleBuildAround}
                   disabled={loading}
                 >
-                  {loading ? 'Generating...' : 'Quick Build (Auto-fill Deck)'}
+                  {loading ? 'Generating...' : 'Quick Build (40 Cards)'}
                 </button>
               </div>
             </div>

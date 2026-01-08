@@ -1171,3 +1171,601 @@ func TestScoreSynergyWithDeckDetailed_StrongTribalWeight(t *testing.T) {
 		t.Errorf("expected Elf score (%.2f) > Beast score (%.2f) due to tribal weight", elfScore, beastScore)
 	}
 }
+
+func TestGetArchetypeProfile(t *testing.T) {
+	tests := []struct {
+		name              string
+		archetype         string
+		expectedName      string
+		expectedLandCount int
+	}{
+		{
+			name:              "Aggro profile",
+			archetype:         "aggro",
+			expectedName:      "Aggro",
+			expectedLandCount: 20,
+		},
+		{
+			name:              "Midrange profile",
+			archetype:         "midrange",
+			expectedName:      "Midrange",
+			expectedLandCount: 24,
+		},
+		{
+			name:              "Control profile",
+			archetype:         "control",
+			expectedName:      "Control",
+			expectedLandCount: 26,
+		},
+		{
+			name:              "Case insensitive",
+			archetype:         "AGGRO",
+			expectedName:      "Aggro",
+			expectedLandCount: 20,
+		},
+		{
+			name:              "Unknown defaults to midrange",
+			archetype:         "unknown",
+			expectedName:      "Midrange",
+			expectedLandCount: 24,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := GetArchetypeProfile(tt.archetype)
+			if profile == nil {
+				t.Fatal("expected non-nil profile")
+			}
+			if profile.Name != tt.expectedName {
+				t.Errorf("expected name %s, got %s", tt.expectedName, profile.Name)
+			}
+			if profile.LandCount != tt.expectedLandCount {
+				t.Errorf("expected land count %d, got %d", tt.expectedLandCount, profile.LandCount)
+			}
+		})
+	}
+}
+
+func TestGetAllArchetypeProfiles(t *testing.T) {
+	profiles := GetAllArchetypeProfiles()
+
+	if len(profiles) != 3 {
+		t.Errorf("expected 3 archetype profiles, got %d", len(profiles))
+	}
+
+	// Verify all profiles have required fields
+	for key, profile := range profiles {
+		if profile.Name == "" {
+			t.Errorf("profile %s has empty name", key)
+		}
+		if profile.LandCount < 18 || profile.LandCount > 28 {
+			t.Errorf("profile %s has invalid land count: %d", key, profile.LandCount)
+		}
+		if len(profile.CurveTargets) == 0 {
+			t.Errorf("profile %s has empty curve targets", key)
+		}
+		if profile.Description == "" {
+			t.Errorf("profile %s has empty description", key)
+		}
+	}
+}
+
+func TestArchetypeProfile_CurveTargetsSum(t *testing.T) {
+	profiles := GetAllArchetypeProfiles()
+
+	for key, profile := range profiles {
+		total := 0
+		for _, count := range profile.CurveTargets {
+			total += count
+		}
+
+		// Expected spells = 60 - LandCount
+		expectedSpells := 60 - profile.LandCount
+
+		// Allow some variance due to curve adjustments
+		if total < expectedSpells-4 || total > expectedSpells+4 {
+			t.Errorf("profile %s curve targets sum to %d, expected ~%d (60 - %d lands)",
+				key, total, expectedSpells, profile.LandCount)
+		}
+	}
+}
+
+func TestScoreArchetypeCurveFit(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	tests := []struct {
+		name        string
+		cmc         float64
+		archetype   string
+		expectHigh  bool // Expect score > 0.5
+	}{
+		{
+			name:       "1-drop in aggro (high target)",
+			cmc:        1,
+			archetype:  "aggro",
+			expectHigh: true,
+		},
+		{
+			name:       "2-drop in aggro (highest target)",
+			cmc:        2,
+			archetype:  "aggro",
+			expectHigh: true,
+		},
+		{
+			name:       "6-drop in aggro (zero target)",
+			cmc:        6,
+			archetype:  "aggro",
+			expectHigh: false,
+		},
+		{
+			name:       "5-drop in control (high target)",
+			cmc:        5,
+			archetype:  "control",
+			expectHigh: true,
+		},
+		{
+			name:       "1-drop in control (low target)",
+			cmc:        1,
+			archetype:  "control",
+			expectHigh: false,
+		},
+		{
+			name:       "3-drop in midrange (highest target)",
+			cmc:        3,
+			archetype:  "midrange",
+			expectHigh: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := GetArchetypeProfile(tt.archetype)
+			card := &cards.Card{CMC: tt.cmc, TypeLine: "Creature"}
+			score := builder.scoreArchetypeCurveFit(card, profile)
+
+			if tt.expectHigh && score <= 0.3 {
+				t.Errorf("expected high score for %s, got %.2f", tt.name, score)
+			}
+			if !tt.expectHigh && score > 0.6 {
+				t.Errorf("expected low score for %s, got %.2f", tt.name, score)
+			}
+		})
+	}
+}
+
+func TestScoreTypeForArchetype(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	tests := []struct {
+		name       string
+		card       *cards.Card
+		archetype  string
+		expectHigh bool // Expect score > 0.7
+	}{
+		{
+			name:       "Creature in aggro",
+			card:       &cards.Card{TypeLine: "Creature"},
+			archetype:  "aggro",
+			expectHigh: true,
+		},
+		{
+			name:       "Creature in control",
+			card:       &cards.Card{TypeLine: "Creature"},
+			archetype:  "control",
+			expectHigh: false,
+		},
+		{
+			name:       "Removal in control",
+			card:       &cards.Card{TypeLine: "Instant", OracleText: strPtr("Destroy target creature")},
+			archetype:  "control",
+			expectHigh: true,
+		},
+		{
+			name:       "Card draw in control",
+			card:       &cards.Card{TypeLine: "Sorcery", OracleText: strPtr("Draw two cards")},
+			archetype:  "control",
+			expectHigh: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := GetArchetypeProfile(tt.archetype)
+			score := builder.scoreTypeForArchetype(tt.card, profile)
+
+			if tt.expectHigh && score <= 0.5 {
+				t.Errorf("expected high score for %s, got %.2f", tt.name, score)
+			}
+			if !tt.expectHigh && score > 0.8 {
+				t.Errorf("expected lower score for %s, got %.2f", tt.name, score)
+			}
+		})
+	}
+}
+
+func TestIsRemovalSpell(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	tests := []struct {
+		name      string
+		card      *cards.Card
+		isRemoval bool
+	}{
+		{
+			name:      "Destroy creature",
+			card:      &cards.Card{OracleText: strPtr("Destroy target creature.")},
+			isRemoval: true,
+		},
+		{
+			name:      "Exile creature",
+			card:      &cards.Card{OracleText: strPtr("Exile target creature.")},
+			isRemoval: true,
+		},
+		{
+			name:      "Deals damage",
+			card:      &cards.Card{OracleText: strPtr("Deal 3 damage to any target.")},
+			isRemoval: true,
+		},
+		{
+			name:      "Board wipe",
+			card:      &cards.Card{OracleText: strPtr("Destroy all creatures.")},
+			isRemoval: true,
+		},
+		{
+			name:      "Draw spell",
+			card:      &cards.Card{OracleText: strPtr("Draw three cards.")},
+			isRemoval: false,
+		},
+		{
+			name:      "Nil oracle text",
+			card:      &cards.Card{OracleText: nil},
+			isRemoval: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := builder.isRemovalSpell(tt.card)
+			if result != tt.isRemoval {
+				t.Errorf("expected %v, got %v", tt.isRemoval, result)
+			}
+		})
+	}
+}
+
+func TestIsCardAdvantageSpell(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	tests := []struct {
+		name           string
+		card           *cards.Card
+		isCardAdvantage bool
+	}{
+		{
+			name:           "Draw a card",
+			card:           &cards.Card{OracleText: strPtr("Draw a card.")},
+			isCardAdvantage: true,
+		},
+		{
+			name:           "Draw two",
+			card:           &cards.Card{OracleText: strPtr("Draw two cards.")},
+			isCardAdvantage: true,
+		},
+		{
+			name:           "Scry",
+			card:           &cards.Card{OracleText: strPtr("Scry 2.")},
+			isCardAdvantage: true,
+		},
+		{
+			name:           "Surveil",
+			card:           &cards.Card{OracleText: strPtr("Surveil 2.")},
+			isCardAdvantage: true,
+		},
+		{
+			name:           "Search library",
+			card:           &cards.Card{OracleText: strPtr("Search your library for a card.")},
+			isCardAdvantage: true,
+		},
+		{
+			name:           "Combat trick",
+			card:           &cards.Card{OracleText: strPtr("Target creature gets +3/+3 until end of turn.")},
+			isCardAdvantage: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := builder.isCardAdvantageSpell(tt.card)
+			if result != tt.isCardAdvantage {
+				t.Errorf("expected %v, got %v", tt.isCardAdvantage, result)
+			}
+		})
+	}
+}
+
+func TestCalculateCopiesForCard(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	tests := []struct {
+		name     string
+		card     *cards.Card
+		score    float64
+		expected int
+	}{
+		{
+			name:     "Legendary creature - expensive",
+			card:     &cards.Card{TypeLine: "Legendary Creature", CMC: 5},
+			score:    0.8,
+			expected: 2,
+		},
+		{
+			name:     "Legendary creature - cheap",
+			card:     &cards.Card{TypeLine: "Legendary Creature", CMC: 2},
+			score:    0.8,
+			expected: 3,
+		},
+		{
+			name:     "Planeswalker - expensive",
+			card:     &cards.Card{TypeLine: "Planeswalker", CMC: 5},
+			score:    0.8,
+			expected: 2,
+		},
+		{
+			name:     "High score card",
+			card:     &cards.Card{TypeLine: "Creature", CMC: 2},
+			score:    0.9,
+			expected: 4,
+		},
+		{
+			name:     "Expensive card",
+			card:     &cards.Card{TypeLine: "Creature", CMC: 6},
+			score:    0.5,
+			expected: 2,
+		},
+		{
+			name:     "4 CMC card",
+			card:     &cards.Card{TypeLine: "Creature", CMC: 4},
+			score:    0.5,
+			expected: 3,
+		},
+		{
+			name:     "Medium score card",
+			card:     &cards.Card{TypeLine: "Creature", CMC: 2},
+			score:    0.6,
+			expected: 4,
+		},
+		{
+			name:     "Low score card",
+			card:     &cards.Card{TypeLine: "Creature", CMC: 2},
+			score:    0.4,
+			expected: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := builder.calculateCopiesForCard(tt.card, tt.score)
+			if result != tt.expected {
+				t.Errorf("expected %d copies, got %d", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestGenerateManaBase_MonoColor(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Colors: []string{"R"},
+	}
+
+	spells := []*CardWithQuantity{
+		{Colors: []string{"R"}, Quantity: 4},
+		{Colors: []string{"R"}, Quantity: 4},
+	}
+
+	profile := GetArchetypeProfile("aggro") // 20 lands
+
+	lands := builder.generateManaBase(seedAnalysis, spells, profile)
+
+	// Should only have Mountains
+	if len(lands) != 1 {
+		t.Errorf("expected 1 land type for mono-color, got %d", len(lands))
+	}
+
+	total := 0
+	for _, land := range lands {
+		total += land.Quantity
+		if land.Name != "Mountain" {
+			t.Errorf("expected Mountain for mono-red, got %s", land.Name)
+		}
+	}
+
+	if total != 20 {
+		t.Errorf("expected 20 lands for aggro, got %d", total)
+	}
+}
+
+func TestGenerateManaBase_TwoColor(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Colors: []string{"W", "U"},
+	}
+
+	spells := []*CardWithQuantity{
+		{Colors: []string{"W"}, Quantity: 4},
+		{Colors: []string{"U"}, Quantity: 4},
+		{Colors: []string{"W", "U"}, Quantity: 4},
+	}
+
+	profile := GetArchetypeProfile("midrange") // 24 lands
+
+	lands := builder.generateManaBase(seedAnalysis, spells, profile)
+
+	// Should have both Plains and Islands
+	if len(lands) != 2 {
+		t.Errorf("expected 2 land types for two-color, got %d", len(lands))
+	}
+
+	total := 0
+	hasPlains := false
+	hasIslands := false
+	for _, land := range lands {
+		total += land.Quantity
+		if land.Name == "Plains" {
+			hasPlains = true
+		}
+		if land.Name == "Island" {
+			hasIslands = true
+		}
+	}
+
+	if !hasPlains {
+		t.Error("expected Plains for W/U deck")
+	}
+	if !hasIslands {
+		t.Error("expected Island for W/U deck")
+	}
+	if total != 24 {
+		t.Errorf("expected 24 lands for midrange, got %d", total)
+	}
+}
+
+func TestGenerateStrategy(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	seedAnalysis := &SeedCardAnalysis{
+		Card: &cards.Card{
+			Name: "Goblin Guide",
+		},
+		Colors: []string{"R"},
+	}
+
+	spells := []*CardWithQuantity{
+		{Name: "Spell 1", Score: 0.9},
+		{Name: "Spell 2", Score: 0.8},
+		{Name: "Spell 3", Score: 0.7},
+	}
+
+	tests := []struct {
+		archetype      string
+		expectSummary  string
+		expectStrength string
+	}{
+		{
+			archetype:      "aggro",
+			expectSummary:  "mono-red aggro",
+			expectStrength: "Fast starts",
+		},
+		{
+			archetype:      "control",
+			expectSummary:  "mono-red control",
+			expectStrength: "Card advantage",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.archetype, func(t *testing.T) {
+			profile := GetArchetypeProfile(tt.archetype)
+			strategy := builder.generateStrategy(seedAnalysis, spells, profile)
+
+			if strategy == nil {
+				t.Fatal("expected non-nil strategy")
+			}
+
+			if strategy.Summary == "" {
+				t.Error("expected non-empty summary")
+			}
+
+			if strategy.GamePlan == "" {
+				t.Error("expected non-empty game plan")
+			}
+
+			if len(strategy.KeyCards) == 0 {
+				t.Error("expected key cards")
+			}
+
+			if strategy.KeyCards[0] != "Goblin Guide" {
+				t.Errorf("expected seed card as first key card, got %s", strategy.KeyCards[0])
+			}
+
+			if len(strategy.Strengths) == 0 {
+				t.Error("expected strengths")
+			}
+
+			if len(strategy.Weaknesses) == 0 {
+				t.Error("expected weaknesses")
+			}
+		})
+	}
+}
+
+func TestGenerateCompleteDeck_NilRequest(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	_, err := builder.GenerateCompleteDeck(context.Background(), nil)
+	if err == nil {
+		t.Error("expected error for nil request")
+	}
+}
+
+func TestGenerateCompleteDeck_InvalidSeedCardID(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	_, err := builder.GenerateCompleteDeck(context.Background(), &GenerateCompleteDeckRequest{
+		SeedCardID: 0,
+		Archetype:  "aggro",
+	})
+	if err == nil {
+		t.Error("expected error for invalid seed card ID")
+	}
+}
+
+func TestBuildGeneratedDeckAnalysis(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	spells := []*CardWithQuantity{
+		{TypeLine: "Creature", CMC: 2, Quantity: 4, Colors: []string{"R"}, Rarity: "rare", OwnedCount: 4},
+		{TypeLine: "Creature", CMC: 3, Quantity: 4, Colors: []string{"R"}, Rarity: "common", OwnedCount: 2},
+		{TypeLine: "Instant", CMC: 1, Quantity: 4, Colors: []string{"R"}, Rarity: "uncommon", OwnedCount: 0},
+	}
+
+	lands := []*LandWithQuantity{
+		{Name: "Mountain", Quantity: 20},
+	}
+
+	profile := GetArchetypeProfile("aggro")
+	collection := map[int]int{}
+
+	analysis := builder.buildGeneratedDeckAnalysis(spells, lands, profile, collection)
+
+	if analysis.SpellCount != 12 {
+		t.Errorf("expected 12 spells, got %d", analysis.SpellCount)
+	}
+
+	if analysis.LandCount != 20 {
+		t.Errorf("expected 20 lands, got %d", analysis.LandCount)
+	}
+
+	if analysis.CreatureCount != 8 {
+		t.Errorf("expected 8 creatures, got %d", analysis.CreatureCount)
+	}
+
+	if analysis.NonCreatureCount != 4 {
+		t.Errorf("expected 4 non-creatures, got %d", analysis.NonCreatureCount)
+	}
+
+	if analysis.TotalCards != 32 {
+		t.Errorf("expected 32 total cards, got %d", analysis.TotalCards)
+	}
+
+	if analysis.InCollectionCount != 6 { // 4 + 2 = 6 owned
+		t.Errorf("expected 6 in collection, got %d", analysis.InCollectionCount)
+	}
+
+	if analysis.MissingCount != 6 { // 0 + 2 + 4 = 6 missing
+		t.Errorf("expected 6 missing, got %d", analysis.MissingCount)
+	}
+}

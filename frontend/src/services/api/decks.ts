@@ -468,3 +468,116 @@ export async function suggestNextCards(
 ): Promise<IterativeBuildAroundResponse> {
   return post<IterativeBuildAroundResponse>('/decks/build-around/suggest-next', request);
 }
+
+// ==========================================
+// Complete Deck Generation (Issue #774)
+// ==========================================
+
+/**
+ * Archetype profile for deck building.
+ */
+export interface ArchetypeProfile {
+  name: string;
+  landCount: number;
+  curveTargets: Record<number, number>;
+  creatureRatio: number;
+  removalCount: number;
+  cardAdvantage: number;
+  description: string;
+}
+
+/**
+ * Request to generate a complete 60-card deck.
+ */
+export interface GenerateCompleteDeckRequest {
+  seed_card_id: number;
+  archetype: 'aggro' | 'midrange' | 'control';
+  budget_mode?: boolean;
+  set_restriction?: string;
+  allowed_sets?: string[];
+}
+
+/**
+ * Card with quantity for generated deck.
+ */
+export interface CardWithQuantity {
+  cardID: number;
+  name: string;
+  manaCost: string;
+  cmc: number;
+  colors: string[];
+  typeLine: string;
+  rarity: string;
+  imageURI: string;
+  quantity: number;
+  score: number;
+  reasoning: string;
+  inCollection: boolean;
+  ownedCount: number;
+}
+
+/**
+ * Land with quantity for generated deck.
+ */
+export interface LandWithQuantity {
+  cardID: number;
+  name: string;
+  quantity: number;
+  colors: string[];
+  isBasic: boolean;
+}
+
+/**
+ * Strategy and game plan for a generated deck.
+ */
+export interface DeckStrategy {
+  summary: string;
+  gamePlan: string;
+  keyCards: string[];
+  mulligan: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+/**
+ * Analysis of a generated deck.
+ */
+export interface GeneratedDeckAnalysis {
+  totalCards: number;
+  spellCount: number;
+  landCount: number;
+  colorDistribution: Record<string, number>;
+  curveDistribution: Record<number, number>;
+  averageCMC: number;
+  creatureCount: number;
+  inCollectionCount: number;
+  missingCount: number;
+  missingWildcardCost: Record<string, number>;
+}
+
+/**
+ * Response from complete deck generation.
+ */
+export interface GenerateCompleteDeckResponse {
+  seedCard: CardWithOwnership;
+  spells: CardWithQuantity[];
+  lands: LandWithQuantity[];
+  strategy: DeckStrategy;
+  analysis: GeneratedDeckAnalysis;
+}
+
+/**
+ * Generate a complete 60-card deck from a seed card.
+ */
+export async function generateCompleteDeck(
+  request: GenerateCompleteDeckRequest
+): Promise<GenerateCompleteDeckResponse> {
+  return post<GenerateCompleteDeckResponse>('/decks/generate', request);
+}
+
+/**
+ * Get available archetype profiles.
+ */
+export async function getArchetypeProfiles(): Promise<Record<string, ArchetypeProfile>> {
+  return get<Record<string, ArchetypeProfile>>('/decks/archetypes');
+}

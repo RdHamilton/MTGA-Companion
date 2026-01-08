@@ -886,3 +886,53 @@ func (h *DeckHandler) SuggestNextCards(w http.ResponseWriter, r *http.Request) {
 
 	response.Success(w, result)
 }
+
+// GenerateCompleteDeckRequest represents a request to generate a complete 60-card deck.
+type GenerateCompleteDeckRequest struct {
+	SeedCardID     int      `json:"seed_card_id"`
+	Archetype      string   `json:"archetype"`                 // "aggro", "midrange", "control"
+	BudgetMode     bool     `json:"budget_mode,omitempty"`     // Only collection cards
+	SetRestriction string   `json:"set_restriction,omitempty"` // "single", "multiple", "all"
+	AllowedSets    []string `json:"allowed_sets,omitempty"`    // Specific set codes if "multiple"
+}
+
+// GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
+func (h *DeckHandler) GenerateCompleteDeck(w http.ResponseWriter, r *http.Request) {
+	var req GenerateCompleteDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.SeedCardID <= 0 {
+		response.BadRequest(w, errors.New("seed_card_id is required"))
+		return
+	}
+
+	if req.Archetype == "" {
+		response.BadRequest(w, errors.New("archetype is required (aggro, midrange, or control)"))
+		return
+	}
+
+	guiReq := &gui.GenerateCompleteDeckRequest{
+		SeedCardID:     req.SeedCardID,
+		Archetype:      req.Archetype,
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+
+	result, err := h.facade.GenerateCompleteDeck(r.Context(), guiReq)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
+}
+
+// GetArchetypeProfiles returns all available archetype profiles.
+func (h *DeckHandler) GetArchetypeProfiles(w http.ResponseWriter, r *http.Request) {
+	profiles := h.facade.GetArchetypeProfiles()
+	response.Success(w, profiles)
+}

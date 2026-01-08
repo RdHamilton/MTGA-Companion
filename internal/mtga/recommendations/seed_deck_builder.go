@@ -151,6 +151,137 @@ type CollectiveDeckAnalysis struct {
 	TotalCards    int
 }
 
+// ArchetypeProfile defines the build parameters for a deck archetype.
+type ArchetypeProfile struct {
+	Name          string      `json:"name"`          // "Aggro", "Midrange", "Control"
+	LandCount     int         `json:"landCount"`     // Target number of lands
+	CurveTargets  map[int]int `json:"curveTargets"`  // CMC -> target count
+	CreatureRatio float64     `json:"creatureRatio"` // % creatures vs spells (0.0-1.0)
+	RemovalCount  int         `json:"removalCount"`  // Target removal spells
+	CardAdvantage int         `json:"cardAdvantage"` // Target draw/advantage cards
+	Description   string      `json:"description"`   // User-friendly description
+}
+
+// archetypeProfiles contains configuration for each deck archetype.
+var archetypeProfiles = map[string]*ArchetypeProfile{
+	"aggro": {
+		Name:          "Aggro",
+		LandCount:     20,
+		CurveTargets:  map[int]int{1: 8, 2: 14, 3: 10, 4: 4, 5: 4, 6: 0}, // Sum: 40 = 60 - 20
+		CreatureRatio: 0.70,
+		RemovalCount:  4,
+		CardAdvantage: 2,
+		Description:   "Fast, aggressive deck that aims to win quickly with cheap threats.",
+	},
+	"midrange": {
+		Name:          "Midrange",
+		LandCount:     24,
+		CurveTargets:  map[int]int{1: 4, 2: 8, 3: 10, 4: 8, 5: 4, 6: 2}, // Sum: 36 = 60 - 24
+		CreatureRatio: 0.55,
+		RemovalCount:  6,
+		CardAdvantage: 4,
+		Description:   "Balanced deck with efficient threats and answers at every point in the curve.",
+	},
+	"control": {
+		Name:          "Control",
+		LandCount:     26,
+		CurveTargets:  map[int]int{1: 2, 2: 6, 3: 8, 4: 8, 5: 6, 6: 4}, // Sum: 34 = 60 - 26
+		CreatureRatio: 0.25,
+		RemovalCount:  10,
+		CardAdvantage: 8,
+		Description:   "Slow, controlling deck that grinds out opponents with removal and card advantage.",
+	},
+}
+
+// GenerateCompleteDeckRequest represents a request to generate a complete 60-card deck.
+type GenerateCompleteDeckRequest struct {
+	SeedCardID     int      `json:"seedCardID"`
+	Archetype      string   `json:"archetype"`      // "aggro", "midrange", "control"
+	BudgetMode     bool     `json:"budgetMode"`     // Only collection cards
+	SetRestriction string   `json:"setRestriction"` // "single", "multiple", "all"
+	AllowedSets    []string `json:"allowedSets"`    // Specific set codes if "multiple"
+}
+
+// GenerateCompleteDeckResponse contains a complete 60-card deck with strategy.
+type GenerateCompleteDeckResponse struct {
+	SeedCard *CardWithOwnership     `json:"seedCard"`
+	Spells   []*CardWithQuantity    `json:"spells"` // Non-land cards with quantities
+	Lands    []*LandWithQuantity    `json:"lands"`  // Lands with quantities
+	Strategy *DeckStrategy          `json:"strategy"`
+	Analysis *GeneratedDeckAnalysis `json:"analysis"`
+}
+
+// CardWithQuantity represents a card with how many copies to include.
+type CardWithQuantity struct {
+	CardID         int             `json:"cardID"`
+	Name           string          `json:"name"`
+	ManaCost       string          `json:"manaCost,omitempty"`
+	CMC            int             `json:"cmc"`
+	Colors         []string        `json:"colors"`
+	TypeLine       string          `json:"typeLine"`
+	Rarity         string          `json:"rarity,omitempty"`
+	ImageURI       string          `json:"imageURI,omitempty"`
+	Score          float64         `json:"score"`
+	Reasoning      string          `json:"reasoning"`
+	Quantity       int             `json:"quantity"` // Number of copies (1-4)
+	InCollection   bool            `json:"inCollection"`
+	OwnedCount     int             `json:"ownedCount"`
+	NeededCount    int             `json:"neededCount"`
+	ScoreBreakdown *ScoreBreakdown `json:"scoreBreakdown,omitempty"`
+	SynergyDetails []SynergyDetail `json:"synergyDetails,omitempty"`
+}
+
+// LandWithQuantity represents a land with quantity and type information.
+type LandWithQuantity struct {
+	CardID       int      `json:"cardID"`
+	Name         string   `json:"name"`
+	Quantity     int      `json:"quantity"`
+	Colors       []string `json:"colors"`       // Colors this land produces
+	IsBasic      bool     `json:"isBasic"`      // Basic vs dual/utility land
+	EntersTapped bool     `json:"entersTapped"` // Does it enter tapped?
+}
+
+// DeckStrategy provides human-readable deck strategy information.
+type DeckStrategy struct {
+	Summary    string   `json:"summary"`    // "Aggressive mono-red deck..."
+	GamePlan   string   `json:"gamePlan"`   // "Curve out with cheap threats..."
+	KeyCards   []string `json:"keyCards"`   // ["Seed Card", "Key Synergy 1", ...]
+	Mulligan   string   `json:"mulligan"`   // "Keep hands with 2-3 lands..."
+	Strengths  []string `json:"strengths"`  // What the deck does well
+	Weaknesses []string `json:"weaknesses"` // What to watch out for
+}
+
+// GeneratedDeckAnalysis provides detailed analysis of the generated deck.
+type GeneratedDeckAnalysis struct {
+	TotalCards          int            `json:"totalCards"`
+	SpellCount          int            `json:"spellCount"`
+	LandCount           int            `json:"landCount"`
+	CreatureCount       int            `json:"creatureCount"`
+	NonCreatureCount    int            `json:"nonCreatureCount"`
+	AverageCMC          float64        `json:"averageCMC"`
+	ManaCurve           map[int]int    `json:"manaCurve"`
+	ColorDistribution   map[string]int `json:"colorDistribution"`
+	InCollectionCount   int            `json:"inCollectionCount"`
+	MissingCount        int            `json:"missingCount"`
+	MissingWildcardCost map[string]int `json:"missingWildcardCost"`
+	ArchetypeMatch      float64        `json:"archetypeMatch"` // How well deck matches archetype (0-1)
+}
+
+// GetArchetypeProfile returns the profile for the given archetype name.
+func GetArchetypeProfile(archetype string) *ArchetypeProfile {
+	profile, ok := archetypeProfiles[strings.ToLower(archetype)]
+	if !ok {
+		// Default to midrange if unknown
+		return archetypeProfiles["midrange"]
+	}
+	return profile
+}
+
+// GetAllArchetypeProfiles returns all available archetype profiles.
+func GetAllArchetypeProfiles() map[string]*ArchetypeProfile {
+	return archetypeProfiles
+}
+
 // BuildAroundSeed generates deck suggestions based on a seed card.
 func (s *SeedDeckBuilder) BuildAroundSeed(ctx context.Context, req *SeedDeckBuilderRequest) (*SeedDeckBuilderResponse, error) {
 	if req == nil {
@@ -1574,4 +1705,702 @@ func (s *SeedDeckBuilder) calculateRecommendedCopies(card *CardWithOwnership) in
 		return 4
 	}
 	return 3
+}
+
+// GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
+func (s *SeedDeckBuilder) GenerateCompleteDeck(ctx context.Context, req *GenerateCompleteDeckRequest) (*GenerateCompleteDeckResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+	if req.SeedCardID <= 0 {
+		return nil, fmt.Errorf("seed card ID is required")
+	}
+
+	// Get archetype profile
+	profile := GetArchetypeProfile(req.Archetype)
+
+	// Apply defaults
+	if req.SetRestriction == "" {
+		req.SetRestriction = "all"
+	}
+
+	// Get and analyze seed card
+	seedAnalysis, err := s.analyzeSeedCard(ctx, req.SeedCardID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze seed card: %w", err)
+	}
+
+	// Get candidate cards
+	seedReq := &SeedDeckBuilderRequest{
+		SeedCardID:     req.SeedCardID,
+		MaxResults:     500, // Get more candidates for complete deck
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+	candidates, err := s.getCandidates(ctx, seedReq, seedAnalysis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get candidates: %w", err)
+	}
+
+	// Score candidates with archetype-adjusted scoring
+	scoredCards := s.scoreForArchetype(candidates, seedAnalysis, profile)
+
+	// Get collection ownership
+	collection, err := s.getCollectionMap(ctx)
+	if err != nil {
+		collection = make(map[int]int)
+	}
+
+	// Apply budget mode filter if enabled
+	if req.BudgetMode {
+		scoredCards = s.filterToCollection(scoredCards, collection)
+	}
+
+	// Calculate target spell count (60 - lands)
+	targetSpellCount := 60 - profile.LandCount
+
+	// Select cards with copy quantities to hit the target
+	selectedCards := s.selectCardsForCompleteDeck(scoredCards, profile, targetSpellCount)
+
+	// Convert to CardWithQuantity and add ownership
+	spells := s.buildSpellsWithQuantity(selectedCards, collection)
+
+	// Generate mana base
+	lands := s.generateManaBase(seedAnalysis, spells, profile)
+
+	// Generate strategy (basic version, will be enhanced in Phase 4)
+	strategy := s.generateStrategy(seedAnalysis, spells, profile)
+
+	// Build analysis
+	analysis := s.buildGeneratedDeckAnalysis(spells, lands, profile, collection)
+
+	// Build seed card response
+	seedCardWithOwnership := s.buildSeedCardResponse(seedAnalysis, collection)
+
+	return &GenerateCompleteDeckResponse{
+		SeedCard: seedCardWithOwnership,
+		Spells:   spells,
+		Lands:    lands,
+		Strategy: strategy,
+		Analysis: analysis,
+	}, nil
+}
+
+// scoreForArchetype scores candidates with archetype-specific curve weighting.
+func (s *SeedDeckBuilder) scoreForArchetype(candidates []*cards.Card, seedAnalysis *SeedCardAnalysis, profile *ArchetypeProfile) []*scoredCard {
+	scored := make([]*scoredCard, 0, len(candidates))
+
+	for _, card := range candidates {
+		score, reasoning, breakdown, synergyDetails := s.scoreCardForArchetype(card, seedAnalysis, profile)
+
+		// Skip cards with very low scores
+		if score < 0.25 {
+			continue
+		}
+
+		scored = append(scored, &scoredCard{
+			card:           card,
+			score:          score,
+			reasoning:      reasoning,
+			scoreBreakdown: breakdown,
+			synergyDetails: synergyDetails,
+		})
+	}
+
+	// Sort by score descending
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
+
+	return scored
+}
+
+// scoreCardForArchetype calculates how well a card fits with the seed card and archetype.
+func (s *SeedDeckBuilder) scoreCardForArchetype(card *cards.Card, seedAnalysis *SeedCardAnalysis, profile *ArchetypeProfile) (float64, string, *ScoreBreakdown, []SynergyDetail) {
+	reasons := make([]string, 0)
+	synergyDetails := make([]SynergyDetail, 0)
+
+	// Factor 1: Color Compatibility (25%)
+	colorScore := s.scoreColorCompatibility(card, seedAnalysis)
+	if colorScore >= 0.8 {
+		reasons = append(reasons, "matches your colors")
+	}
+
+	// Factor 2: Archetype Curve Fit (25%) - higher weight than normal
+	curveScore := s.scoreArchetypeCurveFit(card, profile)
+	if curveScore >= 0.7 {
+		reasons = append(reasons, fmt.Sprintf("fits %s curve at %d CMC", profile.Name, int(card.CMC)))
+	}
+
+	// Factor 3: Synergy with Seed (25%)
+	synergyScore, cardSynergyDetails := s.scoreSynergyWithSeedDetailed(card, seedAnalysis)
+	synergyDetails = append(synergyDetails, cardSynergyDetails...)
+	if synergyScore >= 0.7 {
+		reasons = append(reasons, "synergizes with your strategy")
+	}
+
+	// Factor 4: Card Type Fit (15%) - does it match archetype's creature ratio?
+	typeScore := s.scoreTypeForArchetype(card, profile)
+	if typeScore >= 0.8 {
+		reasons = append(reasons, fmt.Sprintf("good for %s", strings.ToLower(profile.Name)))
+	}
+
+	// Factor 5: Card Quality (10%)
+	qualityScore := s.scoreCardQuality(card)
+
+	// Calculate weighted score
+	score := (colorScore * 0.25) +
+		(curveScore * 0.25) +
+		(synergyScore * 0.25) +
+		(typeScore * 0.15) +
+		(qualityScore * 0.10)
+
+	// Build score breakdown
+	breakdown := &ScoreBreakdown{
+		ColorFit: colorScore,
+		CurveFit: curveScore,
+		Synergy:  synergyScore,
+		Quality:  qualityScore,
+		Overall:  score,
+	}
+
+	// Build reasoning string
+	reasoning := "This card "
+	if len(reasons) == 0 {
+		reasoning = "This card could work in your deck."
+	} else {
+		for i, r := range reasons {
+			if i == 0 {
+				reasoning += r
+			} else if i == len(reasons)-1 {
+				reasoning += ", and " + r
+			} else {
+				reasoning += ", " + r
+			}
+		}
+		reasoning += "."
+	}
+
+	return score, reasoning, breakdown, synergyDetails
+}
+
+// scoreArchetypeCurveFit scores how well a card fits the archetype's ideal curve.
+func (s *SeedDeckBuilder) scoreArchetypeCurveFit(card *cards.Card, profile *ArchetypeProfile) float64 {
+	if containsTypeInTypeLine(card.TypeLine, "Land") {
+		return 0.5 // Neutral for lands
+	}
+
+	cmc := int(card.CMC)
+	if cmc > 6 {
+		cmc = 6 // Cap at 6 for curve lookup
+	}
+
+	target := profile.CurveTargets[cmc]
+	if target == 0 {
+		return 0.2 // Archetype doesn't want cards at this CMC
+	}
+
+	// Higher target = more desirable
+	// Max target in aggro is 12 at 2 CMC
+	maxTarget := 12.0
+	return float64(target) / maxTarget
+}
+
+// scoreTypeForArchetype scores how well a card's type fits the archetype.
+func (s *SeedDeckBuilder) scoreTypeForArchetype(card *cards.Card, profile *ArchetypeProfile) float64 {
+	isCreature := containsTypeInTypeLine(card.TypeLine, "Creature")
+
+	// Check for removal/interaction spells
+	isRemoval := s.isRemovalSpell(card)
+
+	// Check for card advantage
+	isCardAdvantage := s.isCardAdvantageSpell(card)
+
+	// Archetypes want different creature ratios
+	if isCreature {
+		// Aggro wants lots of creatures, control wants few
+		return profile.CreatureRatio + 0.2 // Bonus for creatures in creature-heavy archetypes
+	}
+
+	// Removal is valuable to all archetypes
+	if isRemoval {
+		return 0.9
+	}
+
+	// Card advantage is more valuable for control
+	if isCardAdvantage {
+		if profile.Name == "Control" {
+			return 1.0
+		}
+		return 0.7
+	}
+
+	// Non-creature, non-removal spells
+	return 1.0 - profile.CreatureRatio
+}
+
+// isRemovalSpell checks if a card is a removal spell.
+func (s *SeedDeckBuilder) isRemovalSpell(card *cards.Card) bool {
+	if card.OracleText == nil {
+		return false
+	}
+	text := strings.ToLower(*card.OracleText)
+	removalKeywords := []string{
+		"destroy target",
+		"exile target",
+		"deals damage",
+		"deal", // Matches "deal 3 damage", "deal damage", etc.
+		"-x/-x",
+		"return target",
+		"sacrifice a creature",
+		"destroy all",
+		"exile all",
+	}
+	for _, kw := range removalKeywords {
+		if strings.Contains(text, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// isCardAdvantageSpell checks if a card provides card advantage.
+func (s *SeedDeckBuilder) isCardAdvantageSpell(card *cards.Card) bool {
+	if card.OracleText == nil {
+		return false
+	}
+	text := strings.ToLower(*card.OracleText)
+	advantageKeywords := []string{
+		"draw a card",
+		"draw two",
+		"draw cards",
+		"scry",
+		"surveil",
+		"look at the top",
+		"search your library",
+	}
+	for _, kw := range advantageKeywords {
+		if strings.Contains(text, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// selectCardsForCompleteDeck selects cards with quantities to build a complete deck.
+func (s *SeedDeckBuilder) selectCardsForCompleteDeck(scoredCards []*scoredCard, profile *ArchetypeProfile, targetSpellCount int) []*cardWithCopies {
+	selected := make([]*cardWithCopies, 0)
+	totalCards := 0
+	curveFilled := make(map[int]int) // CMC -> count filled
+
+	// Track used cards to avoid duplicates
+	usedCards := make(map[int]bool)
+
+	// First pass: fill curve slots with best cards
+	for _, sc := range scoredCards {
+		if totalCards >= targetSpellCount {
+			break
+		}
+		if usedCards[sc.card.ArenaID] {
+			continue
+		}
+
+		cmc := int(sc.card.CMC)
+		if cmc > 6 {
+			cmc = 6
+		}
+
+		// Check if we need more cards at this CMC
+		target := profile.CurveTargets[cmc]
+		if curveFilled[cmc] >= target {
+			continue // Curve slot is full
+		}
+
+		// Determine copy count
+		copies := s.calculateCopiesForCard(sc.card, sc.score)
+		remaining := targetSpellCount - totalCards
+		curveRemaining := target - curveFilled[cmc]
+
+		// Limit copies by remaining slots and curve needs
+		if copies > remaining {
+			copies = remaining
+		}
+		if copies > curveRemaining {
+			copies = curveRemaining
+		}
+		if copies < 1 {
+			copies = 1
+		}
+
+		selected = append(selected, &cardWithCopies{
+			scoredCard: sc,
+			copies:     copies,
+		})
+		usedCards[sc.card.ArenaID] = true
+		totalCards += copies
+		curveFilled[cmc] += copies
+	}
+
+	// Second pass: fill any remaining slots with best remaining cards
+	for _, sc := range scoredCards {
+		if totalCards >= targetSpellCount {
+			break
+		}
+		if usedCards[sc.card.ArenaID] {
+			continue
+		}
+
+		copies := s.calculateCopiesForCard(sc.card, sc.score)
+		remaining := targetSpellCount - totalCards
+		if copies > remaining {
+			copies = remaining
+		}
+		if copies < 1 {
+			copies = 1
+		}
+
+		selected = append(selected, &cardWithCopies{
+			scoredCard: sc,
+			copies:     copies,
+		})
+		usedCards[sc.card.ArenaID] = true
+		totalCards += copies
+	}
+
+	return selected
+}
+
+// cardWithCopies holds a scored card with its copy count.
+type cardWithCopies struct {
+	scoredCard *scoredCard
+	copies     int
+}
+
+// calculateCopiesForCard determines how many copies of a card to include.
+func (s *SeedDeckBuilder) calculateCopiesForCard(card *cards.Card, score float64) int {
+	typeLine := strings.ToLower(card.TypeLine)
+
+	// Legendary cards: usually 2-3 copies
+	if strings.Contains(typeLine, "legendary") {
+		if card.CMC >= 5 {
+			return 2
+		}
+		return 3
+	}
+
+	// Planeswalkers: usually 2-3 copies
+	if strings.Contains(typeLine, "planeswalker") {
+		if card.CMC >= 5 {
+			return 2
+		}
+		return 3
+	}
+
+	// High-synergy cards (score > 0.75): want full playsets
+	if score > 0.75 {
+		return 4
+	}
+
+	// Expensive cards (5+ CMC): usually 2-3 copies
+	if card.CMC >= 5 {
+		return 2
+	}
+	if card.CMC == 4 {
+		return 3
+	}
+
+	// Mid-synergy cards: 3-4 copies
+	if score > 0.5 {
+		return 4
+	}
+	return 3
+}
+
+// buildSpellsWithQuantity converts selected cards to CardWithQuantity.
+func (s *SeedDeckBuilder) buildSpellsWithQuantity(selected []*cardWithCopies, collection map[int]int) []*CardWithQuantity {
+	result := make([]*CardWithQuantity, 0, len(selected))
+
+	for _, sel := range selected {
+		card := sel.scoredCard.card
+		owned := collection[card.ArenaID]
+		needed := sel.copies - owned
+		if needed < 0 {
+			needed = 0
+		}
+
+		manaCost := ""
+		if card.ManaCost != nil {
+			manaCost = *card.ManaCost
+		}
+
+		imageURI := ""
+		if card.ImageURI != nil {
+			imageURI = *card.ImageURI
+		}
+
+		result = append(result, &CardWithQuantity{
+			CardID:         card.ArenaID,
+			Name:           card.Name,
+			ManaCost:       manaCost,
+			CMC:            int(card.CMC),
+			Colors:         card.Colors,
+			TypeLine:       card.TypeLine,
+			Rarity:         card.Rarity,
+			ImageURI:       imageURI,
+			Score:          sel.scoredCard.score,
+			Reasoning:      sel.scoredCard.reasoning,
+			Quantity:       sel.copies,
+			InCollection:   owned >= sel.copies,
+			OwnedCount:     owned,
+			NeededCount:    needed,
+			ScoreBreakdown: sel.scoredCard.scoreBreakdown,
+			SynergyDetails: sel.scoredCard.synergyDetails,
+		})
+	}
+
+	return result
+}
+
+// generateManaBase generates a mana base for the deck (basic lands for now).
+func (s *SeedDeckBuilder) generateManaBase(seedAnalysis *SeedCardAnalysis, spells []*CardWithQuantity, profile *ArchetypeProfile) []*LandWithQuantity {
+	// Count color pips across all spells
+	colorPips := make(map[string]int)
+
+	// Add seed colors with weight
+	for _, c := range seedAnalysis.Colors {
+		colorPips[c] += 8 // Weight seed card heavily
+	}
+
+	// Count pips from spells
+	for _, spell := range spells {
+		for _, c := range spell.Colors {
+			colorPips[c] += spell.Quantity
+		}
+	}
+
+	// Calculate total pips
+	totalPips := 0
+	for _, count := range colorPips {
+		totalPips += count
+	}
+
+	lands := make([]*LandWithQuantity, 0)
+	totalLands := profile.LandCount
+
+	if totalPips == 0 {
+		// Colorless deck - can't suggest basic lands
+		return lands
+	}
+
+	// Distribute lands proportionally
+	landCounts := make(map[string]int)
+	allocated := 0
+
+	for color, pips := range colorPips {
+		proportion := float64(pips) / float64(totalPips)
+		count := int(float64(totalLands)*proportion + 0.5)
+		if count < 1 && pips > 0 {
+			count = 1 // At least 1 land of each color
+		}
+		landCounts[color] = count
+		allocated += count
+	}
+
+	// Adjust for rounding errors
+	if allocated != totalLands {
+		// Find the primary color and adjust
+		maxPips := 0
+		maxColor := ""
+		for color, pips := range colorPips {
+			if pips > maxPips {
+				maxPips = pips
+				maxColor = color
+			}
+		}
+		if maxColor != "" {
+			landCounts[maxColor] += totalLands - allocated
+		}
+	}
+
+	// Build land list with basic lands
+	for color, count := range landCounts {
+		if count <= 0 {
+			continue
+		}
+		land, ok := basicLandsByColor[color]
+		if !ok {
+			continue
+		}
+		lands = append(lands, &LandWithQuantity{
+			CardID:       land.ArenaID,
+			Name:         land.Name,
+			Quantity:     count,
+			Colors:       []string{color},
+			IsBasic:      true,
+			EntersTapped: false,
+		})
+	}
+
+	return lands
+}
+
+// generateStrategy generates a deck strategy summary.
+func (s *SeedDeckBuilder) generateStrategy(seedAnalysis *SeedCardAnalysis, spells []*CardWithQuantity, profile *ArchetypeProfile) *DeckStrategy {
+	// Build color description
+	colorNames := map[string]string{
+		"W": "White", "U": "Blue", "B": "Black", "R": "Red", "G": "Green",
+	}
+	colorDesc := ""
+	if len(seedAnalysis.Colors) == 1 {
+		colorDesc = "mono-" + strings.ToLower(colorNames[seedAnalysis.Colors[0]])
+	} else if len(seedAnalysis.Colors) == 2 {
+		colorDesc = strings.ToLower(colorNames[seedAnalysis.Colors[0]]) + "/" +
+			strings.ToLower(colorNames[seedAnalysis.Colors[1]])
+	} else {
+		colorDesc = "multicolor"
+	}
+
+	// Build summary
+	summary := fmt.Sprintf("A %s %s deck built around %s.",
+		colorDesc, strings.ToLower(profile.Name), seedAnalysis.Card.Name)
+
+	// Build game plan based on archetype
+	gamePlan := ""
+	switch profile.Name {
+	case "Aggro":
+		gamePlan = "Curve out with efficient threats and close the game quickly. Keep pressure on your opponent and use removal to clear blockers."
+	case "Midrange":
+		gamePlan = "Play efficient threats at every point in the curve. Trade resources favorably and win through card quality."
+	case "Control":
+		gamePlan = "Control the board with removal and counterspells. Draw cards to gain advantage and win with powerful finishers."
+	}
+
+	// Get key cards (top 3 by score)
+	keyCards := []string{seedAnalysis.Card.Name}
+	for i := 0; i < 3 && i < len(spells); i++ {
+		keyCards = append(keyCards, spells[i].Name)
+	}
+
+	// Build mulligan advice based on archetype
+	mulligan := ""
+	switch profile.Name {
+	case "Aggro":
+		mulligan = fmt.Sprintf("Keep hands with %d lands and a good curve of 1-2-3 drops. Avoid slow hands.", profile.LandCount/10+1)
+	case "Midrange":
+		mulligan = fmt.Sprintf("Keep hands with %d lands and early interaction or threats. Can keep slower hands against control.", profile.LandCount/8)
+	case "Control":
+		mulligan = fmt.Sprintf("Keep hands with %d+ lands and early removal or card draw. Prioritize answers over threats.", profile.LandCount/9)
+	}
+
+	// Build strengths/weaknesses
+	strengths := []string{}
+	weaknesses := []string{}
+
+	switch profile.Name {
+	case "Aggro":
+		strengths = []string{"Fast starts", "Punishes slow decks", "Consistent mana base"}
+		weaknesses = []string{"Can run out of gas", "Weak to board wipes", "Struggles against lifegain"}
+	case "Midrange":
+		strengths = []string{"Flexible game plan", "Good in long games", "Powerful individual cards"}
+		weaknesses = []string{"Can be outpaced by aggro", "Can be out-valued by control"}
+	case "Control":
+		strengths = []string{"Card advantage", "Answers to most threats", "Strong late game"}
+		weaknesses = []string{"Slow starts", "Weak to fast aggro", "Needs to hit land drops"}
+	}
+
+	return &DeckStrategy{
+		Summary:    summary,
+		GamePlan:   gamePlan,
+		KeyCards:   keyCards,
+		Mulligan:   mulligan,
+		Strengths:  strengths,
+		Weaknesses: weaknesses,
+	}
+}
+
+// buildGeneratedDeckAnalysis builds analysis for the generated deck.
+func (s *SeedDeckBuilder) buildGeneratedDeckAnalysis(
+	spells []*CardWithQuantity,
+	lands []*LandWithQuantity,
+	profile *ArchetypeProfile,
+	collection map[int]int,
+) *GeneratedDeckAnalysis {
+	analysis := &GeneratedDeckAnalysis{
+		ManaCurve:           make(map[int]int),
+		ColorDistribution:   make(map[string]int),
+		MissingWildcardCost: make(map[string]int),
+	}
+
+	// Count spells
+	totalCMC := 0.0
+	for _, spell := range spells {
+		analysis.SpellCount += spell.Quantity
+
+		// Count creatures vs non-creatures
+		if containsTypeInTypeLine(spell.TypeLine, "Creature") {
+			analysis.CreatureCount += spell.Quantity
+		} else {
+			analysis.NonCreatureCount += spell.Quantity
+		}
+
+		// Mana curve
+		cmc := spell.CMC
+		analysis.ManaCurve[cmc] += spell.Quantity
+		totalCMC += float64(spell.CMC) * float64(spell.Quantity)
+
+		// Color distribution
+		for _, color := range spell.Colors {
+			analysis.ColorDistribution[color] += spell.Quantity
+		}
+
+		// Collection stats
+		if spell.OwnedCount >= spell.Quantity {
+			analysis.InCollectionCount += spell.Quantity
+		} else {
+			analysis.InCollectionCount += spell.OwnedCount
+			missing := spell.Quantity - spell.OwnedCount
+			analysis.MissingCount += missing
+			analysis.MissingWildcardCost[strings.ToLower(spell.Rarity)] += missing
+		}
+	}
+
+	// Count lands
+	for _, land := range lands {
+		analysis.LandCount += land.Quantity
+	}
+
+	analysis.TotalCards = analysis.SpellCount + analysis.LandCount
+
+	// Calculate average CMC
+	if analysis.SpellCount > 0 {
+		analysis.AverageCMC = totalCMC / float64(analysis.SpellCount)
+	}
+
+	// Calculate archetype match (how well does the deck match the profile?)
+	archetypeMatch := 1.0
+
+	// Check creature ratio
+	actualCreatureRatio := float64(analysis.CreatureCount) / float64(analysis.SpellCount)
+	ratioDiff := abs(actualCreatureRatio - profile.CreatureRatio)
+	archetypeMatch -= ratioDiff * 0.5
+
+	// Check land count
+	landDiff := abs(float64(analysis.LandCount) - float64(profile.LandCount))
+	archetypeMatch -= landDiff * 0.02
+
+	if archetypeMatch < 0 {
+		archetypeMatch = 0
+	}
+	analysis.ArchetypeMatch = archetypeMatch
+
+	return analysis
+}
+
+// abs returns the absolute value of a float64.
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

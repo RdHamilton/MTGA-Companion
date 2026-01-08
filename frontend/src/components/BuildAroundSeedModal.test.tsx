@@ -7,6 +7,8 @@ vi.mock('@/services/api', () => ({
   decks: {
     buildAroundSeed: vi.fn(),
     suggestNextCards: vi.fn(),
+    generateCompleteDeck: vi.fn(),
+    getArchetypeProfiles: vi.fn(),
   },
   cards: {
     searchCardsWithCollection: vi.fn(),
@@ -18,6 +20,8 @@ import { decks, cards } from '@/services/api';
 
 const mockBuildAroundSeed = vi.mocked(decks.buildAroundSeed);
 const mockSuggestNextCards = vi.mocked(decks.suggestNextCards);
+const mockGenerateCompleteDeck = vi.mocked(decks.generateCompleteDeck);
+const mockGetArchetypeProfiles = vi.mocked(decks.getArchetypeProfiles);
 const mockSearchCardsWithCollection = vi.mocked(cards.searchCardsWithCollection);
 const mockGetCardByArenaId = vi.mocked(cards.getCardByArenaId);
 
@@ -154,7 +158,7 @@ describe('BuildAroundSeedModal', () => {
 
     // Should show build button (Quick Build for one-shot mode)
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
   });
 
@@ -265,11 +269,11 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Build Around Me'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
     // Click build button
-    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
+    fireEvent.click(screen.getByText('Quick Build (40 Cards)'));
 
     await waitFor(() => {
       expect(mockBuildAroundSeed).toHaveBeenCalledWith({
@@ -375,10 +379,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Seed Card'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
+    fireEvent.click(screen.getByText('Quick Build (40 Cards)'));
 
     // Wait for suggestions to load - check that card names appear
     await waitFor(() => {
@@ -487,10 +491,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Ownership Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
+    fireEvent.click(screen.getByText('Quick Build (40 Cards)'));
 
     await waitFor(() => {
       expect(screen.getByText('Own 3')).toBeInTheDocument();
@@ -582,10 +586,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Apply Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
+    fireEvent.click(screen.getByText('Quick Build (40 Cards)'));
 
     await waitFor(() => {
       expect(screen.getByText('Apply to Current Deck')).toBeInTheDocument();
@@ -624,10 +628,10 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Error Test'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Quick Build (Auto-fill Deck)'));
+    fireEvent.click(screen.getByText('Quick Build (40 Cards)'));
 
     await waitFor(() => {
       expect(screen.getByText('API Error')).toBeInTheDocument();
@@ -657,14 +661,14 @@ describe('BuildAroundSeedModal', () => {
     fireEvent.click(screen.getByText('Clear Test Card'));
 
     await waitFor(() => {
-      expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+      expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
     });
 
     // Click clear button
     fireEvent.click(screen.getByRole('button', { name: /clear/i }));
 
     // Build button should be gone
-    expect(screen.queryByText('Quick Build (Auto-fill Deck)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quick Build (40 Cards)')).not.toBeInTheDocument();
   });
 
   describe('Search Filters', () => {
@@ -863,7 +867,7 @@ describe('BuildAroundSeedModal', () => {
       // Should show both buttons when iterative mode is available
       await waitFor(() => {
         expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
-        expect(screen.getByText('Quick Build (Auto-fill Deck)')).toBeInTheDocument();
+        expect(screen.getByText('Quick Build (40 Cards)')).toBeInTheDocument();
       });
     });
 
@@ -2123,6 +2127,748 @@ describe('BuildAroundSeedModal', () => {
       await waitFor(() => {
         const scoreBreakdown = document.querySelector('.score-breakdown');
         expect(scoreBreakdown).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Complete Deck Generation (Issue #774)', () => {
+    const mockArchetypeProfiles = {
+      aggro: {
+        name: 'Aggro',
+        landCount: 20,
+        curveTargets: { 1: 8, 2: 14, 3: 10, 4: 4, 5: 4, 6: 0 },
+        creatureRatio: 0.7,
+        removalCount: 4,
+        cardAdvantage: 2,
+        description: 'Fast, aggressive deck that aims to win quickly with cheap threats.',
+      },
+      midrange: {
+        name: 'Midrange',
+        landCount: 24,
+        curveTargets: { 1: 4, 2: 8, 3: 10, 4: 8, 5: 4, 6: 2 },
+        creatureRatio: 0.55,
+        removalCount: 6,
+        cardAdvantage: 4,
+        description: 'Balanced deck with efficient threats and answers.',
+      },
+      control: {
+        name: 'Control',
+        landCount: 26,
+        curveTargets: { 1: 2, 2: 6, 3: 8, 4: 8, 5: 6, 6: 4 },
+        creatureRatio: 0.25,
+        removalCount: 10,
+        cardAdvantage: 8,
+        description: 'Slow, controlling deck that grinds out opponents.',
+      },
+    };
+
+    const mockGeneratedDeck = {
+      seedCard: {
+        cardID: 12345,
+        name: 'Seed Card',
+        manaCost: '{2}{R}',
+        cmc: 3,
+        colors: ['R'],
+        typeLine: 'Creature - Human',
+        score: 1.0,
+        reasoning: 'Seed card',
+        inCollection: true,
+        ownedCount: 4,
+        neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
+      },
+      spells: [
+        {
+          cardID: 11111,
+          name: 'Aggressive Creature',
+          manaCost: '{R}',
+          cmc: 1,
+          colors: ['R'],
+          typeLine: 'Creature - Goblin',
+          rarity: 'common',
+          imageURI: '',
+          quantity: 4,
+          score: 0.9,
+          reasoning: 'Fast creature',
+          inCollection: true,
+          ownedCount: 4,
+        },
+        {
+          cardID: 22222,
+          name: 'Burn Spell',
+          manaCost: '{1}{R}',
+          cmc: 2,
+          colors: ['R'],
+          typeLine: 'Instant',
+          rarity: 'common',
+          imageURI: '',
+          quantity: 4,
+          score: 0.85,
+          reasoning: 'Removal spell',
+          inCollection: true,
+          ownedCount: 4,
+        },
+      ],
+      lands: [
+        {
+          cardID: 81717,
+          name: 'Mountain',
+          quantity: 20,
+          colors: ['R'],
+          isBasic: true,
+        },
+      ],
+      strategy: {
+        summary: 'An aggressive mono-red deck focused on fast creatures and burn.',
+        gamePlan: 'Deploy cheap threats and finish with burn spells.',
+        keyCards: ['Aggressive Creature', 'Burn Spell'],
+        mulligan: 'Keep hands with 2-3 lands and cheap creatures.',
+        strengths: ['Fast', 'Consistent'],
+        weaknesses: ['Weak to lifegain', 'Runs out of gas'],
+      },
+      analysis: {
+        totalCards: 60,
+        spellCount: 40,
+        landCount: 20,
+        colorDistribution: { R: 40 },
+        curveDistribution: { 1: 8, 2: 12, 3: 10, 4: 6, 5: 4 },
+        averageCMC: 2.1,
+        creatureCount: 28,
+        inCollectionCount: 55,
+        missingCount: 5,
+        missingWildcardCost: { common: 3, uncommon: 2 },
+      },
+    };
+
+    it('should show Quick Generate button when card is selected', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Generate Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Generate' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Generate Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Generate Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Quick Generate (60-Card Deck)')).toBeInTheDocument();
+      });
+    });
+
+    it('should show archetype selector when Quick Generate is clicked', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Archetype Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: 'http://example.com/card.png',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Archetype' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Archetype Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Archetype Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Quick Generate (60-Card Deck)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Quick Generate (60-Card Deck)'));
+
+      // Should show archetype selector
+      await waitFor(() => {
+        expect(screen.getByText('Choose Deck Archetype')).toBeInTheDocument();
+        expect(screen.getByText('Building around: Archetype Test Card')).toBeInTheDocument();
+      });
+
+      // Should show all three archetype options
+      expect(screen.getByText('Aggro')).toBeInTheDocument();
+      expect(screen.getByText('Midrange')).toBeInTheDocument();
+      expect(screen.getByText('Control')).toBeInTheDocument();
+    });
+
+    it('should display archetype descriptions and stats', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Desc Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Desc' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Desc Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Desc Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        // Check archetype stats are displayed
+        expect(screen.getByText('20 lands')).toBeInTheDocument();
+        expect(screen.getByText('70% creatures')).toBeInTheDocument();
+        expect(screen.getByText('24 lands')).toBeInTheDocument();
+        expect(screen.getByText('55% creatures')).toBeInTheDocument();
+        expect(screen.getByText('26 lands')).toBeInTheDocument();
+        expect(screen.getByText('25% creatures')).toBeInTheDocument();
+      });
+    });
+
+    it('should generate deck when archetype is selected', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Gen Deck Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Gen' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Gen Deck Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Gen Deck Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      // Click Aggro archetype
+      fireEvent.click(screen.getByText('Aggro'));
+
+      // Should call the API with correct parameters
+      await waitFor(() => {
+        expect(mockGenerateCompleteDeck).toHaveBeenCalledWith({
+          seed_card_id: 12345,
+          archetype: 'aggro',
+          budget_mode: false,
+        });
+      });
+    });
+
+    it('should display generated deck result with strategy', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Result Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Result' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Result Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Result Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      // Should show generated deck result
+      await waitFor(() => {
+        expect(screen.getByText(/Generated Aggro Deck/i)).toBeInTheDocument();
+      });
+
+      // Strategy panel
+      expect(screen.getByText('Deck Strategy')).toBeInTheDocument();
+      expect(screen.getByText(mockGeneratedDeck.strategy.summary)).toBeInTheDocument();
+
+      // Game plan
+      expect(screen.getByText('Game Plan')).toBeInTheDocument();
+      expect(screen.getByText(mockGeneratedDeck.strategy.gamePlan)).toBeInTheDocument();
+
+      // Mulligan guide
+      expect(screen.getByText('Mulligan Guide')).toBeInTheDocument();
+      expect(screen.getByText(mockGeneratedDeck.strategy.mulligan)).toBeInTheDocument();
+    });
+
+    it('should display deck statistics in generated result', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Stats Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Stats' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Stats Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Stats Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Generated Aggro Deck/i)).toBeInTheDocument();
+      });
+
+      // Check stats display
+      expect(screen.getByText('60')).toBeInTheDocument(); // Total Cards
+      expect(screen.getByText('40')).toBeInTheDocument(); // Spells
+      expect(screen.getByText('20')).toBeInTheDocument(); // Lands
+      expect(screen.getByText('2.10')).toBeInTheDocument(); // Avg CMC
+    });
+
+    it('should display card lists grouped by type', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'List Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'List' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('List Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('List Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Generated Aggro Deck/i)).toBeInTheDocument();
+      });
+
+      // Check card lists are displayed (use getAllByText since cards may appear in multiple sections)
+      expect(screen.getAllByText('Aggressive Creature').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Burn Spell').length).toBeGreaterThan(0);
+      expect(screen.getByText('Mountain')).toBeInTheDocument();
+    });
+
+    it('should have Apply Deck button that calls onApplyDeck', async () => {
+      const onApplyDeck = vi.fn();
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Apply Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} onApplyDeck={onApplyDeck} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Apply' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Apply Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Apply Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Apply Deck')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Apply Deck'));
+
+      expect(onApplyDeck).toHaveBeenCalled();
+    });
+
+    it('should allow trying a different archetype', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Retry Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Retry' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Retry Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Retry Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Try Different Archetype')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Try Different Archetype'));
+
+      // Should go back to archetype selector
+      await waitFor(() => {
+        expect(screen.getByText('Choose Deck Archetype')).toBeInTheDocument();
+      });
+    });
+
+    it('should respect budget mode when generating deck', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Budget Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Budget' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Budget Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Budget Test Card'));
+
+      // Enable budget mode
+      const budgetCheckbox = screen.getByLabelText(/budget mode/i);
+      fireEvent.click(budgetCheckbox);
+
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Midrange')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Midrange'));
+
+      await waitFor(() => {
+        expect(mockGenerateCompleteDeck).toHaveBeenCalledWith({
+          seed_card_id: 12345,
+          archetype: 'midrange',
+          budget_mode: true,
+        });
+      });
+    });
+
+    it('should show back button in archetype selector', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Back Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Back' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Back Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Back Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Back to Card Selection')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Back to Card Selection'));
+
+      // Should go back to card selection
+      await waitFor(() => {
+        expect(screen.getByText('Build Around Card')).toBeInTheDocument();
+        expect(screen.getByText('Quick Generate (60-Card Deck)')).toBeInTheDocument();
+      });
+    });
+
+    it('should display strengths and weaknesses in strategy panel', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Strengths Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Strengths' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Strengths Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Strengths Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Control')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Control'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Strengths')).toBeInTheDocument();
+        expect(screen.getByText('Weaknesses')).toBeInTheDocument();
+      });
+
+      // Check actual strength/weakness content
+      expect(screen.getByText('Fast')).toBeInTheDocument();
+      expect(screen.getByText('Consistent')).toBeInTheDocument();
+      expect(screen.getByText('Weak to lifegain')).toBeInTheDocument();
+      expect(screen.getByText('Runs out of gas')).toBeInTheDocument();
+    });
+
+    it('should display key cards in strategy panel', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Key Cards Test',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Key' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Key Cards Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Key Cards Test'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Key Cards')).toBeInTheDocument();
+      });
+
+      // Key cards are displayed as tags
+      const keyCardTags = document.querySelectorAll('.key-card-tag');
+      expect(keyCardTags.length).toBe(2);
+    });
+
+    it('should show wildcard cost when missing cards', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Wildcard Test',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockResolvedValue(mockGeneratedDeck);
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Wildcard' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Wildcard Test')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Wildcard Test'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Wildcards needed:')).toBeInTheDocument();
+      });
+
+      // Should show wildcard badges
+      expect(screen.getByText('3 common')).toBeInTheDocument();
+      expect(screen.getByText('2 uncommon')).toBeInTheDocument();
+    });
+
+    it('should show error when deck generation fails', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Error Test Card',
+          ManaCost: '{2}{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockGetArchetypeProfiles.mockResolvedValue(mockArchetypeProfiles);
+      mockGenerateCompleteDeck.mockRejectedValue(new Error('Generation failed'));
+
+      render(<BuildAroundSeedModal {...defaultProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Error' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Error Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Error Test Card'));
+      fireEvent.click(await screen.findByText('Quick Generate (60-Card Deck)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Aggro')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Aggro'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Generation failed')).toBeInTheDocument();
       });
     });
   });

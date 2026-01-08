@@ -2894,3 +2894,265 @@ func convertIterativeResponse(r *recommendations.IterativeBuildAroundResponse) *
 
 	return response
 }
+
+// GenerateCompleteDeckRequest represents a request to generate a complete 60-card deck.
+type GenerateCompleteDeckRequest struct {
+	SeedCardID     int      `json:"seedCardID"`
+	Archetype      string   `json:"archetype"`                // "aggro", "midrange", "control"
+	BudgetMode     bool     `json:"budgetMode,omitempty"`     // Only collection cards
+	SetRestriction string   `json:"setRestriction,omitempty"` // "single", "multiple", "all"
+	AllowedSets    []string `json:"allowedSets,omitempty"`    // Specific set codes if "multiple"
+}
+
+// GenerateCompleteDeckResponse contains a complete 60-card deck with strategy.
+type GenerateCompleteDeckResponse struct {
+	SeedCard *CardWithOwnershipResponse     `json:"seedCard"`
+	Spells   []*CardWithQuantityResponse    `json:"spells"` // Non-land cards with quantities
+	Lands    []*LandWithQuantityResponse    `json:"lands"`  // Lands with quantities
+	Strategy *DeckStrategyResponse          `json:"strategy"`
+	Analysis *GeneratedDeckAnalysisResponse `json:"analysis"`
+}
+
+// CardWithQuantityResponse represents a card with how many copies to include.
+type CardWithQuantityResponse struct {
+	CardID         int                     `json:"cardID"`
+	Name           string                  `json:"name"`
+	ManaCost       string                  `json:"manaCost,omitempty"`
+	CMC            int                     `json:"cmc"`
+	Colors         []string                `json:"colors"`
+	TypeLine       string                  `json:"typeLine"`
+	Rarity         string                  `json:"rarity,omitempty"`
+	ImageURI       string                  `json:"imageURI,omitempty"`
+	Score          float64                 `json:"score"`
+	Reasoning      string                  `json:"reasoning"`
+	Quantity       int                     `json:"quantity"`
+	InCollection   bool                    `json:"inCollection"`
+	OwnedCount     int                     `json:"ownedCount"`
+	NeededCount    int                     `json:"neededCount"`
+	ScoreBreakdown *ScoreBreakdownResponse `json:"scoreBreakdown,omitempty"`
+	SynergyDetails []SynergyDetailResponse `json:"synergyDetails,omitempty"`
+}
+
+// ScoreBreakdownResponse provides detailed scoring factors.
+type ScoreBreakdownResponse struct {
+	ColorFit float64 `json:"colorFit"`
+	CurveFit float64 `json:"curveFit"`
+	Synergy  float64 `json:"synergy"`
+	Quality  float64 `json:"quality"`
+	Overall  float64 `json:"overall"`
+}
+
+// SynergyDetailResponse describes a specific synergy.
+type SynergyDetailResponse struct {
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// LandWithQuantityResponse represents a land with quantity and type information.
+type LandWithQuantityResponse struct {
+	CardID       int      `json:"cardID"`
+	Name         string   `json:"name"`
+	Quantity     int      `json:"quantity"`
+	Colors       []string `json:"colors"`
+	IsBasic      bool     `json:"isBasic"`
+	EntersTapped bool     `json:"entersTapped"`
+}
+
+// DeckStrategyResponse provides human-readable deck strategy information.
+type DeckStrategyResponse struct {
+	Summary    string   `json:"summary"`
+	GamePlan   string   `json:"gamePlan"`
+	KeyCards   []string `json:"keyCards"`
+	Mulligan   string   `json:"mulligan"`
+	Strengths  []string `json:"strengths"`
+	Weaknesses []string `json:"weaknesses"`
+}
+
+// GeneratedDeckAnalysisResponse provides detailed analysis of the generated deck.
+type GeneratedDeckAnalysisResponse struct {
+	TotalCards          int            `json:"totalCards"`
+	SpellCount          int            `json:"spellCount"`
+	LandCount           int            `json:"landCount"`
+	CreatureCount       int            `json:"creatureCount"`
+	NonCreatureCount    int            `json:"nonCreatureCount"`
+	AverageCMC          float64        `json:"averageCMC"`
+	ManaCurve           map[int]int    `json:"manaCurve"`
+	ColorDistribution   map[string]int `json:"colorDistribution"`
+	InCollectionCount   int            `json:"inCollectionCount"`
+	MissingCount        int            `json:"missingCount"`
+	MissingWildcardCost map[string]int `json:"missingWildcardCost"`
+	ArchetypeMatch      float64        `json:"archetypeMatch"`
+}
+
+// ArchetypeProfileResponse represents an archetype profile for the frontend.
+type ArchetypeProfileResponse struct {
+	Name         string      `json:"name"`
+	LandCount    int         `json:"landCount"`
+	CurveTargets map[int]int `json:"curveTargets"`
+	Description  string      `json:"description"`
+}
+
+// GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
+func (d *DeckFacade) GenerateCompleteDeck(ctx context.Context, req *GenerateCompleteDeckRequest) (*GenerateCompleteDeckResponse, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Create seed deck builder
+	builder := recommendations.NewSeedDeckBuilder(
+		d.services.Storage.SetCardRepo(),
+		d.services.Storage.CollectionRepo(),
+		d.services.Storage.StandardRepo(),
+		d.services.CardService,
+	)
+
+	// Convert request
+	builderReq := &recommendations.GenerateCompleteDeckRequest{
+		SeedCardID:     req.SeedCardID,
+		Archetype:      req.Archetype,
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+
+	result, err := builder.GenerateCompleteDeck(ctx, builderReq)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to generate deck: %v", err)}
+	}
+
+	// Convert to response type
+	return convertGenerateCompleteDeckResponse(result), nil
+}
+
+// GetArchetypeProfiles returns all available archetype profiles.
+func (d *DeckFacade) GetArchetypeProfiles() []*ArchetypeProfileResponse {
+	profiles := recommendations.GetAllArchetypeProfiles()
+	result := make([]*ArchetypeProfileResponse, 0, len(profiles))
+	for _, p := range profiles {
+		result = append(result, &ArchetypeProfileResponse{
+			Name:         p.Name,
+			LandCount:    p.LandCount,
+			CurveTargets: p.CurveTargets,
+			Description:  p.Description,
+		})
+	}
+	return result
+}
+
+// convertGenerateCompleteDeckResponse converts the internal response to the API response type.
+func convertGenerateCompleteDeckResponse(r *recommendations.GenerateCompleteDeckResponse) *GenerateCompleteDeckResponse {
+	if r == nil {
+		return nil
+	}
+
+	response := &GenerateCompleteDeckResponse{}
+
+	// Convert seed card
+	if r.SeedCard != nil {
+		response.SeedCard = convertCardWithOwnership(r.SeedCard)
+	}
+
+	// Convert spells with quantity
+	response.Spells = make([]*CardWithQuantityResponse, 0, len(r.Spells))
+	for _, spell := range r.Spells {
+		response.Spells = append(response.Spells, convertCardWithQuantity(spell))
+	}
+
+	// Convert lands
+	response.Lands = make([]*LandWithQuantityResponse, 0, len(r.Lands))
+	for _, land := range r.Lands {
+		response.Lands = append(response.Lands, &LandWithQuantityResponse{
+			CardID:       land.CardID,
+			Name:         land.Name,
+			Quantity:     land.Quantity,
+			Colors:       land.Colors,
+			IsBasic:      land.IsBasic,
+			EntersTapped: land.EntersTapped,
+		})
+	}
+
+	// Convert strategy
+	if r.Strategy != nil {
+		response.Strategy = &DeckStrategyResponse{
+			Summary:    r.Strategy.Summary,
+			GamePlan:   r.Strategy.GamePlan,
+			KeyCards:   r.Strategy.KeyCards,
+			Mulligan:   r.Strategy.Mulligan,
+			Strengths:  r.Strategy.Strengths,
+			Weaknesses: r.Strategy.Weaknesses,
+		}
+	}
+
+	// Convert analysis
+	if r.Analysis != nil {
+		response.Analysis = &GeneratedDeckAnalysisResponse{
+			TotalCards:          r.Analysis.TotalCards,
+			SpellCount:          r.Analysis.SpellCount,
+			LandCount:           r.Analysis.LandCount,
+			CreatureCount:       r.Analysis.CreatureCount,
+			NonCreatureCount:    r.Analysis.NonCreatureCount,
+			AverageCMC:          r.Analysis.AverageCMC,
+			ManaCurve:           r.Analysis.ManaCurve,
+			ColorDistribution:   r.Analysis.ColorDistribution,
+			InCollectionCount:   r.Analysis.InCollectionCount,
+			MissingCount:        r.Analysis.MissingCount,
+			MissingWildcardCost: r.Analysis.MissingWildcardCost,
+			ArchetypeMatch:      r.Analysis.ArchetypeMatch,
+		}
+	}
+
+	return response
+}
+
+// convertCardWithQuantity converts a card with quantity to the response type.
+func convertCardWithQuantity(c *recommendations.CardWithQuantity) *CardWithQuantityResponse {
+	if c == nil {
+		return nil
+	}
+
+	response := &CardWithQuantityResponse{
+		CardID:       c.CardID,
+		Name:         c.Name,
+		ManaCost:     c.ManaCost,
+		CMC:          c.CMC,
+		Colors:       c.Colors,
+		TypeLine:     c.TypeLine,
+		Rarity:       c.Rarity,
+		ImageURI:     c.ImageURI,
+		Score:        c.Score,
+		Reasoning:    c.Reasoning,
+		Quantity:     c.Quantity,
+		InCollection: c.InCollection,
+		OwnedCount:   c.OwnedCount,
+		NeededCount:  c.NeededCount,
+	}
+
+	// Convert score breakdown
+	if c.ScoreBreakdown != nil {
+		response.ScoreBreakdown = &ScoreBreakdownResponse{
+			ColorFit: c.ScoreBreakdown.ColorFit,
+			CurveFit: c.ScoreBreakdown.CurveFit,
+			Synergy:  c.ScoreBreakdown.Synergy,
+			Quality:  c.ScoreBreakdown.Quality,
+			Overall:  c.ScoreBreakdown.Overall,
+		}
+	}
+
+	// Convert synergy details
+	if len(c.SynergyDetails) > 0 {
+		response.SynergyDetails = make([]SynergyDetailResponse, 0, len(c.SynergyDetails))
+		for _, sd := range c.SynergyDetails {
+			response.SynergyDetails = append(response.SynergyDetails, SynergyDetailResponse{
+				Type:        sd.Type,
+				Name:        sd.Name,
+				Description: sd.Description,
+			})
+		}
+	}
+
+	return response
+}
