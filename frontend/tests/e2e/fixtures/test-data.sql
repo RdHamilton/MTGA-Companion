@@ -11,11 +11,17 @@ VALUES (1, 'TestPlayer', 'TestPlayer#12345', 'test-client-id-12345', 1, 3, 12, 4
 -- ============================================================================
 -- SETS (Recent sets for testing)
 -- ============================================================================
-INSERT OR REPLACE INTO sets (code, name, released_at, card_count, set_type, icon_svg_uri)
+INSERT OR REPLACE INTO sets (code, name, released_at, card_count, set_type, icon_svg_uri, is_standard_legal, rotation_date)
 VALUES
-    ('DSK', 'Duskmourn: House of Horror', '2024-09-27', 291, 'expansion', 'https://svgs.scryfall.io/sets/dsk.svg'),
-    ('BLB', 'Bloomburrow', '2024-08-02', 276, 'expansion', 'https://svgs.scryfall.io/sets/blb.svg'),
-    ('OTJ', 'Outlaws of Thunder Junction', '2024-04-19', 286, 'expansion', 'https://svgs.scryfall.io/sets/otj.svg');
+    ('DSK', 'Duskmourn: House of Horror', '2024-09-27', 291, 'expansion', 'https://svgs.scryfall.io/sets/dsk.svg', 1, '2028-01-01'),
+    ('BLB', 'Bloomburrow', '2024-08-02', 276, 'expansion', 'https://svgs.scryfall.io/sets/blb.svg', 1, '2028-01-01'),
+    ('OTJ', 'Outlaws of Thunder Junction', '2024-04-19', 286, 'expansion', 'https://svgs.scryfall.io/sets/otj.svg', 1, '2027-01-23');
+
+-- ============================================================================
+-- STANDARD CONFIG (for rotation notifications)
+-- ============================================================================
+INSERT OR REPLACE INTO standard_config (id, next_rotation_date, rotation_enabled, updated_at)
+VALUES (1, '2027-01-23', 1, CURRENT_TIMESTAMP);
 
 -- ============================================================================
 -- SET_CARDS (Sample cards from each set)
@@ -224,7 +230,9 @@ VALUES
     ('theme', '"dark"'),
     ('auto_track', 'true'),
     ('show_overlay', 'true'),
-    ('log_path', '""');
+    ('log_path', '""'),
+    ('rotationNotificationsEnabled', 'true'),
+    ('rotationNotificationThreshold', '30');
 
 -- ============================================================================
 -- PLAYER STATS
