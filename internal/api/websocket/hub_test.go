@@ -33,11 +33,20 @@ func TestNewHub(t *testing.T) {
 	if hub.unregister == nil {
 		t.Error("Hub unregister channel is nil")
 	}
+
+	if hub.done == nil {
+		t.Error("Hub done channel is nil")
+	}
+
+	if hub.stopped {
+		t.Error("Hub should not be stopped initially")
+	}
 }
 
 func TestHub_ClientCount(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	defer hub.Stop()
 
 	// Initially no clients
 	if count := hub.ClientCount(); count != 0 {
@@ -48,6 +57,7 @@ func TestHub_ClientCount(t *testing.T) {
 func TestHub_BroadcastEvent(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	defer hub.Stop()
 
 	// Create a test event
 	event := Event{
@@ -100,6 +110,7 @@ func TestEvent_JSON(t *testing.T) {
 func TestHub_WebSocketConnection(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	defer hub.Stop()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(hub.ServeWs))
@@ -152,6 +163,7 @@ func TestHub_WebSocketConnection(t *testing.T) {
 func TestHub_MultipleClients(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	defer hub.Stop()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(hub.ServeWs))
@@ -217,6 +229,7 @@ func TestHub_MultipleClients(t *testing.T) {
 func TestHub_ClientDisconnect(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
+	defer hub.Stop()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(hub.ServeWs))
@@ -246,5 +259,143 @@ func TestHub_ClientDisconnect(t *testing.T) {
 
 	if count := hub.ClientCount(); count != 0 {
 		t.Errorf("Expected 0 clients after disconnect, got %d", count)
+	}
+}
+
+func TestHub_Stop(t *testing.T) {
+	hub := NewHub()
+
+	// Start the hub in a goroutine
+	done := make(chan struct{})
+	go func() {
+		hub.Run()
+		close(done)
+	}()
+
+	// Give time for hub to start
+	time.Sleep(10 * time.Millisecond)
+
+	// Stop the hub
+	hub.Stop()
+
+	// Wait for hub to stop with timeout
+	select {
+	case <-done:
+		// Hub stopped successfully
+	case <-time.After(1 * time.Second):
+		t.Fatal("Hub did not stop within timeout")
+	}
+}
+
+func TestHub_Stop_CleansUpClients(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(hub.ServeWs))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	// Connect multiple clients
+	dialer := websocket.Dialer{}
+	var conns []*websocket.Conn
+
+	for i := 0; i < 3; i++ {
+		conn, _, err := dialer.Dial(wsURL, nil)
+		if err != nil {
+			t.Fatalf("Failed to connect client %d: %v", i, err)
+		}
+		conns = append(conns, conn)
+	}
+
+	// Give time for registrations
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify clients connected
+	if count := hub.ClientCount(); count != 3 {
+		t.Errorf("Expected 3 clients before stop, got %d", count)
+	}
+
+	// Stop the hub
+	hub.Stop()
+
+	// Give time for cleanup
+	time.Sleep(50 * time.Millisecond)
+
+	// After stop, client count should be 0
+	if count := hub.ClientCount(); count != 0 {
+		t.Errorf("Expected 0 clients after stop, got %d", count)
+	}
+
+	// Clean up connections
+	for _, conn := range conns {
+		conn.Close()
+	}
+}
+
+func TestHub_Stop_Idempotent(t *testing.T) {
+	hub := NewHub()
+
+	done := make(chan struct{})
+	go func() {
+		hub.Run()
+		close(done)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Stop should not panic when called once
+	hub.Stop()
+
+	select {
+	case <-done:
+		// Hub stopped successfully
+	case <-time.After(1 * time.Second):
+		t.Fatal("Hub did not stop within timeout")
+	}
+
+	// Calling Stop() multiple times should not panic (idempotent)
+	hub.Stop()
+	hub.Stop()
+	hub.Stop()
+}
+
+func TestHub_IsStopped(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	if hub.IsStopped() {
+		t.Error("Expected IsStopped() to be false before Stop()")
+	}
+
+	hub.Stop()
+
+	// Give time for stop to propagate
+	time.Sleep(50 * time.Millisecond)
+
+	if !hub.IsStopped() {
+		t.Error("Expected IsStopped() to be true after Stop()")
+	}
+}
+
+func TestHub_BroadcastEvent_AfterStop(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	hub.Stop()
+
+	// Give time for stop to propagate
+	time.Sleep(50 * time.Millisecond)
+
+	// BroadcastEvent should return false after stop
+	event := Event{
+		Type: "test:event",
+		Data: map[string]interface{}{"key": "value"},
+	}
+
+	result := hub.BroadcastEvent(event)
+	if result {
+		t.Error("Expected BroadcastEvent to return false after Stop()")
 	}
 }
