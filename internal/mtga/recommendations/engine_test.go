@@ -1487,6 +1487,128 @@ func TestKeywordDictionaryCompleteness(t *testing.T) {
 	}
 }
 
+func TestExtractKeywordsFromText_NewPatterns(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		expected string
+	}{
+		// Second card drawn triggers
+		{
+			name:     "second card draw trigger (Jolrael)",
+			text:     "Whenever you draw your second card each turn, create a 2/2 green Cat creature token",
+			expected: "second draw",
+		},
+		{
+			name:     "additional card draw",
+			text:     "You may draw an additional card during your draw step",
+			expected: "card advantage",
+		},
+		// Spells matter (magecraft)
+		{
+			name:     "whenever cast noncreature spell",
+			text:     "Whenever you cast a noncreature spell, this creature gets +1/+0 until end of turn",
+			expected: "spells matter",
+		},
+		{
+			name:     "whenever cast instant or sorcery",
+			text:     "Whenever you cast an instant or sorcery spell, draw a card",
+			expected: "spells matter",
+		},
+		{
+			name:     "magecraft ability",
+			text:     "Magecraft — Whenever you cast or copy an instant or sorcery spell, create a 1/1 Fractal",
+			expected: "spells matter",
+		},
+		// Token sacrifice
+		{
+			name:     "sacrifice a token",
+			text:     "Sacrifice a token: Add one mana of any color",
+			expected: "token sacrifice",
+		},
+		{
+			name:     "sacrifice payoff",
+			text:     "Whenever you sacrifice a permanent, each opponent loses 1 life",
+			expected: "sacrifice payoff",
+		},
+		// Artifact triggers
+		{
+			name:     "artifact enters the battlefield",
+			text:     "Whenever an artifact enters the battlefield under your control, draw a card",
+			expected: "artifacts ETB",
+		},
+		// Death payoffs
+		{
+			name:     "another creature dies",
+			text:     "Whenever another creature you control dies, put a +1/+1 counter on this creature",
+			expected: "death payoff",
+		},
+		// Discard themes
+		{
+			name:     "discard payoff",
+			text:     "Whenever you discard a card, you may pay {1}. If you do, draw a card",
+			expected: "discard payoff",
+		},
+		// Blink/flicker
+		{
+			name:     "blink effect",
+			text:     "Exile target creature you control, then return it to the battlefield under your control",
+			expected: "blink",
+		},
+		// Anthem effects
+		{
+			name:     "anthem effect",
+			text:     "Other creatures you control get +1/+1",
+			expected: "anthem",
+		},
+		// Landfall
+		{
+			name:     "landfall trigger",
+			text:     "Landfall — Whenever a land enters the battlefield under your control, gain 1 life",
+			expected: "landfall",
+		},
+		// Energy
+		{
+			name:     "energy counter",
+			text:     "When this creature enters the battlefield, you get {E}{E}",
+			expected: "energy",
+		},
+		// Go wide
+		{
+			name:     "go wide payoff",
+			text:     "For each creature you control, draw a card",
+			expected: "go wide",
+		},
+		// Treasure tokens
+		{
+			name:     "treasure token creation",
+			text:     "Create a Treasure token",
+			expected: "treasure tokens",
+		},
+		// Food tokens
+		{
+			name:     "food token creation",
+			text:     "Create a Food token",
+			expected: "food tokens",
+		},
+		// Blood tokens
+		{
+			name:     "blood token creation",
+			text:     "Create a Blood token",
+			expected: "blood tokens",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keywords := extractKeywordsFromText(tt.text)
+			if !keywords[tt.expected] {
+				t.Errorf("Expected keyword %q not found. Text: %q. Found keywords: %v", tt.expected, tt.text, keywords)
+			}
+		})
+	}
+}
+
 func TestThemePatternsCompleteness(t *testing.T) {
 	// Test that important themes are covered
 	importantThemes := map[string]string{
