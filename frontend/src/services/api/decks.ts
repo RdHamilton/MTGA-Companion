@@ -475,14 +475,12 @@ export async function suggestNextCards(
 
 /**
  * Archetype profile for deck building.
+ * Note: Backend ArchetypeProfileResponse only exposes name, landCount, curveTargets, description.
  */
 export interface ArchetypeProfile {
   name: string;
   landCount: number;
   curveTargets: Record<number, number>;
-  creatureRatio: number;
-  removalCount: number;
-  cardAdvantage: number;
   description: string;
 }
 
@@ -541,18 +539,21 @@ export interface DeckStrategy {
 
 /**
  * Analysis of a generated deck.
+ * Matches backend GeneratedDeckAnalysisResponse.
  */
 export interface GeneratedDeckAnalysis {
   totalCards: number;
   spellCount: number;
   landCount: number;
-  colorDistribution: Record<string, number>;
-  curveDistribution: Record<number, number>;
-  averageCMC: number;
   creatureCount: number;
+  nonCreatureCount: number;
+  averageCMC: number;
+  manaCurve: Record<number, number>;
+  colorDistribution: Record<string, number>;
   inCollectionCount: number;
   missingCount: number;
   missingWildcardCost: Record<string, number>;
+  archetypeMatch: number;
 }
 
 /**

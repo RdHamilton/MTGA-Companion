@@ -2231,13 +2231,15 @@ describe('BuildAroundSeedModal', () => {
         totalCards: 60,
         spellCount: 40,
         landCount: 20,
-        colorDistribution: { R: 40 },
-        curveDistribution: { 1: 8, 2: 12, 3: 10, 4: 6, 5: 4 },
-        averageCMC: 2.1,
         creatureCount: 28,
+        nonCreatureCount: 12,
+        averageCMC: 2.1,
+        manaCurve: { 1: 8, 2: 12, 3: 10, 4: 6, 5: 4 },
+        colorDistribution: { R: 40 },
         inCollectionCount: 55,
         missingCount: 5,
         missingWildcardCost: { common: 3, uncommon: 2 },
+        archetypeMatch: 0.85,
       },
     };
 

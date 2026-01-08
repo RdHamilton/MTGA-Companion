@@ -1074,7 +1074,7 @@ export default function BuildAroundSeedModal({
               <div className="curve-visualization">
                 <h4>Mana Curve</h4>
                 <div className="curve-bars">
-                  {Object.entries(generatedDeck.analysis.curveDistribution)
+                  {Object.entries(generatedDeck.analysis.manaCurve)
                     .sort(([a], [b]) => parseInt(a) - parseInt(b))
                     .map(([cmc, count]) => (
                       <div key={cmc} className="curve-bar-wrapper">

@@ -1902,9 +1902,13 @@ func (s *SeedDeckBuilder) scoreArchetypeCurveFit(card *cards.Card, profile *Arch
 	}
 
 	// Higher target = more desirable
-	// Max target in aggro is 12 at 2 CMC
-	maxTarget := 12.0
-	return float64(target) / maxTarget
+	// Max target in aggro is 14 at 2 CMC, cap result at 1.0
+	maxTarget := 14.0
+	score := float64(target) / maxTarget
+	if score > 1.0 {
+		score = 1.0
+	}
+	return score
 }
 
 // scoreTypeForArchetype scores how well a card's type fits the archetype.
@@ -2380,10 +2384,12 @@ func (s *SeedDeckBuilder) buildGeneratedDeckAnalysis(
 	// Calculate archetype match (how well does the deck match the profile?)
 	archetypeMatch := 1.0
 
-	// Check creature ratio
-	actualCreatureRatio := float64(analysis.CreatureCount) / float64(analysis.SpellCount)
-	ratioDiff := abs(actualCreatureRatio - profile.CreatureRatio)
-	archetypeMatch -= ratioDiff * 0.5
+	// Check creature ratio (guard against division by zero)
+	if analysis.SpellCount > 0 {
+		actualCreatureRatio := float64(analysis.CreatureCount) / float64(analysis.SpellCount)
+		ratioDiff := abs(actualCreatureRatio - profile.CreatureRatio)
+		archetypeMatch -= ratioDiff * 0.5
+	}
 
 	// Check land count
 	landDiff := abs(float64(analysis.LandCount) - float64(profile.LandCount))

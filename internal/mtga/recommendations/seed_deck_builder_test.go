@@ -1275,10 +1275,10 @@ func TestScoreArchetypeCurveFit(t *testing.T) {
 	builder := &SeedDeckBuilder{}
 
 	tests := []struct {
-		name        string
-		cmc         float64
-		archetype   string
-		expectHigh  bool // Expect score > 0.5
+		name       string
+		cmc        float64
+		archetype  string
+		expectHigh bool // Expect score > 0.5
 	}{
 		{
 			name:       "1-drop in aggro (high target)",
@@ -1438,38 +1438,38 @@ func TestIsCardAdvantageSpell(t *testing.T) {
 	builder := &SeedDeckBuilder{}
 
 	tests := []struct {
-		name           string
-		card           *cards.Card
+		name            string
+		card            *cards.Card
 		isCardAdvantage bool
 	}{
 		{
-			name:           "Draw a card",
-			card:           &cards.Card{OracleText: strPtr("Draw a card.")},
+			name:            "Draw a card",
+			card:            &cards.Card{OracleText: strPtr("Draw a card.")},
 			isCardAdvantage: true,
 		},
 		{
-			name:           "Draw two",
-			card:           &cards.Card{OracleText: strPtr("Draw two cards.")},
+			name:            "Draw two",
+			card:            &cards.Card{OracleText: strPtr("Draw two cards.")},
 			isCardAdvantage: true,
 		},
 		{
-			name:           "Scry",
-			card:           &cards.Card{OracleText: strPtr("Scry 2.")},
+			name:            "Scry",
+			card:            &cards.Card{OracleText: strPtr("Scry 2.")},
 			isCardAdvantage: true,
 		},
 		{
-			name:           "Surveil",
-			card:           &cards.Card{OracleText: strPtr("Surveil 2.")},
+			name:            "Surveil",
+			card:            &cards.Card{OracleText: strPtr("Surveil 2.")},
 			isCardAdvantage: true,
 		},
 		{
-			name:           "Search library",
-			card:           &cards.Card{OracleText: strPtr("Search your library for a card.")},
+			name:            "Search library",
+			card:            &cards.Card{OracleText: strPtr("Search your library for a card.")},
 			isCardAdvantage: true,
 		},
 		{
-			name:           "Combat trick",
-			card:           &cards.Card{OracleText: strPtr("Target creature gets +3/+3 until end of turn.")},
+			name:            "Combat trick",
+			card:            &cards.Card{OracleText: strPtr("Target creature gets +3/+3 until end of turn.")},
 			isCardAdvantage: false,
 		},
 	}
