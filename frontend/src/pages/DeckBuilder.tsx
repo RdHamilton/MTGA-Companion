@@ -5,11 +5,13 @@ import type { CardWithOwnership, SuggestedLandResponse } from '@/services/api/de
 import { ApiRequestError } from '@/services/apiClient';
 import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
+import { useDeckValidation } from '@/hooks/useDeckValidation';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
 import SuggestDecksModal from '../components/SuggestDecksModal';
 import BuildAroundSeedModal from '../components/BuildAroundSeedModal';
+import LegalityBanner from '../components/LegalityBanner';
 import './DeckBuilder.css';
 
 // Export deck to file using native file save dialog
@@ -38,6 +40,14 @@ export default function DeckBuilder() {
   const [addingLands, setAddingLands] = useState(false);
   const [showSuggestDecks, setShowSuggestDecks] = useState(false);
   const [showBuildAround, setShowBuildAround] = useState(false);
+  const [showLegalityBanner, setShowLegalityBanner] = useState(true);
+
+  // Deck validation for legality checking
+  const {
+    validation,
+    validateDeck,
+    hasLegalityIssues,
+  } = useDeckValidation();
 
   // Load deck data
   useEffect(() => {
@@ -195,6 +205,13 @@ export default function DeckBuilder() {
       setLoading(false);
     }
   }, [deckID, draftEventID]);
+
+  // Validate deck for legality when deck loads or cards change
+  useEffect(() => {
+    if (deck && deck.Format === 'standard' && cards.length > 0) {
+      validateDeck(deck.ID);
+    }
+  }, [deck, cards.length, validateDeck]);
 
   const handleAddCard = async (cardID: number, quantity: number, board: 'main' | 'sideboard') => {
     if (!deck) return;
@@ -749,6 +766,17 @@ export default function DeckBuilder() {
           </button>
         </div>
       </div>
+
+      {/* Legality Banner - show for Standard decks with issues */}
+      {showLegalityBanner && validation && hasLegalityIssues() && deck.Format === 'standard' && (
+        <LegalityBanner
+          isLegal={validation.isLegal}
+          errors={validation.errors}
+          warnings={validation.warnings}
+          format={deck.Format}
+          onDismiss={() => setShowLegalityBanner(false)}
+        />
+      )}
 
       {/* Main Content */}
       <div className="deck-builder-content">

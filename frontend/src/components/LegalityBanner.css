@@ -1,0 +1,257 @@
+/* Legality Banner Component */
+.legality-banner {
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+/* Urgency variants */
+.legality-banner--info {
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d2137 100%);
+  border: 1px solid #2d5a8a;
+}
+
+.legality-banner--warning {
+  background: linear-gradient(135deg, #5c4a1a 0%, #372d0d 100%);
+  border: 1px solid #8a7a2d;
+}
+
+.legality-banner--critical {
+  background: linear-gradient(135deg, #5c1a1a 0%, #370d0d 100%);
+  border: 1px solid #8a2d2d;
+}
+
+/* Header */
+.legality-banner__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.legality-banner__icon-container {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legality-banner--info .legality-banner__icon-container {
+  background: rgba(45, 90, 138, 0.5);
+}
+
+.legality-banner--warning .legality-banner__icon-container {
+  background: rgba(138, 122, 45, 0.5);
+}
+
+.legality-banner--critical .legality-banner__icon-container {
+  background: rgba(138, 45, 45, 0.5);
+}
+
+.legality-banner__icon {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.legality-banner--info .legality-banner__icon {
+  color: #6ab0ff;
+}
+
+.legality-banner--warning .legality-banner__icon {
+  color: #ffd700;
+}
+
+.legality-banner--critical .legality-banner__icon {
+  color: #ff6b6b;
+}
+
+.legality-banner__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.legality-banner__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.legality-banner__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+.legality-banner__subtitle span + span::before {
+  content: '';
+}
+
+.legality-banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.legality-banner__expand,
+.legality-banner__dismiss {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.legality-banner__expand:hover,
+.legality-banner__dismiss:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.legality-banner__dismiss {
+  padding: 6px 8px;
+}
+
+/* Details section */
+.legality-banner__details {
+  padding: 0 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+  margin-top: 0;
+}
+
+.legality-banner__section h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #a0a0a0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.legality-banner__cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.legality-banner__card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.legality-banner__card--banned {
+  background: rgba(255, 107, 107, 0.15);
+  border-left: 3px solid #ff6b6b;
+}
+
+.legality-banner__card--not-legal {
+  background: rgba(255, 215, 0, 0.1);
+  border-left: 3px solid #ffd700;
+}
+
+.legality-banner__card--copies {
+  background: rgba(255, 165, 0, 0.1);
+  border-left: 3px solid #ffa500;
+}
+
+.legality-banner__card--size {
+  background: rgba(255, 165, 0, 0.1);
+  border-left: 3px solid #ffa500;
+}
+
+.legality-banner__card--warning {
+  background: rgba(106, 176, 255, 0.1);
+  border-left: 3px solid #6ab0ff;
+}
+
+.legality-banner__card-name {
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legality-banner__card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #ff6b6b;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.legality-banner__card-details {
+  font-size: 11px;
+  color: var(--text-secondary, #a0a0a0);
+  flex-shrink: 0;
+}
+
+/* Compact variant */
+.legality-banner--compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.legality-banner--compact .legality-banner__icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 50%;
+}
+
+.legality-banner--compact.legality-banner--info .legality-banner__icon {
+  background: rgba(45, 90, 138, 0.5);
+}
+
+.legality-banner--compact.legality-banner--warning .legality-banner__icon {
+  background: rgba(138, 122, 45, 0.5);
+}
+
+.legality-banner--compact.legality-banner--critical .legality-banner__icon {
+  background: rgba(138, 45, 45, 0.5);
+}
+
+.legality-banner--compact .legality-banner__text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary, #fff);
+}
+
+.legality-banner--compact .legality-banner__link {
+  font-size: 12px;
+  color: var(--accent-color, #6ab0ff);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.legality-banner--compact .legality-banner__link:hover {
+  text-decoration: underline;
+}
