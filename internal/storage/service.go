@@ -34,6 +34,7 @@ type Service struct {
 	recommendationFeedback repository.RecommendationFeedbackRepository
 	standard               repository.StandardRepository
 	gamePlay               repository.GamePlayRepository
+	cardPerformanceAnalysis repository.CardPerformanceRepository
 	currentAccountID       int // Current active account ID
 }
 
@@ -56,6 +57,7 @@ type ServiceConfig struct {
 	RecommendationFeedback repository.RecommendationFeedbackRepository
 	Standard               repository.StandardRepository
 	GamePlay               repository.GamePlayRepository
+	CardPerformanceAnalysis repository.CardPerformanceRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -92,6 +94,9 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 		}),
 		standard: orDefault(cfg.Standard, func() repository.StandardRepository { return repository.NewStandardRepository(conn) }),
 		gamePlay: orDefault(cfg.GamePlay, func() repository.GamePlayRepository { return repository.NewGamePlayRepository(conn) }),
+		cardPerformanceAnalysis: orDefault(cfg.CardPerformanceAnalysis, func() repository.CardPerformanceRepository {
+			return repository.NewCardPerformanceRepository(conn)
+		}),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -2024,6 +2029,11 @@ func (s *Service) StandardRepo() repository.StandardRepository {
 // GamePlayRepo returns the game play repository.
 func (s *Service) GamePlayRepo() repository.GamePlayRepository {
 	return s.gamePlay
+}
+
+// CardPerformanceAnalysisRepo returns the card performance analysis repository.
+func (s *Service) CardPerformanceAnalysisRepo() repository.CardPerformanceRepository {
+	return s.cardPerformanceAnalysis
 }
 
 // GetCardNames retrieves card names for multiple arena IDs.

@@ -468,3 +468,202 @@ export async function suggestNextCards(
 ): Promise<IterativeBuildAroundResponse> {
   return post<IterativeBuildAroundResponse>('/decks/build-around/suggest-next', request);
 }
+
+// ============================================================================
+// Card Performance Analysis (Issue #771)
+// ============================================================================
+
+/**
+ * Performance metrics for a single card within a deck.
+ */
+export interface CardPerformance {
+  cardId: number;
+  cardName: string;
+  quantity: number;
+  gamesWithCard: number;
+  gamesDrawn: number;
+  gamesPlayed: number;
+  winRateWhenDrawn: number;
+  winRateWhenPlayed: number;
+  deckWinRate: number;
+  playRate: number;
+  winContribution: number;
+  impactScore: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  sampleSize: number;
+  performanceGrade: 'excellent' | 'good' | 'average' | 'poor' | 'bad';
+  avgTurnPlayed: number;
+  turnPlayedDist?: Record<number, number>;
+  mulliganedAway: number;
+  mulliganRate: number;
+}
+
+/**
+ * Full deck performance analysis response.
+ */
+export interface DeckPerformanceAnalysis {
+  deckId: string;
+  deckName: string;
+  totalMatches: number;
+  totalGames: number;
+  overallWinRate: number;
+  cardPerformance: CardPerformance[];
+  bestPerformers: string[];
+  worstPerformers: string[];
+  analysisDate: string;
+}
+
+/**
+ * Card recommendation for add/remove/swap.
+ */
+export interface PerformanceCardRecommendation {
+  type: 'add' | 'remove' | 'swap';
+  cardId: number;
+  cardName: string;
+  reason: string;
+  impactEstimate: number;
+  confidence: 'high' | 'medium' | 'low';
+  priority: number;
+  swapForCardId?: number;
+  swapForCardName?: string;
+  basedOnGames: number;
+}
+
+/**
+ * All recommendations response for a deck.
+ */
+export interface DeckRecommendationsResponse {
+  deckId: string;
+  deckName: string;
+  currentWinRate: number;
+  addRecommendations: PerformanceCardRecommendation[];
+  removeRecommendations: PerformanceCardRecommendation[];
+  swapRecommendations: PerformanceCardRecommendation[];
+  projectedWinRate: number;
+}
+
+/**
+ * Get card performance metrics for a deck.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getCardPerformance(
+  deckId: string,
+  options?: {
+    minGames?: number;
+    includeLands?: boolean;
+  }
+): Promise<DeckPerformanceAnalysis> {
+  const params = new URLSearchParams();
+  if (options?.minGames !== undefined) {
+    params.set('min_games', options.minGames.toString());
+  }
+  if (options?.includeLands) {
+    params.set('include_lands', 'true');
+  }
+
+  const query = params.toString();
+  return get<DeckPerformanceAnalysis>(
+    `/decks/${deckId}/card-performance${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card add recommendations based on performance data.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceAddRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<PerformanceCardRecommendation[]> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<PerformanceCardRecommendation[]>(
+    `/decks/${deckId}/recommendations/add${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card removal recommendations based on underperformance.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceRemoveRecommendations(
+  deckId: string,
+  options?: {
+    threshold?: number;
+  }
+): Promise<CardPerformance[]> {
+  const params = new URLSearchParams();
+  if (options?.threshold !== undefined) {
+    params.set('threshold', options.threshold.toString());
+  }
+
+  const query = params.toString();
+  return get<CardPerformance[]>(
+    `/decks/${deckId}/recommendations/remove${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card swap recommendations based on performance.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceSwapRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<PerformanceCardRecommendation[]> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<PerformanceCardRecommendation[]>(
+    `/decks/${deckId}/recommendations/swap${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get all recommendations (add/remove/swap) for a deck.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getAllPerformanceRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<DeckRecommendationsResponse> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<DeckRecommendationsResponse>(
+    `/decks/${deckId}/recommendations/all${query ? `?${query}` : ''}`
+  );
+}

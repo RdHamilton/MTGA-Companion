@@ -2894,3 +2894,330 @@ func convertIterativeResponse(r *recommendations.IterativeBuildAroundResponse) *
 
 	return response
 }
+
+// ============================================================================
+// Card Performance Analysis (Issue #771)
+// ============================================================================
+
+// CardPerformanceResponse represents a single card's performance metrics for the frontend.
+type CardPerformanceResponse struct {
+	CardID           int            `json:"cardId"`
+	CardName         string         `json:"cardName"`
+	Quantity         int            `json:"quantity"`
+	GamesWithCard    int            `json:"gamesWithCard"`
+	GamesDrawn       int            `json:"gamesDrawn"`
+	GamesPlayed      int            `json:"gamesPlayed"`
+	WinRateWhenDrawn float64        `json:"winRateWhenDrawn"`
+	WinRateWhenPlayed float64       `json:"winRateWhenPlayed"`
+	DeckWinRate      float64        `json:"deckWinRate"`
+	PlayRate         float64        `json:"playRate"`
+	WinContribution  float64        `json:"winContribution"`
+	ImpactScore      float64        `json:"impactScore"`
+	ConfidenceLevel  string         `json:"confidenceLevel"`
+	SampleSize       int            `json:"sampleSize"`
+	PerformanceGrade string         `json:"performanceGrade"`
+	AvgTurnPlayed    float64        `json:"avgTurnPlayed"`
+	TurnPlayedDist   map[int]int    `json:"turnPlayedDist,omitempty"`
+	MulliganedAway   int            `json:"mulliganedAway"`
+	MulliganRate     float64        `json:"mulliganRate"`
+}
+
+// DeckPerformanceAnalysisResponse represents the full deck performance analysis.
+type DeckPerformanceAnalysisResponse struct {
+	DeckID          string                     `json:"deckId"`
+	DeckName        string                     `json:"deckName"`
+	TotalMatches    int                        `json:"totalMatches"`
+	TotalGames      int                        `json:"totalGames"`
+	OverallWinRate  float64                    `json:"overallWinRate"`
+	CardPerformance []*CardPerformanceResponse `json:"cardPerformance"`
+	BestPerformers  []string                   `json:"bestPerformers"`
+	WorstPerformers []string                   `json:"worstPerformers"`
+	AnalysisDate    string                     `json:"analysisDate"`
+}
+
+// CardRecommendationResponse represents a suggestion to add, remove, or swap a card.
+type CardRecommendationResponse struct {
+	Type            string  `json:"type"`
+	CardID          int     `json:"cardId"`
+	CardName        string  `json:"cardName"`
+	Reason          string  `json:"reason"`
+	ImpactEstimate  float64 `json:"impactEstimate"`
+	Confidence      string  `json:"confidence"`
+	Priority        int     `json:"priority"`
+	SwapForCardID   *int    `json:"swapForCardId,omitempty"`
+	SwapForCardName *string `json:"swapForCardName,omitempty"`
+	BasedOnGames    int     `json:"basedOnGames"`
+}
+
+// DeckRecommendationsResponse contains add/remove/swap recommendations for a deck.
+type DeckRecommendationsResponse struct {
+	DeckID                string                        `json:"deckId"`
+	DeckName              string                        `json:"deckName"`
+	CurrentWinRate        float64                       `json:"currentWinRate"`
+	AddRecommendations    []*CardRecommendationResponse `json:"addRecommendations"`
+	RemoveRecommendations []*CardRecommendationResponse `json:"removeRecommendations"`
+	SwapRecommendations   []*CardRecommendationResponse `json:"swapRecommendations"`
+	ProjectedWinRate      float64                       `json:"projectedWinRate"`
+}
+
+// GetCardPerformanceRequest represents a request to get card performance metrics.
+type GetCardPerformanceRequest struct {
+	DeckID       string `json:"deckId"`
+	MinGames     int    `json:"minGames,omitempty"`
+	IncludeLands bool   `json:"includeLands,omitempty"`
+}
+
+// GetCardPerformance returns performance metrics for all cards in a deck.
+func (d *DeckFacade) GetCardPerformance(ctx context.Context, req *GetCardPerformanceRequest) (*DeckPerformanceAnalysisResponse, error) {
+	if req.DeckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, req.DeckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get card performance: %v", err)}
+	}
+
+	if analysis == nil {
+		return nil, &AppError{Message: "Deck not found or not enough data"}
+	}
+
+	// Convert to response format
+	response := &DeckPerformanceAnalysisResponse{
+		DeckID:          analysis.DeckID,
+		DeckName:        analysis.DeckName,
+		TotalMatches:    analysis.TotalMatches,
+		TotalGames:      analysis.TotalGames,
+		OverallWinRate:  analysis.OverallWinRate,
+		BestPerformers:  analysis.BestPerformers,
+		WorstPerformers: analysis.WorstPerformers,
+		AnalysisDate:    time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Convert card performance
+	response.CardPerformance = make([]*CardPerformanceResponse, 0, len(analysis.CardPerformance))
+	for _, perf := range analysis.CardPerformance {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			Quantity:          perf.Quantity,
+			GamesWithCard:     perf.GamesWithCard,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			PlayRate:          perf.PlayRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			SampleSize:        perf.SampleSize,
+			PerformanceGrade:  perf.PerformanceGrade,
+			AvgTurnPlayed:     perf.AvgTurnPlayed,
+			TurnPlayedDist:    perf.TurnPlayedDist,
+			MulliganedAway:    perf.MulliganedAway,
+			MulliganRate:      perf.MulliganRate,
+		}
+		response.CardPerformance = append(response.CardPerformance, cardPerf)
+	}
+
+	return response, nil
+}
+
+// GetPerformanceRecommendationsRequest represents a request for performance-based recommendations.
+type GetPerformanceRecommendationsRequest struct {
+	DeckID       string `json:"deckId"`
+	MaxResults   int    `json:"maxResults,omitempty"`
+	IncludeSwaps bool   `json:"includeSwaps,omitempty"`
+	Format       string `json:"format,omitempty"`
+}
+
+// GetPerformanceRecommendations returns add/remove/swap recommendations based on card performance.
+func (d *DeckFacade) GetPerformanceRecommendations(ctx context.Context, req *GetPerformanceRecommendationsRequest) (*DeckRecommendationsResponse, error) {
+	if req.DeckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	// Get the repo's recommendations method via type assertion
+	repoWithRecs, ok := repo.(interface {
+		GetCardRecommendations(ctx context.Context, req models.RecommendationsRequest) (*models.RecommendationsResponse, error)
+	})
+	if !ok {
+		return nil, &AppError{Message: "Card recommendations not supported"}
+	}
+
+	maxResults := req.MaxResults
+	if maxResults <= 0 {
+		maxResults = 5
+	}
+
+	recsReq := models.RecommendationsRequest{
+		DeckID:       req.DeckID,
+		Format:       req.Format,
+		MaxResults:   maxResults,
+		IncludeSwaps: req.IncludeSwaps,
+	}
+
+	recs, err := repoWithRecs.GetCardRecommendations(ctx, recsReq)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get recommendations: %v", err)}
+	}
+
+	if recs == nil {
+		return nil, &AppError{Message: "Could not generate recommendations - not enough data"}
+	}
+
+	// Convert to response format
+	response := &DeckRecommendationsResponse{
+		DeckID:           recs.DeckID,
+		DeckName:         recs.DeckName,
+		CurrentWinRate:   recs.CurrentWinRate,
+		ProjectedWinRate: recs.ProjectedWinRate,
+	}
+
+	// Convert add recommendations
+	response.AddRecommendations = make([]*CardRecommendationResponse, 0, len(recs.AddRecommendations))
+	for _, rec := range recs.AddRecommendations {
+		response.AddRecommendations = append(response.AddRecommendations, convertRecommendation(rec))
+	}
+
+	// Convert remove recommendations
+	response.RemoveRecommendations = make([]*CardRecommendationResponse, 0, len(recs.RemoveRecommendations))
+	for _, rec := range recs.RemoveRecommendations {
+		response.RemoveRecommendations = append(response.RemoveRecommendations, convertRecommendation(rec))
+	}
+
+	// Convert swap recommendations
+	response.SwapRecommendations = make([]*CardRecommendationResponse, 0, len(recs.SwapRecommendations))
+	for _, rec := range recs.SwapRecommendations {
+		response.SwapRecommendations = append(response.SwapRecommendations, convertRecommendation(rec))
+	}
+
+	return response, nil
+}
+
+// convertRecommendation converts a model recommendation to a response recommendation.
+func convertRecommendation(rec *models.CardRecommendation) *CardRecommendationResponse {
+	return &CardRecommendationResponse{
+		Type:            rec.Type,
+		CardID:          rec.CardID,
+		CardName:        rec.CardName,
+		Reason:          rec.Reason,
+		ImpactEstimate:  rec.ImpactEstimate,
+		Confidence:      rec.Confidence,
+		Priority:        rec.Priority,
+		SwapForCardID:   rec.SwapForCardID,
+		SwapForCardName: rec.SwapForCardName,
+		BasedOnGames:    rec.BasedOnGames,
+	}
+}
+
+// GetUnderperformingCards returns cards that hurt deck performance.
+func (d *DeckFacade) GetUnderperformingCards(ctx context.Context, deckID string, threshold float64) ([]*CardPerformanceResponse, error) {
+	if deckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	if threshold <= 0 {
+		threshold = 0.05 // Default 5% below deck average
+	}
+
+	cards, err := repo.GetUnderperformingCards(ctx, deckID, threshold)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get underperforming cards: %v", err)}
+	}
+
+	// Convert to response format
+	response := make([]*CardPerformanceResponse, 0, len(cards))
+	for _, perf := range cards {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			PerformanceGrade:  perf.PerformanceGrade,
+		}
+		response = append(response, cardPerf)
+	}
+
+	return response, nil
+}
+
+// GetOverperformingCards returns cards with high win impact.
+func (d *DeckFacade) GetOverperformingCards(ctx context.Context, deckID string, threshold float64) ([]*CardPerformanceResponse, error) {
+	if deckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	if threshold <= 0 {
+		threshold = 0.05 // Default 5% above deck average
+	}
+
+	cards, err := repo.GetOverperformingCards(ctx, deckID, threshold)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get overperforming cards: %v", err)}
+	}
+
+	// Convert to response format
+	response := make([]*CardPerformanceResponse, 0, len(cards))
+	for _, perf := range cards {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			PerformanceGrade:  perf.PerformanceGrade,
+		}
+		response = append(response, cardPerf)
+	}
+
+	return response, nil
+}
