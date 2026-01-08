@@ -17,46 +17,46 @@ import (
 
 // Service provides high-level operations for storing and retrieving MTGA data.
 type Service struct {
-	db                     *DB
-	matches                repository.MatchRepository
-	stats                  repository.StatsRepository
-	decks                  repository.DeckRepository
-	collection             repository.CollectionRepository
-	accounts               repository.AccountRepository
-	rankHistory            repository.RankHistoryRepository
-	quests                 *QuestRepository
-	draft                  repository.DraftRepository
-	setCard                repository.SetCardRepository
-	draftRatings           repository.DraftRatingsRepository
-	inventory              repository.InventoryRepository
-	settings               repository.SettingsRepository
-	deckPerformance        repository.DeckPerformanceRepository
-	recommendationFeedback repository.RecommendationFeedbackRepository
-	standard               repository.StandardRepository
-	gamePlay               repository.GamePlayRepository
+	db                      *DB
+	matches                 repository.MatchRepository
+	stats                   repository.StatsRepository
+	decks                   repository.DeckRepository
+	collection              repository.CollectionRepository
+	accounts                repository.AccountRepository
+	rankHistory             repository.RankHistoryRepository
+	quests                  *QuestRepository
+	draft                   repository.DraftRepository
+	setCard                 repository.SetCardRepository
+	draftRatings            repository.DraftRatingsRepository
+	inventory               repository.InventoryRepository
+	settings                repository.SettingsRepository
+	deckPerformance         repository.DeckPerformanceRepository
+	recommendationFeedback  repository.RecommendationFeedbackRepository
+	standard                repository.StandardRepository
+	gamePlay                repository.GamePlayRepository
 	cardPerformanceAnalysis repository.CardPerformanceRepository
-	currentAccountID       int // Current active account ID
+	currentAccountID        int // Current active account ID
 }
 
 // ServiceConfig holds optional repository overrides for dependency injection.
 // All fields are optional - if nil, the default implementation will be created.
 type ServiceConfig struct {
-	Matches                repository.MatchRepository
-	Stats                  repository.StatsRepository
-	Decks                  repository.DeckRepository
-	Collection             repository.CollectionRepository
-	Accounts               repository.AccountRepository
-	RankHistory            repository.RankHistoryRepository
-	Quests                 *QuestRepository
-	Draft                  repository.DraftRepository
-	SetCard                repository.SetCardRepository
-	DraftRatings           repository.DraftRatingsRepository
-	Inventory              repository.InventoryRepository
-	Settings               repository.SettingsRepository
-	DeckPerformance        repository.DeckPerformanceRepository
-	RecommendationFeedback repository.RecommendationFeedbackRepository
-	Standard               repository.StandardRepository
-	GamePlay               repository.GamePlayRepository
+	Matches                 repository.MatchRepository
+	Stats                   repository.StatsRepository
+	Decks                   repository.DeckRepository
+	Collection              repository.CollectionRepository
+	Accounts                repository.AccountRepository
+	RankHistory             repository.RankHistoryRepository
+	Quests                  *QuestRepository
+	Draft                   repository.DraftRepository
+	SetCard                 repository.SetCardRepository
+	DraftRatings            repository.DraftRatingsRepository
+	Inventory               repository.InventoryRepository
+	Settings                repository.SettingsRepository
+	DeckPerformance         repository.DeckPerformanceRepository
+	RecommendationFeedback  repository.RecommendationFeedbackRepository
+	Standard                repository.StandardRepository
+	GamePlay                repository.GamePlayRepository
 	CardPerformanceAnalysis repository.CardPerformanceRepository
 }
 

@@ -2901,25 +2901,25 @@ func convertIterativeResponse(r *recommendations.IterativeBuildAroundResponse) *
 
 // CardPerformanceResponse represents a single card's performance metrics for the frontend.
 type CardPerformanceResponse struct {
-	CardID           int            `json:"cardId"`
-	CardName         string         `json:"cardName"`
-	Quantity         int            `json:"quantity"`
-	GamesWithCard    int            `json:"gamesWithCard"`
-	GamesDrawn       int            `json:"gamesDrawn"`
-	GamesPlayed      int            `json:"gamesPlayed"`
-	WinRateWhenDrawn float64        `json:"winRateWhenDrawn"`
-	WinRateWhenPlayed float64       `json:"winRateWhenPlayed"`
-	DeckWinRate      float64        `json:"deckWinRate"`
-	PlayRate         float64        `json:"playRate"`
-	WinContribution  float64        `json:"winContribution"`
-	ImpactScore      float64        `json:"impactScore"`
-	ConfidenceLevel  string         `json:"confidenceLevel"`
-	SampleSize       int            `json:"sampleSize"`
-	PerformanceGrade string         `json:"performanceGrade"`
-	AvgTurnPlayed    float64        `json:"avgTurnPlayed"`
-	TurnPlayedDist   map[int]int    `json:"turnPlayedDist,omitempty"`
-	MulliganedAway   int            `json:"mulliganedAway"`
-	MulliganRate     float64        `json:"mulliganRate"`
+	CardID            int         `json:"cardId"`
+	CardName          string      `json:"cardName"`
+	Quantity          int         `json:"quantity"`
+	GamesWithCard     int         `json:"gamesWithCard"`
+	GamesDrawn        int         `json:"gamesDrawn"`
+	GamesPlayed       int         `json:"gamesPlayed"`
+	WinRateWhenDrawn  float64     `json:"winRateWhenDrawn"`
+	WinRateWhenPlayed float64     `json:"winRateWhenPlayed"`
+	DeckWinRate       float64     `json:"deckWinRate"`
+	PlayRate          float64     `json:"playRate"`
+	WinContribution   float64     `json:"winContribution"`
+	ImpactScore       float64     `json:"impactScore"`
+	ConfidenceLevel   string      `json:"confidenceLevel"`
+	SampleSize        int         `json:"sampleSize"`
+	PerformanceGrade  string      `json:"performanceGrade"`
+	AvgTurnPlayed     float64     `json:"avgTurnPlayed"`
+	TurnPlayedDist    map[int]int `json:"turnPlayedDist,omitempty"`
+	MulliganedAway    int         `json:"mulliganedAway"`
+	MulliganRate      float64     `json:"mulliganRate"`
 }
 
 // DeckPerformanceAnalysisResponse represents the full deck performance analysis.

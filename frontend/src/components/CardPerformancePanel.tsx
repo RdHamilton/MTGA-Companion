@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  DeckPerformanceAnalysis,
   getCardPerformance,
   getAllPerformanceRecommendations,
+} from '@/services/api/decks';
+import type {
+  DeckPerformanceAnalysis,
   DeckRecommendationsResponse,
   PerformanceCardRecommendation,
 } from '@/services/api/decks';
