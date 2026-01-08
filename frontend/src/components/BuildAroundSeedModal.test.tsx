@@ -1658,4 +1658,472 @@ describe('BuildAroundSeedModal', () => {
       expect(onCardRemoved).toHaveBeenCalledWith(77777);
     });
   });
+
+  describe('Score Breakdown Display', () => {
+    const iterativeProps = {
+      isOpen: true,
+      onClose: vi.fn(),
+      onApplyDeck: vi.fn(),
+      onCardAdded: vi.fn(),
+      onFinishDeck: vi.fn(),
+      currentDeckCards: [],
+    };
+
+    it('should display score breakdown bars in hover preview', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Score Test Card',
+          ManaCost: '{2}{U}',
+          Types: ['Creature'],
+          Colors: ['U'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 44444,
+          name: 'Card With Breakdown',
+          manaCost: '{1}{U}',
+          cmc: 2,
+          colors: ['U'],
+          typeLine: 'Creature - Wizard',
+          score: 0.85,
+          reasoning: 'High synergy card',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+          scoreBreakdown: {
+            colorFit: 0.95,
+            curveFit: 0.80,
+            synergy: 0.90,
+            quality: 0.75,
+            overall: 0.85,
+          },
+          synergyDetails: [
+            { type: 'keyword', name: 'flying', description: 'Matches 3 other flying creatures' },
+            { type: 'theme', name: 'tokens', description: 'Supports tokens theme' },
+          ],
+        }],
+        deckAnalysis: {
+          colorIdentity: ['U'],
+          keywords: ['Flying'],
+          themes: ['Tokens'],
+          currentCurve: { 2: 1 },
+          recommendedLandCount: 24,
+          totalCards: 1,
+          inCollectionCount: 1,
+        },
+        slotsRemaining: 59,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Score' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Score Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Score Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Hover over the suggestion card to show preview
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      expect(suggestionCards.length).toBeGreaterThan(0);
+      fireEvent.mouseEnter(suggestionCards[0]);
+
+      // Check that score breakdown section is visible
+      await waitFor(() => {
+        const scoreBreakdown = document.querySelector('.score-breakdown');
+        expect(scoreBreakdown).toBeInTheDocument();
+      });
+
+      // Check that individual score bars exist
+      const colorBar = document.querySelector('.score-bar.color-bar');
+      const curveBar = document.querySelector('.score-bar.curve-bar');
+      const synergyBar = document.querySelector('.score-bar.synergy-bar');
+      const qualityBar = document.querySelector('.score-bar.quality-bar');
+
+      expect(colorBar).toBeInTheDocument();
+      expect(curveBar).toBeInTheDocument();
+      expect(synergyBar).toBeInTheDocument();
+      expect(qualityBar).toBeInTheDocument();
+    });
+
+    it('should display synergy details in hover preview', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Synergy Test Card',
+          ManaCost: '{W}',
+          Types: ['Creature'],
+          Colors: ['W'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 55555,
+          name: 'Card With Synergies',
+          manaCost: '{1}{W}',
+          cmc: 2,
+          colors: ['W'],
+          typeLine: 'Creature - Angel',
+          score: 0.90,
+          reasoning: 'Excellent synergy',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+          scoreBreakdown: {
+            colorFit: 1.0,
+            curveFit: 0.85,
+            synergy: 0.95,
+            quality: 0.80,
+            overall: 0.90,
+          },
+          synergyDetails: [
+            { type: 'keyword', name: 'flying', description: 'Matches 3 cards with flying' },
+            { type: 'keyword', name: 'lifelink', description: 'Matches 2 cards with lifelink' },
+            { type: 'creature_type', name: 'Angel', description: 'Angel tribal synergy' },
+          ],
+        }],
+        deckAnalysis: {
+          colorIdentity: ['W'],
+          keywords: ['Flying', 'Lifelink'],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Synergy' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Synergy Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Synergy Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Hover over the suggestion card
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.mouseEnter(suggestionCards[0]);
+
+      // Check synergy details section exists
+      await waitFor(() => {
+        const synergyDetails = document.querySelector('.synergy-details');
+        expect(synergyDetails).toBeInTheDocument();
+      });
+
+      // Check individual synergy items
+      const synergyItems = document.querySelectorAll('.synergy-item');
+      expect(synergyItems.length).toBe(3);
+    });
+
+    it('should toggle details expansion in copy modal', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Toggle Test Card',
+          ManaCost: '{G}',
+          Types: ['Creature'],
+          Colors: ['G'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 66666,
+          name: 'Expandable Card',
+          manaCost: '{1}{G}',
+          cmc: 2,
+          colors: ['G'],
+          typeLine: 'Creature - Elf',
+          score: 0.80,
+          reasoning: 'Good fit',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+          scoreBreakdown: {
+            colorFit: 0.90,
+            curveFit: 0.75,
+            synergy: 0.80,
+            quality: 0.70,
+            overall: 0.80,
+          },
+          synergyDetails: [
+            { type: 'creature_type', name: 'Elf', description: 'Elf tribal with 4 elves' },
+          ],
+        }],
+        deckAnalysis: {
+          colorIdentity: ['G'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Toggle' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Toggle Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Toggle Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Click suggestion to open copy modal
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.click(suggestionCards[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Add Expandable Card/)).toBeInTheDocument();
+      });
+
+      // Should see "Show Details" button
+      const detailsToggle = screen.getByText(/Show Details/);
+      expect(detailsToggle).toBeInTheDocument();
+
+      // Click to expand
+      fireEvent.click(detailsToggle);
+
+      // Should now show "Hide Details" and score breakdown
+      await waitFor(() => {
+        expect(screen.getByText(/Hide Details/)).toBeInTheDocument();
+      });
+
+      // Check that detailed score breakdown is visible in modal
+      const modalScoreBreakdown = document.querySelector('.modal-score-breakdown');
+      expect(modalScoreBreakdown).toBeInTheDocument();
+
+      // Click to collapse
+      fireEvent.click(screen.getByText(/Hide Details/));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Show Details/)).toBeInTheDocument();
+      });
+    });
+
+    it('should display score percentages in expanded copy modal', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'Percentage Test Card',
+          ManaCost: '{B}',
+          Types: ['Creature'],
+          Colors: ['B'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 77777,
+          name: 'Percentage Display Card',
+          manaCost: '{1}{B}',
+          cmc: 2,
+          colors: ['B'],
+          typeLine: 'Creature - Zombie',
+          score: 0.82,
+          reasoning: 'Strong synergy with deck',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+          scoreBreakdown: {
+            colorFit: 1.0,
+            curveFit: 0.70,
+            synergy: 0.85,
+            quality: 0.60,
+            overall: 0.82,
+          },
+          synergyDetails: [],
+        }],
+        deckAnalysis: {
+          colorIdentity: ['B'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'Percentage' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Percentage Test Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Percentage Test Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Click suggestion to open copy modal
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.click(suggestionCards[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Add Percentage Display Card/)).toBeInTheDocument();
+      });
+
+      // Expand details
+      fireEvent.click(screen.getByText(/Show Details/));
+
+      // Check score labels and percentages are displayed (in separate spans)
+      await waitFor(() => {
+        expect(screen.getByText('Color Fit')).toBeInTheDocument();
+        expect(screen.getByText('100%')).toBeInTheDocument();
+        expect(screen.getByText('Curve Fit')).toBeInTheDocument();
+        expect(screen.getByText('70%')).toBeInTheDocument();
+        expect(screen.getByText('Synergy')).toBeInTheDocument();
+        expect(screen.getByText('85%')).toBeInTheDocument();
+        expect(screen.getByText('Quality')).toBeInTheDocument();
+        expect(screen.getByText('60%')).toBeInTheDocument();
+      });
+    });
+
+    it('should not show score breakdown when card has no breakdown data', async () => {
+      mockSearchCardsWithCollection.mockResolvedValue([
+        {
+          ArenaID: '12345',
+          Name: 'No Breakdown Card',
+          ManaCost: '{R}',
+          Types: ['Creature'],
+          Colors: ['R'],
+          ImageURL: '',
+        },
+      ] as any);
+
+      mockSuggestNextCards.mockResolvedValue({
+        suggestions: [{
+          cardID: 88888,
+          name: 'Card Without Breakdown',
+          manaCost: '{R}',
+          cmc: 1,
+          colors: ['R'],
+          typeLine: 'Creature',
+          score: 0.70,
+          reasoning: 'Basic reasoning',
+          inCollection: true,
+          ownedCount: 4,
+          neededCount: 0,
+          currentCopies: 0,
+          recommendedCopies: 4,
+          // No scoreBreakdown or synergyDetails
+        }],
+        deckAnalysis: {
+          colorIdentity: ['R'],
+          keywords: [],
+          themes: [],
+          currentCurve: {},
+          recommendedLandCount: 24,
+          totalCards: 0,
+          inCollectionCount: 0,
+        },
+        slotsRemaining: 60,
+        landSuggestions: [],
+      });
+
+      render(<BuildAroundSeedModal {...iterativeProps} />);
+
+      const searchInput = screen.getByPlaceholderText(/search for a card/i);
+      fireEvent.change(searchInput, { target: { value: 'No Breakdown' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('No Breakdown Card')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('No Breakdown Card'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Building (Pick Cards)')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Start Building (Pick Cards)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Click a card to add 1 copy to your deck')).toBeInTheDocument();
+      });
+
+      // Hover over the suggestion card
+      const suggestionCards = document.querySelectorAll('.clickable-suggestion-card');
+      fireEvent.mouseEnter(suggestionCards[0]);
+
+      // Score breakdown should not be present
+      await waitFor(() => {
+        const scoreBreakdown = document.querySelector('.score-breakdown');
+        expect(scoreBreakdown).not.toBeInTheDocument();
+      });
+    });
+  });
 });

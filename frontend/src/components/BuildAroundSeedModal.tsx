@@ -99,6 +99,8 @@ export default function BuildAroundSeedModal({
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   // Copy selection modal state
   const [copyModalCard, setCopyModalCard] = useState<CardWithOwnership | null>(null);
+  // Track whether details are expanded in copy modal
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   // Ref to track if we've already attempted initial fetch (prevent infinite loops)
   const hasAttemptedFetch = useRef(false);
@@ -611,6 +613,64 @@ export default function BuildAroundSeedModal({
                       )}
                       <span className="preview-score">Score: {(hoverPreview.card.score * 100).toFixed(0)}%</span>
                     </div>
+                    {/* Score Breakdown */}
+                    {hoverPreview.card.scoreBreakdown && (
+                      <div className="score-breakdown">
+                        <div className="score-bar-row">
+                          <span className="score-label">Color</span>
+                          <div className="score-bar-container">
+                            <div
+                              className="score-bar color-bar"
+                              style={{ width: `${hoverPreview.card.scoreBreakdown.colorFit * 100}%` }}
+                            />
+                          </div>
+                          <span className="score-value">{(hoverPreview.card.scoreBreakdown.colorFit * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="score-bar-row">
+                          <span className="score-label">Curve</span>
+                          <div className="score-bar-container">
+                            <div
+                              className="score-bar curve-bar"
+                              style={{ width: `${hoverPreview.card.scoreBreakdown.curveFit * 100}%` }}
+                            />
+                          </div>
+                          <span className="score-value">{(hoverPreview.card.scoreBreakdown.curveFit * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="score-bar-row">
+                          <span className="score-label">Synergy</span>
+                          <div className="score-bar-container">
+                            <div
+                              className="score-bar synergy-bar"
+                              style={{ width: `${hoverPreview.card.scoreBreakdown.synergy * 100}%` }}
+                            />
+                          </div>
+                          <span className="score-value">{(hoverPreview.card.scoreBreakdown.synergy * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="score-bar-row">
+                          <span className="score-label">Quality</span>
+                          <div className="score-bar-container">
+                            <div
+                              className="score-bar quality-bar"
+                              style={{ width: `${hoverPreview.card.scoreBreakdown.quality * 100}%` }}
+                            />
+                          </div>
+                          <span className="score-value">{(hoverPreview.card.scoreBreakdown.quality * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* Synergy Details */}
+                    {hoverPreview.card.synergyDetails && hoverPreview.card.synergyDetails.length > 0 && (
+                      <div className="synergy-details">
+                        <span className="synergy-label">Synergies:</span>
+                        <ul className="synergy-list">
+                          {hoverPreview.card.synergyDetails.slice(0, 3).map((detail, i) => (
+                            <li key={i} className={`synergy-item synergy-${detail.type}`}>
+                              {detail.name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <p className="preview-reasoning">{hoverPreview.card.reasoning}</p>
                     <div className="preview-recommendation">
                       <strong>Recommended: {hoverPreview.card.recommendedCopies > 0 ? hoverPreview.card.recommendedCopies : 4} copies</strong>
@@ -625,11 +685,11 @@ export default function BuildAroundSeedModal({
 
             {/* Copy Selection Modal */}
             {copyModalCard && (
-              <div className="copy-modal-overlay" onClick={() => setCopyModalCard(null)}>
+              <div className="copy-modal-overlay" onClick={() => { setCopyModalCard(null); setDetailsExpanded(false); }}>
                 <div className="copy-modal" onClick={(e) => e.stopPropagation()}>
                   <div className="copy-modal-header">
                     <h3>Add {copyModalCard.name}</h3>
-                    <button className="close-button" onClick={() => setCopyModalCard(null)}>&times;</button>
+                    <button className="close-button" onClick={() => { setCopyModalCard(null); setDetailsExpanded(false); }}>&times;</button>
                   </div>
                   <div className="copy-modal-content">
                     {copyModalCard.imageURI && (
@@ -638,6 +698,62 @@ export default function BuildAroundSeedModal({
                     <div className="copy-modal-info">
                       <p className="copy-modal-type">{copyModalCard.typeLine}</p>
                       <p className="copy-modal-reasoning">{copyModalCard.reasoning}</p>
+
+                      {/* Expandable Details Toggle */}
+                      {(copyModalCard.scoreBreakdown || (copyModalCard.synergyDetails && copyModalCard.synergyDetails.length > 0)) && (
+                        <button
+                          className="details-toggle"
+                          onClick={() => setDetailsExpanded(!detailsExpanded)}
+                        >
+                          {detailsExpanded ? '▼ Hide Details' : '▶ Show Details'}
+                        </button>
+                      )}
+
+                      {/* Expandable Details Section */}
+                      {detailsExpanded && (
+                        <div className="copy-modal-details">
+                          {/* Score Breakdown */}
+                          {copyModalCard.scoreBreakdown && (
+                            <div className="modal-score-breakdown">
+                              <h4>Score Breakdown</h4>
+                              <div className="modal-score-grid">
+                                <div className="modal-score-item">
+                                  <span className="modal-score-name">Color Fit</span>
+                                  <span className="modal-score-percent">{(copyModalCard.scoreBreakdown.colorFit * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="modal-score-item">
+                                  <span className="modal-score-name">Curve Fit</span>
+                                  <span className="modal-score-percent">{(copyModalCard.scoreBreakdown.curveFit * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="modal-score-item">
+                                  <span className="modal-score-name">Synergy</span>
+                                  <span className="modal-score-percent">{(copyModalCard.scoreBreakdown.synergy * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="modal-score-item">
+                                  <span className="modal-score-name">Quality</span>
+                                  <span className="modal-score-percent">{(copyModalCard.scoreBreakdown.quality * 100).toFixed(0)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Synergy Details */}
+                          {copyModalCard.synergyDetails && copyModalCard.synergyDetails.length > 0 && (
+                            <div className="modal-synergy-details">
+                              <h4>Synergies Found</h4>
+                              <ul className="modal-synergy-list">
+                                {copyModalCard.synergyDetails.map((detail, i) => (
+                                  <li key={i} className={`modal-synergy-item synergy-type-${detail.type}`}>
+                                    <span className="synergy-name">{detail.name}</span>
+                                    <span className="synergy-desc">{detail.description}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="copy-modal-stats">
                         <span>In deck: {copyModalCard.currentCopies || 0}</span>
                         <span>Recommended: {copyModalCard.recommendedCopies > 0 ? copyModalCard.recommendedCopies : 4}</span>
@@ -663,7 +779,7 @@ export default function BuildAroundSeedModal({
                       );
                     })}
                   </div>
-                  <button className="copy-modal-cancel" onClick={() => setCopyModalCard(null)}>
+                  <button className="copy-modal-cancel" onClick={() => { setCopyModalCard(null); setDetailsExpanded(false); }}>
                     Cancel
                   </button>
                 </div>

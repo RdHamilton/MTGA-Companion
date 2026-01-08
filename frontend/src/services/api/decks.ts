@@ -336,6 +336,26 @@ export interface BuildAroundSeedRequest {
 }
 
 /**
+ * Score breakdown for detailed reasoning about card suggestions.
+ */
+export interface ScoreBreakdown {
+  colorFit: number;  // 0.0-1.0, weight: 25%
+  curveFit: number;  // 0.0-1.0, weight: 20%
+  synergy: number;   // 0.0-1.0, weight: 30%
+  quality: number;   // 0.0-1.0, weight: 15%
+  overall: number;   // Final weighted score
+}
+
+/**
+ * Synergy detail describing a specific synergy between a card and the deck.
+ */
+export interface SynergyDetail {
+  type: 'keyword' | 'theme' | 'creature_type';
+  name: string;        // e.g., "flying", "tokens", "Elf"
+  description: string; // e.g., "Matches 3 other flying creatures"
+}
+
+/**
  * Card suggestion with ownership information.
  */
 export interface CardWithOwnership {
@@ -354,6 +374,8 @@ export interface CardWithOwnership {
   neededCount: number;
   currentCopies: number;     // Copies currently in deck
   recommendedCopies: number; // Recommended total copies (1-4)
+  scoreBreakdown?: ScoreBreakdown;
+  synergyDetails?: SynergyDetail[];
 }
 
 /**

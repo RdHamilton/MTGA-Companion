@@ -141,10 +141,15 @@ var basicLandsByColor = map[string]struct {
 }
 
 // scoredCard holds a card with its calculated score.
+// Note: scoreBreakdown and synergyDetails are used by SeedDeckBuilder (Build Around feature).
+// They are not populated in DeckSuggester (draft suggestions) but are included here
+// for struct compatibility and potential future enhancement.
 type scoredCard struct {
-	card      *cards.Card
-	score     float64
-	reasoning string
+	card           *cards.Card
+	score          float64
+	reasoning      string
+	scoreBreakdown *ScoreBreakdown // Used by Build Around, nil in draft suggestions
+	synergyDetails []SynergyDetail // Used by Build Around, nil in draft suggestions
 }
 
 // SuggestDecks generates all viable deck suggestions for a draft pool.
