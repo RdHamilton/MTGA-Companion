@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { decks as decksApi } from '@/services/api';
 import { gui } from '@/types/models';
+import { useRotationNotifications } from '@/hooks/useRotationNotifications';
+import { useSettings } from '@/hooks/useSettings';
+import { RotationBanner } from '@/components/RotationBanner';
 import './Decks.css';
 
 export default function Decks() {
@@ -14,6 +17,22 @@ export default function Decks() {
   const [newDeckFormat, setNewDeckFormat] = useState('standard');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deckToDelete, setDeckToDelete] = useState<gui.DeckListItem | null>(null);
+
+  // Rotation notifications
+  const {
+    rotation,
+    affectedDecks,
+    shouldShowNotification,
+    markAsNotified,
+  } = useRotationNotifications();
+  const { rotationNotificationsEnabled, rotationNotificationThreshold } = useSettings();
+
+  // Determine if we should show the rotation banner
+  const showRotationBanner =
+    rotationNotificationsEnabled &&
+    rotation &&
+    affectedDecks.length > 0 &&
+    shouldShowNotification(rotationNotificationThreshold);
 
   const loadDecks = async () => {
     setLoading(true);
@@ -134,6 +153,15 @@ export default function Decks() {
           </button>
         )}
       </div>
+
+      {/* Rotation Banner */}
+      {showRotationBanner && rotation && (
+        <RotationBanner
+          rotation={rotation}
+          affectedDecks={affectedDecks}
+          onDismiss={markAsNotified}
+        />
+      )}
 
       {/* Decks Grid */}
       {deckList.length === 0 ? (

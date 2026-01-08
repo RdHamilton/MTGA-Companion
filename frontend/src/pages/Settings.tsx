@@ -43,6 +43,9 @@ const Settings = () => {
     metaTop8Enabled,
     metaWeight,
     personalWeight,
+    // Rotation settings
+    rotationNotificationsEnabled,
+    rotationNotificationThreshold,
     // State
     isLoading: isLoadingSettings,
     isSaving,
@@ -60,6 +63,8 @@ const Settings = () => {
     setMetaTop8Enabled,
     setMetaWeight,
     setPersonalWeight,
+    setRotationNotificationsEnabled,
+    setRotationNotificationThreshold,
     saveSettings,
     resetToDefaults,
   } = useSettings();
@@ -181,6 +186,10 @@ const Settings = () => {
             onShowNotificationsChange={setShowNotifications}
             theme={theme}
             onThemeChange={setTheme}
+            rotationNotificationsEnabled={rotationNotificationsEnabled}
+            onRotationNotificationsEnabledChange={setRotationNotificationsEnabled}
+            rotationNotificationThreshold={rotationNotificationThreshold}
+            onRotationNotificationThresholdChange={setRotationNotificationThreshold}
           />
         ),
       },
