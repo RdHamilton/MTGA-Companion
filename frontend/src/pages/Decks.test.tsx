@@ -261,6 +261,63 @@ describe('Decks', () => {
       });
     });
 
+    it('should display archetype badge when primaryArchetype is present', async () => {
+      mockDecks.getDecks.mockResolvedValue([
+        createMockDeckListItem({
+          id: 'deck-1',
+          name: 'Boros Aggro',
+          primaryArchetype: 'Boros Aggro',
+        }),
+      ]);
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Boros Aggro', { selector: '.archetype-badge' })).toBeInTheDocument();
+      });
+    });
+
+    it('should not display archetype badge when primaryArchetype is not present', async () => {
+      mockDecks.getDecks.mockResolvedValue([
+        createMockDeckListItem({
+          id: 'deck-1',
+          name: 'Test Deck',
+          primaryArchetype: undefined,
+        }),
+      ]);
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Deck')).toBeInTheDocument();
+      });
+      expect(document.querySelector('.archetype-badge')).not.toBeInTheDocument();
+    });
+
+    it('should display multiple badges (archetype and source) together', async () => {
+      mockDecks.getDecks.mockResolvedValue([
+        createMockDeckListItem({
+          id: 'deck-1',
+          name: 'Draft Midrange',
+          source: 'draft',
+          primaryArchetype: 'Dimir Midrange',
+        }),
+      ]);
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Dimir Midrange', { selector: '.archetype-badge' })).toBeInTheDocument();
+      });
+      expect(screen.getByText('Draft', { selector: '.source-badge' })).toBeInTheDocument();
+    });
+
     it('should display modified date when available', async () => {
       mockDecks.getDecks.mockResolvedValue([
         createMockDeckListItem({

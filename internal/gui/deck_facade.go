@@ -41,19 +41,20 @@ type DeckWithCards struct {
 
 // DeckListItem represents a summary of a deck for list views.
 type DeckListItem struct {
-	ID              string     `json:"id"`
-	Name            string     `json:"name"`
-	Format          string     `json:"format"`
-	Source          string     `json:"source"`
-	ColorIdentity   *string    `json:"colorIdentity"`
-	CardCount       int        `json:"cardCount"`
-	MatchesPlayed   int        `json:"matchesPlayed"`
-	MatchWinRate    float64    `json:"matchWinRate"`
-	ModifiedAt      time.Time  `json:"modifiedAt"`
-	LastPlayed      *time.Time `json:"lastPlayed,omitempty"`
-	Tags            []string   `json:"tags,omitempty"`
-	CurrentStreak   int        `json:"currentStreak"`   // Positive for wins, negative for losses
-	AverageDuration *float64   `json:"averageDuration"` // Average match duration in seconds
+	ID               string     `json:"id"`
+	Name             string     `json:"name"`
+	Format           string     `json:"format"`
+	Source           string     `json:"source"`
+	ColorIdentity    *string    `json:"colorIdentity"`
+	PrimaryArchetype *string    `json:"primaryArchetype,omitempty"` // Detected archetype (e.g., "Aggro", "Control")
+	CardCount        int        `json:"cardCount"`
+	MatchesPlayed    int        `json:"matchesPlayed"`
+	MatchWinRate     float64    `json:"matchWinRate"`
+	ModifiedAt       time.Time  `json:"modifiedAt"`
+	LastPlayed       *time.Time `json:"lastPlayed,omitempty"`
+	Tags             []string   `json:"tags,omitempty"`
+	CurrentStreak    int        `json:"currentStreak"`   // Positive for wins, negative for losses
+	AverageDuration  *float64   `json:"averageDuration"` // Average match duration in seconds
 }
 
 // normalizeDeckSource validates and normalizes deck source values.
@@ -1295,6 +1296,16 @@ func (d *DeckFacade) GetDeckLibrary(ctx context.Context, filter *DeckLibraryFilt
 func (d *DeckFacade) convertToDeckListItems(ctx context.Context, decks []*models.Deck) ([]*DeckListItem, error) {
 	items := make([]*DeckListItem, 0, len(decks))
 
+	// Create archetype classifier for deck classification
+	var classifier *archetype.Classifier
+	if d.services.CardService != nil && d.services.Storage != nil {
+		classifier = archetype.NewClassifier(
+			d.services.CardService,
+			d.services.Storage.DeckRepo(),
+			d.services.Storage.DeckPerformanceRepo(),
+		)
+	}
+
 	for _, deck := range decks {
 		// Get card count
 		var cards []*models.DeckCard
@@ -1335,18 +1346,28 @@ func (d *DeckFacade) convertToDeckListItems(ctx context.Context, decks []*models
 			winRate = float64(deck.MatchesWon) / float64(deck.MatchesPlayed)
 		}
 
+		// Classify deck archetype if classifier is available and deck has cards
+		var primaryArchetype *string
+		if classifier != nil && len(cards) > 0 {
+			result, classErr := classifier.ClassifyDeck(ctx, deck.ID)
+			if classErr == nil && result != nil && result.PrimaryArchetype != "" {
+				primaryArchetype = &result.PrimaryArchetype
+			}
+		}
+
 		items = append(items, &DeckListItem{
-			ID:            deck.ID,
-			Name:          deck.Name,
-			Format:        deck.Format,
-			Source:        deck.Source,
-			ColorIdentity: deck.ColorIdentity,
-			CardCount:     cardCount,
-			MatchesPlayed: deck.MatchesPlayed,
-			MatchWinRate:  winRate,
-			ModifiedAt:    deck.ModifiedAt,
-			LastPlayed:    deck.LastPlayed,
-			Tags:          tagNames,
+			ID:               deck.ID,
+			Name:             deck.Name,
+			Format:           deck.Format,
+			Source:           deck.Source,
+			ColorIdentity:    deck.ColorIdentity,
+			PrimaryArchetype: primaryArchetype,
+			CardCount:        cardCount,
+			MatchesPlayed:    deck.MatchesPlayed,
+			MatchWinRate:     winRate,
+			ModifiedAt:       deck.ModifiedAt,
+			LastPlayed:       deck.LastPlayed,
+			Tags:             tagNames,
 		})
 	}
 
