@@ -84,9 +84,10 @@ export async function getCollectionQuantities(
  */
 export async function getColorRatings(
   setCode: string,
-  format: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _format: string // Format parameter preserved for API compatibility but not used in backend path
 ): Promise<seventeenlands.ColorRating[]> {
-  return get<seventeenlands.ColorRating[]>(`/cards/color-ratings/${setCode}/${format}`);
+  return get<seventeenlands.ColorRating[]>(`/cards/ratings/${setCode}/colors`);
 }
 
 /**

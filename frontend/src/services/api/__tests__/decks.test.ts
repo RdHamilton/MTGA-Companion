@@ -287,17 +287,17 @@ describe('decks API', () => {
   });
 
   describe('validateDraftDeck', () => {
-    it('should call post and return valid status', async () => {
-      vi.mocked(post).mockResolvedValue({ valid: true });
+    it('should call get and return valid status', async () => {
+      vi.mocked(get).mockResolvedValue({ valid: true });
 
       const result = await decks.validateDraftDeck('deck-123');
 
-      expect(post).toHaveBeenCalledWith('/decks/deck-123/validate');
+      expect(get).toHaveBeenCalledWith('/decks/deck-123/validate-draft');
       expect(result).toBe(true);
     });
 
     it('should return false when deck is invalid', async () => {
-      vi.mocked(post).mockResolvedValue({ valid: false });
+      vi.mocked(get).mockResolvedValue({ valid: false });
 
       const result = await decks.validateDraftDeck('deck-123');
 
