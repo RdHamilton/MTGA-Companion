@@ -1079,3 +1079,95 @@ func TestScoreSynergyWithDeckDetailed_SingleTypeCreature(t *testing.T) {
 		t.Errorf("expected 1 creature type synergy detail for single-type creature, got %d", creatureTypeDetails)
 	}
 }
+
+func TestScoreSynergyWithDeckDetailed_Changeling(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+	changelingText := "Changeling (This card is every creature type.)"
+	card := &cards.Card{
+		ArenaID:    12345,
+		Name:       "Changeling Outcast",
+		TypeLine:   "Creature — Shapeshifter",
+		OracleText: &changelingText,
+	}
+
+	// Deck has multiple creature types
+	deckAnalysis := &CollectiveDeckAnalysis{
+		Colors:   map[string]int{"B": 10},
+		Keywords: nil,
+		Themes:   map[string]int{},
+		CreatureTypes: map[string]int{
+			"Elf":    3,
+			"Zombie": 2,
+		},
+		ManaCurve:  map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards: 24,
+	}
+
+	score, details := builder.scoreSynergyWithDeckDetailed(card, deckAnalysis)
+
+	// Score should be high because changeling matches ALL creature types
+	if score <= 0.5 {
+		t.Errorf("expected score > 0.5 for changeling synergy, got %.2f", score)
+	}
+
+	// Should have synergy details for BOTH Elf and Zombie
+	foundElf := false
+	foundZombie := false
+	for _, detail := range details {
+		if detail.Type == "creature_type" {
+			if detail.Name == "Elf" {
+				foundElf = true
+			}
+			if detail.Name == "Zombie" {
+				foundZombie = true
+			}
+		}
+	}
+
+	if !foundElf {
+		t.Error("expected Elf synergy detail for changeling")
+	}
+	if !foundZombie {
+		t.Error("expected Zombie synergy detail for changeling")
+	}
+}
+
+func TestScoreSynergyWithDeckDetailed_StrongTribalWeight(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	// Test with a strong tribal type (Elf)
+	elfCard := &cards.Card{
+		ArenaID:  12345,
+		Name:     "Llanowar Elves",
+		TypeLine: "Creature — Elf Druid",
+	}
+
+	// Test with a weak tribal type (Beast)
+	beastCard := &cards.Card{
+		ArenaID:  12346,
+		Name:     "Grizzly Bears",
+		TypeLine: "Creature — Beast",
+	}
+
+	elfDeck := &CollectiveDeckAnalysis{
+		Colors:        map[string]int{"G": 10},
+		CreatureTypes: map[string]int{"Elf": 5},
+		ManaCurve:     map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards:    24,
+	}
+
+	beastDeck := &CollectiveDeckAnalysis{
+		Colors:        map[string]int{"G": 10},
+		CreatureTypes: map[string]int{"Beast": 5},
+		ManaCurve:     map[int]int{1: 4, 2: 8, 3: 8},
+		TotalCards:    24,
+	}
+
+	elfScore, _ := builder.scoreSynergyWithDeckDetailed(elfCard, elfDeck)
+	beastScore, _ := builder.scoreSynergyWithDeckDetailed(beastCard, beastDeck)
+
+	// Elf (strong tribal) should score higher than Beast (weak tribal)
+	if elfScore <= beastScore {
+		t.Errorf("expected Elf score (%.2f) > Beast score (%.2f) due to tribal weight", elfScore, beastScore)
+	}
+}
