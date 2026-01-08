@@ -870,6 +870,7 @@ export namespace gui {
 	    format: string;
 	    source: string;
 	    colorIdentity?: string;
+	    primaryArchetype?: string;
 	    cardCount: number;
 	    matchesPlayed: number;
 	    matchWinRate: number;
@@ -878,11 +879,11 @@ export namespace gui {
 	    tags?: string[];
 	    currentStreak: number;
 	    averageDuration?: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DeckListItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -890,6 +891,7 @@ export namespace gui {
 	        this.format = source["format"];
 	        this.source = source["source"];
 	        this.colorIdentity = source["colorIdentity"];
+	        this.primaryArchetype = source["primaryArchetype"];
 	        this.cardCount = source["cardCount"];
 	        this.matchesPlayed = source["matchesPlayed"];
 	        this.matchWinRate = source["matchWinRate"];

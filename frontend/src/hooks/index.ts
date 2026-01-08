@@ -31,3 +31,6 @@ export type {
   RotationNotificationState,
   UseRotationNotificationsReturn,
 } from './useRotationNotifications';
+
+export { useDeckValidation } from './useDeckValidation';
+export type { DeckValidationState, UseDeckValidationReturn } from './useDeckValidation';

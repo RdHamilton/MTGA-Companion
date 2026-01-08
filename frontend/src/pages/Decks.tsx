@@ -183,12 +183,17 @@ export default function Decks() {
             >
               <div className="deck-card-header">
                 <h3>{deck.name}</h3>
-                {deck.source === 'draft' && (
-                  <span className="source-badge draft">Draft</span>
-                )}
-                {deck.source === 'import' && (
-                  <span className="source-badge import">Import</span>
-                )}
+                <div className="deck-badges">
+                  {deck.primaryArchetype && (
+                    <span className="archetype-badge">{deck.primaryArchetype}</span>
+                  )}
+                  {deck.source === 'draft' && (
+                    <span className="source-badge draft">Draft</span>
+                  )}
+                  {deck.source === 'import' && (
+                    <span className="source-badge import">Import</span>
+                  )}
+                </div>
               </div>
               <div className="deck-card-body">
                 <div className="deck-info">
