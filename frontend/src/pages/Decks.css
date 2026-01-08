@@ -186,6 +186,23 @@
   color: #fff;
 }
 
+.deck-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.archetype-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #2d4a6f;
+  color: #8bb8e8;
+  border: 1px solid #3d6a9f;
+}
+
 .deck-card-body {
   flex: 1;
 }
