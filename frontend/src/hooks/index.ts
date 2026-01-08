@@ -25,3 +25,6 @@ export type { UseMLSettingsProps, UseMLSettingsReturn } from './useMLSettings';
 
 export { useServices } from './useServices';
 export type { UseServicesOptions, UseServicesReturn } from './useServices';
+
+export { useDeckValidation } from './useDeckValidation';
+export type { DeckValidationState, UseDeckValidationReturn } from './useDeckValidation';
