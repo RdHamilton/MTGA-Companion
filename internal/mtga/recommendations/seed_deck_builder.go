@@ -543,20 +543,77 @@ func (s *SeedDeckBuilder) scoreSynergyWithSeedDetailed(card *cards.Card, seedAna
 		}
 	}
 
-	// Creature type synergy (tribal)
+	// Creature type synergy (tribal) - enhanced with tribal database
 	if containsTypeInTypeLine(card.TypeLine, "Creature") && seedAnalysis.IsCreature {
 		cardCreatureTypes := extractCreatureTypesFromLine(card.TypeLine)
-		for cardType := range cardCreatureTypes {
+
+		// Check if card has changeling (matches all creature types)
+		cardOracleText := ""
+		if card.OracleText != nil {
+			cardOracleText = *card.OracleText
+		}
+		isCardChangeling := IsChangeling(cardOracleText)
+
+		// If changeling, card matches ALL seed creature types
+		if isCardChangeling {
 			for _, seedType := range seedAnalysis.CreatureTypes {
-				if cardType == seedType {
-					synergy += 0.8 // Strong tribal synergy
-					synergyCount++
-					details = append(details, SynergyDetail{
-						Type:        "creature_type",
-						Name:        cardType,
-						Description: fmt.Sprintf("%s tribal synergy", cardType),
-					})
-					break
+				tribalWeight := GetTribalSynergyWeight(seedType)
+				baseSynergy := 0.8 * tribalWeight
+				synergy += baseSynergy
+				synergyCount++
+				details = append(details, SynergyDetail{
+					Type:        "creature_type",
+					Name:        seedType,
+					Description: fmt.Sprintf("Changeling - counts as %s", seedType),
+				})
+			}
+		} else {
+			// Normal creature type matching
+			for cardType := range cardCreatureTypes {
+				for _, seedType := range seedAnalysis.CreatureTypes {
+					if cardType == seedType {
+						// Get tribal weight multiplier from database
+						tribalWeight := GetTribalSynergyWeight(seedType)
+						baseSynergy := 0.8 * tribalWeight
+
+						synergy += baseSynergy
+						synergyCount++
+
+						description := fmt.Sprintf("%s tribal synergy", seedType)
+						if IsStrongTribalSupport(seedType) {
+							description = fmt.Sprintf("%s tribal synergy (strong support)", seedType)
+						}
+
+						details = append(details, SynergyDetail{
+							Type:        "creature_type",
+							Name:        seedType,
+							Description: description,
+						})
+						break
+					}
+				}
+			}
+		}
+
+		// Check for related creature types (e.g., Druid synergizes with Elf)
+		if !isCardChangeling {
+			for cardType := range cardCreatureTypes {
+				for _, seedType := range seedAnalysis.CreatureTypes {
+					if cardType == seedType {
+						continue // Already handled above
+					}
+					relatedTypes := GetRelatedTypes(seedType)
+					for _, related := range relatedTypes {
+						if cardType == related {
+							synergy += 0.5 // Weaker synergy for related types
+							synergyCount++
+							details = append(details, SynergyDetail{
+								Type:        "creature_type",
+								Name:        cardType,
+								Description: fmt.Sprintf("%s synergizes with %s tribe", cardType, seedType),
+							})
+						}
+					}
 				}
 			}
 		}
@@ -1245,19 +1302,71 @@ func (s *SeedDeckBuilder) scoreSynergyWithDeckDetailed(card *cards.Card, deckAna
 		}
 	}
 
-	// Creature type synergy (tribal) - count ALL matching types for multi-type creatures
+	// Creature type synergy (tribal) - enhanced with tribal database
 	if containsTypeInTypeLine(card.TypeLine, "Creature") && len(deckAnalysis.CreatureTypes) > 0 {
 		cardCreatureTypes := extractCreatureTypesFromLine(card.TypeLine)
-		for cardType := range cardCreatureTypes {
-			if count := deckAnalysis.CreatureTypes[cardType]; count > 0 {
-				synergy += 0.8 // Strong tribal synergy
+
+		// Check if card has changeling (matches all creature types)
+		cardOracleText := ""
+		if card.OracleText != nil {
+			cardOracleText = *card.OracleText
+		}
+		isCardChangeling := IsChangeling(cardOracleText)
+
+		// If changeling, card matches ALL deck creature types
+		if isCardChangeling {
+			for deckType, count := range deckAnalysis.CreatureTypes {
+				tribalWeight := GetTribalSynergyWeight(deckType)
+				baseSynergy := 0.8 * tribalWeight
+				synergy += baseSynergy
 				synergyCount++
 				details = append(details, SynergyDetail{
 					Type:        "creature_type",
-					Name:        cardType,
-					Description: fmt.Sprintf("%s tribal - matches %d cards in deck", cardType, count),
+					Name:        deckType,
+					Description: fmt.Sprintf("Changeling - counts as %s (%d in deck)", deckType, count),
 				})
-				// No break - continue checking all creature types for multi-type synergy
+			}
+		} else {
+			// Normal creature type matching with tribal weight
+			for cardType := range cardCreatureTypes {
+				if count := deckAnalysis.CreatureTypes[cardType]; count > 0 {
+					tribalWeight := GetTribalSynergyWeight(cardType)
+					baseSynergy := 0.8 * tribalWeight
+					synergy += baseSynergy
+					synergyCount++
+
+					description := fmt.Sprintf("%s tribal - matches %d cards in deck", cardType, count)
+					if IsStrongTribalSupport(cardType) {
+						description = fmt.Sprintf("%s tribal (strong support) - matches %d cards", cardType, count)
+					}
+
+					details = append(details, SynergyDetail{
+						Type:        "creature_type",
+						Name:        cardType,
+						Description: description,
+					})
+				}
+			}
+
+			// Check for related creature types
+			for cardType := range cardCreatureTypes {
+				for deckType, count := range deckAnalysis.CreatureTypes {
+					if cardType == deckType {
+						continue // Already handled above
+					}
+					relatedTypes := GetRelatedTypes(deckType)
+					for _, related := range relatedTypes {
+						if cardType == related {
+							synergy += 0.5 // Weaker synergy for related types
+							synergyCount++
+							details = append(details, SynergyDetail{
+								Type:        "creature_type",
+								Name:        cardType,
+								Description: fmt.Sprintf("%s synergizes with %s (%d in deck)", cardType, deckType, count),
+							})
+						}
+					}
+				}
 			}
 		}
 	}
