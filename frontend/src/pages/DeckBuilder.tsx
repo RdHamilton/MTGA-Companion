@@ -15,6 +15,7 @@ import BuildAroundSeedModal from '../components/BuildAroundSeedModal';
 import LegalityBanner from '../components/LegalityBanner';
 import DeckNotesPanel from '../components/DeckNotesPanel';
 import ImprovementSuggestionsPanel from '../components/ImprovementSuggestionsPanel';
+import Tooltip from '../components/Tooltip';
 import './DeckBuilder.css';
 
 // Export deck to file using native file save dialog
@@ -957,9 +958,15 @@ export default function DeckBuilder() {
       {/* Quick Actions Footer */}
       <div className="deck-builder-footer">
         <div className="quick-stats">
-          <span>Mainboard: {statistics?.totalMainboard || 0}</span>
-          <span>Sideboard: {statistics?.totalSideboard || 0}</span>
-          <span>Avg CMC: {statistics?.averageCMC?.toFixed(2) || 'N/A'}</span>
+          <Tooltip content="Total cards in main deck (60 for Standard/Historic)" position="top">
+            <span>Mainboard: {statistics?.totalMainboard || 0}</span>
+          </Tooltip>
+          <Tooltip content="Total cards in sideboard (max 15)" position="top">
+            <span>Sideboard: {statistics?.totalSideboard || 0}</span>
+          </Tooltip>
+          <Tooltip content="Average mana cost - lower is faster, 2.5-3.5 is typical" position="top">
+            <span>Avg CMC: {statistics?.averageCMC?.toFixed(2) || 'N/A'}</span>
+          </Tooltip>
         </div>
         <div className="quick-actions">
           <button
@@ -979,12 +986,12 @@ export default function DeckBuilder() {
             ↪ Redo
           </button>
           <span className="action-divider" />
-          <button className="action-button" title="Export deck" onClick={handleExportDeck}>
+          <button className="action-button" title="Download deck as text file for import into MTGA" onClick={handleExportDeck}>
             ⤓ Export
           </button>
           <button
             className={`action-button ${showRecommendations ? 'active' : ''}`}
-            title="Get recommendations"
+            title="Get ML-powered card suggestions based on deck synergy and meta data"
             onClick={() => {
               if (!showRecommendations && recommendations.length === 0) {
                 loadRecommendations();
@@ -996,25 +1003,25 @@ export default function DeckBuilder() {
           </button>
           <button
             className="action-button"
-            title="Add suggested lands based on deck colors"
+            title="Automatically add optimal lands based on your deck's color requirements"
             disabled={addingLands || (statistics?.totalMainboard || 0) < 2}
             onClick={handleAddSuggestedLands}
           >
             {addingLands ? '⏳ Adding...' : '🏔️ Add Lands'}
           </button>
-          <button className="action-button" title="Validate deck" onClick={handleValidateDeck}>
+          <button className="action-button" title="Check deck legality for the selected format" onClick={handleValidateDeck}>
             ✓ Validate
           </button>
           <button
             className={`action-button ${showNotesPanel ? 'active' : ''}`}
-            title="View and add notes for this deck"
+            title="Add notes about matchups, sideboard plans, and mulligan decisions"
             onClick={() => setShowNotesPanel(!showNotesPanel)}
           >
             Notes
           </button>
           <button
             className={`action-button ${showSuggestionsPanel ? 'active' : ''}`}
-            title="View improvement suggestions based on your play patterns"
+            title="View play pattern analysis and improvement suggestions (requires 5+ games)"
             onClick={() => setShowSuggestionsPanel(!showSuggestionsPanel)}
           >
             Insights
@@ -1022,7 +1029,7 @@ export default function DeckBuilder() {
           {deck.Source === 'draft' && deck.DraftEventID && (
             <button
               className="action-button suggest-decks-btn"
-              title="Generate complete deck suggestions from your draft pool"
+              title="Generate complete 40-card deck builds from your draft pool with viability scores"
               onClick={() => setShowSuggestDecks(true)}
             >
               Suggest Decks
@@ -1031,7 +1038,7 @@ export default function DeckBuilder() {
           {deck.Source !== 'draft' && (
             <button
               className="action-button build-around-btn"
-              title={cards.length === 0 ? 'Add cards to your deck first' : 'Get suggestions based on current deck cards'}
+              title={cards.length === 0 ? 'Add cards to your deck first' : 'Generate deck suggestions around key cards with archetype selection'}
               disabled={cards.length === 0}
               onClick={() => setShowBuildAround(true)}
             >

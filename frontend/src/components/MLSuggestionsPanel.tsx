@@ -14,6 +14,8 @@ import {
   parseReasons,
 } from '@/services/api/mlSuggestions';
 import ProgressBar from './ProgressBar';
+import HelpIcon from './HelpIcon';
+import Tooltip from './Tooltip';
 import './MLSuggestionsPanel.css';
 
 interface MLSuggestionsPanelProps {
@@ -159,7 +161,25 @@ export default function MLSuggestionsPanel({
   return (
     <div className="ml-suggestions-panel">
       <div className="suggestions-header">
-        <h3>ML-Powered Suggestions</h3>
+        <h3>
+          ML-Powered Suggestions{' '}
+          <HelpIcon title="ML Suggestions" position="right">
+            <p>
+              <strong>Machine Learning</strong> analyzes your match history to
+              find card synergies and suggest improvements.
+            </p>
+            <p>Suggestions are based on:</p>
+            <ul>
+              <li>Cards that win together in your games</li>
+              <li>Underperforming cards to consider removing</li>
+              <li>Potential swaps for better synergy</li>
+            </ul>
+            <p>
+              <strong>Tip:</strong> Play at least 10 games with a deck for
+              better suggestions.
+            </p>
+          </HelpIcon>
+        </h3>
         <div className="header-controls">
           <select
             value={filterType}
@@ -242,22 +262,26 @@ export default function MLSuggestionsPanel({
                 <div className="suggestion-content">
                   <div className="suggestion-title-row">
                     <h4 className="suggestion-title">{suggestion.title}</h4>
-                    <span className={`confidence-badge ${getConfidenceColor(suggestion.confidence)}`}>
-                      {formatConfidence(suggestion.confidence)}
-                    </span>
+                    <Tooltip content="Confidence: How certain the ML model is about this suggestion (higher = more data supporting it)" position="left">
+                      <span className={`confidence-badge ${getConfidenceColor(suggestion.confidence)}`}>
+                        {formatConfidence(suggestion.confidence)}
+                      </span>
+                    </Tooltip>
                   </div>
                   <div className="suggestion-meta-row">
                     <span className="suggestion-type">
                       {getMLSuggestionTypeLabel(suggestion.suggestionType)}
                     </span>
                     {suggestion.expectedWinRateChange !== 0 && (
-                      <span
-                        className={`win-rate-change ${
-                          suggestion.expectedWinRateChange >= 0 ? 'positive' : 'negative'
-                        }`}
-                      >
-                        {formatWinRateChange(suggestion.expectedWinRateChange)}
-                      </span>
+                      <Tooltip content="Expected win rate change if you apply this suggestion, based on your match history" position="left">
+                        <span
+                          className={`win-rate-change ${
+                            suggestion.expectedWinRateChange >= 0 ? 'positive' : 'negative'
+                          }`}
+                        >
+                          {formatWinRateChange(suggestion.expectedWinRateChange)}
+                        </span>
+                      </Tooltip>
                     )}
                   </div>
                 </div>

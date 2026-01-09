@@ -342,8 +342,8 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const exportButton = screen.getByRole('button', { name: /Export/i });
       const validateButton = screen.getByRole('button', { name: /Validate/i });
 
-      expect(exportButton).toHaveAttribute('title', 'Export deck');
-      expect(validateButton).toHaveAttribute('title', 'Validate deck');
+      expect(exportButton).toHaveAttribute('title', 'Download deck as text file for import into MTGA');
+      expect(validateButton).toHaveAttribute('title', 'Check deck legality for the selected format');
     });
   });
 
@@ -480,7 +480,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
       });
 
       const buildAroundButton = screen.getByRole('button', { name: /Build Around/i });
-      expect(buildAroundButton).toHaveAttribute('title', 'Get suggestions based on current deck cards');
+      expect(buildAroundButton).toHaveAttribute('title', 'Generate deck suggestions around key cards with archetype selection');
     });
   });
 });
