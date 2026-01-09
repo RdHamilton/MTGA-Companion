@@ -1,0 +1,103 @@
+.progress-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.progress-modal {
+  background-color: var(--bg-primary, #1a1a1a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: progress-modal-appear 0.2s ease-out;
+}
+
+@keyframes progress-modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.progress-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.progress-modal-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.progress-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+
+.progress-modal-content {
+  margin-bottom: 20px;
+}
+
+.progress-modal-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.progress-modal-cancel {
+  background-color: transparent;
+  border: 1px solid var(--border-color, #444);
+  color: var(--text-secondary, #a0a0a0);
+  padding: 8px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.progress-modal-cancel:hover {
+  background-color: var(--bg-hover, #2a2a2a);
+  color: var(--text-primary, #ffffff);
+  border-color: var(--border-hover, #666);
+}
+
+.progress-modal-cancel:focus {
+  outline: 2px solid var(--focus-ring, #4a9eff);
+  outline-offset: 2px;
+}
+
+/* Override progress bar styles within modal for better fit */
+.progress-modal .progress-bar-container {
+  gap: 10px;
+}
+
+.progress-modal .progress-bar-label {
+  font-size: 14px;
+}
+
+.progress-modal .progress-bar-detail {
+  font-size: 13px;
+}
+
+.progress-modal .progress-bar-time {
+  font-size: 12px;
+}

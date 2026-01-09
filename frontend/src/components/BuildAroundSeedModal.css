@@ -1775,3 +1775,11 @@
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary, #fff);
 }
+
+/* Iterative Loading Container - Issue #805 */
+.iterative-loading-container {
+  padding: 16px;
+  background: var(--bg-secondary, #222);
+  border-radius: 8px;
+  margin: 16px 0;
+}

@@ -293,7 +293,7 @@ describe('MLSuggestionsPanel', () => {
       });
     });
 
-    it('should show analyzing state while generating', async () => {
+    it('should show progress bar while generating', async () => {
       mockMLSuggestions.getMLSuggestions.mockResolvedValue([]);
       let resolveGenerate: (value: MLSuggestionResult[]) => void;
       const generatePromise = new Promise<MLSuggestionResult[]>((resolve) => {
@@ -307,11 +307,13 @@ describe('MLSuggestionsPanel', () => {
         fireEvent.click(screen.getByText('Generate ML Suggestions'));
       });
 
-      expect(screen.getByText('Analyzing synergies...')).toBeInTheDocument();
+      // Should show ProgressBar with label while generating
+      expect(screen.getByText('Generating ML Suggestions')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
 
       resolveGenerate!([]);
       await waitFor(() => {
-        expect(screen.queryByText('Analyzing synergies...')).not.toBeInTheDocument();
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
       });
     });
 

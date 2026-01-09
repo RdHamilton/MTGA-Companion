@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { AppProvider } from './context/AppContext'
 import { DownloadProvider } from './context/DownloadContext'
+import { TaskProgressProvider } from './context/TaskProgressContext'
 import { initializeServices } from './services/adapter'
 
 // Initialize services (REST API and WebSocket) before rendering
@@ -12,7 +13,9 @@ initializeServices().then(() => {
     <StrictMode>
       <AppProvider>
         <DownloadProvider>
-          <App />
+          <TaskProgressProvider>
+            <App />
+          </TaskProgressProvider>
         </DownloadProvider>
       </AppProvider>
     </StrictMode>,
@@ -24,7 +27,9 @@ initializeServices().then(() => {
     <StrictMode>
       <AppProvider>
         <DownloadProvider>
-          <App />
+          <TaskProgressProvider>
+            <App />
+          </TaskProgressProvider>
         </DownloadProvider>
       </AppProvider>
     </StrictMode>,
