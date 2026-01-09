@@ -100,6 +100,20 @@ func setupMLSuggestionTestDB(t *testing.T) *sql.DB {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(model_name, model_version)
 		);
+
+		CREATE TABLE IF NOT EXISTS card_affinity (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			card_id_1 INTEGER NOT NULL,
+			card_id_2 INTEGER NOT NULL,
+			format TEXT DEFAULT 'Standard',
+			affinity_score REAL DEFAULT 0.0,
+			sample_size INTEGER DEFAULT 0,
+			confidence REAL DEFAULT 0.0,
+			source TEXT DEFAULT 'historical',
+			computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(card_id_1, card_id_2, format),
+			CHECK(card_id_1 < card_id_2)
+		);
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create tables: %v", err)
@@ -507,5 +521,351 @@ func TestCalculateSynergyScore(t *testing.T) {
 					score, tt.expectedMin, tt.expectedMax)
 			}
 		})
+	}
+}
+
+func TestMLSuggestionRepository_GetCombinationStats(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Insert test data
+	stats := &models.CardCombinationStats{
+		CardID1:       100,
+		CardID2:       200,
+		Format:        "Standard",
+		GamesTogether: 15,
+		WinsTogether:  10,
+	}
+	_ = repo.UpsertCombinationStats(ctx, stats)
+
+	// Test getting existing stats
+	result, err := repo.GetCombinationStats(ctx, 100, 200, "Standard")
+	if err != nil {
+		t.Fatalf("Failed to get combination stats: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+	if result.GamesTogether != 15 {
+		t.Errorf("Expected 15 games together, got %d", result.GamesTogether)
+	}
+
+	// Test getting non-existent stats
+	result, err = repo.GetCombinationStats(ctx, 999, 1000, "Standard")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("Expected nil result for non-existent stats")
+	}
+}
+
+func TestMLSuggestionRepository_RecordSuggestionOutcome(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Create and apply a suggestion
+	suggestion := &models.MLSuggestion{
+		DeckID:         "deck-1",
+		SuggestionType: models.MLSuggestionTypeAdd,
+		Title:          "Test Outcome",
+		CreatedAt:      time.Now(),
+	}
+	_ = repo.CreateSuggestion(ctx, suggestion)
+	_ = repo.ApplySuggestion(ctx, suggestion.ID)
+
+	// Record outcome
+	err := repo.RecordSuggestionOutcome(ctx, suggestion.ID, 3.5)
+	if err != nil {
+		t.Fatalf("Failed to record outcome: %v", err)
+	}
+
+	// Verify outcome was recorded
+	suggestions, _ := repo.GetSuggestionsByDeck(ctx, "deck-1")
+	var found *models.MLSuggestion
+	for _, s := range suggestions {
+		if s.ID == suggestion.ID {
+			found = s
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("Suggestion not found")
+	}
+	if found.OutcomeWinRateChange == nil || *found.OutcomeWinRateChange != 3.5 {
+		t.Error("Expected outcome win rate change to be 3.5")
+	}
+	if found.OutcomeRecordedAt == nil {
+		t.Error("Expected outcome_recorded_at to be set")
+	}
+}
+
+func TestMLSuggestionRepository_DeleteSuggestionsByDeck(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Create suggestions
+	s1 := &models.MLSuggestion{
+		DeckID:         "deck-1",
+		SuggestionType: models.MLSuggestionTypeAdd,
+		Title:          "Delete Test 1",
+		CreatedAt:      time.Now(),
+	}
+	s2 := &models.MLSuggestion{
+		DeckID:         "deck-1",
+		SuggestionType: models.MLSuggestionTypeRemove,
+		Title:          "Delete Test 2",
+		CreatedAt:      time.Now(),
+	}
+	_ = repo.CreateSuggestion(ctx, s1)
+	_ = repo.CreateSuggestion(ctx, s2)
+
+	// Verify suggestions exist
+	suggestions, _ := repo.GetSuggestionsByDeck(ctx, "deck-1")
+	if len(suggestions) != 2 {
+		t.Fatalf("Expected 2 suggestions, got %d", len(suggestions))
+	}
+
+	// Delete all suggestions for the deck
+	err := repo.DeleteSuggestionsByDeck(ctx, "deck-1")
+	if err != nil {
+		t.Fatalf("Failed to delete suggestions: %v", err)
+	}
+
+	// Verify suggestions are deleted
+	suggestions, _ = repo.GetSuggestionsByDeck(ctx, "deck-1")
+	if len(suggestions) != 0 {
+		t.Errorf("Expected 0 suggestions after delete, got %d", len(suggestions))
+	}
+}
+
+func TestMLSuggestionRepository_CardAffinity(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Test UpsertCardAffinity
+	affinity := &models.CardAffinity{
+		CardID1:       100,
+		CardID2:       200,
+		Format:        "Standard",
+		AffinityScore: 0.75,
+		SampleSize:    50,
+		Confidence:    0.8,
+		Source:        "historical",
+	}
+	err := repo.UpsertCardAffinity(ctx, affinity)
+	if err != nil {
+		t.Fatalf("Failed to upsert card affinity: %v", err)
+	}
+
+	// Test GetCardAffinity
+	result, err := repo.GetCardAffinity(ctx, 100, 200, "Standard")
+	if err != nil {
+		t.Fatalf("Failed to get card affinity: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+	if result.AffinityScore != 0.75 {
+		t.Errorf("Expected affinity score 0.75, got %f", result.AffinityScore)
+	}
+
+	// Test update via upsert
+	affinity.AffinityScore = 0.85
+	err = repo.UpsertCardAffinity(ctx, affinity)
+	if err != nil {
+		t.Fatalf("Failed to update card affinity: %v", err)
+	}
+
+	result, _ = repo.GetCardAffinity(ctx, 100, 200, "Standard")
+	if result.AffinityScore != 0.85 {
+		t.Errorf("Expected updated affinity score 0.85, got %f", result.AffinityScore)
+	}
+
+	// Test GetCardAffinity for non-existent pair
+	result, err = repo.GetCardAffinity(ctx, 999, 1000, "Standard")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("Expected nil result for non-existent affinity")
+	}
+}
+
+func TestMLSuggestionRepository_GetTopAffinities(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Insert multiple affinities for card 100
+	affinities := []*models.CardAffinity{
+		{CardID1: 100, CardID2: 200, Format: "Standard", AffinityScore: 0.9, SampleSize: 20},
+		{CardID1: 100, CardID2: 300, Format: "Standard", AffinityScore: 0.7, SampleSize: 15},
+		{CardID1: 100, CardID2: 400, Format: "Standard", AffinityScore: 0.5, SampleSize: 10},
+	}
+	for _, a := range affinities {
+		_ = repo.UpsertCardAffinity(ctx, a)
+	}
+
+	// Get top affinities
+	results, err := repo.GetTopAffinities(ctx, 100, "Standard", 10)
+	if err != nil {
+		t.Fatalf("Failed to get top affinities: %v", err)
+	}
+	if len(results) != 3 {
+		t.Errorf("Expected 3 affinities, got %d", len(results))
+	}
+
+	// Verify sorted by affinity score descending
+	if len(results) >= 2 && results[0].AffinityScore < results[1].AffinityScore {
+		t.Error("Expected affinities to be sorted by score descending")
+	}
+
+	// Test with limit
+	results, err = repo.GetTopAffinities(ctx, 100, "Standard", 2)
+	if err != nil {
+		t.Fatalf("Failed to get limited affinities: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Expected 2 affinities with limit, got %d", len(results))
+	}
+}
+
+func TestMLSuggestionRepository_GetActiveModel(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Create an active model
+	accuracy := 0.9
+	activeMeta := &models.MLModelMetadata{
+		ModelName:       "synergy-model",
+		ModelVersion:    "2.0.0",
+		TrainingSamples: 5000,
+		Accuracy:        &accuracy,
+		IsActive:        true,
+	}
+	err := repo.SaveModelMetadata(ctx, activeMeta)
+	if err != nil {
+		t.Fatalf("Failed to save active model: %v", err)
+	}
+
+	// Create an inactive model
+	inactiveMeta := &models.MLModelMetadata{
+		ModelName:       "synergy-model",
+		ModelVersion:    "1.0.0",
+		TrainingSamples: 1000,
+		IsActive:        false,
+	}
+	_ = repo.SaveModelMetadata(ctx, inactiveMeta)
+
+	// Get active model
+	result, err := repo.GetActiveModel(ctx, "synergy-model")
+	if err != nil {
+		t.Fatalf("Failed to get active model: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil active model")
+	}
+	if result.ModelVersion != "2.0.0" {
+		t.Errorf("Expected version 2.0.0, got %s", result.ModelVersion)
+	}
+	if !result.IsActive {
+		t.Error("Expected model to be active")
+	}
+
+	// Test getting non-existent model
+	result, err = repo.GetActiveModel(ctx, "non-existent")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("Expected nil result for non-existent model")
+	}
+}
+
+func TestMLSuggestionRepository_CalculateAndUpdateSynergyScores(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Insert combination stats with enough games
+	stats := &models.CardCombinationStats{
+		CardID1:        100,
+		CardID2:        200,
+		Format:         "Standard",
+		GamesTogether:  20,
+		WinsTogether:   14,
+		GamesCard1Only: 10,
+		WinsCard1Only:  5,
+		GamesCard2Only: 10,
+		WinsCard2Only:  5,
+	}
+	_ = repo.UpsertCombinationStats(ctx, stats)
+
+	// Calculate and update synergy scores
+	err := repo.CalculateAndUpdateSynergyScores(ctx, 5)
+	if err != nil {
+		t.Fatalf("Failed to calculate synergy scores: %v", err)
+	}
+
+	// Verify synergy score was updated
+	result, _ := repo.GetCombinationStats(ctx, 100, 200, "Standard")
+	if result.SynergyScore == 0 {
+		t.Error("Expected synergy score to be calculated and non-zero")
+	}
+}
+
+func TestMLSuggestionRepository_GetUserPlayPatterns_NotFound(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Test getting non-existent patterns
+	result, err := repo.GetUserPlayPatterns(ctx, "non-existent-account")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("Expected nil result for non-existent account")
+	}
+}
+
+func TestGetPairedCardID(t *testing.T) {
+	stats := &models.CardCombinationStats{
+		CardID1: 100,
+		CardID2: 200,
+	}
+
+	// When querying for card 100, should return 200
+	paired := GetPairedCardID(stats, 100)
+	if paired != 200 {
+		t.Errorf("Expected paired card 200, got %d", paired)
+	}
+
+	// When querying for card 200, should return 100
+	paired = GetPairedCardID(stats, 200)
+	if paired != 100 {
+		t.Errorf("Expected paired card 100, got %d", paired)
 	}
 }
