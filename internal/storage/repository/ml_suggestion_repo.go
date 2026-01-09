@@ -543,6 +543,8 @@ func (r *MLSuggestionRepository) GetActiveModel(ctx context.Context, modelName s
 			accuracy, precision_score, recall, f1_score, is_active, model_data, created_at
 		FROM ml_model_metadata
 		WHERE model_name = ? AND is_active = TRUE
+		ORDER BY created_at DESC
+		LIMIT 1
 	`
 
 	var m models.MLModelMetadata
