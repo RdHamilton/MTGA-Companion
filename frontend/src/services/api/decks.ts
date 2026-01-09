@@ -481,6 +481,9 @@ export interface ArchetypeProfile {
   name: string;
   landCount: number;
   curveTargets: Record<number, number>;
+  creatureRatio: number;
+  removalCount: number;
+  cardAdvantage: number;
   description: string;
 }
 
@@ -496,22 +499,45 @@ export interface GenerateCompleteDeckRequest {
 }
 
 /**
+ * Score breakdown for card scoring.
+ */
+export interface ScoreBreakdown {
+  colorFit: number;
+  curveFit: number;
+  synergy: number;
+  quality: number;
+  overall: number;
+}
+
+/**
+ * Synergy detail explaining card synergy.
+ */
+export interface SynergyDetail {
+  type: string;
+  name: string;
+  description: string;
+}
+
+/**
  * Card with quantity for generated deck.
  */
 export interface CardWithQuantity {
   cardID: number;
   name: string;
-  manaCost: string;
+  manaCost?: string;
   cmc: number;
   colors: string[];
   typeLine: string;
-  rarity: string;
-  imageURI: string;
+  rarity?: string;
+  imageURI?: string;
   quantity: number;
   score: number;
   reasoning: string;
   inCollection: boolean;
   ownedCount: number;
+  neededCount: number;
+  scoreBreakdown?: ScoreBreakdown;
+  synergyDetails?: SynergyDetail[];
 }
 
 /**
@@ -523,6 +549,7 @@ export interface LandWithQuantity {
   quantity: number;
   colors: string[];
   isBasic: boolean;
+  entersTapped: boolean;
 }
 
 /**
@@ -579,6 +606,6 @@ export async function generateCompleteDeck(
 /**
  * Get available archetype profiles.
  */
-export async function getArchetypeProfiles(): Promise<Record<string, ArchetypeProfile>> {
-  return get<Record<string, ArchetypeProfile>>('/decks/archetypes');
+export async function getArchetypeProfiles(): Promise<ArchetypeProfile[]> {
+  return get<ArchetypeProfile[]>('/decks/archetypes');
 }

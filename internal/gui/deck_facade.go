@@ -2987,10 +2987,13 @@ type GeneratedDeckAnalysisResponse struct {
 
 // ArchetypeProfileResponse represents an archetype profile for the frontend.
 type ArchetypeProfileResponse struct {
-	Name         string      `json:"name"`
-	LandCount    int         `json:"landCount"`
-	CurveTargets map[int]int `json:"curveTargets"`
-	Description  string      `json:"description"`
+	Name          string      `json:"name"`
+	LandCount     int         `json:"landCount"`
+	CurveTargets  map[int]int `json:"curveTargets"`
+	CreatureRatio float64     `json:"creatureRatio"`
+	RemovalCount  int         `json:"removalCount"`
+	CardAdvantage int         `json:"cardAdvantage"`
+	Description   string      `json:"description"`
 }
 
 // GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
@@ -3034,10 +3037,13 @@ func (d *DeckFacade) GetArchetypeProfiles() []*ArchetypeProfileResponse {
 	result := make([]*ArchetypeProfileResponse, 0, len(profiles))
 	for _, p := range profiles {
 		result = append(result, &ArchetypeProfileResponse{
-			Name:         p.Name,
-			LandCount:    p.LandCount,
-			CurveTargets: p.CurveTargets,
-			Description:  p.Description,
+			Name:          p.Name,
+			LandCount:     p.LandCount,
+			CurveTargets:  p.CurveTargets,
+			CreatureRatio: p.CreatureRatio,
+			RemovalCount:  p.RemovalCount,
+			CardAdvantage: p.CardAdvantage,
+			Description:   p.Description,
 		})
 	}
 	return result

@@ -1324,6 +1324,11 @@ func TestScoreArchetypeCurveFit(t *testing.T) {
 			card := &cards.Card{CMC: tt.cmc, TypeLine: "Creature"}
 			score := builder.scoreArchetypeCurveFit(card, profile)
 
+			// Assert score is within valid range [0, 1]
+			if score < 0.0 || score > 1.0 {
+				t.Errorf("score out of bounds [0, 1] for %s, got %.2f", tt.name, score)
+			}
+
 			if tt.expectHigh && score <= 0.3 {
 				t.Errorf("expected high score for %s, got %.2f", tt.name, score)
 			}
@@ -1767,5 +1772,45 @@ func TestBuildGeneratedDeckAnalysis(t *testing.T) {
 
 	if analysis.MissingCount != 6 { // 0 + 2 + 4 = 6 missing
 		t.Errorf("expected 6 missing, got %d", analysis.MissingCount)
+	}
+}
+
+func TestBuildGeneratedDeckAnalysis_NoSpells(t *testing.T) {
+	builder := &SeedDeckBuilder{}
+
+	// Empty spells slice - should not panic from division by zero
+	spells := []*CardWithQuantity{}
+
+	lands := []*LandWithQuantity{
+		{Name: "Mountain", Quantity: 20},
+	}
+
+	profile := GetArchetypeProfile("aggro")
+	collection := map[int]int{}
+
+	analysis := builder.buildGeneratedDeckAnalysis(spells, lands, profile, collection)
+
+	if analysis.SpellCount != 0 {
+		t.Errorf("expected 0 spells, got %d", analysis.SpellCount)
+	}
+
+	if analysis.LandCount != 20 {
+		t.Errorf("expected 20 lands, got %d", analysis.LandCount)
+	}
+
+	if analysis.TotalCards != 20 {
+		t.Errorf("expected 20 total cards, got %d", analysis.TotalCards)
+	}
+
+	if analysis.AverageCMC != 0 {
+		t.Errorf("expected 0 average CMC for no spells, got %.2f", analysis.AverageCMC)
+	}
+
+	if analysis.CreatureCount != 0 {
+		t.Errorf("expected 0 creatures, got %d", analysis.CreatureCount)
+	}
+
+	if analysis.NonCreatureCount != 0 {
+		t.Errorf("expected 0 non-creatures, got %d", analysis.NonCreatureCount)
 	}
 }

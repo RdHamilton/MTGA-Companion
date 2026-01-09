@@ -1901,10 +1901,17 @@ func (s *SeedDeckBuilder) scoreArchetypeCurveFit(card *cards.Card, profile *Arch
 		return 0.2 // Archetype doesn't want cards at this CMC
 	}
 
-	// Higher target = more desirable
-	// Max target in aggro is 14 at 2 CMC, cap result at 1.0
-	maxTarget := 14.0
-	score := float64(target) / maxTarget
+	// Higher target = more desirable; normalize by the profile's own max target
+	maxTarget := 0
+	for _, v := range profile.CurveTargets {
+		if v > maxTarget {
+			maxTarget = v
+		}
+	}
+	if maxTarget == 0 {
+		return 0.5
+	}
+	score := float64(target) / float64(maxTarget)
 	if score > 1.0 {
 		score = 1.0
 	}

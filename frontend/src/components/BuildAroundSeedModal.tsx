@@ -507,7 +507,7 @@ export default function BuildAroundSeedModal({
       reasoning: spell.reasoning,
       inCollection: spell.inCollection,
       ownedCount: spell.ownedCount,
-      neededCount: spell.inCollection ? 0 : spell.quantity,
+      neededCount: spell.neededCount,
       currentCopies: 0,
       recommendedCopies: spell.quantity,
     }));
