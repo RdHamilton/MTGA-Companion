@@ -17,45 +17,47 @@ import (
 
 // Service provides high-level operations for storing and retrieving MTGA data.
 type Service struct {
-	db                     *DB
-	matches                repository.MatchRepository
-	stats                  repository.StatsRepository
-	decks                  repository.DeckRepository
-	collection             repository.CollectionRepository
-	accounts               repository.AccountRepository
-	rankHistory            repository.RankHistoryRepository
-	quests                 *QuestRepository
-	draft                  repository.DraftRepository
-	setCard                repository.SetCardRepository
-	draftRatings           repository.DraftRatingsRepository
-	inventory              repository.InventoryRepository
-	settings               repository.SettingsRepository
-	deckPerformance        repository.DeckPerformanceRepository
-	recommendationFeedback repository.RecommendationFeedbackRepository
-	standard               repository.StandardRepository
-	gamePlay               repository.GamePlayRepository
-	currentAccountID       int // Current active account ID
+	db                      *DB
+	matches                 repository.MatchRepository
+	stats                   repository.StatsRepository
+	decks                   repository.DeckRepository
+	collection              repository.CollectionRepository
+	accounts                repository.AccountRepository
+	rankHistory             repository.RankHistoryRepository
+	quests                  *QuestRepository
+	draft                   repository.DraftRepository
+	setCard                 repository.SetCardRepository
+	draftRatings            repository.DraftRatingsRepository
+	inventory               repository.InventoryRepository
+	settings                repository.SettingsRepository
+	deckPerformance         repository.DeckPerformanceRepository
+	recommendationFeedback  repository.RecommendationFeedbackRepository
+	standard                repository.StandardRepository
+	gamePlay                repository.GamePlayRepository
+	cardPerformanceAnalysis repository.CardPerformanceRepository
+	currentAccountID        int // Current active account ID
 }
 
 // ServiceConfig holds optional repository overrides for dependency injection.
 // All fields are optional - if nil, the default implementation will be created.
 type ServiceConfig struct {
-	Matches                repository.MatchRepository
-	Stats                  repository.StatsRepository
-	Decks                  repository.DeckRepository
-	Collection             repository.CollectionRepository
-	Accounts               repository.AccountRepository
-	RankHistory            repository.RankHistoryRepository
-	Quests                 *QuestRepository
-	Draft                  repository.DraftRepository
-	SetCard                repository.SetCardRepository
-	DraftRatings           repository.DraftRatingsRepository
-	Inventory              repository.InventoryRepository
-	Settings               repository.SettingsRepository
-	DeckPerformance        repository.DeckPerformanceRepository
-	RecommendationFeedback repository.RecommendationFeedbackRepository
-	Standard               repository.StandardRepository
-	GamePlay               repository.GamePlayRepository
+	Matches                 repository.MatchRepository
+	Stats                   repository.StatsRepository
+	Decks                   repository.DeckRepository
+	Collection              repository.CollectionRepository
+	Accounts                repository.AccountRepository
+	RankHistory             repository.RankHistoryRepository
+	Quests                  *QuestRepository
+	Draft                   repository.DraftRepository
+	SetCard                 repository.SetCardRepository
+	DraftRatings            repository.DraftRatingsRepository
+	Inventory               repository.InventoryRepository
+	Settings                repository.SettingsRepository
+	DeckPerformance         repository.DeckPerformanceRepository
+	RecommendationFeedback  repository.RecommendationFeedbackRepository
+	Standard                repository.StandardRepository
+	GamePlay                repository.GamePlayRepository
+	CardPerformanceAnalysis repository.CardPerformanceRepository
 }
 
 // NewService creates a new storage service with default repository implementations.
@@ -92,6 +94,9 @@ func NewServiceWithConfig(db *DB, cfg *ServiceConfig) *Service {
 		}),
 		standard: orDefault(cfg.Standard, func() repository.StandardRepository { return repository.NewStandardRepository(conn) }),
 		gamePlay: orDefault(cfg.GamePlay, func() repository.GamePlayRepository { return repository.NewGamePlayRepository(conn) }),
+		cardPerformanceAnalysis: orDefault(cfg.CardPerformanceAnalysis, func() repository.CardPerformanceRepository {
+			return repository.NewCardPerformanceRepository(conn)
+		}),
 	}
 
 	// Initialize default account if it doesn't exist
@@ -2026,6 +2031,11 @@ func (s *Service) GamePlayRepo() repository.GamePlayRepository {
 	return s.gamePlay
 }
 
+// CardPerformanceAnalysisRepo returns the card performance analysis repository.
+func (s *Service) CardPerformanceAnalysisRepo() repository.CardPerformanceRepository {
+	return s.cardPerformanceAnalysis
+}
+
 // GetCardNames retrieves card names for multiple arena IDs.
 func (s *Service) GetCardNames(ctx context.Context, arenaIDs []string) (map[string]string, error) {
 	if len(arenaIDs) == 0 {
@@ -2184,6 +2194,26 @@ func (s *Service) DeckPerformanceRepo() repository.DeckPerformanceRepository {
 // RecommendationFeedbackRepo returns the recommendation feedback repository.
 func (s *Service) RecommendationFeedbackRepo() repository.RecommendationFeedbackRepository {
 	return s.recommendationFeedback
+}
+
+// NewNotesRepo creates a new notes repository using the service's database connection.
+func (s *Service) NewNotesRepo() repository.NotesRepository {
+	return repository.NewNotesRepository(s.db.Conn())
+}
+
+// NewSuggestionRepo creates a new suggestion repository using the service's database connection.
+func (s *Service) NewSuggestionRepo() repository.SuggestionRepository {
+	return repository.NewSuggestionRepository(s.db.Conn())
+}
+
+// NewGamePlayRepo creates a new game play repository using the service's database connection.
+func (s *Service) NewGamePlayRepo() repository.GamePlayRepository {
+	return repository.NewGamePlayRepository(s.db.Conn())
+}
+
+// NewMatchRepo creates a new match repository using the service's database connection.
+func (s *Service) NewMatchRepo() repository.MatchRepository {
+	return repository.NewMatchRepository(s.db.Conn())
 }
 
 // Close closes the database connection.

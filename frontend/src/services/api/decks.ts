@@ -468,3 +468,340 @@ export async function suggestNextCards(
 ): Promise<IterativeBuildAroundResponse> {
   return post<IterativeBuildAroundResponse>('/decks/build-around/suggest-next', request);
 }
+
+// ==========================================
+// Complete Deck Generation (Issue #774)
+// ==========================================
+
+/**
+ * Archetype profile for deck building.
+ * Matches backend ArchetypeProfileResponse.
+ */
+export interface ArchetypeProfile {
+  name: string;
+  landCount: number;
+  curveTargets: Record<number, number>;
+  creatureRatio: number;
+  removalCount: number;
+  cardAdvantage: number;
+  description: string;
+}
+
+/**
+ * Request to generate a complete 60-card deck.
+ */
+export interface GenerateCompleteDeckRequest {
+  seed_card_id: number;
+  archetype: 'aggro' | 'midrange' | 'control';
+  budget_mode?: boolean;
+  set_restriction?: string;
+  allowed_sets?: string[];
+}
+
+/**
+ * Score breakdown for card scoring.
+ */
+export interface ScoreBreakdown {
+  colorFit: number;
+  curveFit: number;
+  synergy: number;
+  quality: number;
+  overall: number;
+}
+
+/**
+ * Card with quantity for generated deck.
+ */
+export interface CardWithQuantity {
+  cardID: number;
+  name: string;
+  manaCost?: string;
+  cmc: number;
+  colors: string[];
+  typeLine: string;
+  rarity?: string;
+  imageURI?: string;
+  quantity: number;
+  score: number;
+  reasoning: string;
+  inCollection: boolean;
+  ownedCount: number;
+  neededCount: number;
+  scoreBreakdown?: ScoreBreakdown;
+  synergyDetails?: SynergyDetail[];
+}
+
+/**
+ * Land with quantity for generated deck.
+ */
+export interface LandWithQuantity {
+  cardID: number;
+  name: string;
+  quantity: number;
+  colors: string[];
+  isBasic: boolean;
+  entersTapped: boolean;
+}
+
+/**
+ * Strategy and game plan for a generated deck.
+ */
+export interface DeckStrategy {
+  summary: string;
+  gamePlan: string;
+  keyCards: string[];
+  mulligan: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+/**
+ * Analysis of a generated deck.
+ * Matches backend GeneratedDeckAnalysisResponse.
+ */
+export interface GeneratedDeckAnalysis {
+  totalCards: number;
+  spellCount: number;
+  landCount: number;
+  creatureCount: number;
+  nonCreatureCount: number;
+  averageCMC: number;
+  manaCurve: Record<number, number>;
+  colorDistribution: Record<string, number>;
+  inCollectionCount: number;
+  missingCount: number;
+  missingWildcardCost: Record<string, number>;
+  archetypeMatch: number;
+}
+
+/**
+ * Response from complete deck generation.
+ */
+export interface GenerateCompleteDeckResponse {
+  seedCard: CardWithOwnership;
+  spells: CardWithQuantity[];
+  lands: LandWithQuantity[];
+  strategy: DeckStrategy;
+  analysis: GeneratedDeckAnalysis;
+}
+
+/**
+ * Generate a complete 60-card deck from a seed card.
+ */
+export async function generateCompleteDeck(
+  request: GenerateCompleteDeckRequest
+): Promise<GenerateCompleteDeckResponse> {
+  return post<GenerateCompleteDeckResponse>('/decks/generate', request);
+}
+
+/**
+ * Get available archetype profiles.
+ * Returns a record keyed by archetype name (lowercase).
+ */
+export async function getArchetypeProfiles(): Promise<Record<string, ArchetypeProfile>> {
+  const profiles = await get<ArchetypeProfile[]>('/decks/archetypes');
+  const record: Record<string, ArchetypeProfile> = {};
+  for (const profile of profiles) {
+    record[profile.name.toLowerCase()] = profile;
+  }
+  return record;
+}
+
+// ============================================================================
+// Card Performance Analysis (Issue #771)
+// ============================================================================
+
+/**
+ * Performance metrics for a single card within a deck.
+ */
+export interface CardPerformance {
+  cardId: number;
+  cardName: string;
+  quantity: number;
+  gamesWithCard: number;
+  gamesDrawn: number;
+  gamesPlayed: number;
+  winRateWhenDrawn: number;
+  winRateWhenPlayed: number;
+  deckWinRate: number;
+  playRate: number;
+  winContribution: number;
+  impactScore: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  sampleSize: number;
+  performanceGrade: 'excellent' | 'good' | 'average' | 'poor' | 'bad';
+  avgTurnPlayed: number;
+  turnPlayedDist?: Record<number, number>;
+  mulliganedAway: number;
+  mulliganRate: number;
+}
+
+/**
+ * Full deck performance analysis response.
+ */
+export interface DeckPerformanceAnalysis {
+  deckId: string;
+  deckName: string;
+  totalMatches: number;
+  totalGames: number;
+  overallWinRate: number;
+  cardPerformance: CardPerformance[];
+  bestPerformers: string[];
+  worstPerformers: string[];
+  analysisDate: string;
+}
+
+/**
+ * Card recommendation for add/remove/swap.
+ */
+export interface PerformanceCardRecommendation {
+  type: 'add' | 'remove' | 'swap';
+  cardId: number;
+  cardName: string;
+  reason: string;
+  impactEstimate: number;
+  confidence: 'high' | 'medium' | 'low';
+  priority: number;
+  swapForCardId?: number;
+  swapForCardName?: string;
+  basedOnGames: number;
+}
+
+/**
+ * All recommendations response for a deck.
+ */
+export interface DeckRecommendationsResponse {
+  deckId: string;
+  deckName: string;
+  currentWinRate: number;
+  addRecommendations: PerformanceCardRecommendation[];
+  removeRecommendations: PerformanceCardRecommendation[];
+  swapRecommendations: PerformanceCardRecommendation[];
+  projectedWinRate: number;
+}
+
+/**
+ * Get card performance metrics for a deck.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getCardPerformance(
+  deckId: string,
+  options?: {
+    minGames?: number;
+    includeLands?: boolean;
+  }
+): Promise<DeckPerformanceAnalysis> {
+  const params = new URLSearchParams();
+  if (options?.minGames !== undefined) {
+    params.set('min_games', options.minGames.toString());
+  }
+  if (options?.includeLands) {
+    params.set('include_lands', 'true');
+  }
+
+  const query = params.toString();
+  return get<DeckPerformanceAnalysis>(
+    `/decks/${deckId}/card-performance${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card add recommendations based on performance data.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceAddRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<PerformanceCardRecommendation[]> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<PerformanceCardRecommendation[]>(
+    `/decks/${deckId}/recommendations/add${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card removal recommendations based on underperformance.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceRemoveRecommendations(
+  deckId: string,
+  options?: {
+    threshold?: number;
+  }
+): Promise<CardPerformance[]> {
+  const params = new URLSearchParams();
+  if (options?.threshold !== undefined) {
+    params.set('threshold', options.threshold.toString());
+  }
+
+  const query = params.toString();
+  return get<CardPerformance[]>(
+    `/decks/${deckId}/recommendations/remove${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get card swap recommendations based on performance.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getPerformanceSwapRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<PerformanceCardRecommendation[]> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<PerformanceCardRecommendation[]>(
+    `/decks/${deckId}/recommendations/swap${query ? `?${query}` : ''}`
+  );
+}
+
+/**
+ * Get all recommendations (add/remove/swap) for a deck.
+ * @param deckId - The deck ID
+ * @param options - Optional query parameters
+ */
+export async function getAllPerformanceRecommendations(
+  deckId: string,
+  options?: {
+    maxResults?: number;
+    format?: string;
+  }
+): Promise<DeckRecommendationsResponse> {
+  const params = new URLSearchParams();
+  if (options?.maxResults !== undefined) {
+    params.set('max_results', options.maxResults.toString());
+  }
+  if (options?.format) {
+    params.set('format', options.format);
+  }
+
+  const query = params.toString();
+  return get<DeckRecommendationsResponse>(
+    `/decks/${deckId}/recommendations/all${query ? `?${query}` : ''}`
+  );
+}

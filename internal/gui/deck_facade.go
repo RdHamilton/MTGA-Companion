@@ -1909,6 +1909,10 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 		exportFormat = deckexport.FormatMTGO
 	case "mtggoldfish":
 		exportFormat = deckexport.FormatMTGGoldfish
+	case "moxfield":
+		exportFormat = deckexport.FormatMoxfield
+	case "archidekt":
+		exportFormat = deckexport.FormatArchidekt
 	default:
 		return &ExportDeckResponse{
 			Error: fmt.Sprintf("Unsupported export format: %s", req.Format),
@@ -2893,4 +2897,627 @@ func convertIterativeResponse(r *recommendations.IterativeBuildAroundResponse) *
 	}
 
 	return response
+}
+
+// GenerateCompleteDeckRequest represents a request to generate a complete 60-card deck.
+type GenerateCompleteDeckRequest struct {
+	SeedCardID     int      `json:"seedCardID"`
+	Archetype      string   `json:"archetype"`                // "aggro", "midrange", "control"
+	BudgetMode     bool     `json:"budgetMode,omitempty"`     // Only collection cards
+	SetRestriction string   `json:"setRestriction,omitempty"` // "single", "multiple", "all"
+	AllowedSets    []string `json:"allowedSets,omitempty"`    // Specific set codes if "multiple"
+}
+
+// GenerateCompleteDeckResponse contains a complete 60-card deck with strategy.
+type GenerateCompleteDeckResponse struct {
+	SeedCard *CardWithOwnershipResponse     `json:"seedCard"`
+	Spells   []*CardWithQuantityResponse    `json:"spells"` // Non-land cards with quantities
+	Lands    []*LandWithQuantityResponse    `json:"lands"`  // Lands with quantities
+	Strategy *DeckStrategyResponse          `json:"strategy"`
+	Analysis *GeneratedDeckAnalysisResponse `json:"analysis"`
+}
+
+// CardWithQuantityResponse represents a card with how many copies to include.
+type CardWithQuantityResponse struct {
+	CardID         int                     `json:"cardID"`
+	Name           string                  `json:"name"`
+	ManaCost       string                  `json:"manaCost,omitempty"`
+	CMC            int                     `json:"cmc"`
+	Colors         []string                `json:"colors"`
+	TypeLine       string                  `json:"typeLine"`
+	Rarity         string                  `json:"rarity,omitempty"`
+	ImageURI       string                  `json:"imageURI,omitempty"`
+	Score          float64                 `json:"score"`
+	Reasoning      string                  `json:"reasoning"`
+	Quantity       int                     `json:"quantity"`
+	InCollection   bool                    `json:"inCollection"`
+	OwnedCount     int                     `json:"ownedCount"`
+	NeededCount    int                     `json:"neededCount"`
+	ScoreBreakdown *ScoreBreakdownResponse `json:"scoreBreakdown,omitempty"`
+	SynergyDetails []SynergyDetailResponse `json:"synergyDetails,omitempty"`
+}
+
+// ScoreBreakdownResponse provides detailed scoring factors.
+type ScoreBreakdownResponse struct {
+	ColorFit float64 `json:"colorFit"`
+	CurveFit float64 `json:"curveFit"`
+	Synergy  float64 `json:"synergy"`
+	Quality  float64 `json:"quality"`
+	Overall  float64 `json:"overall"`
+}
+
+// SynergyDetailResponse describes a specific synergy.
+type SynergyDetailResponse struct {
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// LandWithQuantityResponse represents a land with quantity and type information.
+type LandWithQuantityResponse struct {
+	CardID       int      `json:"cardID"`
+	Name         string   `json:"name"`
+	Quantity     int      `json:"quantity"`
+	Colors       []string `json:"colors"`
+	IsBasic      bool     `json:"isBasic"`
+	EntersTapped bool     `json:"entersTapped"`
+}
+
+// DeckStrategyResponse provides human-readable deck strategy information.
+type DeckStrategyResponse struct {
+	Summary    string   `json:"summary"`
+	GamePlan   string   `json:"gamePlan"`
+	KeyCards   []string `json:"keyCards"`
+	Mulligan   string   `json:"mulligan"`
+	Strengths  []string `json:"strengths"`
+	Weaknesses []string `json:"weaknesses"`
+}
+
+// GeneratedDeckAnalysisResponse provides detailed analysis of the generated deck.
+type GeneratedDeckAnalysisResponse struct {
+	TotalCards          int            `json:"totalCards"`
+	SpellCount          int            `json:"spellCount"`
+	LandCount           int            `json:"landCount"`
+	CreatureCount       int            `json:"creatureCount"`
+	NonCreatureCount    int            `json:"nonCreatureCount"`
+	AverageCMC          float64        `json:"averageCMC"`
+	ManaCurve           map[int]int    `json:"manaCurve"`
+	ColorDistribution   map[string]int `json:"colorDistribution"`
+	InCollectionCount   int            `json:"inCollectionCount"`
+	MissingCount        int            `json:"missingCount"`
+	MissingWildcardCost map[string]int `json:"missingWildcardCost"`
+	ArchetypeMatch      float64        `json:"archetypeMatch"`
+}
+
+// ArchetypeProfileResponse represents an archetype profile for the frontend.
+type ArchetypeProfileResponse struct {
+	Name          string      `json:"name"`
+	LandCount     int         `json:"landCount"`
+	CurveTargets  map[int]int `json:"curveTargets"`
+	CreatureRatio float64     `json:"creatureRatio"`
+	RemovalCount  int         `json:"removalCount"`
+	CardAdvantage int         `json:"cardAdvantage"`
+	Description   string      `json:"description"`
+}
+
+// GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
+func (d *DeckFacade) GenerateCompleteDeck(ctx context.Context, req *GenerateCompleteDeckRequest) (*GenerateCompleteDeckResponse, error) {
+	if req == nil {
+		return nil, &AppError{Message: "Request is required"}
+	}
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+	if d.services.CardService == nil {
+		return nil, &AppError{Message: "Card service not initialized"}
+	}
+
+	// Create seed deck builder
+	builder := recommendations.NewSeedDeckBuilder(
+		d.services.Storage.SetCardRepo(),
+		d.services.Storage.CollectionRepo(),
+		d.services.Storage.StandardRepo(),
+		d.services.CardService,
+	)
+
+	// Convert request
+	builderReq := &recommendations.GenerateCompleteDeckRequest{
+		SeedCardID:     req.SeedCardID,
+		Archetype:      req.Archetype,
+		BudgetMode:     req.BudgetMode,
+		SetRestriction: req.SetRestriction,
+		AllowedSets:    req.AllowedSets,
+	}
+
+	result, err := builder.GenerateCompleteDeck(ctx, builderReq)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to generate deck: %v", err)}
+	}
+
+	// Convert to response type
+	return convertGenerateCompleteDeckResponse(result), nil
+}
+
+// GetArchetypeProfiles returns all available archetype profiles.
+func (d *DeckFacade) GetArchetypeProfiles() []*ArchetypeProfileResponse {
+	profiles := recommendations.GetAllArchetypeProfiles()
+	result := make([]*ArchetypeProfileResponse, 0, len(profiles))
+	for _, p := range profiles {
+		result = append(result, &ArchetypeProfileResponse{
+			Name:          p.Name,
+			LandCount:     p.LandCount,
+			CurveTargets:  p.CurveTargets,
+			CreatureRatio: p.CreatureRatio,
+			RemovalCount:  p.RemovalCount,
+			CardAdvantage: p.CardAdvantage,
+			Description:   p.Description,
+		})
+	}
+	return result
+}
+
+// convertGenerateCompleteDeckResponse converts the internal response to the API response type.
+func convertGenerateCompleteDeckResponse(r *recommendations.GenerateCompleteDeckResponse) *GenerateCompleteDeckResponse {
+	if r == nil {
+		return nil
+	}
+
+	response := &GenerateCompleteDeckResponse{}
+
+	// Convert seed card
+	if r.SeedCard != nil {
+		response.SeedCard = convertCardWithOwnership(r.SeedCard)
+	}
+
+	// Convert spells with quantity
+	response.Spells = make([]*CardWithQuantityResponse, 0, len(r.Spells))
+	for _, spell := range r.Spells {
+		response.Spells = append(response.Spells, convertCardWithQuantity(spell))
+	}
+
+	// Convert lands
+	response.Lands = make([]*LandWithQuantityResponse, 0, len(r.Lands))
+	for _, land := range r.Lands {
+		response.Lands = append(response.Lands, &LandWithQuantityResponse{
+			CardID:       land.CardID,
+			Name:         land.Name,
+			Quantity:     land.Quantity,
+			Colors:       land.Colors,
+			IsBasic:      land.IsBasic,
+			EntersTapped: land.EntersTapped,
+		})
+	}
+
+	// Convert strategy
+	if r.Strategy != nil {
+		response.Strategy = &DeckStrategyResponse{
+			Summary:    r.Strategy.Summary,
+			GamePlan:   r.Strategy.GamePlan,
+			KeyCards:   r.Strategy.KeyCards,
+			Mulligan:   r.Strategy.Mulligan,
+			Strengths:  r.Strategy.Strengths,
+			Weaknesses: r.Strategy.Weaknesses,
+		}
+	}
+
+	// Convert analysis
+	if r.Analysis != nil {
+		response.Analysis = &GeneratedDeckAnalysisResponse{
+			TotalCards:          r.Analysis.TotalCards,
+			SpellCount:          r.Analysis.SpellCount,
+			LandCount:           r.Analysis.LandCount,
+			CreatureCount:       r.Analysis.CreatureCount,
+			NonCreatureCount:    r.Analysis.NonCreatureCount,
+			AverageCMC:          r.Analysis.AverageCMC,
+			ManaCurve:           r.Analysis.ManaCurve,
+			ColorDistribution:   r.Analysis.ColorDistribution,
+			InCollectionCount:   r.Analysis.InCollectionCount,
+			MissingCount:        r.Analysis.MissingCount,
+			MissingWildcardCost: r.Analysis.MissingWildcardCost,
+			ArchetypeMatch:      r.Analysis.ArchetypeMatch,
+		}
+	}
+
+	return response
+}
+
+// convertCardWithQuantity converts a card with quantity to the response type.
+func convertCardWithQuantity(c *recommendations.CardWithQuantity) *CardWithQuantityResponse {
+	if c == nil {
+		return nil
+	}
+
+	response := &CardWithQuantityResponse{
+		CardID:       c.CardID,
+		Name:         c.Name,
+		ManaCost:     c.ManaCost,
+		CMC:          c.CMC,
+		Colors:       c.Colors,
+		TypeLine:     c.TypeLine,
+		Rarity:       c.Rarity,
+		ImageURI:     c.ImageURI,
+		Score:        c.Score,
+		Reasoning:    c.Reasoning,
+		Quantity:     c.Quantity,
+		InCollection: c.InCollection,
+		OwnedCount:   c.OwnedCount,
+		NeededCount:  c.NeededCount,
+	}
+
+	// Convert score breakdown
+	if c.ScoreBreakdown != nil {
+		response.ScoreBreakdown = &ScoreBreakdownResponse{
+			ColorFit: c.ScoreBreakdown.ColorFit,
+			CurveFit: c.ScoreBreakdown.CurveFit,
+			Synergy:  c.ScoreBreakdown.Synergy,
+			Quality:  c.ScoreBreakdown.Quality,
+			Overall:  c.ScoreBreakdown.Overall,
+		}
+	}
+
+	// Convert synergy details
+	if len(c.SynergyDetails) > 0 {
+		response.SynergyDetails = make([]SynergyDetailResponse, 0, len(c.SynergyDetails))
+		for _, sd := range c.SynergyDetails {
+			response.SynergyDetails = append(response.SynergyDetails, SynergyDetailResponse{
+				Type:        sd.Type,
+				Name:        sd.Name,
+				Description: sd.Description,
+			})
+		}
+	}
+
+	return response
+}
+
+// ============================================================================
+// Card Performance Analysis (Issue #771)
+// ============================================================================
+
+// CardPerformanceResponse represents a single card's performance metrics for the frontend.
+type CardPerformanceResponse struct {
+	CardID            int         `json:"cardId"`
+	CardName          string      `json:"cardName"`
+	Quantity          int         `json:"quantity"`
+	GamesWithCard     int         `json:"gamesWithCard"`
+	GamesDrawn        int         `json:"gamesDrawn"`
+	GamesPlayed       int         `json:"gamesPlayed"`
+	WinRateWhenDrawn  float64     `json:"winRateWhenDrawn"`
+	WinRateWhenPlayed float64     `json:"winRateWhenPlayed"`
+	DeckWinRate       float64     `json:"deckWinRate"`
+	PlayRate          float64     `json:"playRate"`
+	WinContribution   float64     `json:"winContribution"`
+	ImpactScore       float64     `json:"impactScore"`
+	ConfidenceLevel   string      `json:"confidenceLevel"`
+	SampleSize        int         `json:"sampleSize"`
+	PerformanceGrade  string      `json:"performanceGrade"`
+	AvgTurnPlayed     float64     `json:"avgTurnPlayed"`
+	TurnPlayedDist    map[int]int `json:"turnPlayedDist,omitempty"`
+	MulliganedAway    int         `json:"mulliganedAway"`
+	MulliganRate      float64     `json:"mulliganRate"`
+}
+
+// DeckPerformanceAnalysisResponse represents the full deck performance analysis.
+type DeckPerformanceAnalysisResponse struct {
+	DeckID          string                     `json:"deckId"`
+	DeckName        string                     `json:"deckName"`
+	TotalMatches    int                        `json:"totalMatches"`
+	TotalGames      int                        `json:"totalGames"`
+	OverallWinRate  float64                    `json:"overallWinRate"`
+	CardPerformance []*CardPerformanceResponse `json:"cardPerformance"`
+	BestPerformers  []string                   `json:"bestPerformers"`
+	WorstPerformers []string                   `json:"worstPerformers"`
+	AnalysisDate    string                     `json:"analysisDate"`
+}
+
+// CardRecommendationResponse represents a suggestion to add, remove, or swap a card.
+type CardRecommendationResponse struct {
+	Type            string  `json:"type"`
+	CardID          int     `json:"cardId"`
+	CardName        string  `json:"cardName"`
+	Reason          string  `json:"reason"`
+	ImpactEstimate  float64 `json:"impactEstimate"`
+	Confidence      string  `json:"confidence"`
+	Priority        int     `json:"priority"`
+	SwapForCardID   *int    `json:"swapForCardId,omitempty"`
+	SwapForCardName *string `json:"swapForCardName,omitempty"`
+	BasedOnGames    int     `json:"basedOnGames"`
+}
+
+// DeckRecommendationsResponse contains add/remove/swap recommendations for a deck.
+type DeckRecommendationsResponse struct {
+	DeckID                string                        `json:"deckId"`
+	DeckName              string                        `json:"deckName"`
+	CurrentWinRate        float64                       `json:"currentWinRate"`
+	AddRecommendations    []*CardRecommendationResponse `json:"addRecommendations"`
+	RemoveRecommendations []*CardRecommendationResponse `json:"removeRecommendations"`
+	SwapRecommendations   []*CardRecommendationResponse `json:"swapRecommendations"`
+	ProjectedWinRate      float64                       `json:"projectedWinRate"`
+}
+
+// GetCardPerformanceRequest represents a request to get card performance metrics.
+type GetCardPerformanceRequest struct {
+	DeckID       string `json:"deckId"`
+	MinGames     int    `json:"minGames,omitempty"`
+	IncludeLands bool   `json:"includeLands,omitempty"`
+}
+
+// GetCardPerformance returns performance metrics for all cards in a deck.
+func (d *DeckFacade) GetCardPerformance(ctx context.Context, req *GetCardPerformanceRequest) (*DeckPerformanceAnalysisResponse, error) {
+	if req.DeckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	filter := models.CardPerformanceFilter{
+		DeckID:       req.DeckID,
+		MinGames:     req.MinGames,
+		IncludeLands: req.IncludeLands,
+	}
+	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, filter)
+	if err != nil {
+		return nil, &AppError{
+			Message: fmt.Sprintf("Failed to get card performance: %v", err),
+			Err:     err,
+		}
+	}
+
+	if analysis == nil {
+		return nil, &AppError{
+			Message: "Deck not found or not enough data",
+			Err:     repository.ErrNotEnoughData,
+		}
+	}
+
+	// Convert to response format
+	response := &DeckPerformanceAnalysisResponse{
+		DeckID:          analysis.DeckID,
+		DeckName:        analysis.DeckName,
+		TotalMatches:    analysis.TotalMatches,
+		TotalGames:      analysis.TotalGames,
+		OverallWinRate:  analysis.OverallWinRate,
+		BestPerformers:  analysis.BestPerformers,
+		WorstPerformers: analysis.WorstPerformers,
+		AnalysisDate:    time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Convert card performance
+	response.CardPerformance = make([]*CardPerformanceResponse, 0, len(analysis.CardPerformance))
+	for _, perf := range analysis.CardPerformance {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			Quantity:          perf.Quantity,
+			GamesWithCard:     perf.GamesWithCard,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			PlayRate:          perf.PlayRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			SampleSize:        perf.SampleSize,
+			PerformanceGrade:  perf.PerformanceGrade,
+			AvgTurnPlayed:     perf.AvgTurnPlayed,
+			TurnPlayedDist:    perf.TurnPlayedDist,
+			MulliganedAway:    perf.MulliganedAway,
+			MulliganRate:      perf.MulliganRate,
+		}
+		response.CardPerformance = append(response.CardPerformance, cardPerf)
+	}
+
+	return response, nil
+}
+
+// GetPerformanceRecommendationsRequest represents a request for performance-based recommendations.
+type GetPerformanceRecommendationsRequest struct {
+	DeckID       string `json:"deckId"`
+	MaxResults   int    `json:"maxResults,omitempty"`
+	IncludeSwaps bool   `json:"includeSwaps,omitempty"`
+	Format       string `json:"format,omitempty"`
+}
+
+// GetPerformanceRecommendations returns add/remove/swap recommendations based on card performance.
+func (d *DeckFacade) GetPerformanceRecommendations(ctx context.Context, req *GetPerformanceRecommendationsRequest) (*DeckRecommendationsResponse, error) {
+	if req.DeckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	// Get the repo's recommendations method via type assertion
+	repoWithRecs, ok := repo.(interface {
+		GetCardRecommendations(ctx context.Context, req models.RecommendationsRequest) (*models.RecommendationsResponse, error)
+	})
+	if !ok {
+		return nil, &AppError{Message: "Card recommendations not supported"}
+	}
+
+	maxResults := req.MaxResults
+	if maxResults <= 0 {
+		maxResults = 5
+	}
+
+	recsReq := models.RecommendationsRequest{
+		DeckID:       req.DeckID,
+		Format:       req.Format,
+		MaxResults:   maxResults,
+		IncludeSwaps: req.IncludeSwaps,
+	}
+
+	recs, err := repoWithRecs.GetCardRecommendations(ctx, recsReq)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get recommendations: %v", err)}
+	}
+
+	if recs == nil {
+		return nil, &AppError{Message: "Could not generate recommendations - not enough data"}
+	}
+
+	// Convert to response format
+	response := &DeckRecommendationsResponse{
+		DeckID:           recs.DeckID,
+		DeckName:         recs.DeckName,
+		CurrentWinRate:   recs.CurrentWinRate,
+		ProjectedWinRate: recs.ProjectedWinRate,
+	}
+
+	// Convert add recommendations
+	response.AddRecommendations = make([]*CardRecommendationResponse, 0, len(recs.AddRecommendations))
+	for _, rec := range recs.AddRecommendations {
+		response.AddRecommendations = append(response.AddRecommendations, convertRecommendation(rec))
+	}
+
+	// Convert remove recommendations
+	response.RemoveRecommendations = make([]*CardRecommendationResponse, 0, len(recs.RemoveRecommendations))
+	for _, rec := range recs.RemoveRecommendations {
+		response.RemoveRecommendations = append(response.RemoveRecommendations, convertRecommendation(rec))
+	}
+
+	// Convert swap recommendations
+	response.SwapRecommendations = make([]*CardRecommendationResponse, 0, len(recs.SwapRecommendations))
+	for _, rec := range recs.SwapRecommendations {
+		response.SwapRecommendations = append(response.SwapRecommendations, convertRecommendation(rec))
+	}
+
+	return response, nil
+}
+
+// convertRecommendation converts a model recommendation to a response recommendation.
+func convertRecommendation(rec *models.CardRecommendation) *CardRecommendationResponse {
+	return &CardRecommendationResponse{
+		Type:            rec.Type,
+		CardID:          rec.CardID,
+		CardName:        rec.CardName,
+		Reason:          rec.Reason,
+		ImpactEstimate:  rec.ImpactEstimate,
+		Confidence:      rec.Confidence,
+		Priority:        rec.Priority,
+		SwapForCardID:   rec.SwapForCardID,
+		SwapForCardName: rec.SwapForCardName,
+		BasedOnGames:    rec.BasedOnGames,
+	}
+}
+
+// GetUnderperformingCards returns cards that hurt deck performance.
+func (d *DeckFacade) GetUnderperformingCards(ctx context.Context, deckID string, threshold float64) ([]*CardPerformanceResponse, error) {
+	if deckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	if threshold <= 0 {
+		threshold = 0.05 // Default 5% below deck average
+	}
+
+	cards, err := repo.GetUnderperformingCards(ctx, deckID, threshold)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get underperforming cards: %v", err)}
+	}
+
+	// Convert to response format
+	response := make([]*CardPerformanceResponse, 0, len(cards))
+	for _, perf := range cards {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			Quantity:          perf.Quantity,
+			GamesWithCard:     perf.GamesWithCard,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			PlayRate:          perf.PlayRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			SampleSize:        perf.SampleSize,
+			PerformanceGrade:  perf.PerformanceGrade,
+			AvgTurnPlayed:     perf.AvgTurnPlayed,
+			MulliganedAway:    perf.MulliganedAway,
+			MulliganRate:      perf.MulliganRate,
+		}
+		response = append(response, cardPerf)
+	}
+
+	return response, nil
+}
+
+// GetOverperformingCards returns cards with high win impact.
+func (d *DeckFacade) GetOverperformingCards(ctx context.Context, deckID string, threshold float64) ([]*CardPerformanceResponse, error) {
+	if deckID == "" {
+		return nil, &AppError{Message: "deck_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.CardPerformanceAnalysisRepo()
+	if repo == nil {
+		return nil, &AppError{Message: "Card performance repository not available"}
+	}
+
+	if threshold <= 0 {
+		threshold = 0.05 // Default 5% above deck average
+	}
+
+	cards, err := repo.GetOverperformingCards(ctx, deckID, threshold)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get overperforming cards: %v", err)}
+	}
+
+	// Convert to response format
+	response := make([]*CardPerformanceResponse, 0, len(cards))
+	for _, perf := range cards {
+		cardPerf := &CardPerformanceResponse{
+			CardID:            perf.CardID,
+			CardName:          perf.CardName,
+			Quantity:          perf.Quantity,
+			GamesWithCard:     perf.GamesWithCard,
+			GamesDrawn:        perf.GamesDrawn,
+			GamesPlayed:       perf.GamesPlayed,
+			WinRateWhenDrawn:  perf.WinRateWhenDrawn,
+			WinRateWhenPlayed: perf.WinRateWhenPlayed,
+			DeckWinRate:       perf.DeckWinRate,
+			PlayRate:          perf.PlayRate,
+			WinContribution:   perf.WinContribution,
+			ImpactScore:       perf.ImpactScore,
+			ConfidenceLevel:   perf.ConfidenceLevel,
+			SampleSize:        perf.SampleSize,
+			PerformanceGrade:  perf.PerformanceGrade,
+			AvgTurnPlayed:     perf.AvgTurnPlayed,
+			MulliganedAway:    perf.MulliganedAway,
+			MulliganRate:      perf.MulliganRate,
+		}
+		response = append(response, cardPerf)
+	}
+
+	return response, nil
 }

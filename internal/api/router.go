@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/handlers"
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/analysis"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
 
@@ -95,6 +96,8 @@ func (s *Server) setupRoutes() {
 			r.Post("/suggest", deckHandler.SuggestDecks)
 			r.Post("/build-around", deckHandler.BuildAroundSeed)
 			r.Post("/build-around/suggest-next", deckHandler.SuggestNextCards)
+			r.Post("/generate", deckHandler.GenerateCompleteDeck)
+			r.Get("/archetypes", deckHandler.GetArchetypeProfiles)
 			r.Post("/analyze", deckHandler.AnalyzeDeck)
 			r.Post("/by-tags", deckHandler.GetDecksByTags)
 			r.Post("/library", deckHandler.GetDeckLibrary)
@@ -119,6 +122,13 @@ func (s *Server) setupRoutes() {
 			r.Post("/{deckID}/tags", deckHandler.AddTag)
 			r.Delete("/{deckID}/tags/{tag}", deckHandler.RemoveTag)
 			r.Get("/{deckID}/validate-draft", deckHandler.ValidateDraftDeck)
+
+			// Card performance analysis routes (Issue #771)
+			r.Get("/{deckID}/card-performance", deckHandler.GetCardPerformance)
+			r.Get("/{deckID}/recommendations/add", deckHandler.GetPerformanceAddRecommendations)
+			r.Get("/{deckID}/recommendations/remove", deckHandler.GetPerformanceRemoveRecommendations)
+			r.Get("/{deckID}/recommendations/swap", deckHandler.GetPerformanceSwapRecommendations)
+			r.Get("/{deckID}/recommendations/all", deckHandler.GetAllPerformanceRecommendations)
 		})
 
 		// Card routes
@@ -264,6 +274,39 @@ func (s *Server) setupRoutes() {
 			r.Post("/models/pull", llmHandler.PullModel)
 			r.Post("/test", llmHandler.TestGeneration)
 		})
+
+		// Notes and Suggestions routes
+		if s.services != nil && s.services.Storage != nil {
+			notesRepo := s.services.Storage.NewNotesRepo()
+			suggRepo := s.services.Storage.NewSuggestionRepo()
+			playRepo := s.services.Storage.NewGamePlayRepo()
+			matchRepo := s.services.Storage.NewMatchRepo()
+			playAnalyzer := analysis.NewPlayAnalyzer(playRepo, matchRepo)
+			suggGenerator := analysis.NewSuggestionGenerator(playAnalyzer, suggRepo)
+			notesHandler := handlers.NewNotesHandler(notesRepo, suggRepo, suggGenerator)
+
+			// Deck notes routes
+			r.Route("/decks/{deckID}/notes", func(r chi.Router) {
+				r.Get("/", notesHandler.GetDeckNotes)
+				r.Post("/", notesHandler.CreateDeckNote)
+				r.Get("/{noteID}", notesHandler.GetDeckNote)
+				r.Put("/{noteID}", notesHandler.UpdateDeckNote)
+				r.Delete("/{noteID}", notesHandler.DeleteDeckNote)
+			})
+
+			// Deck suggestions routes
+			r.Route("/decks/{deckID}/suggestions", func(r chi.Router) {
+				r.Get("/", notesHandler.GetDeckSuggestions)
+				r.Post("/generate", notesHandler.GenerateSuggestions)
+			})
+
+			// Match notes routes
+			r.Get("/matches/{matchID}/notes", notesHandler.GetMatchNotes)
+			r.Put("/matches/{matchID}/notes", notesHandler.UpdateMatchNotes)
+
+			// Suggestion dismiss route
+			r.Put("/suggestions/{suggestionID}/dismiss", notesHandler.DismissSuggestion)
+		}
 	})
 }
 
