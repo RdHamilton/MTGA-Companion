@@ -26,6 +26,7 @@ export * as settings from './settings';
 export * as standard from './standard';
 export * as gameplays from './gameplays';
 export * as notes from './notes';
+export * as mlSuggestions from './mlSuggestions';
 
 // Re-export commonly used types
 export type {
@@ -90,3 +91,15 @@ export type {
   UpdateDeckNoteRequest,
   UpdateMatchNotesRequest,
 } from './notes';
+
+export type {
+  MLSuggestion,
+  MLSuggestionType,
+  MLSuggestionReason,
+  MLSuggestionResult,
+  CardSynergyInfo,
+  CardCombinationStats,
+  CardPairSynergy,
+  SynergyReport,
+  UserPlayPatterns,
+} from './mlSuggestions';

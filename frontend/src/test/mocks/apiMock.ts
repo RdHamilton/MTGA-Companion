@@ -140,6 +140,34 @@ export const mockNotes = {
   getPriorityColor: vi.fn((() => 'text-gray-400') as MockFn),
 };
 
+export const mockMLSuggestions = {
+  getMLSuggestions: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  generateMLSuggestions: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  dismissMLSuggestion: vi.fn((() => Promise.resolve()) as MockFn),
+  applyMLSuggestion: vi.fn((() => Promise.resolve()) as MockFn),
+  getSynergyReport: vi.fn((() => Promise.resolve({
+    deckId: '',
+    cardCount: 0,
+    totalPairs: 0,
+    avgSynergyScore: 0,
+    synergies: [],
+  })) as MockFn),
+  getCardSynergies: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getCombinationStats: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  processMatchHistory: vi.fn((() => Promise.resolve({ status: 'success', message: 'Processed' })) as MockFn),
+  getUserPlayPatterns: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  updateUserPlayPatterns: vi.fn((() => Promise.resolve({ status: 'success', message: 'Updated' })) as MockFn),
+  parseReasons: vi.fn((() => []) as MockFn),
+  parseColorPreferences: vi.fn((() => ({})) as MockFn),
+  getMLSuggestionTypeLabel: vi.fn(((type: string) => type) as MockFn),
+  getMLSuggestionTypeIcon: vi.fn(((type: string) => (type === 'add' ? '+' : type === 'remove' ? '-' : '⇄')) as MockFn),
+  formatConfidence: vi.fn(((c: number) => `${Math.round(c * 100)}%`) as MockFn),
+  formatWinRateChange: vi.fn(((c: number) => `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`) as MockFn),
+  getConfidenceLevel: vi.fn((() => 'medium') as MockFn),
+  getConfidenceColor: vi.fn((() => 'text-blue-400') as MockFn),
+  getArchetypeLabel: vi.fn(((a: string) => a) as MockFn),
+};
+
 export const mockSystem = {
   getStatus: vi.fn(() => Promise.resolve({
     status: 'standalone',
@@ -201,6 +229,7 @@ export const mockApi = {
   settings: mockSettings,
   system: mockSystem,
   notes: mockNotes,
+  mlSuggestions: mockMLSuggestions,
 };
 
 // Legacy mock kept for backwards compatibility with tests that haven't migrated
@@ -336,6 +365,12 @@ export function resetMocks() {
     if (vi.isMockFunction(mock)) mock.mockClear();
   });
   Object.values(mockSystem).forEach((mock) => {
+    if (vi.isMockFunction(mock)) mock.mockClear();
+  });
+  Object.values(mockNotes).forEach((mock) => {
+    if (vi.isMockFunction(mock)) mock.mockClear();
+  });
+  Object.values(mockMLSuggestions).forEach((mock) => {
     if (vi.isMockFunction(mock)) mock.mockClear();
   });
   Object.values(mockWailsApp).forEach((mock) => {

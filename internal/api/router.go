@@ -306,6 +306,37 @@ func (s *Server) setupRoutes() {
 
 			// Suggestion dismiss route
 			r.Put("/suggestions/{suggestionID}/dismiss", notesHandler.DismissSuggestion)
+
+			// ML Suggestions routes
+			mlRepo := s.services.Storage.NewMLSuggestionRepo()
+			deckRepo := s.services.Storage.NewDeckRepo()
+			cardRepo := s.services.Storage.NewSetCardRepo()
+			mlEngine := analysis.NewMLEngine(mlRepo, matchRepo, deckRepo, cardRepo, playAnalyzer)
+			mlHandler := handlers.NewMLSuggestionsHandler(mlRepo, mlEngine, s.systemFacade)
+
+			// ML suggestions for decks
+			r.Route("/decks/{deckID}/ml-suggestions", func(r chi.Router) {
+				r.Get("/", mlHandler.GetMLSuggestions)
+				r.Post("/generate", mlHandler.GenerateMLSuggestions)
+			})
+
+			// Deck synergy report
+			r.Get("/decks/{deckID}/synergy-report", mlHandler.GetSynergyReport)
+
+			// Card synergies
+			r.Get("/cards/{cardID}/synergies", mlHandler.GetTopSynergies)
+
+			// ML management routes
+			r.Route("/ml", func(r chi.Router) {
+				r.Post("/process-history", mlHandler.ProcessMatchHistory)
+				r.Get("/play-patterns", mlHandler.GetUserPlayPatterns)
+				r.Post("/play-patterns/update", mlHandler.UpdateUserPlayPatterns)
+				r.Get("/combinations", mlHandler.GetCombinationStats)
+			})
+
+			// ML suggestion actions
+			r.Put("/ml-suggestions/{suggestionID}/dismiss", mlHandler.DismissMLSuggestion)
+			r.Put("/ml-suggestions/{suggestionID}/apply", mlHandler.ApplyMLSuggestion)
 		}
 	})
 }

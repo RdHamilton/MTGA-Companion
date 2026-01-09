@@ -2216,6 +2216,21 @@ func (s *Service) NewMatchRepo() repository.MatchRepository {
 	return repository.NewMatchRepository(s.db.Conn())
 }
 
+// NewMLSuggestionRepo creates a new ML suggestion repository using the service's database connection.
+func (s *Service) NewMLSuggestionRepo() *repository.MLSuggestionRepository {
+	return repository.NewMLSuggestionRepository(s.db.Conn())
+}
+
+// NewDeckRepo creates a new deck repository using the service's database connection.
+func (s *Service) NewDeckRepo() repository.DeckRepository {
+	return repository.NewDeckRepository(s.db.Conn())
+}
+
+// NewSetCardRepo creates a new set card repository using the service's database connection.
+func (s *Service) NewSetCardRepo() repository.SetCardRepository {
+	return repository.NewSetCardRepository(s.db.Conn())
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()
