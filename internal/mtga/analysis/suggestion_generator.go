@@ -3,11 +3,15 @@ package analysis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
+
+// ErrInsufficientGames is returned when there aren't enough games for analysis.
+var ErrInsufficientGames = errors.New("insufficient games for analysis")
 
 // SuggestionGenerator creates improvement suggestions from play analysis.
 type SuggestionGenerator struct {
@@ -39,7 +43,7 @@ func (g *SuggestionGenerator) GenerateSuggestions(ctx context.Context, deckID st
 
 	// Check if we have enough games
 	if analysis.TotalGames < minGames {
-		return nil, fmt.Errorf("insufficient games for analysis: %d/%d required", analysis.TotalGames, minGames)
+		return nil, fmt.Errorf("%w: %d/%d required", ErrInsufficientGames, analysis.TotalGames, minGames)
 	}
 
 	// Delete existing active suggestions before generating new ones

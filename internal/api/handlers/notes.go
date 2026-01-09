@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -138,6 +139,10 @@ func (h *NotesHandler) GetDeckNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := h.notesRepo.GetDeckNoteByID(r.Context(), noteID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			response.NotFound(w, errors.New("note not found"))
+			return
+		}
 		response.InternalError(w, err)
 		return
 	}
@@ -312,6 +317,11 @@ func (h *NotesHandler) GenerateSuggestions(w http.ResponseWriter, r *http.Reques
 
 	suggestions, err := h.suggGenerator.GenerateSuggestions(r.Context(), deckID, minGames)
 	if err != nil {
+		// Check for insufficient games error
+		if errors.Is(err, analysis.ErrInsufficientGames) {
+			response.BadRequest(w, err)
+			return
+		}
 		response.InternalError(w, err)
 		return
 	}

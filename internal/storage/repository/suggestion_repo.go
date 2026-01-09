@@ -167,7 +167,12 @@ func (r *suggestionRepository) GetSuggestionByID(ctx context.Context, id int64) 
 		return nil, err
 	}
 
-	suggestion.CreatedAt, _ = time.Parse("2006-01-02 15:04:05.999999", createdAt)
+	parsedTime, err := time.Parse("2006-01-02 15:04:05.999999", createdAt)
+	if err != nil {
+		// Log warning but don't fail - use zero time if parse fails
+		parsedTime = time.Time{}
+	}
+	suggestion.CreatedAt = parsedTime
 
 	return suggestion, nil
 }
@@ -256,7 +261,12 @@ func (r *suggestionRepository) scanSuggestions(rows *sql.Rows) ([]*models.Improv
 			return nil, err
 		}
 
-		suggestion.CreatedAt, _ = time.Parse("2006-01-02 15:04:05.999999", createdAt)
+		parsedTime, err := time.Parse("2006-01-02 15:04:05.999999", createdAt)
+		if err != nil {
+			// Use zero time if parse fails - don't break the scan loop
+			parsedTime = time.Time{}
+		}
+		suggestion.CreatedAt = parsedTime
 
 		suggestions = append(suggestions, suggestion)
 	}

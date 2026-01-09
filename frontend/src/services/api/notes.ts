@@ -38,7 +38,7 @@ export interface DeckNote {
 export interface MatchNotes {
   matchId: string;
   notes: string;
-  rating: number; // 0-5
+  rating: number; // 0 = no rating, 1-5 = star rating
 }
 
 /**

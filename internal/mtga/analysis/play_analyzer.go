@@ -84,8 +84,9 @@ func (a *PlayAnalyzer) AnalyzeDeck(ctx context.Context, deckID string, minGames 
 	}
 
 	result := &AnalysisResult{
-		DeckID:     deckID,
-		TotalGames: len(matches),
+		DeckID:           deckID,
+		TotalGames:       len(matches),
+		SequencingIssues: []SequencingIssue{},
 		CurveAnalysis: CurveAnalysis{
 			CMCDistribution: make(map[int]int),
 		},
@@ -95,6 +96,7 @@ func (a *PlayAnalyzer) AnalyzeDeck(ctx context.Context, deckID string, minGames 
 	var gamesWithMulligan int
 	var gamesWithMissedLandDrop int
 	var firstPlayTurns []int
+	var matchesWithPlayData int
 
 	for _, match := range matches {
 		// Count wins/losses
@@ -107,15 +109,28 @@ func (a *PlayAnalyzer) AnalyzeDeck(ctx context.Context, deckID string, minGames 
 		// Analyze plays for this match
 		plays, err := a.playRepo.GetPlaysByMatch(ctx, match.ID)
 		if err != nil {
+			// Log but continue - play data may not exist for all matches
 			continue
 		}
 
 		snapshots, err := a.playRepo.GetSnapshotsByMatch(ctx, match.ID)
 		if err != nil {
-			continue
+			// Snapshots are optional - continue with plays only
+			snapshots = nil
+		}
+
+		// Track that we have play data for this match
+		if len(plays) > 0 {
+			matchesWithPlayData++
 		}
 
 		matchAnalysis := a.analyzeMatch(plays, snapshots)
+
+		// Collect sequencing issues from this match
+		for _, issue := range a.detectSequencingIssues(plays, snapshots) {
+			issue.MatchID = match.ID
+			result.SequencingIssues = append(result.SequencingIssues, issue)
+		}
 
 		// Aggregate results
 		totalTurns += matchAnalysis.maxTurn
