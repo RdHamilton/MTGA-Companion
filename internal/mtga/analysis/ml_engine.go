@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -59,46 +60,106 @@ type CardSynergyInfo struct {
 
 // ProcessMatchHistory analyzes match history to build card combination statistics.
 // This should be called periodically or after matches are recorded.
+// This method is idempotent - it only processes matches that haven't been processed yet.
 func (e *MLEngine) ProcessMatchHistory(ctx context.Context, format string, lookbackDays int) error {
-	// Get recent matches
+	// Get recent matches that haven't been processed yet
 	since := time.Now().AddDate(0, 0, -lookbackDays)
 	filter := models.StatsFilter{
 		StartDate: &since,
 	}
 
-	matches, err := e.matchRepo.GetMatches(ctx, filter)
+	matches, err := e.matchRepo.GetMatchesForMLProcessing(ctx, filter)
 	if err != nil {
-		return fmt.Errorf("failed to get matches: %w", err)
+		return fmt.Errorf("failed to get matches for ML processing: %w", err)
 	}
+
+	if len(matches) == 0 {
+		// No new matches to process
+		return nil
+	}
+
+	// Track processed match IDs for marking as processed
+	var processedIDs []string
 
 	// Process each match to extract card combinations
 	for _, match := range matches {
+		// Permanent condition: no deck ID - mark as processed to avoid re-checking
 		if match.DeckID == nil || *match.DeckID == "" {
+			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Get deck
+		// Get deck - distinguish between "not found" (permanent) and DB error (transient)
 		deck, err := e.deckRepo.GetByID(ctx, *match.DeckID)
-		if err != nil || deck == nil {
+		if err != nil {
+			// Transient error (database issue) - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error getting deck %s for match %s: %v", *match.DeckID, match.ID, err)
+			continue
+		}
+		if deck == nil {
+			// Permanent condition: deck not found - mark as processed
+			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Skip if format doesn't match (if specified)
+		// Permanent condition: format doesn't match - mark as processed
 		if format != "" && deck.Format != format {
+			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Get deck cards
+		// Get deck cards - distinguish between error types
 		cardIDs, err := e.getDeckCardIDs(ctx, deck.ID)
-		if err != nil || len(cardIDs) < 2 {
+		if err != nil {
+			// Transient error - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error getting cards for deck %s, match %s: %v", deck.ID, match.ID, err)
+			continue
+		}
+		// Permanent condition: insufficient cards - mark as processed
+		if len(cardIDs) < 2 {
+			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Record combinations
+		// Record combinations and individual stats atomically in a transaction
+		// This prevents double-counting if one operation succeeds but the other fails
 		isWin := match.Result == "win"
-		if err := e.recordCombinations(ctx, cardIDs, deck.Format, isWin); err != nil {
-			// Log but continue processing
+
+		if err := e.mlRepo.RecordMatchStatsInTx(ctx, cardIDs, deck.Format, isWin); err != nil {
+			// Transient error - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error recording match stats for match %s: %v", match.ID, err)
 			continue
+		}
+
+		// Successfully processed - mark as processed
+		processedIDs = append(processedIDs, match.ID)
+	}
+
+	// Mark all processed matches to prevent double-counting
+	if len(processedIDs) > 0 {
+		if err := e.matchRepo.MarkMatchesAsProcessedForML(ctx, processedIDs); err != nil {
+			return fmt.Errorf("failed to mark matches as processed: %w", err)
+		}
+	}
+
+	// Update separate stats from individual card performance (#852)
+	if format != "" {
+		if err := e.mlRepo.UpdateSeparateStatsFromIndividual(ctx, format); err != nil {
+			return fmt.Errorf("failed to update separate stats: %w", err)
+		}
+	} else {
+		// Update all formats if no specific format was requested
+		// Get unique formats from processed matches
+		formatSet := make(map[string]bool)
+		for _, match := range matches {
+			if match.DeckFormat != nil && *match.DeckFormat != "" {
+				formatSet[*match.DeckFormat] = true
+			}
+		}
+		for f := range formatSet {
+			if err := e.mlRepo.UpdateSeparateStatsFromIndividual(ctx, f); err != nil {
+				return fmt.Errorf("failed to update separate stats for format %s: %w", f, err)
+			}
 		}
 	}
 
@@ -123,33 +184,6 @@ func (e *MLEngine) getDeckCardIDs(ctx context.Context, deckID string) ([]int, er
 	}
 
 	return cardIDs, nil
-}
-
-// recordCombinations records all pairwise card combinations from a game.
-func (e *MLEngine) recordCombinations(ctx context.Context, cardIDs []int, format string, isWin bool) error {
-	// Sort card IDs for consistent ordering
-	sort.Ints(cardIDs)
-
-	// Process all pairs
-	for i := 0; i < len(cardIDs)-1; i++ {
-		for j := i + 1; j < len(cardIDs); j++ {
-			stats := &models.CardCombinationStats{
-				CardID1:       cardIDs[i],
-				CardID2:       cardIDs[j],
-				Format:        format,
-				GamesTogether: 1,
-			}
-			if isWin {
-				stats.WinsTogether = 1
-			}
-
-			if err := e.mlRepo.UpsertCombinationStats(ctx, stats); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // GenerateMLSuggestions creates ML-powered suggestions for a deck.

@@ -213,6 +213,24 @@ type MLModelMetadata struct {
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
 
+// CardIndividualStats tracks how individual cards perform across all decks.
+// This is used to calculate separate win rates for synergy scoring.
+type CardIndividualStats struct {
+	CardID     int       `json:"cardId" db:"card_id"`
+	Format     string    `json:"format" db:"format"`
+	TotalGames int       `json:"totalGames" db:"total_games"`
+	Wins       int       `json:"wins" db:"wins"`
+	UpdatedAt  time.Time `json:"updatedAt" db:"updated_at"`
+}
+
+// WinRate returns the win rate for this card.
+func (c *CardIndividualStats) WinRate() float64 {
+	if c.TotalGames == 0 {
+		return 0
+	}
+	return float64(c.Wins) / float64(c.TotalGames)
+}
+
 // MLSuggestionType constants for suggestion types.
 const (
 	MLSuggestionTypeAdd    = "add"

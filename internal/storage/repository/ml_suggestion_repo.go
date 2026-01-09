@@ -21,6 +21,155 @@ func NewMLSuggestionRepository(db *sql.DB) *MLSuggestionRepository {
 }
 
 // ============================================================================
+// Individual Card Stats
+// ============================================================================
+
+// UpsertIndividualCardStats inserts or updates individual card statistics.
+func (r *MLSuggestionRepository) UpsertIndividualCardStats(ctx context.Context, stats *models.CardIndividualStats) error {
+	query := `
+		INSERT INTO card_individual_stats (card_id, format, total_games, wins, updated_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(card_id, format) DO UPDATE SET
+			total_games = total_games + excluded.total_games,
+			wins = wins + excluded.wins,
+			updated_at = excluded.updated_at
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		stats.CardID, stats.Format, stats.TotalGames, stats.Wins, time.Now(),
+	)
+	return err
+}
+
+// GetIndividualCardStats retrieves stats for a specific card.
+func (r *MLSuggestionRepository) GetIndividualCardStats(ctx context.Context, cardID int, format string) (*models.CardIndividualStats, error) {
+	query := `
+		SELECT card_id, format, total_games, wins, updated_at
+		FROM card_individual_stats
+		WHERE card_id = ? AND format = ?
+	`
+
+	var stats models.CardIndividualStats
+	err := r.db.QueryRowContext(ctx, query, cardID, format).Scan(
+		&stats.CardID, &stats.Format, &stats.TotalGames, &stats.Wins, &stats.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+// UpdateSeparateStatsFromIndividual calculates and updates games_card1_only, wins_card1_only, etc.
+// for all card combinations based on individual card stats.
+// This should be called after processing all matches.
+func (r *MLSuggestionRepository) UpdateSeparateStatsFromIndividual(ctx context.Context, format string) error {
+	// For each card pair, calculate separate stats:
+	// games_card1_only = individual_games_card1 - games_together
+	// wins_card1_only = individual_wins_card1 - wins_together
+	// Note: This is an approximation since we track total individual stats, not per-pair.
+	// The "separate" wins are calculated by subtracting wins_together from individual wins,
+	// which assumes wins are distributed evenly (not truly proportional).
+
+	// Use UPDATE...FROM with JOINs for better performance (SQLite 3.33+)
+	// This avoids 6 correlated subqueries per row
+	query := `
+		UPDATE card_combination_stats
+		SET
+			games_card1_only = MAX(0, COALESCE(i1.total_games, 0) - card_combination_stats.games_together),
+			games_card2_only = MAX(0, COALESCE(i2.total_games, 0) - card_combination_stats.games_together),
+			wins_card1_only = CASE
+				WHEN COALESCE(i1.total_games, 0) - card_combination_stats.games_together <= 0 THEN 0
+				ELSE MAX(0, COALESCE(i1.wins, 0) - card_combination_stats.wins_together)
+			END,
+			wins_card2_only = CASE
+				WHEN COALESCE(i2.total_games, 0) - card_combination_stats.games_together <= 0 THEN 0
+				ELSE MAX(0, COALESCE(i2.wins, 0) - card_combination_stats.wins_together)
+			END,
+			updated_at = ?
+		FROM card_combination_stats AS ccs
+		LEFT JOIN card_individual_stats i1 ON i1.card_id = ccs.card_id_1 AND i1.format = ccs.format
+		LEFT JOIN card_individual_stats i2 ON i2.card_id = ccs.card_id_2 AND i2.format = ccs.format
+		WHERE card_combination_stats.id = ccs.id AND card_combination_stats.format = ?
+	`
+
+	_, err := r.db.ExecContext(ctx, query, time.Now(), format)
+	return err
+}
+
+// RecordMatchStatsInTx records both individual card stats and combination stats
+// for a match within a single transaction to ensure atomicity.
+// This prevents double-counting if one operation succeeds but the other fails.
+func (r *MLSuggestionRepository) RecordMatchStatsInTx(ctx context.Context, cardIDs []int, format string, isWin bool) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	now := time.Now()
+
+	// Record individual card stats
+	individualQuery := `
+		INSERT INTO card_individual_stats (card_id, format, total_games, wins, updated_at)
+		VALUES (?, ?, 1, ?, ?)
+		ON CONFLICT(card_id, format) DO UPDATE SET
+			total_games = total_games + 1,
+			wins = wins + excluded.wins,
+			updated_at = excluded.updated_at
+	`
+	wins := 0
+	if isWin {
+		wins = 1
+	}
+
+	for _, cardID := range cardIDs {
+		if _, err = tx.ExecContext(ctx, individualQuery, cardID, format, wins, now); err != nil {
+			return fmt.Errorf("failed to record individual stats for card %d: %w", cardID, err)
+		}
+	}
+
+	// Record combination stats for all pairs
+	combinationQuery := `
+		INSERT INTO card_combination_stats (
+			card_id_1, card_id_2, deck_id, format,
+			games_together, games_card1_only, games_card2_only,
+			wins_together, wins_card1_only, wins_card2_only,
+			synergy_score, confidence_score, updated_at
+		) VALUES (?, ?, '', ?, 1, 0, 0, ?, 0, 0, 0, 0, ?)
+		ON CONFLICT(card_id_1, card_id_2, deck_id, format) DO UPDATE SET
+			games_together = games_together + 1,
+			wins_together = wins_together + excluded.wins_together,
+			updated_at = excluded.updated_at
+	`
+
+	for i := 0; i < len(cardIDs)-1; i++ {
+		for j := i + 1; j < len(cardIDs); j++ {
+			cardID1, cardID2 := cardIDs[i], cardIDs[j]
+			// Ensure proper ordering
+			if cardID1 > cardID2 {
+				cardID1, cardID2 = cardID2, cardID1
+			}
+			if _, err = tx.ExecContext(ctx, combinationQuery, cardID1, cardID2, format, wins, now); err != nil {
+				return fmt.Errorf("failed to record combination stats for cards %d,%d: %w", cardID1, cardID2, err)
+			}
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// ============================================================================
 // Card Combination Stats
 // ============================================================================
 

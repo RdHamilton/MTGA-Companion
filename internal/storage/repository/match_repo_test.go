@@ -62,6 +62,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 			result_reason TEXT,
 			opponent_name TEXT,
 			opponent_id TEXT,
+			processed_for_ml BOOLEAN DEFAULT FALSE,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (account_id) REFERENCES accounts(id),
 			FOREIGN KEY (deck_id) REFERENCES decks(id)
@@ -1532,5 +1533,166 @@ func TestMatchRepository_GetWeeklyWins_CappedAt15(t *testing.T) {
 
 	if weeklyWins != 15 {
 		t.Errorf("expected weekly wins to be capped at 15, got %d", weeklyWins)
+	}
+}
+
+// ============================================================================
+// ML Processing Tests (Issue #851)
+// ============================================================================
+
+func TestMatchRepository_GetMatchesForMLProcessing(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	// Create a deck first (needed for the JOIN)
+	_, err := db.Exec(`INSERT INTO decks (id, account_id, name, format) VALUES ('deck-1', 1, 'Test Deck', 'Standard')`)
+	if err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+
+	now := time.Now()
+
+	// Create 3 matches - 2 unprocessed, 1 processed
+	matches := []*models.Match{
+		{ID: "match-1", AccountID: 1, EventID: "e1", EventName: "Standard Ranked", Timestamp: now, PlayerWins: 2, OpponentWins: 0, PlayerTeamID: 1, Format: "Standard", Result: "win", CreatedAt: now},
+		{ID: "match-2", AccountID: 1, EventID: "e2", EventName: "Standard Ranked", Timestamp: now, PlayerWins: 0, OpponentWins: 2, PlayerTeamID: 1, Format: "Standard", Result: "loss", CreatedAt: now},
+		{ID: "match-3", AccountID: 1, EventID: "e3", EventName: "Standard Ranked", Timestamp: now, PlayerWins: 2, OpponentWins: 1, PlayerTeamID: 1, Format: "Standard", Result: "win", CreatedAt: now},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Mark match-3 as processed
+	_, err = db.Exec(`UPDATE matches SET processed_for_ml = TRUE WHERE id = 'match-3'`)
+	if err != nil {
+		t.Fatalf("failed to mark match as processed: %v", err)
+	}
+
+	// Get unprocessed matches
+	filter := models.StatsFilter{}
+	unprocessed, err := repo.GetMatchesForMLProcessing(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get matches for ML processing: %v", err)
+	}
+
+	if len(unprocessed) != 2 {
+		t.Errorf("expected 2 unprocessed matches, got %d", len(unprocessed))
+	}
+
+	// Verify match-3 is not in the results
+	for _, m := range unprocessed {
+		if m.ID == "match-3" {
+			t.Error("match-3 should not be in unprocessed results")
+		}
+	}
+}
+
+func TestMatchRepository_MarkMatchesAsProcessedForML(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create matches
+	matches := []*models.Match{
+		{ID: "match-1", AccountID: 1, EventID: "e1", EventName: "Test", Timestamp: now, PlayerWins: 2, OpponentWins: 0, PlayerTeamID: 1, Format: "Standard", Result: "win", CreatedAt: now},
+		{ID: "match-2", AccountID: 1, EventID: "e2", EventName: "Test", Timestamp: now, PlayerWins: 2, OpponentWins: 1, PlayerTeamID: 1, Format: "Standard", Result: "win", CreatedAt: now},
+		{ID: "match-3", AccountID: 1, EventID: "e3", EventName: "Test", Timestamp: now, PlayerWins: 0, OpponentWins: 2, PlayerTeamID: 1, Format: "Standard", Result: "loss", CreatedAt: now},
+	}
+
+	for _, m := range matches {
+		if err := repo.Create(ctx, m); err != nil {
+			t.Fatalf("failed to create match: %v", err)
+		}
+	}
+
+	// Mark match-1 and match-2 as processed
+	err := repo.MarkMatchesAsProcessedForML(ctx, []string{"match-1", "match-2"})
+	if err != nil {
+		t.Fatalf("failed to mark matches as processed: %v", err)
+	}
+
+	// Verify by getting unprocessed matches
+	filter := models.StatsFilter{}
+	unprocessed, err := repo.GetMatchesForMLProcessing(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed to get unprocessed matches: %v", err)
+	}
+
+	if len(unprocessed) != 1 {
+		t.Errorf("expected 1 unprocessed match, got %d", len(unprocessed))
+	}
+
+	if len(unprocessed) > 0 && unprocessed[0].ID != "match-3" {
+		t.Errorf("expected match-3 to be unprocessed, got %s", unprocessed[0].ID)
+	}
+}
+
+func TestMatchRepository_MarkMatchesAsProcessedForML_EmptyList(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	// Should not error with empty list
+	err := repo.MarkMatchesAsProcessedForML(ctx, []string{})
+	if err != nil {
+		t.Errorf("expected no error with empty list, got: %v", err)
+	}
+}
+
+func TestMatchRepository_GetMatchesForMLProcessing_IdempotencyCheck(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewMatchRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Create a match
+	match := &models.Match{
+		ID: "match-1", AccountID: 1, EventID: "e1", EventName: "Test",
+		Timestamp: now, PlayerWins: 2, OpponentWins: 0, PlayerTeamID: 1,
+		Format: "Standard", Result: "win", CreatedAt: now,
+	}
+	if err := repo.Create(ctx, match); err != nil {
+		t.Fatalf("failed to create match: %v", err)
+	}
+
+	filter := models.StatsFilter{}
+
+	// First call - should return 1 match
+	unprocessed1, err := repo.GetMatchesForMLProcessing(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed first call: %v", err)
+	}
+	if len(unprocessed1) != 1 {
+		t.Errorf("expected 1 match on first call, got %d", len(unprocessed1))
+	}
+
+	// Mark as processed
+	err = repo.MarkMatchesAsProcessedForML(ctx, []string{"match-1"})
+	if err != nil {
+		t.Fatalf("failed to mark as processed: %v", err)
+	}
+
+	// Second call - should return 0 matches (idempotent)
+	unprocessed2, err := repo.GetMatchesForMLProcessing(ctx, filter)
+	if err != nil {
+		t.Fatalf("failed second call: %v", err)
+	}
+	if len(unprocessed2) != 0 {
+		t.Errorf("expected 0 matches on second call (idempotent), got %d", len(unprocessed2))
 	}
 }

@@ -114,6 +114,15 @@ func setupMLSuggestionTestDB(t *testing.T) *sql.DB {
 			UNIQUE(card_id_1, card_id_2, format),
 			CHECK(card_id_1 < card_id_2)
 		);
+
+		CREATE TABLE IF NOT EXISTS card_individual_stats (
+			card_id INTEGER NOT NULL,
+			format TEXT NOT NULL,
+			total_games INTEGER DEFAULT 0,
+			wins INTEGER DEFAULT 0,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (card_id, format)
+		);
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create tables: %v", err)
@@ -867,5 +876,188 @@ func TestGetPairedCardID(t *testing.T) {
 	paired = GetPairedCardID(stats, 200)
 	if paired != 100 {
 		t.Errorf("Expected paired card 100, got %d", paired)
+	}
+}
+
+// ============================================================================
+// Individual Card Stats Tests (Issue #852)
+// ============================================================================
+
+func TestMLSuggestionRepository_UpsertIndividualCardStats(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Insert initial stats
+	stats := &models.CardIndividualStats{
+		CardID:     100,
+		Format:     "Standard",
+		TotalGames: 5,
+		Wins:       3,
+	}
+	err := repo.UpsertIndividualCardStats(ctx, stats)
+	if err != nil {
+		t.Fatalf("Failed to upsert individual card stats: %v", err)
+	}
+
+	// Verify stats were inserted
+	result, err := repo.GetIndividualCardStats(ctx, 100, "Standard")
+	if err != nil {
+		t.Fatalf("Failed to get individual card stats: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+	if result.TotalGames != 5 {
+		t.Errorf("Expected 5 total games, got %d", result.TotalGames)
+	}
+	if result.Wins != 3 {
+		t.Errorf("Expected 3 wins, got %d", result.Wins)
+	}
+}
+
+func TestMLSuggestionRepository_UpsertIndividualCardStats_Accumulates(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Insert initial stats
+	stats1 := &models.CardIndividualStats{
+		CardID:     100,
+		Format:     "Standard",
+		TotalGames: 5,
+		Wins:       3,
+	}
+	_ = repo.UpsertIndividualCardStats(ctx, stats1)
+
+	// Insert more stats for same card - should accumulate
+	stats2 := &models.CardIndividualStats{
+		CardID:     100,
+		Format:     "Standard",
+		TotalGames: 3,
+		Wins:       2,
+	}
+	err := repo.UpsertIndividualCardStats(ctx, stats2)
+	if err != nil {
+		t.Fatalf("Failed to accumulate individual card stats: %v", err)
+	}
+
+	// Verify accumulated (5+3=8 games, 3+2=5 wins)
+	result, _ := repo.GetIndividualCardStats(ctx, 100, "Standard")
+	if result.TotalGames != 8 {
+		t.Errorf("Expected 8 total games (accumulated), got %d", result.TotalGames)
+	}
+	if result.Wins != 5 {
+		t.Errorf("Expected 5 wins (accumulated), got %d", result.Wins)
+	}
+}
+
+func TestMLSuggestionRepository_GetIndividualCardStats_NotFound(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Get non-existent stats
+	result, err := repo.GetIndividualCardStats(ctx, 999, "Standard")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("Expected nil result for non-existent card")
+	}
+}
+
+func TestMLSuggestionRepository_UpdateSeparateStatsFromIndividual(t *testing.T) {
+	db := setupMLSuggestionTestDB(t)
+	defer db.Close()
+
+	repo := NewMLSuggestionRepository(db)
+	ctx := context.Background()
+
+	// Setup: Card 100 appeared in 20 games total, won 12
+	_ = repo.UpsertIndividualCardStats(ctx, &models.CardIndividualStats{
+		CardID: 100, Format: "Standard", TotalGames: 20, Wins: 12,
+	})
+
+	// Setup: Card 200 appeared in 15 games total, won 9
+	_ = repo.UpsertIndividualCardStats(ctx, &models.CardIndividualStats{
+		CardID: 200, Format: "Standard", TotalGames: 15, Wins: 9,
+	})
+
+	// Setup: Cards 100 and 200 appeared together in 10 games, won 7
+	_ = repo.UpsertCombinationStats(ctx, &models.CardCombinationStats{
+		CardID1: 100, CardID2: 200, Format: "Standard",
+		GamesTogether: 10, WinsTogether: 7,
+	})
+
+	// Update separate stats from individual stats
+	err := repo.UpdateSeparateStatsFromIndividual(ctx, "Standard")
+	if err != nil {
+		t.Fatalf("Failed to update separate stats: %v", err)
+	}
+
+	// Verify separate stats were calculated
+	result, _ := repo.GetCombinationStats(ctx, 100, 200, "Standard")
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	// Card 100: 20 total - 10 together = 10 only
+	if result.GamesCard1Only != 10 {
+		t.Errorf("Expected 10 games card1 only, got %d", result.GamesCard1Only)
+	}
+
+	// Card 200: 15 total - 10 together = 5 only
+	if result.GamesCard2Only != 5 {
+		t.Errorf("Expected 5 games card2 only, got %d", result.GamesCard2Only)
+	}
+
+	// Card 100 wins: 12 total - 7 together = 5 only
+	if result.WinsCard1Only != 5 {
+		t.Errorf("Expected 5 wins card1 only, got %d", result.WinsCard1Only)
+	}
+
+	// Card 200 wins: 9 total - 7 together = 2 only
+	if result.WinsCard2Only != 2 {
+		t.Errorf("Expected 2 wins card2 only, got %d", result.WinsCard2Only)
+	}
+}
+
+func TestCardIndividualStats_WinRate(t *testing.T) {
+	tests := []struct {
+		name     string
+		stats    *models.CardIndividualStats
+		expected float64
+	}{
+		{
+			name:     "50% win rate",
+			stats:    &models.CardIndividualStats{TotalGames: 10, Wins: 5},
+			expected: 0.5,
+		},
+		{
+			name:     "no games",
+			stats:    &models.CardIndividualStats{TotalGames: 0, Wins: 0},
+			expected: 0.0,
+		},
+		{
+			name:     "all wins",
+			stats:    &models.CardIndividualStats{TotalGames: 10, Wins: 10},
+			expected: 1.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.stats.WinRate()
+			if result != tt.expected {
+				t.Errorf("WinRate() = %f, want %f", result, tt.expected)
+			}
+		})
 	}
 }
