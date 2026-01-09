@@ -2186,6 +2186,26 @@ func (s *Service) RecommendationFeedbackRepo() repository.RecommendationFeedback
 	return s.recommendationFeedback
 }
 
+// NewNotesRepo creates a new notes repository using the service's database connection.
+func (s *Service) NewNotesRepo() repository.NotesRepository {
+	return repository.NewNotesRepository(s.db.Conn())
+}
+
+// NewSuggestionRepo creates a new suggestion repository using the service's database connection.
+func (s *Service) NewSuggestionRepo() repository.SuggestionRepository {
+	return repository.NewSuggestionRepository(s.db.Conn())
+}
+
+// NewGamePlayRepo creates a new game play repository using the service's database connection.
+func (s *Service) NewGamePlayRepo() repository.GamePlayRepository {
+	return repository.NewGamePlayRepository(s.db.Conn())
+}
+
+// NewMatchRepo creates a new match repository using the service's database connection.
+func (s *Service) NewMatchRepo() repository.MatchRepository {
+	return repository.NewMatchRepository(s.db.Conn())
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()
