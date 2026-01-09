@@ -514,7 +514,7 @@ func (r *MLSuggestionRepository) SaveModelMetadata(ctx context.Context, meta *mo
 			model_data = excluded.model_data
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
+	_, err := r.db.ExecContext(ctx, query,
 		meta.ModelName, meta.ModelVersion, meta.TrainingSamples, meta.TrainingDate,
 		meta.Accuracy, meta.PrecisionScore, meta.Recall, meta.F1Score,
 		meta.IsActive, meta.ModelData,
@@ -523,7 +523,12 @@ func (r *MLSuggestionRepository) SaveModelMetadata(ctx context.Context, meta *mo
 		return err
 	}
 
-	id, err := result.LastInsertId()
+	// Query for the actual ID since LastInsertId doesn't work with ON CONFLICT DO UPDATE
+	var id int64
+	err = r.db.QueryRowContext(ctx,
+		"SELECT id FROM ml_model_metadata WHERE model_name = ? AND model_version = ?",
+		meta.ModelName, meta.ModelVersion,
+	).Scan(&id)
 	if err != nil {
 		return err
 	}

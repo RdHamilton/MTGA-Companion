@@ -546,7 +546,10 @@ func (e *MLEngine) buildAddReasons(synergies []*CardSynergyInfo, cardName string
 
 	// Add top synergy reason
 	top := synergies[0]
-	topCardName := fmt.Sprintf("Card #%d", top.CardID)
+	topCardName := top.CardName
+	if topCardName == "" {
+		topCardName = fmt.Sprintf("Card #%d", top.CardID)
+	}
 	reasons = append(reasons, models.MLSuggestionReason{
 		Type:        "synergy",
 		Description: fmt.Sprintf("%s has %.1f%% higher win rate when paired with %s", cardName, top.WinRateTogether*100, topCardName),
