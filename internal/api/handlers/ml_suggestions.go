@@ -300,3 +300,17 @@ func (h *MLSuggestionsHandler) GetCombinationStats(w http.ResponseWriter, r *htt
 
 	response.Success(w, stats)
 }
+
+// ClearLearnedData removes all ML learned data.
+// DELETE /ml/learned-data
+func (h *MLSuggestionsHandler) ClearLearnedData(w http.ResponseWriter, r *http.Request) {
+	if err := h.mlRepo.ClearAllLearnedData(r.Context()); err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, map[string]string{
+		"status":  "success",
+		"message": "All learned data has been cleared",
+	})
+}

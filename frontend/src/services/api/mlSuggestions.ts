@@ -3,7 +3,7 @@
  * Handles ML-powered card suggestions based on synergy analysis.
  */
 
-import { get, post, put } from '../apiClient';
+import { del, get, post, put } from '../apiClient';
 
 /**
  * ML suggestion types.
@@ -258,6 +258,17 @@ export async function updateUserPlayPatterns(
 ): Promise<{ status: string; message: string }> {
   const params = accountId ? `?account_id=${accountId}` : '';
   return post(`/ml/play-patterns/update${params}`, {});
+}
+
+/**
+ * Clear all ML learned data from the database.
+ * This includes card synergies, play patterns, and model metadata.
+ */
+export async function clearLearnedData(): Promise<{
+  status: string;
+  message: string;
+}> {
+  return del<{ status: string; message: string }>('/ml/learned-data');
 }
 
 // -------------------- Utility Functions --------------------

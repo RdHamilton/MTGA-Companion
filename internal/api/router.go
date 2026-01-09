@@ -333,6 +333,7 @@ func (s *Server) setupRoutes() {
 				r.Get("/play-patterns", mlHandler.GetUserPlayPatterns)
 				r.Post("/play-patterns/update", mlHandler.UpdateUserPlayPatterns)
 				r.Get("/combinations", mlHandler.GetCombinationStats)
+				r.Delete("/learned-data", mlHandler.ClearLearnedData)
 			})
 
 			// ML suggestion actions

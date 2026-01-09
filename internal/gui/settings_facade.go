@@ -35,6 +35,17 @@ type AppSettings struct {
 	MetaTop8Enabled     bool    `json:"metaTop8Enabled"`
 	MetaWeight          float64 `json:"metaWeight"`
 	PersonalWeight      float64 `json:"personalWeight"`
+
+	// ML Suggestion Preferences
+	SuggestionFrequency   string `json:"suggestionFrequency"` // low, medium, high
+	MinimumConfidence     int    `json:"minimumConfidence"`   // 0-100
+	ShowCardAdditions     bool   `json:"showCardAdditions"`
+	ShowCardRemovals      bool   `json:"showCardRemovals"`
+	ShowArchetypeChanges  bool   `json:"showArchetypeChanges"`
+	LearnFromMatches      bool   `json:"learnFromMatches"`
+	LearnFromDeckChanges  bool   `json:"learnFromDeckChanges"`
+	RetentionDays         int    `json:"retentionDays"`         // 30, 90, 180, 365, -1 (forever)
+	MaxSuggestionsPerView int    `json:"maxSuggestionsPerView"` // 3, 5, 10
 }
 
 // GetAllSettings retrieves all settings as an AppSettings struct.
@@ -61,6 +72,16 @@ func (s *SettingsFacade) GetAllSettings(ctx context.Context) (*AppSettings, erro
 		MetaTop8Enabled:     true,
 		MetaWeight:          0.3,
 		PersonalWeight:      0.2,
+		// ML Suggestion defaults
+		SuggestionFrequency:   "medium",
+		MinimumConfidence:     50,
+		ShowCardAdditions:     true,
+		ShowCardRemovals:      true,
+		ShowArchetypeChanges:  true,
+		LearnFromMatches:      true,
+		LearnFromDeckChanges:  true,
+		RetentionDays:         90,
+		MaxSuggestionsPerView: 5,
 	}
 
 	// Get each setting, using defaults if not found (errors are intentionally ignored)
@@ -78,6 +99,16 @@ func (s *SettingsFacade) GetAllSettings(ctx context.Context) (*AppSettings, erro
 	_ = repo.GetTyped(ctx, "metaTop8Enabled", &settings.MetaTop8Enabled)
 	_ = repo.GetTyped(ctx, "metaWeight", &settings.MetaWeight)
 	_ = repo.GetTyped(ctx, "personalWeight", &settings.PersonalWeight)
+	// ML Suggestion settings
+	_ = repo.GetTyped(ctx, "suggestionFrequency", &settings.SuggestionFrequency)
+	_ = repo.GetTyped(ctx, "minimumConfidence", &settings.MinimumConfidence)
+	_ = repo.GetTyped(ctx, "showCardAdditions", &settings.ShowCardAdditions)
+	_ = repo.GetTyped(ctx, "showCardRemovals", &settings.ShowCardRemovals)
+	_ = repo.GetTyped(ctx, "showArchetypeChanges", &settings.ShowArchetypeChanges)
+	_ = repo.GetTyped(ctx, "learnFromMatches", &settings.LearnFromMatches)
+	_ = repo.GetTyped(ctx, "learnFromDeckChanges", &settings.LearnFromDeckChanges)
+	_ = repo.GetTyped(ctx, "retentionDays", &settings.RetentionDays)
+	_ = repo.GetTyped(ctx, "maxSuggestionsPerView", &settings.MaxSuggestionsPerView)
 
 	return settings, nil
 }
@@ -105,6 +136,16 @@ func (s *SettingsFacade) SaveAllSettings(ctx context.Context, settings *AppSetti
 		"metaTop8Enabled":     settings.MetaTop8Enabled,
 		"metaWeight":          settings.MetaWeight,
 		"personalWeight":      settings.PersonalWeight,
+		// ML Suggestion settings
+		"suggestionFrequency":   settings.SuggestionFrequency,
+		"minimumConfidence":     settings.MinimumConfidence,
+		"showCardAdditions":     settings.ShowCardAdditions,
+		"showCardRemovals":      settings.ShowCardRemovals,
+		"showArchetypeChanges":  settings.ShowArchetypeChanges,
+		"learnFromMatches":      settings.LearnFromMatches,
+		"learnFromDeckChanges":  settings.LearnFromDeckChanges,
+		"retentionDays":         settings.RetentionDays,
+		"maxSuggestionsPerView": settings.MaxSuggestionsPerView,
 	}
 
 	if err := repo.SetMany(ctx, settingsMap); err != nil {

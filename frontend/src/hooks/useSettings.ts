@@ -18,6 +18,16 @@ interface SettingsState {
   metaTop8Enabled: boolean;
   metaWeight: number;
   personalWeight: number;
+  // ML Suggestion Preferences
+  suggestionFrequency: string; // low, medium, high
+  minimumConfidence: number; // 0-100
+  showCardAdditions: boolean;
+  showCardRemovals: boolean;
+  showArchetypeChanges: boolean;
+  learnFromMatches: boolean;
+  learnFromDeckChanges: boolean;
+  retentionDays: number; // 30, 90, 180, 365, -1 (forever)
+  maxSuggestionsPerView: number; // 3, 5, 10
   // Rotation Settings
   rotationNotificationsEnabled: boolean;
   rotationNotificationThreshold: number; // Days before rotation to notify
@@ -41,6 +51,16 @@ interface UseSettingsReturn extends SettingsState {
   setMetaTop8Enabled: (value: boolean) => void;
   setMetaWeight: (value: number) => void;
   setPersonalWeight: (value: number) => void;
+  // ML Suggestion Preferences setters
+  setSuggestionFrequency: (value: string) => void;
+  setMinimumConfidence: (value: number) => void;
+  setShowCardAdditions: (value: boolean) => void;
+  setShowCardRemovals: (value: boolean) => void;
+  setShowArchetypeChanges: (value: boolean) => void;
+  setLearnFromMatches: (value: boolean) => void;
+  setLearnFromDeckChanges: (value: boolean) => void;
+  setRetentionDays: (value: number) => void;
+  setMaxSuggestionsPerView: (value: number) => void;
   // Rotation Settings setters
   setRotationNotificationsEnabled: (value: boolean) => void;
   setRotationNotificationThreshold: (value: number) => void;
@@ -66,6 +86,16 @@ const defaultSettings: Omit<SettingsState, 'isLoading' | 'isSaving' | 'error'> =
   metaTop8Enabled: true,
   metaWeight: 0.3,
   personalWeight: 0.2,
+  // ML Suggestion Preferences defaults
+  suggestionFrequency: 'medium',
+  minimumConfidence: 50,
+  showCardAdditions: true,
+  showCardRemovals: true,
+  showArchetypeChanges: true,
+  learnFromMatches: true,
+  learnFromDeckChanges: true,
+  retentionDays: 90,
+  maxSuggestionsPerView: 5,
   // Rotation defaults
   rotationNotificationsEnabled: true,
   rotationNotificationThreshold: 30, // Notify 30 days before rotation
@@ -101,6 +131,16 @@ export function useSettings(): UseSettingsReturn {
           metaTop8Enabled: backendSettings.metaTop8Enabled ?? defaultSettings.metaTop8Enabled,
           metaWeight: backendSettings.metaWeight ?? defaultSettings.metaWeight,
           personalWeight: backendSettings.personalWeight ?? defaultSettings.personalWeight,
+          // ML Suggestion Preferences
+          suggestionFrequency: backendSettings.suggestionFrequency ?? defaultSettings.suggestionFrequency,
+          minimumConfidence: backendSettings.minimumConfidence ?? defaultSettings.minimumConfidence,
+          showCardAdditions: backendSettings.showCardAdditions ?? defaultSettings.showCardAdditions,
+          showCardRemovals: backendSettings.showCardRemovals ?? defaultSettings.showCardRemovals,
+          showArchetypeChanges: backendSettings.showArchetypeChanges ?? defaultSettings.showArchetypeChanges,
+          learnFromMatches: backendSettings.learnFromMatches ?? defaultSettings.learnFromMatches,
+          learnFromDeckChanges: backendSettings.learnFromDeckChanges ?? defaultSettings.learnFromDeckChanges,
+          retentionDays: backendSettings.retentionDays ?? defaultSettings.retentionDays,
+          maxSuggestionsPerView: backendSettings.maxSuggestionsPerView ?? defaultSettings.maxSuggestionsPerView,
           // Rotation settings
           rotationNotificationsEnabled:
             backendSettings.rotationNotificationsEnabled ?? defaultSettings.rotationNotificationsEnabled,
@@ -175,6 +215,43 @@ export function useSettings(): UseSettingsReturn {
     setSettings((prev) => ({ ...prev, personalWeight: value }));
   }, []);
 
+  // ML Suggestion Preferences setters
+  const setSuggestionFrequency = useCallback((value: string) => {
+    setSettings((prev) => ({ ...prev, suggestionFrequency: value }));
+  }, []);
+
+  const setMinimumConfidence = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, minimumConfidence: value }));
+  }, []);
+
+  const setShowCardAdditions = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, showCardAdditions: value }));
+  }, []);
+
+  const setShowCardRemovals = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, showCardRemovals: value }));
+  }, []);
+
+  const setShowArchetypeChanges = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, showArchetypeChanges: value }));
+  }, []);
+
+  const setLearnFromMatches = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, learnFromMatches: value }));
+  }, []);
+
+  const setLearnFromDeckChanges = useCallback((value: boolean) => {
+    setSettings((prev) => ({ ...prev, learnFromDeckChanges: value }));
+  }, []);
+
+  const setRetentionDays = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, retentionDays: value }));
+  }, []);
+
+  const setMaxSuggestionsPerView = useCallback((value: number) => {
+    setSettings((prev) => ({ ...prev, maxSuggestionsPerView: value }));
+  }, []);
+
   // Rotation setters
   const setRotationNotificationsEnabled = useCallback((value: boolean) => {
     setSettings((prev) => ({ ...prev, rotationNotificationsEnabled: value }));
@@ -204,6 +281,16 @@ export function useSettings(): UseSettingsReturn {
         metaTop8Enabled: settings.metaTop8Enabled,
         metaWeight: settings.metaWeight,
         personalWeight: settings.personalWeight,
+        // ML Suggestion Preferences
+        suggestionFrequency: settings.suggestionFrequency,
+        minimumConfidence: settings.minimumConfidence,
+        showCardAdditions: settings.showCardAdditions,
+        showCardRemovals: settings.showCardRemovals,
+        showArchetypeChanges: settings.showArchetypeChanges,
+        learnFromMatches: settings.learnFromMatches,
+        learnFromDeckChanges: settings.learnFromDeckChanges,
+        retentionDays: settings.retentionDays,
+        maxSuggestionsPerView: settings.maxSuggestionsPerView,
         // Rotation settings
         rotationNotificationsEnabled: settings.rotationNotificationsEnabled,
         rotationNotificationThreshold: settings.rotationNotificationThreshold,
@@ -245,6 +332,16 @@ export function useSettings(): UseSettingsReturn {
     setMetaTop8Enabled,
     setMetaWeight,
     setPersonalWeight,
+    // ML Suggestion Preferences setters
+    setSuggestionFrequency,
+    setMinimumConfidence,
+    setShowCardAdditions,
+    setShowCardRemovals,
+    setShowArchetypeChanges,
+    setLearnFromMatches,
+    setLearnFromDeckChanges,
+    setRetentionDays,
+    setMaxSuggestionsPerView,
     // Rotation setters
     setRotationNotificationsEnabled,
     setRotationNotificationThreshold,

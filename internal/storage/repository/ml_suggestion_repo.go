@@ -806,3 +806,82 @@ func GenerateMLSuggestion(
 
 	return suggestion, nil
 }
+
+// ============================================================================
+// Data Management
+// ============================================================================
+
+// ClearAllLearnedData removes all ML learned data from the database.
+// This includes card combination stats, individual stats, suggestions,
+// affinity data, and user play patterns.
+func (r *MLSuggestionRepository) ClearAllLearnedData(ctx context.Context) error {
+	tables := []string{
+		"card_combination_stats",
+		"card_individual_stats",
+		"ml_suggestions",
+		"card_affinity",
+		"user_play_patterns",
+		"ml_model_metadata",
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	for _, table := range tables {
+		if _, err = tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {
+			return fmt.Errorf("failed to clear %s: %w", table, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// ClearLearnedDataByRetention removes learned data older than the specified days.
+// If days is -1, no data is removed (keep forever).
+func (r *MLSuggestionRepository) ClearLearnedDataByRetention(ctx context.Context, retentionDays int) error {
+	if retentionDays < 0 {
+		return nil // Keep forever
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+
+	queries := []string{
+		"DELETE FROM card_combination_stats WHERE updated_at < ?",
+		"DELETE FROM card_individual_stats WHERE updated_at < ?",
+		"DELETE FROM ml_suggestions WHERE created_at < ?",
+		"DELETE FROM card_affinity WHERE computed_at < ?",
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	for _, query := range queries {
+		if _, err = tx.ExecContext(ctx, query, cutoff); err != nil {
+			return fmt.Errorf("failed to clear old data: %w", err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
