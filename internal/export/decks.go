@@ -2,7 +2,9 @@ package export
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
@@ -500,4 +502,367 @@ func ExportDeckViewToTextFormat(deck *models.DeckView) string {
 	}
 
 	return content.String()
+}
+
+// ExportDeckViewToArenaFormatWithSetCodes exports a DeckView to MTG Arena format with set codes.
+// This format is more portable as it includes set information for card identification.
+func ExportDeckViewToArenaFormatWithSetCodes(deck *models.DeckView) string {
+	var content strings.Builder
+	content.WriteString("Deck\n")
+
+	// Main deck
+	for _, card := range deck.MainboardCards {
+		content.WriteString(formatArenaCardLine(card))
+	}
+
+	// Sideboard (if any)
+	if len(deck.SideboardCards) > 0 {
+		content.WriteString("\nSideboard\n")
+		for _, card := range deck.SideboardCards {
+			content.WriteString(formatArenaCardLine(card))
+		}
+	}
+
+	return content.String()
+}
+
+// formatArenaCardLine formats a card line in Arena format: "4 Card Name (SET) 123"
+func formatArenaCardLine(card *models.DeckCardView) string {
+	if card.Metadata == nil || card.Metadata.Name == "" {
+		return fmt.Sprintf("%d Card#%d\n", card.Quantity, card.CardID)
+	}
+
+	// Full Arena format: "4 Card Name (SET) 123"
+	if card.Metadata.SetCode != "" && card.Metadata.CollectorNumber != "" {
+		return fmt.Sprintf("%d %s (%s) %s\n",
+			card.Quantity,
+			card.Metadata.Name,
+			strings.ToUpper(card.Metadata.SetCode),
+			card.Metadata.CollectorNumber)
+	}
+
+	// Fallback to just name
+	return fmt.Sprintf("%d %s\n", card.Quantity, card.Metadata.Name)
+}
+
+// MoxfieldDeckExport represents the structure for Moxfield import.
+type MoxfieldDeckExport struct {
+	Name        string                 `json:"name,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Format      string                 `json:"format,omitempty"`
+	MainBoard   map[string]interface{} `json:"mainboard"`
+	SideBoard   map[string]interface{} `json:"sideboard,omitempty"`
+}
+
+// GenerateMoxfieldURL generates a Moxfield import URL for a deck.
+// Note: Moxfield doesn't have a direct URL import - we generate a deck string for clipboard import.
+func GenerateMoxfieldURL(deck *models.DeckView) string {
+	// Moxfield uses the same text format as Arena for import
+	// Users can paste this on moxfield.com/decks/new
+	return ExportDeckViewToArenaFormatWithSetCodes(deck)
+}
+
+// GenerateMoxfieldImportData generates JSON data for Moxfield API import.
+func GenerateMoxfieldImportData(deck *models.DeckView) (string, error) {
+	export := MoxfieldDeckExport{
+		Name:      deck.Deck.Name,
+		Format:    mapFormatToMoxfield(deck.Deck.Format),
+		MainBoard: make(map[string]interface{}),
+		SideBoard: make(map[string]interface{}),
+	}
+
+	if deck.Deck.Description != nil {
+		export.Description = *deck.Deck.Description
+	}
+
+	// Main deck cards
+	for _, card := range deck.MainboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			export.MainBoard[card.Metadata.Name] = card.Quantity
+		}
+	}
+
+	// Sideboard cards
+	for _, card := range deck.SideboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			export.SideBoard[card.Metadata.Name] = card.Quantity
+		}
+	}
+
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Moxfield data: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// mapFormatToMoxfield maps internal format names to Moxfield format names.
+func mapFormatToMoxfield(format string) string {
+	formatMap := map[string]string{
+		"standard":      "standard",
+		"historic":      "historic",
+		"explorer":      "explorer",
+		"pioneer":       "pioneer",
+		"modern":        "modern",
+		"legacy":        "legacy",
+		"vintage":       "vintage",
+		"pauper":        "pauper",
+		"commander":     "commander",
+		"brawl":         "brawl",
+		"historicbrawl": "historicBrawl",
+		"alchemy":       "alchemy",
+		"timeless":      "timeless",
+	}
+
+	if mapped, ok := formatMap[strings.ToLower(format)]; ok {
+		return mapped
+	}
+	return strings.ToLower(format)
+}
+
+// ArchidektDeckExport represents the structure for Archidekt import.
+type ArchidektDeckExport struct {
+	Name   string              `json:"name"`
+	Format int                 `json:"format"`
+	Cards  []ArchidektCardData `json:"cards"`
+}
+
+// ArchidektCardData represents a card for Archidekt import.
+type ArchidektCardData struct {
+	Quantity   int    `json:"quantity"`
+	CardName   string `json:"name"`
+	Categories string `json:"categories,omitempty"`
+}
+
+// GenerateArchidektURL generates an Archidekt import URL for a deck.
+// Archidekt supports URL-based import via /decks/import with base64 deck string.
+func GenerateArchidektURL(deck *models.DeckView) string {
+	// Build deck string in simple format for URL encoding
+	var deckStr strings.Builder
+
+	for _, card := range deck.MainboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			deckStr.WriteString(fmt.Sprintf("%d %s\n", card.Quantity, card.Metadata.Name))
+		}
+	}
+
+	if len(deck.SideboardCards) > 0 {
+		deckStr.WriteString("\n// Sideboard\n")
+		for _, card := range deck.SideboardCards {
+			if card.Metadata != nil && card.Metadata.Name != "" {
+				deckStr.WriteString(fmt.Sprintf("%d %s\n", card.Quantity, card.Metadata.Name))
+			}
+		}
+	}
+
+	// URL encode the deck string
+	encoded := url.QueryEscape(deckStr.String())
+
+	return fmt.Sprintf("https://archidekt.com/decks/new?deck=%s", encoded)
+}
+
+// GenerateArchidektImportData generates JSON data for Archidekt API import.
+func GenerateArchidektImportData(deck *models.DeckView) (string, error) {
+	export := ArchidektDeckExport{
+		Name:   deck.Deck.Name,
+		Format: mapFormatToArchidekt(deck.Deck.Format),
+		Cards:  make([]ArchidektCardData, 0),
+	}
+
+	// Main deck cards
+	for _, card := range deck.MainboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			export.Cards = append(export.Cards, ArchidektCardData{
+				Quantity:   card.Quantity,
+				CardName:   card.Metadata.Name,
+				Categories: "Mainboard",
+			})
+		}
+	}
+
+	// Sideboard cards
+	for _, card := range deck.SideboardCards {
+		if card.Metadata != nil && card.Metadata.Name != "" {
+			export.Cards = append(export.Cards, ArchidektCardData{
+				Quantity:   card.Quantity,
+				CardName:   card.Metadata.Name,
+				Categories: "Sideboard",
+			})
+		}
+	}
+
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Archidekt data: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// mapFormatToArchidekt maps internal format names to Archidekt format IDs.
+func mapFormatToArchidekt(format string) int {
+	// Archidekt format IDs
+	formatMap := map[string]int{
+		"standard":  1,
+		"modern":    2,
+		"legacy":    3,
+		"vintage":   4,
+		"commander": 5,
+		"pauper":    6,
+		"pioneer":   7,
+		"historic":  8,
+		"brawl":     9,
+		"explorer":  10,
+		"alchemy":   11,
+		"timeless":  12,
+	}
+
+	if id, ok := formatMap[strings.ToLower(format)]; ok {
+		return id
+	}
+	return 1 // Default to Standard
+}
+
+// DeckExportResponse represents the response from deck export API.
+type DeckExportResponse struct {
+	DeckID      string `json:"deck_id"`
+	DeckName    string `json:"deck_name"`
+	Format      string `json:"format"`
+	ExportType  string `json:"export_type"`
+	Content     string `json:"content"`
+	URL         string `json:"url,omitempty"`
+	FileName    string `json:"file_name,omitempty"`
+	ContentType string `json:"content_type"`
+}
+
+// ExportDeckToFormat exports a deck to the specified format and returns the response.
+func ExportDeckToFormat(deck *models.DeckView, exportFormat string) (*DeckExportResponse, error) {
+	if deck == nil {
+		return nil, fmt.Errorf("deck is required")
+	}
+
+	response := &DeckExportResponse{
+		DeckID:     deck.Deck.ID,
+		DeckName:   deck.Deck.Name,
+		Format:     deck.Deck.Format,
+		ExportType: exportFormat,
+	}
+
+	switch strings.ToLower(exportFormat) {
+	case "arena":
+		response.Content = ExportDeckViewToArenaFormatWithSetCodes(deck)
+		response.ContentType = "text/plain"
+		response.FileName = GenerateDeckFilename(deck.Deck.Name, DeckFormatArena)
+
+	case "moxfield":
+		response.Content = GenerateMoxfieldURL(deck)
+		response.ContentType = "text/plain"
+		response.FileName = fmt.Sprintf("%s_moxfield.txt", sanitizeFileName(deck.Deck.Name))
+
+	case "archidekt":
+		response.URL = GenerateArchidektURL(deck)
+		response.Content = ExportDeckViewToArenaFormatWithSetCodes(deck)
+		response.ContentType = "text/plain"
+		response.FileName = fmt.Sprintf("%s_archidekt.txt", sanitizeFileName(deck.Deck.Name))
+
+	case "json":
+		jsonData, err := exportSingleDeckJSON(deck)
+		if err != nil {
+			return nil, err
+		}
+		response.Content = jsonData
+		response.ContentType = "application/json"
+		response.FileName = GenerateDeckFilename(deck.Deck.Name, DeckFormatJSON)
+
+	case "text":
+		response.Content = ExportDeckViewToTextFormat(deck)
+		response.ContentType = "text/plain"
+		response.FileName = GenerateDeckFilename(deck.Deck.Name, DeckFormatText)
+
+	default:
+		return nil, fmt.Errorf("unsupported export format: %s", exportFormat)
+	}
+
+	return response, nil
+}
+
+// exportSingleDeckJSON exports a single deck to JSON format.
+func exportSingleDeckJSON(deck *models.DeckView) (string, error) {
+	totalCards := deck.TotalMainboard + deck.TotalSideboard
+	jsonDeck := DeckJSON{
+		ID:         deck.Deck.ID,
+		Name:       deck.Deck.Name,
+		Format:     deck.Deck.Format,
+		TotalCards: totalCards,
+		CreatedAt:  deck.Deck.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ModifiedAt: deck.Deck.ModifiedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	if deck.Deck.Description != nil {
+		jsonDeck.Description = *deck.Deck.Description
+	}
+	if len(deck.ColorIdentity) > 0 {
+		jsonDeck.ColorIdentity = strings.Join(deck.ColorIdentity, "")
+	}
+	if deck.Deck.LastPlayed != nil {
+		jsonDeck.LastPlayed = deck.Deck.LastPlayed.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	// Main deck cards
+	jsonDeck.MainDeck = make([]DeckCardJSON, len(deck.MainboardCards))
+	for j, card := range deck.MainboardCards {
+		cardJSON := DeckCardJSON{
+			Quantity: card.Quantity,
+			CardID:   card.CardID,
+		}
+		if card.Metadata != nil {
+			cardJSON.CardName = card.Metadata.Name
+			if card.Metadata.ManaCost != nil {
+				cardJSON.ManaCost = *card.Metadata.ManaCost
+			}
+			cardJSON.Type = card.Metadata.TypeLine
+			cardJSON.Rarity = card.Metadata.Rarity
+			cardJSON.SetCode = card.Metadata.SetCode
+			cardJSON.CollectorNo = card.Metadata.CollectorNumber
+		}
+		jsonDeck.MainDeck[j] = cardJSON
+	}
+
+	// Sideboard cards
+	jsonDeck.Sideboard = make([]DeckCardJSON, len(deck.SideboardCards))
+	for j, card := range deck.SideboardCards {
+		cardJSON := DeckCardJSON{
+			Quantity: card.Quantity,
+			CardID:   card.CardID,
+		}
+		if card.Metadata != nil {
+			cardJSON.CardName = card.Metadata.Name
+			if card.Metadata.ManaCost != nil {
+				cardJSON.ManaCost = *card.Metadata.ManaCost
+			}
+			cardJSON.Type = card.Metadata.TypeLine
+			cardJSON.Rarity = card.Metadata.Rarity
+			cardJSON.SetCode = card.Metadata.SetCode
+			cardJSON.CollectorNo = card.Metadata.CollectorNumber
+		}
+		jsonDeck.Sideboard[j] = cardJSON
+	}
+
+	data, err := json.MarshalIndent(jsonDeck, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal deck JSON: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// sanitizeFileName removes invalid characters from a filename.
+func sanitizeFileName(name string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' || r == ' ' {
+			return '_'
+		}
+		return r
+	}, name)
 }

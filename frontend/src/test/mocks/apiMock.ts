@@ -124,6 +124,22 @@ export const mockSettings = {
   saveAllSettings: vi.fn(() => Promise.resolve()),
 };
 
+export const mockNotes = {
+  getDeckNotes: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getDeckNote: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  createDeckNote: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  updateDeckNote: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  deleteDeckNote: vi.fn((() => Promise.resolve()) as MockFn),
+  getMatchNotes: vi.fn((() => Promise.resolve({ matchId: '', notes: '', rating: 0 })) as MockFn),
+  updateMatchNotes: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  getDeckSuggestions: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  generateSuggestions: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  dismissSuggestion: vi.fn((() => Promise.resolve()) as MockFn),
+  getSuggestionTypeLabel: vi.fn(((type: string) => type) as MockFn),
+  getPriorityLabel: vi.fn(((priority: string) => priority) as MockFn),
+  getPriorityColor: vi.fn((() => 'text-gray-400') as MockFn),
+};
+
 export const mockSystem = {
   getStatus: vi.fn(() => Promise.resolve({
     status: 'standalone',
@@ -184,6 +200,7 @@ export const mockApi = {
   quests: mockQuests,
   settings: mockSettings,
   system: mockSystem,
+  notes: mockNotes,
 };
 
 // Legacy mock kept for backwards compatibility with tests that haven't migrated

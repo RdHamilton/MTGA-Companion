@@ -10,6 +10,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
 	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
+	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // DeckHandler handles deck-related API requests.
@@ -935,4 +936,188 @@ func (h *DeckHandler) GenerateCompleteDeck(w http.ResponseWriter, r *http.Reques
 func (h *DeckHandler) GetArchetypeProfiles(w http.ResponseWriter, r *http.Request) {
 	profiles := h.facade.GetArchetypeProfiles()
 	response.Success(w, profiles)
+}
+
+// ============================================================================
+// Card Performance Analysis (Issue #771)
+// ============================================================================
+
+// GetCardPerformance returns performance metrics for all cards in a deck.
+// GET /decks/{deckID}/card-performance
+func (h *DeckHandler) GetCardPerformance(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	// Parse query params
+	includeLands := r.URL.Query().Get("include_lands") == "true"
+	minGames := 0
+	if minGamesStr := r.URL.Query().Get("min_games"); minGamesStr != "" {
+		if parsed, err := strconv.Atoi(minGamesStr); err == nil {
+			minGames = parsed
+		}
+	}
+
+	req := &gui.GetCardPerformanceRequest{
+		DeckID:       deckID,
+		MinGames:     minGames,
+		IncludeLands: includeLands,
+	}
+
+	result, err := h.facade.GetCardPerformance(r.Context(), req)
+	if err != nil {
+		// Handle specific error cases with appropriate status codes
+		if errors.Is(err, repository.ErrDeckNotFound) {
+			response.NotFound(w, err)
+			return
+		}
+		if errors.Is(err, repository.ErrNotEnoughData) {
+			// Return empty result for insufficient data (not an error)
+			response.Success(w, &gui.DeckPerformanceAnalysisResponse{
+				DeckID:          deckID,
+				CardPerformance: []*gui.CardPerformanceResponse{},
+			})
+			return
+		}
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
+}
+
+// GetPerformanceRecommendationsRequest represents the request body for getting performance-based recommendations.
+type GetPerformanceRecommendationsRequest struct {
+	MaxResults   int    `json:"max_results,omitempty"`
+	IncludeSwaps bool   `json:"include_swaps,omitempty"`
+	Format       string `json:"format,omitempty"`
+}
+
+// GetPerformanceAddRecommendations returns card add recommendations based on performance.
+// GET /decks/{deckID}/recommendations/add
+func (h *DeckHandler) GetPerformanceAddRecommendations(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	// Parse query params
+	maxResults := 5
+	if maxStr := r.URL.Query().Get("max_results"); maxStr != "" {
+		if parsed, err := strconv.Atoi(maxStr); err == nil && parsed > 0 {
+			maxResults = parsed
+		}
+	}
+
+	req := &gui.GetPerformanceRecommendationsRequest{
+		DeckID:       deckID,
+		MaxResults:   maxResults,
+		IncludeSwaps: false,
+		Format:       r.URL.Query().Get("format"),
+	}
+
+	result, err := h.facade.GetPerformanceRecommendations(r.Context(), req)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	// Return just the add recommendations
+	response.Success(w, result.AddRecommendations)
+}
+
+// GetPerformanceRemoveRecommendations returns card removal recommendations based on performance.
+// GET /decks/{deckID}/recommendations/remove
+func (h *DeckHandler) GetPerformanceRemoveRecommendations(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	// Parse query params
+	threshold := 0.05
+	if thresholdStr := r.URL.Query().Get("threshold"); thresholdStr != "" {
+		if parsed, err := strconv.ParseFloat(thresholdStr, 64); err == nil && parsed > 0 {
+			threshold = parsed
+		}
+	}
+
+	result, err := h.facade.GetUnderperformingCards(r.Context(), deckID, threshold)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
+}
+
+// GetPerformanceSwapRecommendations returns card swap recommendations based on performance.
+// GET /decks/{deckID}/recommendations/swap
+func (h *DeckHandler) GetPerformanceSwapRecommendations(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	// Parse query params
+	maxResults := 5
+	if maxStr := r.URL.Query().Get("max_results"); maxStr != "" {
+		if parsed, err := strconv.Atoi(maxStr); err == nil && parsed > 0 {
+			maxResults = parsed
+		}
+	}
+
+	req := &gui.GetPerformanceRecommendationsRequest{
+		DeckID:       deckID,
+		MaxResults:   maxResults,
+		IncludeSwaps: true,
+		Format:       r.URL.Query().Get("format"),
+	}
+
+	result, err := h.facade.GetPerformanceRecommendations(r.Context(), req)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	// Return just the swap recommendations
+	response.Success(w, result.SwapRecommendations)
+}
+
+// GetAllPerformanceRecommendations returns all recommendations (add/remove/swap) for a deck.
+// GET /decks/{deckID}/recommendations/all
+func (h *DeckHandler) GetAllPerformanceRecommendations(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	// Parse query params
+	maxResults := 5
+	if maxStr := r.URL.Query().Get("max_results"); maxStr != "" {
+		if parsed, err := strconv.Atoi(maxStr); err == nil && parsed > 0 {
+			maxResults = parsed
+		}
+	}
+
+	req := &gui.GetPerformanceRecommendationsRequest{
+		DeckID:       deckID,
+		MaxResults:   maxResults,
+		IncludeSwaps: true,
+		Format:       r.URL.Query().Get("format"),
+	}
+
+	result, err := h.facade.GetPerformanceRecommendations(r.Context(), req)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, result)
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { decks as decksApi } from '@/services/api';
 import { gui } from '@/types/models';
@@ -6,6 +6,8 @@ import { useRotationNotifications } from '@/hooks/useRotationNotifications';
 import { useSettings } from '@/hooks/useSettings';
 import { RotationBanner } from '@/components/RotationBanner';
 import './Decks.css';
+
+type ExportFormat = 'arena' | 'moxfield' | 'archidekt' | 'mtgo' | 'mtggoldfish' | 'plaintext';
 
 export default function Decks() {
   const navigate = useNavigate();
@@ -17,6 +19,10 @@ export default function Decks() {
   const [newDeckFormat, setNewDeckFormat] = useState('standard');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deckToDelete, setDeckToDelete] = useState<gui.DeckListItem | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [deckToExport, setDeckToExport] = useState<gui.DeckListItem | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('arena');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Rotation notifications
   const {
@@ -95,6 +101,72 @@ export default function Decks() {
     setShowDeleteDialog(false);
     setDeckToDelete(null);
   };
+
+  const handleExportClick = (deck: gui.DeckListItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeckToExport(deck);
+    setShowExportDialog(true);
+  };
+
+  const handleExportConfirm = useCallback(async () => {
+    if (!deckToExport) return;
+
+    try {
+      setIsExporting(true);
+      const response = await decksApi.exportDeck(deckToExport.id, { format: exportFormat });
+
+      if (response.error) {
+        alert(`Export failed: ${response.error}`);
+        return;
+      }
+
+      // Create blob and trigger download
+      const blob = new Blob([response.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = response.filename || `${deckToExport.name}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setShowExportDialog(false);
+      setDeckToExport(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export deck');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [deckToExport, exportFormat]);
+
+  const handleExportCancel = () => {
+    setShowExportDialog(false);
+    setDeckToExport(null);
+  };
+
+  const handleCopyToClipboard = useCallback(async () => {
+    if (!deckToExport) return;
+
+    try {
+      setIsExporting(true);
+      const response = await decksApi.exportDeck(deckToExport.id, { format: exportFormat });
+
+      if (response.error) {
+        alert(`Export failed: ${response.error}`);
+        return;
+      }
+
+      await navigator.clipboard.writeText(response.content);
+      alert('Deck copied to clipboard!');
+      setShowExportDialog(false);
+      setDeckToExport(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to copy to clipboard');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [deckToExport, exportFormat]);
 
   const formatDate = (date: unknown) => {
     if (!date) return 'N/A';
@@ -229,6 +301,12 @@ export default function Decks() {
                   Edit
                 </button>
                 <button
+                  className="export-button"
+                  onClick={(e) => handleExportClick(deck, e)}
+                >
+                  Export
+                </button>
+                <button
                   className="delete-button"
                   onClick={(e) => handleDeleteClick(deck, e)}
                 >
@@ -316,6 +394,66 @@ export default function Decks() {
               </button>
               <button className="delete-button-confirm" onClick={handleDeleteConfirm}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Deck Dialog */}
+      {showExportDialog && deckToExport && (
+        <div className="modal-overlay" onClick={handleExportCancel}>
+          <div className="modal-content export-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Export Deck</h2>
+              <button className="close-button" onClick={handleExportCancel}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>Export <strong>{deckToExport.name}</strong></p>
+              <div className="form-group">
+                <label htmlFor="export-format">Export Format</label>
+                <select
+                  id="export-format"
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as ExportFormat)}
+                  disabled={isExporting}
+                >
+                  <option value="arena">MTG Arena</option>
+                  <option value="moxfield">Moxfield</option>
+                  <option value="archidekt">Archidekt</option>
+                  <option value="mtgo">MTGO</option>
+                  <option value="mtggoldfish">MTGGoldfish</option>
+                  <option value="plaintext">Plain Text</option>
+                </select>
+              </div>
+              <p className="export-hint">
+                {exportFormat === 'arena' && 'Standard MTGA import format with set codes'}
+                {exportFormat === 'moxfield' && 'Import directly into Moxfield'}
+                {exportFormat === 'archidekt' && 'Import directly into Archidekt'}
+                {exportFormat === 'mtgo' && 'MTGO deck format (.dek)'}
+                {exportFormat === 'mtggoldfish' && 'MTGGoldfish import format'}
+                {exportFormat === 'plaintext' && 'Simple text list (4x Card Name)'}
+              </p>
+            </div>
+            <div className="modal-footer export-footer">
+              <button className="cancel-button" onClick={handleExportCancel} disabled={isExporting}>
+                Cancel
+              </button>
+              <button
+                className="copy-button"
+                onClick={handleCopyToClipboard}
+                disabled={isExporting}
+              >
+                {isExporting ? 'Copying...' : 'Copy to Clipboard'}
+              </button>
+              <button
+                className="export-button-confirm"
+                onClick={handleExportConfirm}
+                disabled={isExporting}
+              >
+                {isExporting ? 'Exporting...' : 'Download File'}
               </button>
             </div>
           </div>
