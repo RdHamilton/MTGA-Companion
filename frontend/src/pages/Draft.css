@@ -858,6 +858,39 @@
     transform: none;
 }
 
+.btn-export-draft {
+    background-color: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-export-draft:hover {
+    background-color: #6ab0ff;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-export-draft:active {
+    transform: translateY(0);
+}
+
+.btn-export-draft:disabled {
+    background-color: #2d2d2d;
+    color: #888888;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Replay Controls - Bottom Left */
 .replay-controls {
     position: fixed;

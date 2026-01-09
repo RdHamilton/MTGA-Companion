@@ -533,3 +533,48 @@ func (h *DraftHandler) ResetStats(w http.ResponseWriter, r *http.Request) {
 	h.facade.ResetDraftPerformanceMetrics(r.Context())
 	response.Success(w, map[string]string{"status": "success"})
 }
+
+// ExportTo17Lands exports a draft session to 17Lands JSON format.
+func (h *DraftHandler) ExportTo17Lands(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+	if sessionID == "" {
+		response.BadRequest(w, errors.New("session ID is required"))
+		return
+	}
+
+	exportData, err := h.facade.ExportDraftTo17Lands(r.Context(), sessionID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if exportData == nil {
+		response.NotFound(w, errors.New("draft session not found"))
+		return
+	}
+
+	response.Success(w, exportData)
+}
+
+// GetExportableDrafts returns draft sessions that can be exported.
+func (h *DraftHandler) GetExportableDrafts(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.URL.Query().Get("limit")
+	limit := 20
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	drafts, err := h.facade.GetExportableDrafts(r.Context(), limit)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	if drafts == nil {
+		drafts = []*models.DraftSession{}
+	}
+
+	response.Success(w, drafts)
+}
