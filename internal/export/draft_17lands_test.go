@@ -84,8 +84,8 @@ func TestExportDraftTo17Lands_BasicExport(t *testing.T) {
 		t.Errorf("Expected set code 'TLA', got '%s'", result.SetCode)
 	}
 
-	if result.EventType != "QuickDraft" {
-		t.Errorf("Expected event type 'QuickDraft', got '%s'", result.EventType)
+	if result.EventType != "quick" {
+		t.Errorf("Expected event type 'quick', got '%s'", result.EventType)
 	}
 
 	// Verify picks were converted (0-based to 1-based)
@@ -156,18 +156,21 @@ func TestNormalizeEventType(t *testing.T) {
 		eventName string
 		expected  string
 	}{
-		{"quick_draft", "", "QuickDraft"},
-		{"QuickDraft", "", "QuickDraft"},
-		{"premier_draft", "", "PremierDraft"},
-		{"PremierDraft", "", "PremierDraft"},
-		{"traditional_draft", "", "TradDraft"},
-		{"TraditionalDraft", "", "TradDraft"},
-		{"sealed", "", "Sealed"},
-		{"Sealed", "", "Sealed"},
-		{"unknown", "QuickDraft_TLA", "QuickDraft"},
-		{"unknown", "PremierDraft_DSK", "PremierDraft"},
-		{"unknown", "TraditionalDraft_FDN", "TradDraft"},
-		{"unknown", "TradDraft", "TradDraft"},
+		// 17Lands expects lowercase event types: quick, premier, traditional, sealed
+		{"quick_draft", "", "quick"},
+		{"QuickDraft", "", "quick"},
+		{"premier_draft", "", "premier"},
+		{"PremierDraft", "", "premier"},
+		{"traditional_draft", "", "traditional"},
+		{"TraditionalDraft", "", "traditional"},
+		{"TradDraft", "", "traditional"},
+		{"sealed", "", "sealed"},
+		{"Sealed", "", "sealed"},
+		{"unknown", "QuickDraft_TLA", "quick"},
+		{"unknown", "PremierDraft_DSK", "premier"},
+		{"unknown", "TraditionalDraft_FDN", "traditional"},
+		{"unknown", "TradDraft", "traditional"},
+		{"unknown", "Sealed_DSK", "sealed"},
 		{"unknown", "SomeOtherEvent", "unknown"},
 	}
 

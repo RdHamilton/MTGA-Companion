@@ -114,9 +114,9 @@ func ExportDraftTo17Lands(data *DraftExportData) (*SeventeenLandsDraftExport, er
 		packContents := packMap[key]
 
 		// Convert picked card ID to int
-		pickedCardID := 0
-		if id, err := strconv.Atoi(pick.CardID); err == nil {
-			pickedCardID = id
+		pickedCardID, err := strconv.Atoi(pick.CardID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid card ID '%s' for pick %d in pack %d: %w", pick.CardID, pickNum, packNum, err)
 		}
 
 		pickData := SeventeenLandsPickData{
@@ -168,29 +168,34 @@ func ExportDraftToJSON(data *DraftExportData) (string, error) {
 }
 
 // normalizeEventType converts internal event types to 17Lands format.
+// 17Lands expects lowercase event types: quick, premier, traditional, sealed.
 func normalizeEventType(draftType, eventName string) string {
-	// Map common draft types to 17Lands conventions
-	switch draftType {
-	case "quick_draft", "QuickDraft":
-		return "QuickDraft"
-	case "premier_draft", "PremierDraft":
-		return "PremierDraft"
-	case "traditional_draft", "TraditionalDraft":
-		return "TradDraft"
-	case "sealed", "Sealed":
-		return "Sealed"
+	// Map common draft types to 17Lands conventions (lowercase)
+	switch strings.ToLower(draftType) {
+	case "quick_draft", "quickdraft", "quick":
+		return "quick"
+	case "premier_draft", "premierdraft", "premier":
+		return "premier"
+	case "traditional_draft", "traditionaldraft", "traddraft", "traditional":
+		return "traditional"
+	case "sealed":
+		return "sealed"
 	default:
 		// Try to extract from event name
-		if strings.Contains(eventName, "Quick") {
-			return "QuickDraft"
+		eventLower := strings.ToLower(eventName)
+		if strings.Contains(eventLower, "quick") {
+			return "quick"
 		}
-		if strings.Contains(eventName, "Premier") {
-			return "PremierDraft"
+		if strings.Contains(eventLower, "premier") {
+			return "premier"
 		}
-		if strings.Contains(eventName, "Traditional") || strings.Contains(eventName, "Trad") {
-			return "TradDraft"
+		if strings.Contains(eventLower, "traditional") || strings.Contains(eventLower, "trad") {
+			return "traditional"
 		}
-		// Default to the original value
-		return draftType
+		if strings.Contains(eventLower, "sealed") {
+			return "sealed"
+		}
+		// Default to lowercase version of the original value
+		return strings.ToLower(draftType)
 	}
 }
