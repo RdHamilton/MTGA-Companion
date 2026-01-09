@@ -561,6 +561,192 @@ export const handlers = [
       },
     ]);
   }),
+
+  // Opponent analysis endpoint
+  http.get(`${API_BASE}/matches/:matchID/opponent-analysis`, () => {
+    return successResponse({
+      profile: {
+        id: 1,
+        matchId: 'test-match-123',
+        detectedArchetype: 'Mono Red Aggro',
+        archetypeConfidence: 0.85,
+        colorIdentity: 'R',
+        deckStyle: 'aggro',
+        cardsObserved: 12,
+        estimatedDeckSize: 60,
+        observedCardIds: '[12345, 12346, 12347]',
+        inferredCardIds: null,
+        signatureCards: '[12345]',
+        format: 'Standard',
+        metaArchetypeId: null,
+        createdAt: '2025-01-01T00:00:00Z',
+        updatedAt: '2025-01-01T00:00:00Z',
+      },
+      observedCards: [
+        {
+          cardId: 12345,
+          cardName: 'Lightning Bolt',
+          zone: 'battlefield',
+          turnFirstSeen: 2,
+          timesSeen: 3,
+          isSignature: true,
+          category: 'removal',
+        },
+        {
+          cardId: 12346,
+          cardName: 'Monastery Swiftspear',
+          zone: 'battlefield',
+          turnFirstSeen: 1,
+          timesSeen: 2,
+          isSignature: false,
+          category: 'threat',
+        },
+      ],
+      expectedCards: [
+        {
+          cardId: 12347,
+          cardName: 'Goblin Guide',
+          inclusionRate: 0.95,
+          avgCopies: 4.0,
+          wasSeen: false,
+          category: 'threat',
+          playAround: 'Fast creature - expect early aggression',
+        },
+        {
+          cardId: 12345,
+          cardName: 'Lightning Bolt',
+          inclusionRate: 0.99,
+          avgCopies: 4.0,
+          wasSeen: true,
+          category: 'removal',
+          playAround: '',
+        },
+      ],
+      strategicInsights: [
+        {
+          type: 'archetype',
+          description: 'Opponent is likely playing Mono Red Aggro',
+          priority: 'high',
+          cards: [],
+        },
+        {
+          type: 'strategy',
+          description: 'Aggressive deck - prioritize early blockers and stabilize life total',
+          priority: 'high',
+          cards: [],
+        },
+        {
+          type: 'removal',
+          description: 'Opponent has shown 1 removal spell(s) - be cautious with key threats',
+          priority: 'medium',
+          cards: [12345],
+        },
+      ],
+      matchupStats: null,
+      metaArchetype: null,
+    });
+  }),
+
+  // Opponent decks list endpoint
+  http.get(`${API_BASE}/opponents/decks`, () => {
+    return successResponse({
+      profiles: [
+        {
+          id: 1,
+          matchId: 'test-match-123',
+          detectedArchetype: 'Mono Red Aggro',
+          archetypeConfidence: 0.85,
+          colorIdentity: 'R',
+          deckStyle: 'aggro',
+          cardsObserved: 12,
+          estimatedDeckSize: 60,
+          format: 'Standard',
+          createdAt: '2025-01-01T00:00:00Z',
+          updatedAt: '2025-01-01T00:00:00Z',
+        },
+      ],
+      total: 1,
+    });
+  }),
+
+  // Matchup stats endpoint
+  http.get(`${API_BASE}/analytics/matchups`, () => {
+    return successResponse({
+      matchups: [
+        {
+          id: 1,
+          accountId: 1,
+          playerArchetype: 'UW Control',
+          opponentArchetype: 'Mono Red Aggro',
+          format: 'Standard',
+          totalMatches: 5,
+          wins: 3,
+          losses: 2,
+          winRate: 0.6,
+          avgGameDuration: 600,
+          lastMatchAt: '2025-01-01T00:00:00Z',
+          createdAt: '2025-01-01T00:00:00Z',
+          updatedAt: '2025-01-01T00:00:00Z',
+        },
+      ],
+      total: 1,
+    });
+  }),
+
+  // Opponent history endpoint
+  http.get(`${API_BASE}/analytics/opponent-history`, () => {
+    return successResponse({
+      totalOpponents: 20,
+      uniqueArchetypes: 8,
+      mostCommonArchetype: 'Mono Red Aggro',
+      mostCommonCount: 5,
+      archetypeBreakdown: [
+        { archetype: 'Mono Red Aggro', count: 5, percentage: 25.0, winRate: 0.6 },
+        { archetype: 'UW Control', count: 4, percentage: 20.0, winRate: 0.5 },
+        { archetype: 'Gruul Stompy', count: 3, percentage: 15.0, winRate: 0.67 },
+      ],
+      colorIdentityStats: [
+        { colorIdentity: 'R', count: 5, percentage: 25.0, winRate: 0.6 },
+        { colorIdentity: 'WU', count: 4, percentage: 20.0, winRate: 0.5 },
+        { colorIdentity: 'RG', count: 3, percentage: 15.0, winRate: 0.67 },
+      ],
+    });
+  }),
+
+  // Expected cards for archetype endpoint
+  http.get(`${API_BASE}/archetypes/:name/expected-cards`, () => {
+    return successResponse({
+      archetype: 'Mono Red Aggro',
+      format: 'Standard',
+      expectedCards: [
+        {
+          id: 1,
+          archetypeName: 'Mono Red Aggro',
+          format: 'Standard',
+          cardId: 12345,
+          cardName: 'Lightning Bolt',
+          inclusionRate: 0.99,
+          avgCopies: 4.0,
+          isSignature: true,
+          category: 'removal',
+          createdAt: '2025-01-01T00:00:00Z',
+        },
+        {
+          id: 2,
+          archetypeName: 'Mono Red Aggro',
+          format: 'Standard',
+          cardId: 12346,
+          cardName: 'Monastery Swiftspear',
+          inclusionRate: 0.95,
+          avgCopies: 4.0,
+          isSignature: true,
+          category: 'threat',
+          createdAt: '2025-01-01T00:00:00Z',
+        },
+      ],
+      total: 2,
+    });
+  }),
 ];
 
 /**

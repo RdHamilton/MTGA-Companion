@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from './LoadingSpinner';
+import OpponentAnalysisPanel from './OpponentAnalysisPanel';
 import './MatchDetailsModal.css';
 
 interface MatchDetailsModalProps {
@@ -13,6 +14,7 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
   const [games, setGames] = useState<models.Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [opponentAnalysisExpanded, setOpponentAnalysisExpanded] = useState(false);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -169,6 +171,13 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
               </div>
             )}
           </div>
+
+          {/* Opponent Analysis */}
+          <OpponentAnalysisPanel
+            matchId={match.ID}
+            isExpanded={opponentAnalysisExpanded}
+            onToggle={() => setOpponentAnalysisExpanded(!opponentAnalysisExpanded)}
+          />
         </div>
 
         <div className="modal-footer">
