@@ -2231,6 +2231,11 @@ func (s *Service) NewSetCardRepo() repository.SetCardRepository {
 	return repository.NewSetCardRepository(s.db.Conn())
 }
 
+// NewOpponentRepo creates a new opponent repository using the service's database connection.
+func (s *Service) NewOpponentRepo() repository.OpponentRepository {
+	return repository.NewOpponentRepository(s.db.Conn())
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()

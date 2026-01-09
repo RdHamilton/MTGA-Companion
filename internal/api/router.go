@@ -7,6 +7,7 @@ import (
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/handlers"
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
+	"github.com/ramonehamilton/MTGA-Companion/internal/archetype"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/analysis"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage"
 )
@@ -337,6 +338,28 @@ func (s *Server) setupRoutes() {
 			// ML suggestion actions
 			r.Put("/ml-suggestions/{suggestionID}/dismiss", mlHandler.DismissMLSuggestion)
 			r.Put("/ml-suggestions/{suggestionID}/apply", mlHandler.ApplyMLSuggestion)
+
+			// Opponent Analysis routes
+			opponentRepo := s.services.Storage.NewOpponentRepo()
+			perfRepo := s.services.Storage.DeckPerformanceRepo()
+			classifier := archetype.NewClassifier(s.services.CardService, deckRepo, perfRepo)
+			opponentAnalyzer := analysis.NewOpponentAnalyzer(playRepo, opponentRepo, matchRepo, s.services.CardService, classifier)
+			opponentHandler := handlers.NewOpponentHandler(opponentAnalyzer, opponentRepo, func() int { return s.services.Storage.CurrentAccountID() })
+
+			// Match opponent analysis
+			r.Get("/matches/{matchID}/opponent-analysis", opponentHandler.GetOpponentAnalysis)
+
+			// Opponent routes
+			r.Route("/opponents", func(r chi.Router) {
+				r.Get("/decks", opponentHandler.ListOpponentDecks)
+			})
+
+			// Analytics routes for matchups
+			r.Get("/analytics/matchups", opponentHandler.GetMatchupStats)
+			r.Get("/analytics/opponent-history", opponentHandler.GetOpponentHistory)
+
+			// Archetype expected cards
+			r.Get("/archetypes/{name}/expected-cards", opponentHandler.GetExpectedCards)
 		}
 	})
 }
