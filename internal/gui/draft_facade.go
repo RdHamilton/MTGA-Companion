@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ramonehamilton/MTGA-Companion/internal/export"
 	"github.com/ramonehamilton/MTGA-Companion/internal/metrics"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/draft/grading"
@@ -1557,4 +1558,92 @@ func parseColors(manaCost string) []string {
 		colors = append(colors, c)
 	}
 	return colors
+}
+
+// ExportDraftTo17LandsRequest contains the request parameters for exporting a draft.
+type ExportDraftTo17LandsRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+// ExportDraftTo17LandsResponse contains the exported draft data.
+type ExportDraftTo17LandsResponse struct {
+	SessionID string                            `json:"session_id"`
+	FileName  string                            `json:"file_name"`
+	Export    *export.SeventeenLandsDraftExport `json:"export"`
+}
+
+// ExportDraftTo17Lands exports a draft session to 17Lands JSON format.
+func (d *DraftFacade) ExportDraftTo17Lands(ctx context.Context, sessionID string) (*ExportDraftTo17LandsResponse, error) {
+	if sessionID == "" {
+		return nil, &AppError{Message: "session_id is required"}
+	}
+
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	repo := d.services.Storage.DraftRepo()
+
+	// Get the draft session
+	session, err := repo.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft session: %v", err)}
+	}
+	if session == nil {
+		return nil, &AppError{Message: "Draft session not found"}
+	}
+
+	// Get all picks for this session
+	picks, err := repo.GetPicksBySession(ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft picks: %v", err)}
+	}
+
+	// Get all packs for this session
+	packs, err := repo.GetPacksBySession(ctx, sessionID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get draft packs: %v", err)}
+	}
+
+	// Build export data
+	exportData := &export.DraftExportData{
+		Session: session,
+		Picks:   picks,
+		Packs:   packs,
+	}
+
+	// Convert to 17Lands format
+	exportResult, err := export.ExportDraftTo17Lands(exportData)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to export draft: %v", err)}
+	}
+
+	// Generate filename
+	fileName := fmt.Sprintf("draft_%s_%s.json",
+		session.SetCode,
+		session.StartTime.Format("2006-01-02_15-04-05"))
+
+	return &ExportDraftTo17LandsResponse{
+		SessionID: sessionID,
+		FileName:  fileName,
+		Export:    exportResult,
+	}, nil
+}
+
+// GetExportableDrafts returns all completed drafts that can be exported.
+func (d *DraftFacade) GetExportableDrafts(ctx context.Context, limit int) ([]*models.DraftSession, error) {
+	if d.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+
+	sessions, err := d.services.Storage.DraftRepo().GetCompletedSessions(ctx, limit)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get completed drafts: %v", err)}
+	}
+
+	return sessions, nil
 }

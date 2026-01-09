@@ -332,6 +332,68 @@ export const handlers = [
     }
     return successResponse([]);
   }),
+
+  // Draft export to 17Lands endpoint
+  http.get(`${API_BASE}/drafts/:sessionID/export/17lands`, ({ params }) => {
+    const sessionID = params.sessionID as string;
+    return successResponse({
+      session_id: sessionID,
+      file_name: `draft_TLA_2024-01-15_14-30-00.json`,
+      export: {
+        draft_id: sessionID,
+        event_type: 'QuickDraft',
+        set_code: 'TLA',
+        draft_time: '2024-01-15T14:30:00Z',
+        picks: [
+          {
+            pack_number: 1,
+            pick_number: 1,
+            pack: [12345, 12346, 12347],
+            pick: 12345,
+            pick_time: '2024-01-15T14:31:00Z',
+          },
+          {
+            pack_number: 1,
+            pick_number: 2,
+            pack: [12346, 12348],
+            pick: 12346,
+            pick_time: '2024-01-15T14:32:00Z',
+          },
+        ],
+        metadata: {
+          exported_at: new Date().toISOString(),
+          exported_from: 'MTGA-Companion',
+          overall_grade: 'B+',
+          overall_score: 78,
+          predicted_win_rate: 0.55,
+        },
+      },
+    });
+  }),
+
+  // Exportable drafts endpoint
+  http.get(`${API_BASE}/drafts/exportable`, () => {
+    return successResponse([
+      {
+        ID: 'test-session-123',
+        SetCode: 'TLA',
+        DraftType: 'QuickDraft',
+        EventName: 'QuickDraft_TLA',
+        Status: 'completed',
+        TotalPicks: 45,
+        StartTime: '2024-01-15T14:30:00Z',
+      },
+      {
+        ID: 'test-session-456',
+        SetCode: 'DSK',
+        DraftType: 'PremierDraft',
+        EventName: 'PremierDraft_DSK',
+        Status: 'completed',
+        TotalPicks: 45,
+        StartTime: '2024-01-14T10:00:00Z',
+      },
+    ]);
+  }),
 ];
 
 /**
