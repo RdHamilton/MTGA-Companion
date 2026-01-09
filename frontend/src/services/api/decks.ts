@@ -475,7 +475,7 @@ export async function suggestNextCards(
 
 /**
  * Archetype profile for deck building.
- * Note: Backend ArchetypeProfileResponse only exposes name, landCount, curveTargets, description.
+ * Matches backend ArchetypeProfileResponse.
  */
 export interface ArchetypeProfile {
   name: string;

@@ -2998,6 +2998,9 @@ type ArchetypeProfileResponse struct {
 
 // GenerateCompleteDeck generates a complete 60-card deck from a seed card and archetype.
 func (d *DeckFacade) GenerateCompleteDeck(ctx context.Context, req *GenerateCompleteDeckRequest) (*GenerateCompleteDeckResponse, error) {
+	if req == nil {
+		return nil, &AppError{Message: "Request is required"}
+	}
 	if d.services.Storage == nil {
 		return nil, &AppError{Message: "Database not initialized"}
 	}

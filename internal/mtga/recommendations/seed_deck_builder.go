@@ -1757,14 +1757,19 @@ func (s *SeedDeckBuilder) GenerateCompleteDeck(ctx context.Context, req *Generat
 		scoredCards = s.filterToCollection(scoredCards, collection)
 	}
 
-	// Calculate target spell count (60 - lands)
-	targetSpellCount := 60 - profile.LandCount
+	// Calculate target spell count (60 - lands - 4 for seed card)
+	seedCardCopies := 4
+	targetSpellCount := 60 - profile.LandCount - seedCardCopies
 
 	// Select cards with copy quantities to hit the target
 	selectedCards := s.selectCardsForCompleteDeck(scoredCards, profile, targetSpellCount)
 
 	// Convert to CardWithQuantity and add ownership
 	spells := s.buildSpellsWithQuantity(selectedCards, collection)
+
+	// Add the seed card at the beginning of spells (the deck is "built around" it)
+	seedSpell := s.buildSeedCardAsSpell(seedAnalysis, collection, seedCardCopies)
+	spells = append([]*CardWithQuantity{seedSpell}, spells...)
 
 	// Generate mana base
 	lands := s.generateManaBase(seedAnalysis, spells, profile)
@@ -1919,6 +1924,7 @@ func (s *SeedDeckBuilder) scoreArchetypeCurveFit(card *cards.Card, profile *Arch
 }
 
 // scoreTypeForArchetype scores how well a card's type fits the archetype.
+// Returns a value in the range [0, 1].
 func (s *SeedDeckBuilder) scoreTypeForArchetype(card *cards.Card, profile *ArchetypeProfile) float64 {
 	isCreature := containsTypeInTypeLine(card.TypeLine, "Creature")
 
@@ -1931,7 +1937,11 @@ func (s *SeedDeckBuilder) scoreTypeForArchetype(card *cards.Card, profile *Arche
 	// Archetypes want different creature ratios
 	if isCreature {
 		// Aggro wants lots of creatures, control wants few
-		return profile.CreatureRatio + 0.2 // Bonus for creatures in creature-heavy archetypes
+		score := profile.CreatureRatio + 0.2 // Bonus for creatures in creature-heavy archetypes
+		if score > 1.0 {
+			score = 1.0
+		}
+		return score
 	}
 
 	// Removal is valuable to all archetypes
@@ -1948,7 +1958,11 @@ func (s *SeedDeckBuilder) scoreTypeForArchetype(card *cards.Card, profile *Arche
 	}
 
 	// Non-creature, non-removal spells
-	return 1.0 - profile.CreatureRatio
+	score := 1.0 - profile.CreatureRatio
+	if score < 0 {
+		score = 0
+	}
+	return score
 }
 
 // isRemovalSpell checks if a card is a removal spell.
@@ -2173,20 +2187,124 @@ func (s *SeedDeckBuilder) buildSpellsWithQuantity(selected []*cardWithCopies, co
 	return result
 }
 
-// generateManaBase generates a mana base for the deck (basic lands for now).
-func (s *SeedDeckBuilder) generateManaBase(seedAnalysis *SeedCardAnalysis, spells []*CardWithQuantity, profile *ArchetypeProfile) []*LandWithQuantity {
-	// Count color pips across all spells
-	colorPips := make(map[string]int)
-
-	// Add seed colors with weight
-	for _, c := range seedAnalysis.Colors {
-		colorPips[c] += 8 // Weight seed card heavily
+// buildSeedCardAsSpell converts the seed card to a CardWithQuantity for the spells list.
+func (s *SeedDeckBuilder) buildSeedCardAsSpell(seedAnalysis *SeedCardAnalysis, collection map[int]int, copies int) *CardWithQuantity {
+	card := seedAnalysis.Card
+	owned := collection[card.ArenaID]
+	needed := copies - owned
+	if needed < 0 {
+		needed = 0
 	}
 
-	// Count pips from spells
+	manaCost := ""
+	if card.ManaCost != nil {
+		manaCost = *card.ManaCost
+	}
+
+	imageURI := ""
+	if card.ImageURI != nil {
+		imageURI = *card.ImageURI
+	}
+
+	return &CardWithQuantity{
+		CardID:       card.ArenaID,
+		Name:         card.Name,
+		ManaCost:     manaCost,
+		CMC:          int(card.CMC),
+		Colors:       card.Colors,
+		TypeLine:     card.TypeLine,
+		Rarity:       card.Rarity,
+		ImageURI:     imageURI,
+		Score:        1.0, // Seed card always has top score
+		Reasoning:    "Build-around card - the deck is designed around this card",
+		Quantity:     copies,
+		InCollection: owned >= copies,
+		OwnedCount:   owned,
+		NeededCount:  needed,
+	}
+}
+
+// countManaPips parses a mana cost string and returns a map of color to pip count.
+// For example, "{2}{W}{W}{U}" returns {"W": 2, "U": 1}.
+// Generic mana ({1}, {2}, etc.) and colorless ({C}) are ignored.
+func countManaPips(manaCost string) map[string]int {
+	pips := make(map[string]int)
+	if manaCost == "" {
+		return pips
+	}
+
+	// Parse mana symbols like {W}, {U}, {B}, {R}, {G}
+	// Also handle hybrid mana like {W/U} - count both colors
+	i := 0
+	for i < len(manaCost) {
+		if manaCost[i] == '{' {
+			// Find the closing brace
+			end := i + 1
+			for end < len(manaCost) && manaCost[end] != '}' {
+				end++
+			}
+			if end < len(manaCost) {
+				symbol := manaCost[i+1 : end]
+				// Check for colored mana symbols
+				switch symbol {
+				case "W", "U", "B", "R", "G":
+					pips[symbol]++
+				default:
+					// Check for hybrid mana (e.g., "W/U", "2/W")
+					if len(symbol) >= 3 && symbol[1] == '/' {
+						// First part
+						first := string(symbol[0])
+						if first == "W" || first == "U" || first == "B" || first == "R" || first == "G" {
+							pips[first]++
+						}
+						// Second part
+						if len(symbol) >= 3 {
+							second := string(symbol[2])
+							if second == "W" || second == "U" || second == "B" || second == "R" || second == "G" {
+								pips[second]++
+							}
+						}
+					}
+					// Phyrexian mana like {W/P} - count the color
+					if len(symbol) >= 3 && symbol[2] == 'P' {
+						first := string(symbol[0])
+						if first == "W" || first == "U" || first == "B" || first == "R" || first == "G" {
+							pips[first]++
+						}
+					}
+				}
+				i = end + 1
+			} else {
+				i++
+			}
+		} else {
+			i++
+		}
+	}
+
+	return pips
+}
+
+// generateManaBase generates a mana base for the deck (basic lands for now).
+func (s *SeedDeckBuilder) generateManaBase(seedAnalysis *SeedCardAnalysis, spells []*CardWithQuantity, profile *ArchetypeProfile) []*LandWithQuantity {
+	// Count color pips across all spells by parsing mana costs
+	colorPips := make(map[string]int)
+
+	// Add seed card's pips with weight (count actual pips, not just colors)
+	if seedAnalysis.Card != nil && seedAnalysis.Card.ManaCost != nil {
+		seedPips := countManaPips(*seedAnalysis.Card.ManaCost)
+		for color, count := range seedPips {
+			colorPips[color] += count * 4 * 2 // 4 copies, weighted 2x for seed
+		}
+	}
+
+	// Count pips from spells by parsing their mana costs
 	for _, spell := range spells {
-		for _, c := range spell.Colors {
-			colorPips[c] += spell.Quantity
+		if spell.ManaCost != "" {
+			spellPips := countManaPips(spell.ManaCost)
+			for color, count := range spellPips {
+				colorPips[color] += count * spell.Quantity
+			}
 		}
 	}
 
@@ -2194,6 +2312,20 @@ func (s *SeedDeckBuilder) generateManaBase(seedAnalysis *SeedCardAnalysis, spell
 	totalPips := 0
 	for _, count := range colorPips {
 		totalPips += count
+	}
+
+	// If no mana costs available, fall back to counting Colors
+	// This handles cases where ManaCost isn't populated
+	if totalPips == 0 {
+		for _, spell := range spells {
+			for _, color := range spell.Colors {
+				colorPips[color] += spell.Quantity
+			}
+		}
+		// Recalculate total
+		for _, count := range colorPips {
+			totalPips += count
+		}
 	}
 
 	lands := make([]*LandWithQuantity, 0)
@@ -2372,7 +2504,11 @@ func (s *SeedDeckBuilder) buildGeneratedDeckAnalysis(
 			analysis.InCollectionCount += spell.OwnedCount
 			missing := spell.Quantity - spell.OwnedCount
 			analysis.MissingCount += missing
-			analysis.MissingWildcardCost[strings.ToLower(spell.Rarity)] += missing
+			rarity := strings.ToLower(spell.Rarity)
+			if rarity == "" {
+				rarity = "unknown"
+			}
+			analysis.MissingWildcardCost[rarity] += missing
 		}
 	}
 
