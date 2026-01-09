@@ -398,27 +398,28 @@ export const handlers = [
   }),
 
   // Get archetype profiles endpoint (Issue #774)
+  // Note: API returns an array, frontend transforms to Record<string, ArchetypeProfile>
   http.get(`${API_BASE}/decks/archetypes`, () => {
-    return successResponse({
-      aggro: {
+    return successResponse([
+      {
         name: 'Aggro',
         landCount: 20,
         curveTargets: { 1: 8, 2: 14, 3: 10, 4: 4, 5: 4, 6: 0 },
         description: 'Fast, aggressive deck that aims to win quickly with cheap threats.',
       },
-      midrange: {
+      {
         name: 'Midrange',
         landCount: 24,
         curveTargets: { 1: 4, 2: 8, 3: 10, 4: 8, 5: 4, 6: 2 },
         description: 'Balanced deck with efficient threats and answers.',
       },
-      control: {
+      {
         name: 'Control',
         landCount: 26,
         curveTargets: { 1: 2, 2: 6, 3: 8, 4: 8, 5: 6, 6: 4 },
         description: 'Slow, controlling deck that grinds out opponents with removal.',
       },
-    });
+    ]);
   }),
 
   // Card search endpoint

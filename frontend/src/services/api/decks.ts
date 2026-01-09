@@ -497,18 +497,6 @@ export interface GenerateCompleteDeckRequest {
   set_restriction?: string;
   allowed_sets?: string[];
 }
-
-/**
- * Score breakdown for card scoring.
- */
-export interface ScoreBreakdown {
-  colorFit: number;
-  curveFit: number;
-  synergy: number;
-  quality: number;
-  overall: number;
-}
-
 /**
  * Card with quantity for generated deck.
  */
