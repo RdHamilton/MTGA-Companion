@@ -37,6 +37,25 @@ const defaultProps = {
   onMetaWeightChange: vi.fn(),
   personalWeight: 0.2,
   onPersonalWeightChange: vi.fn(),
+  // ML Suggestion Preferences
+  suggestionFrequency: 'medium',
+  onSuggestionFrequencyChange: vi.fn(),
+  minimumConfidence: 50,
+  onMinimumConfidenceChange: vi.fn(),
+  showCardAdditions: true,
+  onShowCardAdditionsChange: vi.fn(),
+  showCardRemovals: true,
+  onShowCardRemovalsChange: vi.fn(),
+  showArchetypeChanges: true,
+  onShowArchetypeChangesChange: vi.fn(),
+  learnFromMatches: true,
+  onLearnFromMatchesChange: vi.fn(),
+  learnFromDeckChanges: true,
+  onLearnFromDeckChangesChange: vi.fn(),
+  retentionDays: 90,
+  onRetentionDaysChange: vi.fn(),
+  maxSuggestionsPerView: 5,
+  onMaxSuggestionsPerViewChange: vi.fn(),
 };
 
 describe('MLSettingsSection', () => {
@@ -355,6 +374,117 @@ describe('MLSettingsSection', () => {
       render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
       expect(screen.getByText(/about ml recommendations/i)).toBeInTheDocument();
       expect(screen.getByText(/all processing is done locally/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('suggestion preferences', () => {
+    it('shows suggestion preferences section when ML is enabled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      expect(screen.getByText('Suggestion Preferences')).toBeInTheDocument();
+      expect(screen.getByText('Suggestion Frequency')).toBeInTheDocument();
+      expect(screen.getByText('Minimum Confidence')).toBeInTheDocument();
+      expect(screen.getByText('Max Suggestions Per View')).toBeInTheDocument();
+    });
+
+    it('displays current minimum confidence value', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} minimumConfidence={75} />);
+      expect(screen.getByText('75%')).toBeInTheDocument();
+    });
+
+    it('calls onSuggestionFrequencyChange when frequency is changed', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} suggestionFrequency="medium" />);
+      const selects = screen.getAllByRole('combobox');
+      // Find the frequency select by its current value
+      const frequencySelect = selects.find((s) => (s as HTMLSelectElement).value === 'medium');
+      expect(frequencySelect).toBeDefined();
+      if (frequencySelect) {
+        fireEvent.change(frequencySelect, { target: { value: 'high' } });
+        expect(defaultProps.onSuggestionFrequencyChange).toHaveBeenCalledWith('high');
+      }
+    });
+
+    it('calls onMinimumConfidenceChange when slider is adjusted', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const sliders = screen.getAllByRole('slider');
+      const confidenceSlider = sliders.find((s) => s.getAttribute('max') === '100');
+      expect(confidenceSlider).toBeDefined();
+      if (confidenceSlider) {
+        fireEvent.change(confidenceSlider, { target: { value: '70' } });
+        expect(defaultProps.onMinimumConfidenceChange).toHaveBeenCalledWith(70);
+      }
+    });
+  });
+
+  describe('suggestion types', () => {
+    it('shows suggestion types section when ML is enabled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      expect(screen.getByText('Suggestion Types')).toBeInTheDocument();
+      expect(screen.getByText('Card Additions')).toBeInTheDocument();
+      expect(screen.getByText('Card Removals')).toBeInTheDocument();
+      expect(screen.getByText('Archetype Changes')).toBeInTheDocument();
+    });
+
+    it('calls onShowCardAdditionsChange when toggled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const checkbox = screen.getByRole('checkbox', { name: /card additions/i });
+      fireEvent.click(checkbox);
+      expect(defaultProps.onShowCardAdditionsChange).toHaveBeenCalledWith(false);
+    });
+
+    it('calls onShowCardRemovalsChange when toggled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const checkbox = screen.getByRole('checkbox', { name: /card removals/i });
+      fireEvent.click(checkbox);
+      expect(defaultProps.onShowCardRemovalsChange).toHaveBeenCalledWith(false);
+    });
+
+    it('calls onShowArchetypeChangesChange when toggled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const checkbox = screen.getByRole('checkbox', { name: /archetype changes/i });
+      fireEvent.click(checkbox);
+      expect(defaultProps.onShowArchetypeChangesChange).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('learning options', () => {
+    it('shows learning options section when ML is enabled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      expect(screen.getByText('Learning Options')).toBeInTheDocument();
+      expect(screen.getByText('Learn from Match Results')).toBeInTheDocument();
+      expect(screen.getByText('Learn from Deck Changes')).toBeInTheDocument();
+      expect(screen.getByText('Data Retention')).toBeInTheDocument();
+      expect(screen.getByText('Clear Learned Data')).toBeInTheDocument();
+    });
+
+    it('calls onLearnFromMatchesChange when toggled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const checkbox = screen.getByRole('checkbox', { name: /learn from match results/i });
+      fireEvent.click(checkbox);
+      expect(defaultProps.onLearnFromMatchesChange).toHaveBeenCalledWith(false);
+    });
+
+    it('calls onLearnFromDeckChangesChange when toggled', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      const checkbox = screen.getByRole('checkbox', { name: /learn from deck changes/i });
+      fireEvent.click(checkbox);
+      expect(defaultProps.onLearnFromDeckChangesChange).toHaveBeenCalledWith(false);
+    });
+
+    it('calls onRetentionDaysChange when selection is changed', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} retentionDays={90} />);
+      const selects = screen.getAllByRole('combobox');
+      // Find the retention select by its current value (90 days)
+      const retentionSelect = selects.find((s) => (s as HTMLSelectElement).value === '90');
+      expect(retentionSelect).toBeDefined();
+      if (retentionSelect) {
+        fireEvent.change(retentionSelect, { target: { value: '180' } });
+        expect(defaultProps.onRetentionDaysChange).toHaveBeenCalledWith(180);
+      }
+    });
+
+    it('shows Clear All Data button', () => {
+      render(<MLSettingsSection {...defaultProps} mlEnabled={true} />);
+      expect(screen.getByRole('button', { name: /clear all data/i })).toBeInTheDocument();
     });
   });
 });
