@@ -96,9 +96,11 @@ func ExportDraftTo17Lands(data *DraftExportData) (*SeventeenLandsDraftExport, er
 		// Convert string card IDs to ints
 		cardIDs := make([]int, 0, len(pack.CardIDs))
 		for _, cardID := range pack.CardIDs {
-			if id, err := strconv.Atoi(cardID); err == nil {
-				cardIDs = append(cardIDs, id)
+			id, err := strconv.Atoi(cardID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid card ID '%s' in pack %d pick %d: %w", cardID, pack.PackNumber+1, pack.PickNumber+1, err)
 			}
+			cardIDs = append(cardIDs, id)
 		}
 		packMap[key] = cardIDs
 	}

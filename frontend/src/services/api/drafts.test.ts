@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import {
   exportDraftTo17Lands,
   getExportableDrafts,
+} from './drafts';
+import type {
   ExportDraftTo17LandsResponse,
   SeventeenLandsDraftExport,
 } from './drafts';
