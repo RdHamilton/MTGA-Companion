@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -82,28 +83,40 @@ func (e *MLEngine) ProcessMatchHistory(ctx context.Context, format string, lookb
 
 	// Process each match to extract card combinations
 	for _, match := range matches {
+		// Permanent condition: no deck ID - mark as processed to avoid re-checking
 		if match.DeckID == nil || *match.DeckID == "" {
-			// Still mark as processed to avoid re-checking
 			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Get deck
+		// Get deck - distinguish between "not found" (permanent) and DB error (transient)
 		deck, err := e.deckRepo.GetByID(ctx, *match.DeckID)
-		if err != nil || deck == nil {
+		if err != nil {
+			// Transient error (database issue) - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error getting deck %s for match %s: %v", *match.DeckID, match.ID, err)
+			continue
+		}
+		if deck == nil {
+			// Permanent condition: deck not found - mark as processed
 			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Skip if format doesn't match (if specified)
+		// Permanent condition: format doesn't match - mark as processed
 		if format != "" && deck.Format != format {
 			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
 
-		// Get deck cards
+		// Get deck cards - distinguish between error types
 		cardIDs, err := e.getDeckCardIDs(ctx, deck.ID)
-		if err != nil || len(cardIDs) < 2 {
+		if err != nil {
+			// Transient error - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error getting cards for deck %s, match %s: %v", deck.ID, match.ID, err)
+			continue
+		}
+		// Permanent condition: insufficient cards - mark as processed
+		if len(cardIDs) < 2 {
 			processedIDs = append(processedIDs, match.ID)
 			continue
 		}
@@ -112,18 +125,19 @@ func (e *MLEngine) ProcessMatchHistory(ctx context.Context, format string, lookb
 		isWin := match.Result == "win"
 
 		// Record individual card appearances (#852)
+		// Transient error - don't mark as processed, allow retry
 		if err := e.recordIndividualCards(ctx, cardIDs, deck.Format, isWin); err != nil {
-			// Log but continue processing
-			processedIDs = append(processedIDs, match.ID)
+			log.Printf("[MLEngine] Transient error recording individual cards for match %s: %v", match.ID, err)
 			continue
 		}
 
+		// Transient error - don't mark as processed, allow retry
 		if err := e.recordCombinations(ctx, cardIDs, deck.Format, isWin); err != nil {
-			// Log but continue processing
-			processedIDs = append(processedIDs, match.ID)
+			log.Printf("[MLEngine] Transient error recording combinations for match %s: %v", match.ID, err)
 			continue
 		}
 
+		// Successfully processed - mark as processed
 		processedIDs = append(processedIDs, match.ID)
 	}
 

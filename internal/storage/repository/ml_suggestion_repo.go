@@ -74,37 +74,37 @@ func (r *MLSuggestionRepository) UpdateSeparateStatsFromIndividual(ctx context.C
 	query := `
 		UPDATE card_combination_stats
 		SET
-			games_card1_only = COALESCE(
+			games_card1_only = MAX(0, COALESCE(
 				(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
 				0
-			) - games_together,
-			games_card2_only = COALESCE(
+			) - games_together),
+			games_card2_only = MAX(0, COALESCE(
 				(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
 				0
-			) - games_together,
+			) - games_together),
 			wins_card1_only = CASE
 				WHEN COALESCE(
 					(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
 					0
 				) - games_together <= 0 THEN 0
-				ELSE CAST(
+				ELSE MAX(0, CAST(
 					(COALESCE(
 						(SELECT i1.wins FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
 						0
 					) - wins_together) AS INTEGER
-				)
+				))
 			END,
 			wins_card2_only = CASE
 				WHEN COALESCE(
 					(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
 					0
 				) - games_together <= 0 THEN 0
-				ELSE CAST(
+				ELSE MAX(0, CAST(
 					(COALESCE(
 						(SELECT i2.wins FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
 						0
 					) - wins_together) AS INTEGER
-				)
+				))
 			END,
 			updated_at = ?
 		WHERE format = ?
