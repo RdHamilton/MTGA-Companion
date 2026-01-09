@@ -308,3 +308,63 @@ export async function recalculateSetGrades(setCode: string): Promise<Recalculate
     set_code: setCode,
   });
 }
+
+/**
+ * 17Lands pick data structure.
+ */
+export interface SeventeenLandsPickData {
+  pack_number: number;
+  pick_number: number;
+  pack: number[];
+  pick: number;
+  pick_time: string;
+}
+
+/**
+ * 17Lands metadata structure.
+ */
+export interface SeventeenLandsMetadata {
+  exported_at: string;
+  exported_from: string;
+  overall_grade?: string;
+  overall_score?: number;
+  predicted_win_rate?: number;
+}
+
+/**
+ * 17Lands draft export structure.
+ */
+export interface SeventeenLandsDraftExport {
+  draft_id: string;
+  event_type: string;
+  set_code: string;
+  draft_time: string;
+  picks: SeventeenLandsPickData[];
+  final_deck?: number[];
+  sideboard?: number[];
+  metadata?: SeventeenLandsMetadata;
+}
+
+/**
+ * Response from exporting a draft to 17Lands format.
+ */
+export interface ExportDraftTo17LandsResponse {
+  session_id: string;
+  file_name: string;
+  export: SeventeenLandsDraftExport;
+}
+
+/**
+ * Export a draft session to 17Lands JSON format.
+ */
+export async function exportDraftTo17Lands(sessionId: string): Promise<ExportDraftTo17LandsResponse> {
+  return get<ExportDraftTo17LandsResponse>(`/drafts/${sessionId}/export/17lands`);
+}
+
+/**
+ * Get draft sessions that can be exported.
+ */
+export async function getExportableDrafts(limit?: number): Promise<DraftSession[]> {
+  const params = limit ? `?limit=${limit}` : '';
+  return get<DraftSession[]>(`/drafts/exportable${params}`);
+}

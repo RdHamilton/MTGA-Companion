@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { drafts, cards } from '@/services/api';
 import { models, pickquality, grading, gui } from '@/types/models';
@@ -101,6 +101,7 @@ const Draft: React.FC = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [pickAlternatives, setPickAlternatives] = useState<Map<string, pickquality.PickQuality>>(new Map());
     const [showCurrentPack, setShowCurrentPack] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
 
     const { startDownload, updateProgress, completeDownload, failDownload } = useDownload();
 
@@ -441,6 +442,34 @@ const Draft: React.FC = () => {
         return null;
     };
 
+    const handleExportDraft = useCallback(async (sessionId: string) => {
+        if (isExporting) return;
+
+        try {
+            setIsExporting(true);
+            const response = await drafts.exportDraftTo17Lands(sessionId);
+
+            // Create a blob from the export data and trigger download
+            const jsonString = JSON.stringify(response.export, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = response.file_name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            console.log(`[Draft] Exported draft to ${response.file_name}`);
+        } catch (error) {
+            console.error('Failed to export draft:', error);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [isExporting]);
+
     // ========================================
     // HOOKS MUST BE CALLED UNCONDITIONALLY
     // Call all hooks at the top before any conditional returns
@@ -508,13 +537,23 @@ const Draft: React.FC = () => {
                             </div>
                         </div>
                         {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
-                            <button
-                                className="btn-build-deck"
-                                onClick={() => navigate(`/deck-builder/draft/${historicalDetailState.session!.ID}`)}
-                                title="Build and edit your deck from draft picks"
-                            >
-                                🃏 Build Deck
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    className="btn-build-deck"
+                                    onClick={() => navigate(`/deck-builder/draft/${historicalDetailState.session!.ID}`)}
+                                    title="Build and edit your deck from draft picks"
+                                >
+                                    🃏 Build Deck
+                                </button>
+                                <button
+                                    className="btn-export-draft"
+                                    onClick={() => handleExportDraft(historicalDetailState.session!.ID)}
+                                    disabled={isExporting}
+                                    title="Export draft to 17Lands JSON format"
+                                >
+                                    {isExporting ? '⏳ Exporting...' : '📤 Export to 17Lands'}
+                                </button>
+                            </div>
                         )}
                     </div>
                     {historicalDetailState.picks.length > 0 && historicalDetailState.session && (
@@ -792,6 +831,14 @@ const Draft: React.FC = () => {
                                                 title="Build and edit your deck from draft picks"
                                             >
                                                 🃏 Build Deck
+                                            </button>
+                                            <button
+                                                className="btn-export-draft"
+                                                onClick={() => handleExportDraft(session.ID)}
+                                                disabled={isExporting}
+                                                title="Export draft to 17Lands JSON format"
+                                            >
+                                                📤
                                             </button>
                                         </div>
                                     </div>
