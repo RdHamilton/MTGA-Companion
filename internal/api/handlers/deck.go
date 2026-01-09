@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -917,6 +918,20 @@ func (h *DeckHandler) GetCardPerformance(w http.ResponseWriter, r *http.Request)
 
 	result, err := h.facade.GetCardPerformance(r.Context(), req)
 	if err != nil {
+		errMsg := err.Error()
+		// Handle specific error cases with appropriate status codes
+		if strings.Contains(errMsg, "not found") {
+			response.NotFound(w, err)
+			return
+		}
+		if strings.Contains(errMsg, "not enough data") {
+			// Return empty result for insufficient data (not an error)
+			response.Success(w, &gui.DeckPerformanceAnalysisResponse{
+				DeckID:          deckID,
+				CardPerformance: []*gui.CardPerformanceResponse{},
+			})
+			return
+		}
 		response.InternalError(w, err)
 		return
 	}

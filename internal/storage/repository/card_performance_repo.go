@@ -104,8 +104,8 @@ func (r *cardPerformanceRepository) GetCardPerformance(ctx context.Context, filt
 			COALESCE(cp.card_name, cd.card_name) as card_name,
 			COUNT(DISTINCT cd.game_id) as games_drawn,
 			COUNT(DISTINCT cp.game_id) as games_played,
-			SUM(CASE WHEN cd.match_result = 'win' THEN 1 ELSE 0 END) as wins_when_drawn,
-			SUM(CASE WHEN cp.match_result = 'win' THEN 1 ELSE 0 END) as wins_when_played,
+			COUNT(DISTINCT CASE WHEN cd.match_result = 'win' THEN cd.game_id END) as wins_when_drawn,
+			COUNT(DISTINCT CASE WHEN cp.match_result = 'win' THEN cp.game_id END) as wins_when_played,
 			AVG(CASE WHEN cp.turn_number IS NOT NULL THEN cp.turn_number END) as avg_turn_played,
 			COUNT(DISTINCT cm.game_id) as mulliganed_games
 		FROM card_draws cd
