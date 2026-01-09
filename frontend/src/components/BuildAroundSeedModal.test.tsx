@@ -2132,8 +2132,8 @@ describe('BuildAroundSeedModal', () => {
   });
 
   describe('Complete Deck Generation (Issue #774)', () => {
-    const mockArchetypeProfiles = [
-      {
+    const mockArchetypeProfiles: Record<string, decks.ArchetypeProfile> = {
+      aggro: {
         name: 'Aggro',
         landCount: 20,
         curveTargets: { 1: 8, 2: 14, 3: 10, 4: 4, 5: 4, 6: 0 },
@@ -2142,7 +2142,7 @@ describe('BuildAroundSeedModal', () => {
         cardAdvantage: 2,
         description: 'Fast, aggressive deck that aims to win quickly with cheap threats.',
       },
-      {
+      midrange: {
         name: 'Midrange',
         landCount: 24,
         curveTargets: { 1: 4, 2: 8, 3: 10, 4: 8, 5: 4, 6: 2 },
@@ -2151,7 +2151,7 @@ describe('BuildAroundSeedModal', () => {
         cardAdvantage: 4,
         description: 'Balanced deck with efficient threats and answers.',
       },
-      {
+      control: {
         name: 'Control',
         landCount: 26,
         curveTargets: { 1: 2, 2: 6, 3: 8, 4: 8, 5: 6, 6: 4 },
@@ -2160,7 +2160,7 @@ describe('BuildAroundSeedModal', () => {
         cardAdvantage: 8,
         description: 'Slow, controlling deck that grinds out opponents.',
       },
-    ];
+    };
 
     const mockGeneratedDeck = {
       seedCard: {
@@ -2219,6 +2219,7 @@ describe('BuildAroundSeedModal', () => {
           quantity: 20,
           colors: ['R'],
           isBasic: true,
+          entersTapped: false,
         },
       ],
       strategy: {

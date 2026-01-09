@@ -510,15 +510,6 @@ export interface ScoreBreakdown {
 }
 
 /**
- * Synergy detail explaining card synergy.
- */
-export interface SynergyDetail {
-  type: string;
-  name: string;
-  description: string;
-}
-
-/**
  * Card with quantity for generated deck.
  */
 export interface CardWithQuantity {
@@ -605,7 +596,13 @@ export async function generateCompleteDeck(
 
 /**
  * Get available archetype profiles.
+ * Returns a record keyed by archetype name (lowercase).
  */
-export async function getArchetypeProfiles(): Promise<ArchetypeProfile[]> {
-  return get<ArchetypeProfile[]>('/decks/archetypes');
+export async function getArchetypeProfiles(): Promise<Record<string, ArchetypeProfile>> {
+  const profiles = await get<ArchetypeProfile[]>('/decks/archetypes');
+  const record: Record<string, ArchetypeProfile> = {};
+  for (const profile of profiles) {
+    record[profile.name.toLowerCase()] = profile;
+  }
+  return record;
 }
