@@ -68,46 +68,31 @@ func (r *MLSuggestionRepository) GetIndividualCardStats(ctx context.Context, car
 func (r *MLSuggestionRepository) UpdateSeparateStatsFromIndividual(ctx context.Context, format string) error {
 	// For each card pair, calculate separate stats:
 	// games_card1_only = individual_games_card1 - games_together
-	// wins_card1_only = individual_wins_card1 - wins_together (proportionally)
-	// Note: This is an approximation since we track total individual stats, not per-pair
+	// wins_card1_only = individual_wins_card1 - wins_together
+	// Note: This is an approximation since we track total individual stats, not per-pair.
+	// The "separate" wins are calculated by subtracting wins_together from individual wins,
+	// which assumes wins are distributed evenly (not truly proportional).
 
+	// Use UPDATE...FROM with JOINs for better performance (SQLite 3.33+)
+	// This avoids 6 correlated subqueries per row
 	query := `
 		UPDATE card_combination_stats
 		SET
-			games_card1_only = MAX(0, COALESCE(
-				(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
-				0
-			) - games_together),
-			games_card2_only = MAX(0, COALESCE(
-				(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
-				0
-			) - games_together),
+			games_card1_only = MAX(0, COALESCE(i1.total_games, 0) - card_combination_stats.games_together),
+			games_card2_only = MAX(0, COALESCE(i2.total_games, 0) - card_combination_stats.games_together),
 			wins_card1_only = CASE
-				WHEN COALESCE(
-					(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
-					0
-				) - games_together <= 0 THEN 0
-				ELSE MAX(0, CAST(
-					(COALESCE(
-						(SELECT i1.wins FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
-						0
-					) - wins_together) AS INTEGER
-				))
+				WHEN COALESCE(i1.total_games, 0) - card_combination_stats.games_together <= 0 THEN 0
+				ELSE MAX(0, COALESCE(i1.wins, 0) - card_combination_stats.wins_together)
 			END,
 			wins_card2_only = CASE
-				WHEN COALESCE(
-					(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
-					0
-				) - games_together <= 0 THEN 0
-				ELSE MAX(0, CAST(
-					(COALESCE(
-						(SELECT i2.wins FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
-						0
-					) - wins_together) AS INTEGER
-				))
+				WHEN COALESCE(i2.total_games, 0) - card_combination_stats.games_together <= 0 THEN 0
+				ELSE MAX(0, COALESCE(i2.wins, 0) - card_combination_stats.wins_together)
 			END,
 			updated_at = ?
-		WHERE format = ?
+		FROM card_combination_stats AS ccs
+		LEFT JOIN card_individual_stats i1 ON i1.card_id = ccs.card_id_1 AND i1.format = ccs.format
+		LEFT JOIN card_individual_stats i2 ON i2.card_id = ccs.card_id_2 AND i2.format = ccs.format
+		WHERE card_combination_stats.id = ccs.id AND card_combination_stats.format = ?
 	`
 
 	_, err := r.db.ExecContext(ctx, query, time.Now(), format)
