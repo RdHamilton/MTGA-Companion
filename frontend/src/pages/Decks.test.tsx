@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Decks from './Decks';
 import { mockDecks } from '@/test/mocks/apiMock';
@@ -782,6 +782,353 @@ describe('Decks', () => {
       expect(options).toContain('timeless');
       expect(options).toContain('brawl');
       expect(options).toContain('limited');
+    });
+  });
+
+  describe('Export Deck Dialog', () => {
+    it('should open export dialog when clicking export button', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      expect(screen.getByRole('heading', { name: 'Export Deck' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Export Format')).toBeInTheDocument();
+      expect(screen.getByText('Mono Red Aggro', { selector: 'strong' })).toBeInTheDocument();
+    });
+
+    it('should close export dialog when clicking cancel', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      expect(screen.getByText('Export Deck')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Export Deck')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should close export dialog when clicking overlay', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      expect(screen.getByText('Export Deck')).toBeInTheDocument();
+
+      const overlay = document.querySelector('.modal-overlay');
+      fireEvent.click(overlay!);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Export Deck')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should have all export format options available', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      const formatSelect = screen.getByLabelText('Export Format') as HTMLSelectElement;
+      const options = Array.from(formatSelect.options).map((opt) => opt.value);
+
+      expect(options).toContain('arena');
+      expect(options).toContain('moxfield');
+      expect(options).toContain('archidekt');
+      expect(options).toContain('mtgo');
+      expect(options).toContain('mtggoldfish');
+      expect(options).toContain('plaintext');
+    });
+
+    it('should show format hint when format is selected', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      // Default is arena
+      expect(screen.getByText('Standard MTGA import format with set codes')).toBeInTheDocument();
+
+      // Change to moxfield
+      const formatSelect = screen.getByLabelText('Export Format') as HTMLSelectElement;
+      fireEvent.change(formatSelect, { target: { value: 'moxfield' } });
+
+      expect(screen.getByText('Import directly into Moxfield')).toBeInTheDocument();
+    });
+
+    it('should export deck and call API with correct format', async () => {
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.exportDeck.mockResolvedValue({
+        content: 'Deck\n4 Lightning Bolt (STA) 1',
+        filename: 'Mono_Red_Aggro.txt',
+        error: '',
+      });
+
+      // Mock URL methods and link creation/click to prevent actual download
+      const originalCreateObjectURL = URL.createObjectURL;
+      const originalRevokeObjectURL = URL.revokeObjectURL;
+      URL.createObjectURL = vi.fn(() => 'blob:test');
+      URL.revokeObjectURL = vi.fn();
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download File' }));
+
+      await waitFor(() => {
+        expect(mockDecks.exportDeck).toHaveBeenCalledWith('deck-1', { format: 'arena' });
+      });
+
+      // Restore URL mocks
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    });
+
+    it('should copy deck to clipboard', async () => {
+      cleanup();
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.exportDeck.mockResolvedValue({
+        content: 'Deck\n4 Lightning Bolt (STA) 1',
+        filename: 'Mono_Red_Aggro.txt',
+        error: '',
+      });
+
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy to Clipboard' }));
+
+      await waitFor(() => {
+        expect(mockDecks.exportDeck).toHaveBeenCalledWith('deck-1', { format: 'arena' });
+      });
+
+      await waitFor(() => {
+        expect(writeTextMock).toHaveBeenCalledWith('Deck\n4 Lightning Bolt (STA) 1');
+      });
+
+      await waitFor(() => {
+        expect(alertMock).toHaveBeenCalledWith('Deck copied to clipboard!');
+      });
+
+      alertMock.mockRestore();
+    });
+
+    it('should show error alert when export fails', async () => {
+      cleanup();
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.exportDeck.mockResolvedValue({
+        content: '',
+        filename: '',
+        error: 'deck not found',
+      });
+
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download File' }));
+
+      await waitFor(() => {
+        expect(alertMock).toHaveBeenCalledWith('Export failed: deck not found');
+      });
+
+      alertMock.mockRestore();
+    });
+
+    it('should disable buttons while exporting', async () => {
+      cleanup();
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveExport: (value: any) => void;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exportPromise = new Promise<any>((resolve) => {
+        resolveExport = resolve;
+      });
+      mockDecks.exportDeck.mockReturnValue(exportPromise);
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download File' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Exporting...' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Copying...' })).toBeDisabled();
+      });
+
+      resolveExport!({
+        content: 'test',
+        filename: 'test.txt',
+        error: '',
+      });
+    });
+
+    it('should export with moxfield format when selected', async () => {
+      cleanup();
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.exportDeck.mockResolvedValue({
+        content: 'Deck\n4 Lightning Bolt',
+        filename: 'Mono_Red_Aggro_moxfield.txt',
+        error: '',
+      });
+
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      // Change format to moxfield
+      const formatSelect = screen.getByLabelText('Export Format') as HTMLSelectElement;
+      fireEvent.change(formatSelect, { target: { value: 'moxfield' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy to Clipboard' }));
+
+      await waitFor(() => {
+        expect(mockDecks.exportDeck).toHaveBeenCalledWith('deck-1', { format: 'moxfield' });
+      });
+
+      alertMock.mockRestore();
+    });
+
+    it('should export with archidekt format when selected', async () => {
+      cleanup();
+      mockDecks.getDecks.mockResolvedValue(createMockDeckList());
+      mockDecks.exportDeck.mockResolvedValue({
+        content: '4 Lightning Bolt',
+        filename: 'Mono_Red_Aggro_archidekt.txt',
+        error: '',
+      });
+
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      renderWithRouter(<Decks />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+      });
+
+      const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+      fireEvent.click(exportButtons[0]);
+
+      // Change format to archidekt
+      const formatSelect = screen.getByLabelText('Export Format') as HTMLSelectElement;
+      fireEvent.change(formatSelect, { target: { value: 'archidekt' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy to Clipboard' }));
+
+      await waitFor(() => {
+        expect(mockDecks.exportDeck).toHaveBeenCalledWith('deck-1', { format: 'archidekt' });
+      });
+
+      alertMock.mockRestore();
     });
   });
 });

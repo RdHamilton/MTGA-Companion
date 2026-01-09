@@ -332,6 +332,65 @@ export const handlers = [
     }
     return successResponse([]);
   }),
+
+  // Deck export endpoint
+  http.post(`${API_BASE}/decks/:deckId/export`, async ({ request }) => {
+    // Read format from request body (the API sends { format: 'arena' })
+    let format = 'arena';
+    try {
+      const body = (await request.json()) as { format?: string };
+      if (body.format) {
+        format = body.format;
+      }
+    } catch {
+      // Use default format if body parsing fails
+    }
+
+    const formatExtensions: Record<string, string> = {
+      arena: '.txt',
+      moxfield: '_moxfield.txt',
+      archidekt: '_archidekt.txt',
+      mtgo: '.dek',
+      mtggoldfish: '.txt',
+      plaintext: '.txt',
+    };
+
+    return successResponse({
+      content: `Deck\n4 Lightning Bolt (STA) 1\n4 Mountain (M21) 269`,
+      filename: `Test_Deck${formatExtensions[format] || '.txt'}`,
+      error: '',
+    });
+  }),
+
+  // Decks list endpoint
+  http.get(`${API_BASE}/decks`, () => {
+    return successResponse([
+      {
+        id: 'deck-1',
+        name: 'Mono Red Aggro',
+        format: 'Standard',
+        source: 'manual',
+        primaryArchetype: 'Aggro',
+        modifiedAt: '2025-01-01T00:00:00Z',
+        matchesPlayed: 10,
+        matchWinRate: 0.6,
+        currentStreak: 2,
+        averageDuration: 600,
+      },
+      {
+        id: 'deck-2',
+        name: 'UW Control',
+        format: 'Historic',
+        source: 'import',
+        primaryArchetype: 'Control',
+        modifiedAt: '2025-01-02T00:00:00Z',
+        matchesPlayed: 5,
+        matchWinRate: 0.4,
+        currentStreak: -1,
+        averageDuration: 1200,
+      },
+    ]);
+  }),
 ];
 
 /**

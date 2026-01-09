@@ -416,6 +416,102 @@ func TestSanitizeFilename(t *testing.T) {
 	}
 }
 
+func TestExport_MoxfieldFormat(t *testing.T) {
+	mockService := newMockCardService()
+	exporter := NewExporter(mockService)
+	deck, deckCards := createTestDeck()
+
+	options := &ExportOptions{
+		Format:         FormatMoxfield,
+		IncludeHeaders: true,
+	}
+
+	result, err := exporter.Export(deck, deckCards, options)
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	// Check filename
+	if !strings.HasSuffix(result.Filename, "_moxfield.txt") {
+		t.Errorf("Moxfield export should have _moxfield.txt suffix, got %s", result.Filename)
+	}
+
+	content := result.Content
+	// Should have deck info as comments
+	if !strings.Contains(content, "// Name: Test Deck") {
+		t.Error("Content should contain deck name as comment")
+	}
+	// Should have Deck header
+	if !strings.Contains(content, "Deck\n") {
+		t.Error("Content should contain 'Deck' header")
+	}
+	// Should contain cards with set codes (Arena format)
+	if !strings.Contains(content, "4 Lightning Bolt (M21) 123") {
+		t.Error("Content should contain mainboard cards with set info")
+	}
+	// Should have Sideboard header
+	if !strings.Contains(content, "Sideboard\n") {
+		t.Error("Content should contain 'Sideboard' header")
+	}
+	// Should contain sideboard cards
+	if !strings.Contains(content, "2 Duress (M21) 95") {
+		t.Error("Content should contain sideboard cards")
+	}
+}
+
+func TestExport_ArchidektFormat(t *testing.T) {
+	mockService := newMockCardService()
+	exporter := NewExporter(mockService)
+	deck, deckCards := createTestDeck()
+
+	options := &ExportOptions{
+		Format:         FormatArchidekt,
+		IncludeHeaders: true,
+	}
+
+	result, err := exporter.Export(deck, deckCards, options)
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	// Check filename
+	if !strings.HasSuffix(result.Filename, "_archidekt.txt") {
+		t.Errorf("Archidekt export should have _archidekt.txt suffix, got %s", result.Filename)
+	}
+
+	content := result.Content
+	// Should have deck info as comments
+	if !strings.Contains(content, "// Name: Test Deck") {
+		t.Error("Content should contain deck name as comment")
+	}
+	// Should have import URL comment
+	if !strings.Contains(content, "// Import at: https://archidekt.com/decks/new") {
+		t.Error("Content should contain Archidekt import URL")
+	}
+	// Should contain simple card format (no set codes)
+	if !strings.Contains(content, "4 Lightning Bolt") {
+		t.Error("Content should contain mainboard cards")
+	}
+	// Should NOT have set codes in card lines (Archidekt uses simple format)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Lightning Bolt") && !strings.HasPrefix(line, "//") {
+			if strings.Contains(line, "(M21)") {
+				t.Error("Archidekt format should not include set codes in card lines")
+			}
+			break
+		}
+	}
+	// Should have sideboard comment
+	if !strings.Contains(content, "// Sideboard") {
+		t.Error("Content should contain '// Sideboard' header")
+	}
+	// Should contain sideboard cards
+	if !strings.Contains(content, "2 Duress") {
+		t.Error("Content should contain sideboard cards")
+	}
+}
+
 func TestExport_AllFormats(t *testing.T) {
 	mockService := newMockCardService()
 	exporter := NewExporter(mockService)
@@ -426,6 +522,8 @@ func TestExport_AllFormats(t *testing.T) {
 		FormatPlainText,
 		FormatMTGO,
 		FormatMTGGoldfish,
+		FormatMoxfield,
+		FormatArchidekt,
 	}
 
 	for _, format := range formats {

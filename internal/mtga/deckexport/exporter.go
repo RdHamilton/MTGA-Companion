@@ -16,13 +16,17 @@ const (
 	FormatPlainText   ExportFormat = "plaintext"   // Simple text list (4x Card Name)
 	FormatMTGO        ExportFormat = "mtgo"        // MTGO format
 	FormatMTGGoldfish ExportFormat = "mtggoldfish" // MTGGoldfish format
+	FormatMoxfield    ExportFormat = "moxfield"    // Moxfield import format
+	FormatArchidekt   ExportFormat = "archidekt"   // Archidekt import format
 )
 
 // ExportOptions controls deck export behavior.
 type ExportOptions struct {
 	Format         ExportFormat
-	IncludeStats   bool // Include deck statistics in export (as comments)
-	IncludeHeaders bool // Include section headers (Deck, Sideboard, etc.)
+	IncludeStats   bool   // Include deck statistics in export (as comments)
+	IncludeHeaders bool   // Include section headers (Deck, Sideboard, etc.)
+	DeckName       string // Deck name for services that support it
+	DeckFormat     string // Format (Standard, Historic, etc.) for services that support it
 }
 
 // DeckExport represents an exported deck.
@@ -91,6 +95,12 @@ func (e *Exporter) Export(deck *models.Deck, deckCards []*models.DeckCard, optio
 	case FormatMTGGoldfish:
 		content = e.exportMTGGoldfish(deck, deckCards, cardMetadata, options)
 		filename = fmt.Sprintf("%s.txt", sanitizeFilename(deck.Name))
+	case FormatMoxfield:
+		content = e.exportMoxfield(deck, deckCards, cardMetadata, options)
+		filename = fmt.Sprintf("%s_moxfield.txt", sanitizeFilename(deck.Name))
+	case FormatArchidekt:
+		content = e.exportArchidekt(deck, deckCards, cardMetadata, options)
+		filename = fmt.Sprintf("%s_archidekt.txt", sanitizeFilename(deck.Name))
 	default:
 		return nil, fmt.Errorf("unsupported export format: %s", options.Format)
 	}
@@ -279,6 +289,106 @@ func filterCardsByBoard(deckCards []*models.DeckCard, board string) []*models.De
 		}
 	}
 	return filtered
+}
+
+// exportMoxfield exports deck in Moxfield import format.
+// Moxfield accepts Arena-style deck lists with set codes.
+func (e *Exporter) exportMoxfield(deck *models.Deck, deckCards []*models.DeckCard, cardMetadata map[int]*cards.Card, options *ExportOptions) string {
+	var sb strings.Builder
+
+	// Add deck info as comments
+	if options.IncludeHeaders {
+		sb.WriteString(fmt.Sprintf("// Name: %s\n", deck.Name))
+		if deck.Format != "" {
+			sb.WriteString(fmt.Sprintf("// Format: %s\n", deck.Format))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Moxfield uses Arena format for import
+	sb.WriteString("Deck\n")
+
+	// Add mainboard cards
+	mainboard := filterCardsByBoard(deckCards, "main")
+	for _, deckCard := range mainboard {
+		card, ok := cardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		// Format: "4 Card Name (SET) 123"
+		line := fmt.Sprintf("%d %s", deckCard.Quantity, card.Name)
+		if card.SetCode != "" && card.CollectorNumber != "" {
+			line += fmt.Sprintf(" (%s) %s", strings.ToUpper(card.SetCode), card.CollectorNumber)
+		}
+		sb.WriteString(line)
+		sb.WriteString("\n")
+	}
+
+	// Add sideboard
+	sideboard := filterCardsByBoard(deckCards, "sideboard")
+	if len(sideboard) > 0 {
+		sb.WriteString("\nSideboard\n")
+		for _, deckCard := range sideboard {
+			card, ok := cardMetadata[deckCard.CardID]
+			if !ok {
+				continue
+			}
+
+			line := fmt.Sprintf("%d %s", deckCard.Quantity, card.Name)
+			if card.SetCode != "" && card.CollectorNumber != "" {
+				line += fmt.Sprintf(" (%s) %s", strings.ToUpper(card.SetCode), card.CollectorNumber)
+			}
+			sb.WriteString(line)
+			sb.WriteString("\n")
+		}
+	}
+
+	return sb.String()
+}
+
+// exportArchidekt exports deck in Archidekt import format.
+// Archidekt accepts a simple card list that can be used with their import feature.
+func (e *Exporter) exportArchidekt(deck *models.Deck, deckCards []*models.DeckCard, cardMetadata map[int]*cards.Card, options *ExportOptions) string {
+	var sb strings.Builder
+
+	// Add deck info as comments
+	if options.IncludeHeaders {
+		sb.WriteString(fmt.Sprintf("// Name: %s\n", deck.Name))
+		if deck.Format != "" {
+			sb.WriteString(fmt.Sprintf("// Format: %s\n", deck.Format))
+		}
+		sb.WriteString("// Import at: https://archidekt.com/decks/new\n")
+		sb.WriteString("\n")
+	}
+
+	// Add mainboard cards
+	mainboard := filterCardsByBoard(deckCards, "main")
+	for _, deckCard := range mainboard {
+		card, ok := cardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		// Simple format for Archidekt: "4 Card Name"
+		sb.WriteString(fmt.Sprintf("%d %s\n", deckCard.Quantity, card.Name))
+	}
+
+	// Add sideboard with comment marker
+	sideboard := filterCardsByBoard(deckCards, "sideboard")
+	if len(sideboard) > 0 {
+		sb.WriteString("\n// Sideboard\n")
+		for _, deckCard := range sideboard {
+			card, ok := cardMetadata[deckCard.CardID]
+			if !ok {
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("%d %s\n", deckCard.Quantity, card.Name))
+		}
+	}
+
+	return sb.String()
 }
 
 // sanitizeFilename removes invalid characters from filename.
