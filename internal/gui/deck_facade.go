@@ -2982,13 +2982,24 @@ func (d *DeckFacade) GetCardPerformance(ctx context.Context, req *GetCardPerform
 		return nil, &AppError{Message: "Card performance repository not available"}
 	}
 
-	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, req.DeckID)
+	filter := models.CardPerformanceFilter{
+		DeckID:       req.DeckID,
+		MinGames:     req.MinGames,
+		IncludeLands: req.IncludeLands,
+	}
+	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, filter)
 	if err != nil {
-		return nil, &AppError{Message: fmt.Sprintf("Failed to get card performance: %v", err)}
+		return nil, &AppError{
+			Message: fmt.Sprintf("Failed to get card performance: %v", err),
+			Err:     err,
+		}
 	}
 
 	if analysis == nil {
-		return nil, &AppError{Message: "Deck not found or not enough data"}
+		return nil, &AppError{
+			Message: "Deck not found or not enough data",
+			Err:     repository.ErrNotEnoughData,
+		}
 	}
 
 	// Convert to response format

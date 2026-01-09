@@ -3,11 +3,20 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
+)
+
+// Sentinel errors for card performance repository.
+var (
+	// ErrDeckNotFound is returned when the requested deck does not exist.
+	ErrDeckNotFound = errors.New("deck not found")
+	// ErrNotEnoughData is returned when there isn't enough game data for analysis.
+	ErrNotEnoughData = errors.New("not enough data for analysis")
 )
 
 // CardPerformanceRepository handles card performance analysis queries.
@@ -16,7 +25,8 @@ type CardPerformanceRepository interface {
 	GetCardPerformance(ctx context.Context, filter models.CardPerformanceFilter) ([]*models.CardPerformance, error)
 
 	// GetDeckPerformanceAnalysis returns a complete analysis for a deck.
-	GetDeckPerformanceAnalysis(ctx context.Context, deckID string) (*models.DeckPerformanceAnalysis, error)
+	// The filter parameter allows customizing MinGames and IncludeLands settings.
+	GetDeckPerformanceAnalysis(ctx context.Context, filter models.CardPerformanceFilter) (*models.DeckPerformanceAnalysis, error)
 
 	// GetCardPlayEvents retrieves all play events for a specific card in a deck.
 	GetCardPlayEvents(ctx context.Context, deckID string, cardID int) ([]*models.CardPlayEvent, error)
@@ -204,13 +214,17 @@ func (r *cardPerformanceRepository) GetCardPerformance(ctx context.Context, filt
 }
 
 // GetDeckPerformanceAnalysis returns a complete analysis for a deck.
-func (r *cardPerformanceRepository) GetDeckPerformanceAnalysis(ctx context.Context, deckID string) (*models.DeckPerformanceAnalysis, error) {
+func (r *cardPerformanceRepository) GetDeckPerformanceAnalysis(ctx context.Context, filter models.CardPerformanceFilter) (*models.DeckPerformanceAnalysis, error) {
+	if filter.DeckID == "" {
+		return nil, fmt.Errorf("deck_id is required")
+	}
+
 	// Get deck info
 	var deckName string
-	err := r.db.QueryRowContext(ctx, `SELECT name FROM decks WHERE id = ?`, deckID).Scan(&deckName)
+	err := r.db.QueryRowContext(ctx, `SELECT name FROM decks WHERE id = ?`, filter.DeckID).Scan(&deckName)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("deck not found: %s", deckID)
+			return nil, ErrDeckNotFound
 		}
 		return nil, fmt.Errorf("failed to get deck: %w", err)
 	}
@@ -220,10 +234,10 @@ func (r *cardPerformanceRepository) GetDeckPerformanceAnalysis(ctx context.Conte
 	err = r.db.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins
+			COUNT(CASE WHEN result = 'win' THEN 1 END) as wins
 		FROM matches
 		WHERE deck_id = ?
-	`, deckID).Scan(&totalMatches, &matchesWon)
+	`, filter.DeckID).Scan(&totalMatches, &matchesWon)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match stats: %w", err)
 	}
@@ -235,18 +249,18 @@ func (r *cardPerformanceRepository) GetDeckPerformanceAnalysis(ctx context.Conte
 		FROM games g
 		INNER JOIN matches m ON g.match_id = m.id
 		WHERE m.deck_id = ?
-	`, deckID).Scan(&totalGames)
+	`, filter.DeckID).Scan(&totalGames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get game count: %w", err)
 	}
 
-	// Get card performance
-	filter := models.CardPerformanceFilter{
-		DeckID:       deckID,
-		MinGames:     models.MinGamesForAnalysis,
-		IncludeLands: false,
+	// Get card performance using the provided filter settings
+	// Apply defaults if not specified
+	cardFilter := filter
+	if cardFilter.MinGames <= 0 {
+		cardFilter.MinGames = models.MinGamesForAnalysis
 	}
-	cardPerf, err := r.GetCardPerformance(ctx, filter)
+	cardPerf, err := r.GetCardPerformance(ctx, cardFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +285,7 @@ func (r *cardPerformanceRepository) GetDeckPerformanceAnalysis(ctx context.Conte
 	}
 
 	analysis := &models.DeckPerformanceAnalysis{
-		DeckID:          deckID,
+		DeckID:          filter.DeckID,
 		DeckName:        deckName,
 		TotalMatches:    totalMatches,
 		TotalGames:      totalGames,
@@ -407,7 +421,7 @@ func (r *cardPerformanceRepository) getDeckWinRate(ctx context.Context, deckID s
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*) as total,
-			SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins
+			COUNT(CASE WHEN result = 'win' THEN 1 END) as wins
 		FROM matches
 		WHERE deck_id = ?
 	`, deckID).Scan(&total, &wins)
@@ -424,7 +438,7 @@ func (r *cardPerformanceRepository) getDeckWinRate(ctx context.Context, deckID s
 
 // isBasicLand checks if a card name is a basic land.
 func isBasicLand(cardName string) bool {
-	basicLands := []string{"Plains", "Island", "Swamp", "Mountain", "Forest"}
+	basicLands := []string{"Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"}
 	for _, land := range basicLands {
 		if cardName == land {
 			return true
@@ -527,7 +541,12 @@ func (r *cardPerformanceRepository) GetTurnPlayedDistribution(ctx context.Contex
 // GetCardRecommendations generates add/remove recommendations for a deck.
 func (r *cardPerformanceRepository) GetCardRecommendations(ctx context.Context, req models.RecommendationsRequest) (*models.RecommendationsResponse, error) {
 	// Get deck info and current performance
-	analysis, err := r.GetDeckPerformanceAnalysis(ctx, req.DeckID)
+	filter := models.CardPerformanceFilter{
+		DeckID:       req.DeckID,
+		MinGames:     models.MinGamesForAnalysis,
+		IncludeLands: false,
+	}
+	analysis, err := r.GetDeckPerformanceAnalysis(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

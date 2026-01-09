@@ -184,7 +184,12 @@ func TestGetDeckPerformanceAnalysis(t *testing.T) {
 	repo := NewCardPerformanceRepository(db)
 	ctx := context.Background()
 
-	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, "deck-1")
+	filter := models.CardPerformanceFilter{
+		DeckID:       "deck-1",
+		MinGames:     1,
+		IncludeLands: false,
+	}
+	analysis, err := repo.GetDeckPerformanceAnalysis(ctx, filter)
 	require.NoError(t, err)
 	require.NotNil(t, analysis)
 
@@ -201,9 +206,12 @@ func TestGetDeckPerformanceAnalysis_DeckNotFound(t *testing.T) {
 	repo := NewCardPerformanceRepository(db)
 	ctx := context.Background()
 
-	_, err := repo.GetDeckPerformanceAnalysis(ctx, "non-existent")
+	filter := models.CardPerformanceFilter{
+		DeckID: "non-existent",
+	}
+	_, err := repo.GetDeckPerformanceAnalysis(ctx, filter)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "deck not found")
+	assert.ErrorIs(t, err, ErrDeckNotFound)
 }
 
 func TestGetUnderperformingCards(t *testing.T) {
