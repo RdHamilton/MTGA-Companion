@@ -74,6 +74,13 @@ type MatchRepository interface {
 	// GetWeeklyWins returns the number of match wins for the current week (Sunday-Saturday UTC).
 	// If accountID is 0, returns wins for all accounts.
 	GetWeeklyWins(ctx context.Context, accountID int) (int, error)
+
+	// GetMatchesForMLProcessing returns matches that haven't been processed by the ML engine.
+	// It filters by processed_for_ml = FALSE and applies the given filter.
+	GetMatchesForMLProcessing(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error)
+
+	// MarkMatchesAsProcessedForML marks the given match IDs as processed by the ML engine.
+	MarkMatchesAsProcessedForML(ctx context.Context, matchIDs []string) error
 }
 
 // matchRepository is the concrete implementation of MatchRepository.
@@ -1340,4 +1347,101 @@ func (r *matchRepository) GetWeeklyWins(ctx context.Context, accountID int) (int
 	}
 
 	return count, nil
+}
+
+// GetMatchesForMLProcessing returns matches that haven't been processed by the ML engine.
+// It filters by processed_for_ml = FALSE and applies the given filter.
+func (r *matchRepository) GetMatchesForMLProcessing(ctx context.Context, filter models.StatsFilter) ([]*models.Match, error) {
+	// Always JOIN with decks table to get deck format for display
+	fromClause := "FROM matches m LEFT JOIN decks d ON m.deck_id = d.id"
+	tableAlias := "m"
+
+	// Build WHERE clause using the filter builder with table alias
+	where, args := buildFilterWhereClause(filter, tableAlias)
+
+	// Add condition for unprocessed matches (using COALESCE for NULL safety)
+	where += " AND COALESCE(m.processed_for_ml, 0) = 0"
+
+	query := fmt.Sprintf(`
+		SELECT
+			m.id, m.account_id, m.event_id, m.event_name, m.timestamp, m.duration_seconds,
+			m.player_wins, m.opponent_wins, m.player_team_id, m.deck_id, d.format,
+			m.rank_before, m.rank_after, m.format, m.result, m.result_reason,
+			m.opponent_name, m.opponent_id, m.created_at
+		%s
+		%s
+		ORDER BY m.timestamp DESC
+	`, fromClause, where)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get matches for ML processing: %w", err)
+	}
+	defer func() {
+		//nolint:errcheck // Ignore error on cleanup - this is a defer cleanup operation
+		_ = rows.Close()
+	}()
+
+	var matches []*models.Match
+	for rows.Next() {
+		match := &models.Match{}
+		err := rows.Scan(
+			&match.ID,
+			&match.AccountID,
+			&match.EventID,
+			&match.EventName,
+			&match.Timestamp,
+			&match.DurationSeconds,
+			&match.PlayerWins,
+			&match.OpponentWins,
+			&match.PlayerTeamID,
+			&match.DeckID,
+			&match.DeckFormat,
+			&match.RankBefore,
+			&match.RankAfter,
+			&match.Format,
+			&match.Result,
+			&match.ResultReason,
+			&match.OpponentName,
+			&match.OpponentID,
+			&match.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan match: %w", err)
+		}
+		matches = append(matches, match)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating matches: %w", err)
+	}
+
+	return matches, nil
+}
+
+// MarkMatchesAsProcessedForML marks the given match IDs as processed by the ML engine.
+func (r *matchRepository) MarkMatchesAsProcessedForML(ctx context.Context, matchIDs []string) error {
+	if len(matchIDs) == 0 {
+		return nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, len(matchIDs))
+	for i, id := range matchIDs {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`UPDATE matches SET processed_for_ml = TRUE WHERE id IN (%s)`, placeholders)
+
+	_, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to mark matches as processed for ML: %w", err)
+	}
+
+	return nil
 }

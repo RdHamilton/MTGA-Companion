@@ -21,6 +21,100 @@ func NewMLSuggestionRepository(db *sql.DB) *MLSuggestionRepository {
 }
 
 // ============================================================================
+// Individual Card Stats
+// ============================================================================
+
+// UpsertIndividualCardStats inserts or updates individual card statistics.
+func (r *MLSuggestionRepository) UpsertIndividualCardStats(ctx context.Context, stats *models.CardIndividualStats) error {
+	query := `
+		INSERT INTO card_individual_stats (card_id, format, total_games, wins, updated_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(card_id, format) DO UPDATE SET
+			total_games = total_games + excluded.total_games,
+			wins = wins + excluded.wins,
+			updated_at = excluded.updated_at
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		stats.CardID, stats.Format, stats.TotalGames, stats.Wins, time.Now(),
+	)
+	return err
+}
+
+// GetIndividualCardStats retrieves stats for a specific card.
+func (r *MLSuggestionRepository) GetIndividualCardStats(ctx context.Context, cardID int, format string) (*models.CardIndividualStats, error) {
+	query := `
+		SELECT card_id, format, total_games, wins, updated_at
+		FROM card_individual_stats
+		WHERE card_id = ? AND format = ?
+	`
+
+	var stats models.CardIndividualStats
+	err := r.db.QueryRowContext(ctx, query, cardID, format).Scan(
+		&stats.CardID, &stats.Format, &stats.TotalGames, &stats.Wins, &stats.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+// UpdateSeparateStatsFromIndividual calculates and updates games_card1_only, wins_card1_only, etc.
+// for all card combinations based on individual card stats.
+// This should be called after processing all matches.
+func (r *MLSuggestionRepository) UpdateSeparateStatsFromIndividual(ctx context.Context, format string) error {
+	// For each card pair, calculate separate stats:
+	// games_card1_only = individual_games_card1 - games_together
+	// wins_card1_only = individual_wins_card1 - wins_together (proportionally)
+	// Note: This is an approximation since we track total individual stats, not per-pair
+
+	query := `
+		UPDATE card_combination_stats
+		SET
+			games_card1_only = COALESCE(
+				(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
+				0
+			) - games_together,
+			games_card2_only = COALESCE(
+				(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
+				0
+			) - games_together,
+			wins_card1_only = CASE
+				WHEN COALESCE(
+					(SELECT i1.total_games FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
+					0
+				) - games_together <= 0 THEN 0
+				ELSE CAST(
+					(COALESCE(
+						(SELECT i1.wins FROM card_individual_stats i1 WHERE i1.card_id = card_combination_stats.card_id_1 AND i1.format = card_combination_stats.format),
+						0
+					) - wins_together) AS INTEGER
+				)
+			END,
+			wins_card2_only = CASE
+				WHEN COALESCE(
+					(SELECT i2.total_games FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
+					0
+				) - games_together <= 0 THEN 0
+				ELSE CAST(
+					(COALESCE(
+						(SELECT i2.wins FROM card_individual_stats i2 WHERE i2.card_id = card_combination_stats.card_id_2 AND i2.format = card_combination_stats.format),
+						0
+					) - wins_together) AS INTEGER
+				)
+			END,
+			updated_at = ?
+		WHERE format = ?
+	`
+
+	_, err := r.db.ExecContext(ctx, query, time.Now(), format)
+	return err
+}
+
+// ============================================================================
 // Card Combination Stats
 // ============================================================================
 
