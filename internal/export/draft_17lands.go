@@ -113,7 +113,10 @@ func ExportDraftTo17Lands(data *DraftExportData) (*SeventeenLandsDraftExport, er
 
 		// Get the pack contents for this pick
 		key := fmt.Sprintf("%d-%d", pick.PackNumber, pick.PickNumber)
-		packContents := packMap[key]
+		packContents, found := packMap[key]
+		if !found || len(packContents) == 0 {
+			return nil, fmt.Errorf("missing pack contents for pick %d in pack %d", pickNum, packNum)
+		}
 
 		// Convert picked card ID to int
 		pickedCardID, err := strconv.Atoi(pick.CardID)
