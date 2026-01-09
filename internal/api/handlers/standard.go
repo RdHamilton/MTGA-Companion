@@ -30,6 +30,11 @@ func (h *StandardHandler) GetStandardSets(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Ensure we return an empty array instead of null
+	if sets == nil {
+		sets = []*models.StandardSet{}
+	}
+
 	response.Success(w, sets)
 }
 
@@ -52,6 +57,11 @@ func (h *StandardHandler) GetRotationAffectedDecks(w http.ResponseWriter, r *htt
 	if err != nil {
 		response.InternalError(w, err)
 		return
+	}
+
+	// Ensure we return an empty array instead of null
+	if decks == nil {
+		decks = []*models.RotationAffectedDeck{}
 	}
 
 	response.Success(w, decks)
