@@ -118,6 +118,13 @@ func (s *Server) setupRoutes() {
 			r.Post("/{deckID}/tags", deckHandler.AddTag)
 			r.Delete("/{deckID}/tags/{tag}", deckHandler.RemoveTag)
 			r.Get("/{deckID}/validate-draft", deckHandler.ValidateDraftDeck)
+
+			// Card performance analysis routes (Issue #771)
+			r.Get("/{deckID}/card-performance", deckHandler.GetCardPerformance)
+			r.Get("/{deckID}/recommendations/add", deckHandler.GetPerformanceAddRecommendations)
+			r.Get("/{deckID}/recommendations/remove", deckHandler.GetPerformanceRemoveRecommendations)
+			r.Get("/{deckID}/recommendations/swap", deckHandler.GetPerformanceSwapRecommendations)
+			r.Get("/{deckID}/recommendations/all", deckHandler.GetAllPerformanceRecommendations)
 		})
 
 		// Card routes

@@ -71,8 +71,14 @@ type Services struct {
 // AppError represents an application error with a user-friendly message.
 type AppError struct {
 	Message string `json:"message"`
+	Err     error  `json:"-"` // Wrapped error for errors.Is/As chain
 }
 
 func (e *AppError) Error() string {
 	return e.Message
+}
+
+// Unwrap returns the wrapped error for errors.Is/As chain.
+func (e *AppError) Unwrap() error {
+	return e.Err
 }
