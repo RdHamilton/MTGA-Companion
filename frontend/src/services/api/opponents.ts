@@ -1,4 +1,4 @@
-import { fetchApi } from './index';
+import { get } from '../apiClient';
 
 // Types for opponent analysis
 
@@ -123,7 +123,7 @@ export interface ArchetypeExpectedCard {
  * Get opponent analysis for a specific match
  */
 export async function getOpponentAnalysis(matchId: string): Promise<OpponentAnalysis> {
-  return fetchApi<OpponentAnalysis>(`/matches/${matchId}/opponent-analysis`);
+  return get<OpponentAnalysis>(`/matches/${matchId}/opponent-analysis`);
 }
 
 /**
@@ -147,7 +147,7 @@ export async function listOpponentDecks(params?: {
 
   const query = searchParams.toString();
   const url = `/opponents/decks${query ? `?${query}` : ''}`;
-  return fetchApi<{ profiles: OpponentDeckProfile[]; total: number }>(url);
+  return get<{ profiles: OpponentDeckProfile[]; total: number }>(url);
 }
 
 /**
@@ -158,7 +158,7 @@ export async function getMatchupStats(format?: string): Promise<{
   total: number;
 }> {
   const params = format ? `?format=${encodeURIComponent(format)}` : '';
-  return fetchApi<{ matchups: MatchupStatistic[]; total: number }>(
+  return get<{ matchups: MatchupStatistic[]; total: number }>(
     `/analytics/matchups${params}`
   );
 }
@@ -170,7 +170,7 @@ export async function getOpponentHistory(
   format?: string
 ): Promise<OpponentHistorySummary> {
   const params = format ? `?format=${encodeURIComponent(format)}` : '';
-  return fetchApi<OpponentHistorySummary>(`/analytics/opponent-history${params}`);
+  return get<OpponentHistorySummary>(`/analytics/opponent-history${params}`);
 }
 
 /**
@@ -186,7 +186,7 @@ export async function getExpectedCards(
   total: number;
 }> {
   const params = format ? `?format=${encodeURIComponent(format)}` : '';
-  return fetchApi<{
+  return get<{
     archetype: string;
     format: string;
     expectedCards: ArchetypeExpectedCard[];

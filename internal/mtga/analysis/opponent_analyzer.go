@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/archetype"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
@@ -452,6 +453,9 @@ func (a *OpponentAnalyzer) UpdateMatchupStats(ctx context.Context, accountID int
 	now := stat.UpdatedAt
 	if now.IsZero() {
 		now = stat.CreatedAt
+	}
+	if now.IsZero() {
+		now = time.Now()
 	}
 	stat.LastMatchAt = &now
 

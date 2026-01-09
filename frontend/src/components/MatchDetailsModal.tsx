@@ -65,6 +65,11 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
     return `${match.RankBefore} → ${match.RankAfter}`;
   };
 
+  // Reset opponent analysis expansion when match changes
+  useEffect(() => {
+    setOpponentAnalysisExpanded(false);
+  }, [match.ID]);
+
   // Handle click on backdrop to close modal
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -176,7 +181,7 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
           <OpponentAnalysisPanel
             matchId={match.ID}
             isExpanded={opponentAnalysisExpanded}
-            onToggle={() => setOpponentAnalysisExpanded(!opponentAnalysisExpanded)}
+            onToggle={() => setOpponentAnalysisExpanded(prev => !prev)}
           />
         </div>
 

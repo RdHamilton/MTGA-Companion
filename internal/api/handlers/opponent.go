@@ -12,6 +12,9 @@ import (
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
+// MaxOpponentLimit is the maximum number of opponent profiles that can be requested.
+const MaxOpponentLimit = 500
+
 // OpponentHandler handles opponent analysis API requests.
 type OpponentHandler struct {
 	analyzer     *analysis.OpponentAnalyzer
@@ -72,7 +75,7 @@ func (h *OpponentHandler) ListOpponentDecks(w http.ResponseWriter, r *http.Reque
 	}
 	if limitStr != "" {
 		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
-			filter.Limit = limit
+			filter.Limit = min(limit, MaxOpponentLimit)
 		}
 	}
 

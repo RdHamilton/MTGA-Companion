@@ -174,15 +174,21 @@ const OpponentAnalysisPanel = ({ matchId, isExpanded = false, onToggle }: Oppone
 
   return (
     <div className="opponent-analysis-panel">
-      <div className="panel-header" onClick={onToggle}>
+      <button
+        type="button"
+        className="panel-header"
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+        aria-controls="opponent-analysis-content"
+      >
         <h3>Opponent Analysis</h3>
-        <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>
+        <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`} aria-hidden="true">
           {isExpanded ? '\u25BC' : '\u25B6'}
         </span>
-      </div>
+      </button>
 
       {isExpanded && (
-        <div className="panel-content">
+        <div id="opponent-analysis-content" className="panel-content">
           {loading && <LoadingSpinner message="Analyzing opponent..." />}
 
           {error && <div className="error-message">{error}</div>}
@@ -219,20 +225,32 @@ const OpponentAnalysisPanel = ({ matchId, isExpanded = false, onToggle }: Oppone
               )}
 
               {/* Tabs */}
-              <div className="analysis-tabs">
+              <div className="analysis-tabs" role="tablist" aria-label="Opponent analysis tabs">
                 <button
+                  id="tab-observed"
+                  role="tab"
+                  aria-selected={activeTab === 'observed'}
+                  aria-controls="panel-observed"
                   className={`tab-btn ${activeTab === 'observed' ? 'active' : ''}`}
                   onClick={() => setActiveTab('observed')}
                 >
                   Observed ({analysis.observedCards.length})
                 </button>
                 <button
+                  id="tab-expected"
+                  role="tab"
+                  aria-selected={activeTab === 'expected'}
+                  aria-controls="panel-expected"
                   className={`tab-btn ${activeTab === 'expected' ? 'active' : ''}`}
                   onClick={() => setActiveTab('expected')}
                 >
                   Expected ({analysis.expectedCards.length})
                 </button>
                 <button
+                  id="tab-insights"
+                  role="tab"
+                  aria-selected={activeTab === 'insights'}
+                  aria-controls="panel-insights"
                   className={`tab-btn ${activeTab === 'insights' ? 'active' : ''}`}
                   onClick={() => setActiveTab('insights')}
                 >
@@ -242,9 +260,21 @@ const OpponentAnalysisPanel = ({ matchId, isExpanded = false, onToggle }: Oppone
 
               {/* Tab Content */}
               <div className="tab-content">
-                {activeTab === 'observed' && renderObservedCards(analysis.observedCards)}
-                {activeTab === 'expected' && renderExpectedCards(analysis.expectedCards)}
-                {activeTab === 'insights' && renderInsights(analysis.strategicInsights)}
+                {activeTab === 'observed' && (
+                  <div id="panel-observed" role="tabpanel" aria-labelledby="tab-observed">
+                    {renderObservedCards(analysis.observedCards)}
+                  </div>
+                )}
+                {activeTab === 'expected' && (
+                  <div id="panel-expected" role="tabpanel" aria-labelledby="tab-expected">
+                    {renderExpectedCards(analysis.expectedCards)}
+                  </div>
+                )}
+                {activeTab === 'insights' && (
+                  <div id="panel-insights" role="tabpanel" aria-labelledby="tab-insights">
+                    {renderInsights(analysis.strategicInsights)}
+                  </div>
+                )}
               </div>
             </>
           )}

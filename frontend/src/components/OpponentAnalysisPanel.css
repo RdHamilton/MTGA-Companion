@@ -14,6 +14,10 @@
   cursor: pointer;
   background-color: #252525;
   transition: background-color 0.2s;
+  width: 100%;
+  border: none;
+  text-align: left;
+  font-family: inherit;
 }
 
 .opponent-analysis-panel .panel-header:hover {
@@ -30,10 +34,11 @@
   color: #aaaaaa;
   font-size: 0.8rem;
   transition: transform 0.2s;
+  transform: rotate(0deg);
 }
 
 .opponent-analysis-panel .expand-icon.expanded {
-  transform: rotate(0deg);
+  transform: rotate(180deg);
 }
 
 .opponent-analysis-panel .panel-content {

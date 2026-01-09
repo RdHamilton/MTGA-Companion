@@ -190,6 +190,9 @@ func (r *opponentRepository) ListProfiles(ctx context.Context, filter *OpponentP
 		}
 		profiles = append(profiles, &p)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate opponent profiles: %w", err)
+	}
 
 	return profiles, nil
 }
@@ -310,6 +313,9 @@ func (r *opponentRepository) ListMatchupStats(ctx context.Context, accountID int
 		}
 		stats = append(stats, &s)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate matchup stats: %w", err)
+	}
 
 	return stats, nil
 }
@@ -347,6 +353,9 @@ func (r *opponentRepository) GetTopMatchups(ctx context.Context, accountID int, 
 			s.WinRate = float64(s.Wins) / float64(s.TotalMatches)
 		}
 		stats = append(stats, &s)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate top matchups: %w", err)
 	}
 
 	return stats, nil
@@ -412,6 +421,9 @@ func (r *opponentRepository) GetExpectedCards(ctx context.Context, archetypeName
 		}
 		cards = append(cards, &c)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate expected cards: %w", err)
+	}
 
 	return cards, nil
 }
@@ -468,6 +480,9 @@ func (r *opponentRepository) GetOpponentHistorySummary(ctx context.Context, acco
 		}
 		breakdown = append(breakdown, entry)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate archetype breakdown: %w", err)
+	}
 
 	// Calculate percentages
 	for i := range breakdown {
@@ -516,6 +531,9 @@ func (r *opponentRepository) GetOpponentHistorySummary(ctx context.Context, acco
 			entry.WinRate = float64(wins) / float64(wins+losses)
 		}
 		colorStats = append(colorStats, entry)
+	}
+	if err = colorRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate color stats: %w", err)
 	}
 
 	summary := &models.OpponentHistorySummary{
