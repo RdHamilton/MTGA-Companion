@@ -904,9 +904,9 @@ describe('Decks', () => {
     it('should export deck and call API with correct format', async () => {
       mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       mockDecks.exportDeck.mockResolvedValue({
-        Content: 'Deck\n4 Lightning Bolt (STA) 1',
-        Filename: 'Mono_Red_Aggro.txt',
-        Error: '',
+        content: 'Deck\n4 Lightning Bolt (STA) 1',
+        filename: 'Mono_Red_Aggro.txt',
+        error: '',
       });
 
       // Mock URL methods and link creation/click to prevent actual download
@@ -941,9 +941,9 @@ describe('Decks', () => {
       cleanup();
       mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       mockDecks.exportDeck.mockResolvedValue({
-        Content: 'Deck\n4 Lightning Bolt (STA) 1',
-        Filename: 'Mono_Red_Aggro.txt',
-        Error: '',
+        content: 'Deck\n4 Lightning Bolt (STA) 1',
+        filename: 'Mono_Red_Aggro.txt',
+        error: '',
       });
 
       const writeTextMock = vi.fn().mockResolvedValue(undefined);
@@ -986,9 +986,9 @@ describe('Decks', () => {
       cleanup();
       mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       mockDecks.exportDeck.mockResolvedValue({
-        Content: '',
-        Filename: '',
-        Error: 'Export failed: deck not found',
+        content: '',
+        filename: '',
+        error: 'Export failed: deck not found',
       });
 
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
@@ -1043,9 +1043,9 @@ describe('Decks', () => {
       });
 
       resolveExport!({
-        Content: 'test',
-        Filename: 'test.txt',
-        Error: '',
+        content: 'test',
+        filename: 'test.txt',
+        error: '',
       });
     });
 
@@ -1053,9 +1053,9 @@ describe('Decks', () => {
       cleanup();
       mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       mockDecks.exportDeck.mockResolvedValue({
-        Content: 'Deck\n4 Lightning Bolt',
-        Filename: 'Mono_Red_Aggro_moxfield.txt',
-        Error: '',
+        content: 'Deck\n4 Lightning Bolt',
+        filename: 'Mono_Red_Aggro_moxfield.txt',
+        error: '',
       });
 
       const writeTextMock = vi.fn().mockResolvedValue(undefined);
@@ -1094,9 +1094,9 @@ describe('Decks', () => {
       cleanup();
       mockDecks.getDecks.mockResolvedValue(createMockDeckList());
       mockDecks.exportDeck.mockResolvedValue({
-        Content: '4 Lightning Bolt',
-        Filename: 'Mono_Red_Aggro_archidekt.txt',
-        Error: '',
+        content: '4 Lightning Bolt',
+        filename: 'Mono_Red_Aggro_archidekt.txt',
+        error: '',
       });
 
       const writeTextMock = vi.fn().mockResolvedValue(undefined);

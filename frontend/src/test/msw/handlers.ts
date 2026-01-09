@@ -348,9 +348,9 @@ export const handlers = [
     };
 
     return successResponse({
-      Content: `Deck\n4 Lightning Bolt (STA) 1\n4 Mountain (M21) 269`,
-      Filename: `Test_Deck${formatExtensions[format] || '.txt'}`,
-      Error: '',
+      content: `Deck\n4 Lightning Bolt (STA) 1\n4 Mountain (M21) 269`,
+      filename: `Test_Deck${formatExtensions[format] || '.txt'}`,
+      error: '',
     });
   }),
 

@@ -115,17 +115,17 @@ export default function Decks() {
       setIsExporting(true);
       const response = await decksApi.exportDeck(deckToExport.id, { format: exportFormat });
 
-      if (response.Error) {
-        alert(`Export failed: ${response.Error}`);
+      if (response.error) {
+        alert(`Export failed: ${response.error}`);
         return;
       }
 
       // Create blob and trigger download
-      const blob = new Blob([response.Content], { type: 'text/plain' });
+      const blob = new Blob([response.content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = response.Filename || `${deckToExport.name}.txt`;
+      link.download = response.filename || `${deckToExport.name}.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -152,12 +152,12 @@ export default function Decks() {
       setIsExporting(true);
       const response = await decksApi.exportDeck(deckToExport.id, { format: exportFormat });
 
-      if (response.Error) {
-        alert(`Export failed: ${response.Error}`);
+      if (response.error) {
+        alert(`Export failed: ${response.error}`);
         return;
       }
 
-      await navigator.clipboard.writeText(response.Content);
+      await navigator.clipboard.writeText(response.content);
       alert('Deck copied to clipboard!');
       setShowExportDialog(false);
       setDeckToExport(null);
