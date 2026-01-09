@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from './LoadingSpinner';
+import OpponentAnalysisPanel from './OpponentAnalysisPanel';
 import './MatchDetailsModal.css';
 
 interface MatchDetailsModalProps {
@@ -13,6 +14,7 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
   const [games, setGames] = useState<models.Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [opponentAnalysisExpanded, setOpponentAnalysisExpanded] = useState(false);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -62,6 +64,11 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
     if (match.RankBefore === match.RankAfter) return 'No Change';
     return `${match.RankBefore} → ${match.RankAfter}`;
   };
+
+  // Reset opponent analysis expansion when match changes
+  useEffect(() => {
+    setOpponentAnalysisExpanded(false);
+  }, [match.ID]);
 
   // Handle click on backdrop to close modal
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -169,6 +176,13 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
               </div>
             )}
           </div>
+
+          {/* Opponent Analysis */}
+          <OpponentAnalysisPanel
+            matchId={match.ID}
+            isExpanded={opponentAnalysisExpanded}
+            onToggle={() => setOpponentAnalysisExpanded(prev => !prev)}
+          />
         </div>
 
         <div className="modal-footer">

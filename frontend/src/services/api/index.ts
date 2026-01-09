@@ -27,6 +27,7 @@ export * as standard from './standard';
 export * as gameplays from './gameplays';
 export * as notes from './notes';
 export * as mlSuggestions from './mlSuggestions';
+export * as opponents from './opponents';
 
 // Re-export commonly used types
 export type {
@@ -103,3 +104,17 @@ export type {
   SynergyReport,
   UserPlayPatterns,
 } from './mlSuggestions';
+
+export type {
+  OpponentDeckProfile,
+  ObservedCard,
+  ExpectedCard,
+  StrategicInsight,
+  MetaArchetypeMatch,
+  MatchupStatistic,
+  OpponentAnalysis,
+  ArchetypeBreakdownEntry,
+  ColorIdentityStatsEntry,
+  OpponentHistorySummary,
+  ArchetypeExpectedCard,
+} from './opponents';
