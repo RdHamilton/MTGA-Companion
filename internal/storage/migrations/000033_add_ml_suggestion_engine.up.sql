@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS card_combination_stats (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Ensure card_id_1 < card_id_2 for uniqueness
-    UNIQUE(card_id_1, card_id_2, deck_id, format)
+    UNIQUE(card_id_1, card_id_2, deck_id, format),
+    CHECK(card_id_1 < card_id_2)
 );
 
 CREATE INDEX IF NOT EXISTS idx_combo_stats_card1 ON card_combination_stats(card_id_1);
@@ -95,7 +96,8 @@ CREATE TABLE IF NOT EXISTS card_affinity (
     -- Timestamps
     computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE(card_id_1, card_id_2, format)
+    UNIQUE(card_id_1, card_id_2, format),
+    CHECK(card_id_1 < card_id_2)
 );
 
 CREATE INDEX IF NOT EXISTS idx_affinity_card1 ON card_affinity(card_id_1);

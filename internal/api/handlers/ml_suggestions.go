@@ -8,24 +8,28 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/api/response"
+	"github.com/ramonehamilton/MTGA-Companion/internal/gui"
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/analysis"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
 
 // MLSuggestionsHandler handles ML-powered suggestion API requests.
 type MLSuggestionsHandler struct {
-	mlRepo   *repository.MLSuggestionRepository
-	mlEngine *analysis.MLEngine
+	mlRepo       *repository.MLSuggestionRepository
+	mlEngine     *analysis.MLEngine
+	systemFacade *gui.SystemFacade
 }
 
 // NewMLSuggestionsHandler creates a new MLSuggestionsHandler.
 func NewMLSuggestionsHandler(
 	mlRepo *repository.MLSuggestionRepository,
 	mlEngine *analysis.MLEngine,
+	systemFacade *gui.SystemFacade,
 ) *MLSuggestionsHandler {
 	return &MLSuggestionsHandler{
-		mlRepo:   mlRepo,
-		mlEngine: mlEngine,
+		mlRepo:       mlRepo,
+		mlEngine:     mlEngine,
+		systemFacade: systemFacade,
 	}
 }
 
@@ -207,7 +211,13 @@ func (h *MLSuggestionsHandler) ProcessMatchHistory(w http.ResponseWriter, r *htt
 func (h *MLSuggestionsHandler) GetUserPlayPatterns(w http.ResponseWriter, r *http.Request) {
 	accountID := r.URL.Query().Get("account_id")
 	if accountID == "" {
-		accountID = "default" // Use default if not specified
+		// Get current account from system facade
+		account, err := h.systemFacade.GetCurrentAccount(r.Context())
+		if err != nil || account == nil || account.Name == "" {
+			response.BadRequest(w, errors.New("account_id is required or no current account available"))
+			return
+		}
+		accountID = account.Name
 	}
 
 	patterns, err := h.mlRepo.GetUserPlayPatterns(r.Context(), accountID)
@@ -229,7 +239,13 @@ func (h *MLSuggestionsHandler) GetUserPlayPatterns(w http.ResponseWriter, r *htt
 func (h *MLSuggestionsHandler) UpdateUserPlayPatterns(w http.ResponseWriter, r *http.Request) {
 	accountID := r.URL.Query().Get("account_id")
 	if accountID == "" {
-		accountID = "default"
+		// Get current account from system facade
+		account, err := h.systemFacade.GetCurrentAccount(r.Context())
+		if err != nil || account == nil || account.Name == "" {
+			response.BadRequest(w, errors.New("account_id is required or no current account available"))
+			return
+		}
+		accountID = account.Name
 	}
 
 	if err := h.mlEngine.UpdateUserPlayPatterns(r.Context(), accountID); err != nil {

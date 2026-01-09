@@ -310,7 +310,7 @@ func (s *Server) setupRoutes() {
 			deckRepo := s.services.Storage.NewDeckRepo()
 			cardRepo := s.services.Storage.NewSetCardRepo()
 			mlEngine := analysis.NewMLEngine(mlRepo, matchRepo, deckRepo, cardRepo, playAnalyzer)
-			mlHandler := handlers.NewMLSuggestionsHandler(mlRepo, mlEngine)
+			mlHandler := handlers.NewMLSuggestionsHandler(mlRepo, mlEngine, s.systemFacade)
 
 			// ML suggestions for decks
 			r.Route("/decks/{deckID}/ml-suggestions", func(r chi.Router) {
