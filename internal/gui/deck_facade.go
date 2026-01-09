@@ -1909,6 +1909,10 @@ func (d *DeckFacade) ExportDeck(ctx context.Context, req *ExportDeckRequest) (*E
 		exportFormat = deckexport.FormatMTGO
 	case "mtggoldfish":
 		exportFormat = deckexport.FormatMTGGoldfish
+	case "moxfield":
+		exportFormat = deckexport.FormatMoxfield
+	case "archidekt":
+		exportFormat = deckexport.FormatArchidekt
 	default:
 		return &ExportDeckResponse{
 			Error: fmt.Sprintf("Unsupported export format: %s", req.Format),

@@ -284,6 +284,23 @@
   border-color: #4a9eff;
 }
 
+.export-button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #4a9eff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-button:hover {
+  background: #1f2d3d;
+  border-color: #4a9eff;
+}
+
 .delete-button {
   flex: 1;
   padding: 0.5rem 1rem;
@@ -471,6 +488,70 @@
   font-style: italic;
 }
 
+/* Export Modal */
+.export-modal .modal-body p {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.export-hint {
+  font-size: 0.875rem;
+  color: #888;
+  font-style: italic;
+}
+
+.export-footer {
+  justify-content: flex-end;
+}
+
+.copy-button {
+  padding: 0.75rem 1.5rem;
+  background: #2a2a2a;
+  border: 1px solid #4a9eff;
+  border-radius: 6px;
+  color: #4a9eff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-button:hover:not(:disabled) {
+  background: #1f2d3d;
+}
+
+.copy-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.export-button-confirm {
+  padding: 0.75rem 1.5rem;
+  background: #4a9eff;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-button-confirm:hover:not(:disabled) {
+  background: #3a8edf;
+  transform: translateY(-2px);
+}
+
+.export-button-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .decks-page {
@@ -485,5 +566,16 @@
 
   .decks-grid {
     grid-template-columns: 1fr;
+  }
+
+  .export-footer {
+    flex-direction: column;
+  }
+
+  .export-footer .cancel-button,
+  .export-footer .copy-button,
+  .export-footer .export-button-confirm {
+    flex: none;
+    width: 100%;
   }
 }
