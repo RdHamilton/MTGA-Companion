@@ -114,6 +114,76 @@ func (r *MLSuggestionRepository) UpdateSeparateStatsFromIndividual(ctx context.C
 	return err
 }
 
+// RecordMatchStatsInTx records both individual card stats and combination stats
+// for a match within a single transaction to ensure atomicity.
+// This prevents double-counting if one operation succeeds but the other fails.
+func (r *MLSuggestionRepository) RecordMatchStatsInTx(ctx context.Context, cardIDs []int, format string, isWin bool) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	now := time.Now()
+
+	// Record individual card stats
+	individualQuery := `
+		INSERT INTO card_individual_stats (card_id, format, total_games, wins, updated_at)
+		VALUES (?, ?, 1, ?, ?)
+		ON CONFLICT(card_id, format) DO UPDATE SET
+			total_games = total_games + 1,
+			wins = wins + excluded.wins,
+			updated_at = excluded.updated_at
+	`
+	wins := 0
+	if isWin {
+		wins = 1
+	}
+
+	for _, cardID := range cardIDs {
+		if _, err = tx.ExecContext(ctx, individualQuery, cardID, format, wins, now); err != nil {
+			return fmt.Errorf("failed to record individual stats for card %d: %w", cardID, err)
+		}
+	}
+
+	// Record combination stats for all pairs
+	combinationQuery := `
+		INSERT INTO card_combination_stats (
+			card_id_1, card_id_2, deck_id, format,
+			games_together, games_card1_only, games_card2_only,
+			wins_together, wins_card1_only, wins_card2_only,
+			synergy_score, confidence_score, updated_at
+		) VALUES (?, ?, '', ?, 1, 0, 0, ?, 0, 0, 0, 0, ?)
+		ON CONFLICT(card_id_1, card_id_2, deck_id, format) DO UPDATE SET
+			games_together = games_together + 1,
+			wins_together = wins_together + excluded.wins_together,
+			updated_at = excluded.updated_at
+	`
+
+	for i := 0; i < len(cardIDs)-1; i++ {
+		for j := i + 1; j < len(cardIDs); j++ {
+			cardID1, cardID2 := cardIDs[i], cardIDs[j]
+			// Ensure proper ordering
+			if cardID1 > cardID2 {
+				cardID1, cardID2 = cardID2, cardID1
+			}
+			if _, err = tx.ExecContext(ctx, combinationQuery, cardID1, cardID2, format, wins, now); err != nil {
+				return fmt.Errorf("failed to record combination stats for cards %d,%d: %w", cardID1, cardID2, err)
+			}
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 // ============================================================================
 // Card Combination Stats
 // ============================================================================

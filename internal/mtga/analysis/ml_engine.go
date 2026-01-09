@@ -121,19 +121,13 @@ func (e *MLEngine) ProcessMatchHistory(ctx context.Context, format string, lookb
 			continue
 		}
 
-		// Record combinations and individual stats
+		// Record combinations and individual stats atomically in a transaction
+		// This prevents double-counting if one operation succeeds but the other fails
 		isWin := match.Result == "win"
 
-		// Record individual card appearances (#852)
-		// Transient error - don't mark as processed, allow retry
-		if err := e.recordIndividualCards(ctx, cardIDs, deck.Format, isWin); err != nil {
-			log.Printf("[MLEngine] Transient error recording individual cards for match %s: %v", match.ID, err)
-			continue
-		}
-
-		// Transient error - don't mark as processed, allow retry
-		if err := e.recordCombinations(ctx, cardIDs, deck.Format, isWin); err != nil {
-			log.Printf("[MLEngine] Transient error recording combinations for match %s: %v", match.ID, err)
+		if err := e.mlRepo.RecordMatchStatsInTx(ctx, cardIDs, deck.Format, isWin); err != nil {
+			// Transient error - don't mark as processed, allow retry
+			log.Printf("[MLEngine] Transient error recording match stats for match %s: %v", match.ID, err)
 			continue
 		}
 
@@ -173,25 +167,6 @@ func (e *MLEngine) ProcessMatchHistory(ctx context.Context, format string, lookb
 	return e.mlRepo.CalculateAndUpdateSynergyScores(ctx, e.minGames)
 }
 
-// recordIndividualCards records individual card appearances for a game.
-func (e *MLEngine) recordIndividualCards(ctx context.Context, cardIDs []int, format string, isWin bool) error {
-	for _, cardID := range cardIDs {
-		stats := &models.CardIndividualStats{
-			CardID:     cardID,
-			Format:     format,
-			TotalGames: 1,
-		}
-		if isWin {
-			stats.Wins = 1
-		}
-
-		if err := e.mlRepo.UpsertIndividualCardStats(ctx, stats); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // getDeckCardIDs extracts unique card IDs from a deck's mainboard.
 func (e *MLEngine) getDeckCardIDs(ctx context.Context, deckID string) ([]int, error) {
 	cards, err := e.deckRepo.GetCards(ctx, deckID)
@@ -209,33 +184,6 @@ func (e *MLEngine) getDeckCardIDs(ctx context.Context, deckID string) ([]int, er
 	}
 
 	return cardIDs, nil
-}
-
-// recordCombinations records all pairwise card combinations from a game.
-func (e *MLEngine) recordCombinations(ctx context.Context, cardIDs []int, format string, isWin bool) error {
-	// Sort card IDs for consistent ordering
-	sort.Ints(cardIDs)
-
-	// Process all pairs
-	for i := 0; i < len(cardIDs)-1; i++ {
-		for j := i + 1; j < len(cardIDs); j++ {
-			stats := &models.CardCombinationStats{
-				CardID1:       cardIDs[i],
-				CardID2:       cardIDs[j],
-				Format:        format,
-				GamesTogether: 1,
-			}
-			if isWin {
-				stats.WinsTogether = 1
-			}
-
-			if err := e.mlRepo.UpsertCombinationStats(ctx, stats); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // GenerateMLSuggestions creates ML-powered suggestions for a deck.

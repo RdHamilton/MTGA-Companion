@@ -44,3 +44,5 @@ CREATE INDEX IF NOT EXISTS idx_matches_event_id ON matches(event_id);
 CREATE INDEX IF NOT EXISTS idx_matches_format ON matches(format);
 CREATE INDEX IF NOT EXISTS idx_matches_result ON matches(result);
 CREATE INDEX IF NOT EXISTS idx_matches_account_id ON matches(account_id);
+CREATE INDEX IF NOT EXISTS idx_matches_opponent_id ON matches(opponent_id);
+CREATE INDEX IF NOT EXISTS idx_matches_opponent_name ON matches(opponent_name);
