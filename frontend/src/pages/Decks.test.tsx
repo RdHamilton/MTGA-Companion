@@ -988,7 +988,7 @@ describe('Decks', () => {
       mockDecks.exportDeck.mockResolvedValue({
         content: '',
         filename: '',
-        error: 'Export failed: deck not found',
+        error: 'deck not found',
       });
 
       const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
@@ -1007,7 +1007,7 @@ describe('Decks', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Download File' }));
 
       await waitFor(() => {
-        expect(alertMock).toHaveBeenCalledWith('Export failed: Export failed: deck not found');
+        expect(alertMock).toHaveBeenCalledWith('Export failed: deck not found');
       });
 
       alertMock.mockRestore();

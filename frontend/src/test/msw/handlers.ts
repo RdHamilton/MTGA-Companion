@@ -334,9 +334,17 @@ export const handlers = [
   }),
 
   // Deck export endpoint
-  http.post(`${API_BASE}/decks/:deckId/export`, ({ request }) => {
-    const url = new URL(request.url);
-    const format = url.searchParams.get('format') || 'arena';
+  http.post(`${API_BASE}/decks/:deckId/export`, async ({ request }) => {
+    // Read format from request body (the API sends { format: 'arena' })
+    let format = 'arena';
+    try {
+      const body = (await request.json()) as { format?: string };
+      if (body.format) {
+        format = body.format;
+      }
+    } catch {
+      // Use default format if body parsing fails
+    }
 
     const formatExtensions: Record<string, string> = {
       arena: '.txt',
