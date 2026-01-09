@@ -469,6 +469,144 @@ export async function suggestNextCards(
   return post<IterativeBuildAroundResponse>('/decks/build-around/suggest-next', request);
 }
 
+// ==========================================
+// Complete Deck Generation (Issue #774)
+// ==========================================
+
+/**
+ * Archetype profile for deck building.
+ * Matches backend ArchetypeProfileResponse.
+ */
+export interface ArchetypeProfile {
+  name: string;
+  landCount: number;
+  curveTargets: Record<number, number>;
+  creatureRatio: number;
+  removalCount: number;
+  cardAdvantage: number;
+  description: string;
+}
+
+/**
+ * Request to generate a complete 60-card deck.
+ */
+export interface GenerateCompleteDeckRequest {
+  seed_card_id: number;
+  archetype: 'aggro' | 'midrange' | 'control';
+  budget_mode?: boolean;
+  set_restriction?: string;
+  allowed_sets?: string[];
+}
+
+/**
+ * Score breakdown for card scoring.
+ */
+export interface ScoreBreakdown {
+  colorFit: number;
+  curveFit: number;
+  synergy: number;
+  quality: number;
+  overall: number;
+}
+
+/**
+ * Card with quantity for generated deck.
+ */
+export interface CardWithQuantity {
+  cardID: number;
+  name: string;
+  manaCost?: string;
+  cmc: number;
+  colors: string[];
+  typeLine: string;
+  rarity?: string;
+  imageURI?: string;
+  quantity: number;
+  score: number;
+  reasoning: string;
+  inCollection: boolean;
+  ownedCount: number;
+  neededCount: number;
+  scoreBreakdown?: ScoreBreakdown;
+  synergyDetails?: SynergyDetail[];
+}
+
+/**
+ * Land with quantity for generated deck.
+ */
+export interface LandWithQuantity {
+  cardID: number;
+  name: string;
+  quantity: number;
+  colors: string[];
+  isBasic: boolean;
+  entersTapped: boolean;
+}
+
+/**
+ * Strategy and game plan for a generated deck.
+ */
+export interface DeckStrategy {
+  summary: string;
+  gamePlan: string;
+  keyCards: string[];
+  mulligan: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+/**
+ * Analysis of a generated deck.
+ * Matches backend GeneratedDeckAnalysisResponse.
+ */
+export interface GeneratedDeckAnalysis {
+  totalCards: number;
+  spellCount: number;
+  landCount: number;
+  creatureCount: number;
+  nonCreatureCount: number;
+  averageCMC: number;
+  manaCurve: Record<number, number>;
+  colorDistribution: Record<string, number>;
+  inCollectionCount: number;
+  missingCount: number;
+  missingWildcardCost: Record<string, number>;
+  archetypeMatch: number;
+}
+
+/**
+ * Response from complete deck generation.
+ */
+export interface GenerateCompleteDeckResponse {
+  seedCard: CardWithOwnership;
+  spells: CardWithQuantity[];
+  lands: LandWithQuantity[];
+  strategy: DeckStrategy;
+  analysis: GeneratedDeckAnalysis;
+}
+
+/**
+ * Generate a complete 60-card deck from a seed card.
+ */
+export async function generateCompleteDeck(
+  request: GenerateCompleteDeckRequest
+): Promise<GenerateCompleteDeckResponse> {
+  return post<GenerateCompleteDeckResponse>('/decks/generate', request);
+}
+
+/**
+ * Get available archetype profiles.
+ * Returns a record keyed by archetype name (lowercase).
+ */
+export async function getArchetypeProfiles(): Promise<Record<string, ArchetypeProfile>> {
+  const profiles = await get<ArchetypeProfile[]>('/decks/archetypes');
+  const record: Record<string, ArchetypeProfile> = {};
+  for (const profile of profiles) {
+    record[profile.name.toLowerCase()] = profile;
+  }
+  return record;
+}
+
 // ============================================================================
 // Card Performance Analysis (Issue #771)
 // ============================================================================

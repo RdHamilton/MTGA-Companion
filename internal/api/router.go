@@ -94,6 +94,8 @@ func (s *Server) setupRoutes() {
 			r.Post("/suggest", deckHandler.SuggestDecks)
 			r.Post("/build-around", deckHandler.BuildAroundSeed)
 			r.Post("/build-around/suggest-next", deckHandler.SuggestNextCards)
+			r.Post("/generate", deckHandler.GenerateCompleteDeck)
+			r.Get("/archetypes", deckHandler.GetArchetypeProfiles)
 			r.Post("/analyze", deckHandler.AnalyzeDeck)
 			r.Post("/by-tags", deckHandler.GetDecksByTags)
 			r.Post("/library", deckHandler.GetDeckLibrary)

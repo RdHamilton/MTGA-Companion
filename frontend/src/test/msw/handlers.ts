@@ -313,6 +313,114 @@ export const handlers = [
     });
   }),
 
+  // Generate complete deck endpoint (Issue #774)
+  http.post(`${API_BASE}/decks/generate`, () => {
+    return successResponse({
+      seedCard: {
+        cardID: 12345,
+        name: 'Test Seed Card',
+        manaCost: '{2}{R}',
+        cmc: 3,
+        colors: ['R'],
+        typeLine: 'Creature - Human',
+        score: 1.0,
+        reasoning: 'Seed card',
+        inCollection: true,
+        ownedCount: 4,
+        neededCount: 0,
+        currentCopies: 0,
+        recommendedCopies: 4,
+      },
+      spells: [
+        {
+          cardID: 11111,
+          name: 'Aggressive Creature',
+          manaCost: '{R}',
+          cmc: 1,
+          colors: ['R'],
+          typeLine: 'Creature - Goblin',
+          rarity: 'common',
+          imageURI: '',
+          quantity: 4,
+          score: 0.9,
+          reasoning: 'Fast creature for aggro',
+          inCollection: true,
+          ownedCount: 4,
+        },
+        {
+          cardID: 22222,
+          name: 'Burn Spell',
+          manaCost: '{1}{R}',
+          cmc: 2,
+          colors: ['R'],
+          typeLine: 'Instant',
+          rarity: 'common',
+          imageURI: '',
+          quantity: 4,
+          score: 0.85,
+          reasoning: 'Removal spell',
+          inCollection: true,
+          ownedCount: 4,
+        },
+      ],
+      lands: [
+        {
+          cardID: 81717,
+          name: 'Mountain',
+          quantity: 20,
+          colors: ['R'],
+          isBasic: true,
+        },
+      ],
+      strategy: {
+        summary: 'An aggressive mono-red deck focused on fast creatures and burn.',
+        gamePlan: 'Deploy cheap threats early and finish with burn spells.',
+        keyCards: ['Aggressive Creature', 'Burn Spell'],
+        mulligan: 'Keep hands with 2-3 lands and cheap creatures.',
+        strengths: ['Fast', 'Consistent'],
+        weaknesses: ['Weak to lifegain', 'Runs out of gas late'],
+      },
+      analysis: {
+        totalCards: 60,
+        spellCount: 40,
+        landCount: 20,
+        creatureCount: 28,
+        nonCreatureCount: 12,
+        averageCMC: 2.1,
+        manaCurve: { 1: 8, 2: 12, 3: 10, 4: 6, 5: 4 },
+        colorDistribution: { R: 40 },
+        inCollectionCount: 55,
+        missingCount: 5,
+        missingWildcardCost: { common: 3, uncommon: 2 },
+        archetypeMatch: 0.85,
+      },
+    });
+  }),
+
+  // Get archetype profiles endpoint (Issue #774)
+  http.get(`${API_BASE}/decks/archetypes`, () => {
+    return successResponse({
+      aggro: {
+        name: 'Aggro',
+        landCount: 20,
+        curveTargets: { 1: 8, 2: 14, 3: 10, 4: 4, 5: 4, 6: 0 },
+        description: 'Fast, aggressive deck that aims to win quickly with cheap threats.',
+      },
+      midrange: {
+        name: 'Midrange',
+        landCount: 24,
+        curveTargets: { 1: 4, 2: 8, 3: 10, 4: 8, 5: 4, 6: 2 },
+        description: 'Balanced deck with efficient threats and answers.',
+      },
+      control: {
+        name: 'Control',
+        landCount: 26,
+        curveTargets: { 1: 2, 2: 6, 3: 8, 4: 8, 5: 6, 6: 4 },
+        description: 'Slow, controlling deck that grinds out opponents with removal.',
+      },
+    });
+  }),
+
   // Card search endpoint
   http.get(`${API_BASE}/cards`, ({ request }) => {
     const url = new URL(request.url);
