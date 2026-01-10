@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MatchComparisonPanel from './MatchComparisonPanel';
-import type { ComparisonResult } from '@/services/api/matches';
+import type { ComparisonResult, StatsFilter } from '@/services/api/matches';
 import * as matchesApi from '@/services/api/matches';
 
 vi.mock('@/services/api/matches', () => ({
@@ -14,8 +14,8 @@ const mockCompareFormats = vi.mocked(matchesApi.compareFormats);
 const mockCompareDecks = vi.mocked(matchesApi.compareDecks);
 const mockCompareTimePeriods = vi.mocked(matchesApi.compareTimePeriods);
 
-// Mock filter with required fields
-const mockFilter = { Formats: [], EventNames: [] };
+// Mock filter with required fields - cast as StatsFilter for test purposes
+const mockFilter = { Formats: [], EventNames: [] } as unknown as StatsFilter;
 
 const mockComparisonResult: ComparisonResult = {
   Groups: [
