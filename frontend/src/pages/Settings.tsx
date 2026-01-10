@@ -43,6 +43,16 @@ const Settings = () => {
     metaTop8Enabled,
     metaWeight,
     personalWeight,
+    // ML Suggestion Preferences
+    suggestionFrequency,
+    minimumConfidence,
+    showCardAdditions,
+    showCardRemovals,
+    showArchetypeChanges,
+    learnFromMatches,
+    learnFromDeckChanges,
+    retentionDays,
+    maxSuggestionsPerView,
     // Rotation settings
     rotationNotificationsEnabled,
     rotationNotificationThreshold,
@@ -63,6 +73,16 @@ const Settings = () => {
     setMetaTop8Enabled,
     setMetaWeight,
     setPersonalWeight,
+    // ML Suggestion Preferences setters
+    setSuggestionFrequency,
+    setMinimumConfidence,
+    setShowCardAdditions,
+    setShowCardRemovals,
+    setShowArchetypeChanges,
+    setLearnFromMatches,
+    setLearnFromDeckChanges,
+    setRetentionDays,
+    setMaxSuggestionsPerView,
     setRotationNotificationsEnabled,
     setRotationNotificationThreshold,
     saveSettings,
@@ -268,6 +288,25 @@ const Settings = () => {
             onMetaWeightChange={setMetaWeight}
             personalWeight={personalWeight}
             onPersonalWeightChange={setPersonalWeight}
+            // ML Suggestion Preferences
+            suggestionFrequency={suggestionFrequency}
+            onSuggestionFrequencyChange={setSuggestionFrequency}
+            minimumConfidence={minimumConfidence}
+            onMinimumConfidenceChange={setMinimumConfidence}
+            showCardAdditions={showCardAdditions}
+            onShowCardAdditionsChange={setShowCardAdditions}
+            showCardRemovals={showCardRemovals}
+            onShowCardRemovalsChange={setShowCardRemovals}
+            showArchetypeChanges={showArchetypeChanges}
+            onShowArchetypeChangesChange={setShowArchetypeChanges}
+            learnFromMatches={learnFromMatches}
+            onLearnFromMatchesChange={setLearnFromMatches}
+            learnFromDeckChanges={learnFromDeckChanges}
+            onLearnFromDeckChangesChange={setLearnFromDeckChanges}
+            retentionDays={retentionDays}
+            onRetentionDaysChange={setRetentionDays}
+            maxSuggestionsPerView={maxSuggestionsPerView}
+            onMaxSuggestionsPerViewChange={setMaxSuggestionsPerView}
           />
         ),
       },

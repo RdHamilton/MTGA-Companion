@@ -50,11 +50,21 @@ export namespace gui {
 	    personalWeight: number;
 	    rotationNotificationsEnabled: boolean;
 	    rotationNotificationThreshold: number;
+	    // ML Suggestion Preferences
+	    suggestionFrequency: string; // low, medium, high
+	    minimumConfidence: number; // 0-100
+	    showCardAdditions: boolean;
+	    showCardRemovals: boolean;
+	    showArchetypeChanges: boolean;
+	    learnFromMatches: boolean;
+	    learnFromDeckChanges: boolean;
+	    retentionDays: number; // 30, 90, 180, 365, -1 (forever)
+	    maxSuggestionsPerView: number; // 3, 5, 10
 
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.autoRefresh = source["autoRefresh"];
@@ -73,6 +83,16 @@ export namespace gui {
 	        this.personalWeight = source["personalWeight"];
 	        this.rotationNotificationsEnabled = source["rotationNotificationsEnabled"];
 	        this.rotationNotificationThreshold = source["rotationNotificationThreshold"];
+	        // ML Suggestion Preferences
+	        this.suggestionFrequency = source["suggestionFrequency"] ?? "medium";
+	        this.minimumConfidence = source["minimumConfidence"] ?? 50;
+	        this.showCardAdditions = source["showCardAdditions"] ?? true;
+	        this.showCardRemovals = source["showCardRemovals"] ?? true;
+	        this.showArchetypeChanges = source["showArchetypeChanges"] ?? true;
+	        this.learnFromMatches = source["learnFromMatches"] ?? true;
+	        this.learnFromDeckChanges = source["learnFromDeckChanges"] ?? true;
+	        this.retentionDays = source["retentionDays"] ?? 90;
+	        this.maxSuggestionsPerView = source["maxSuggestionsPerView"] ?? 5;
 	    }
 	}
 	export class DeckArchetypeAnalysis {
