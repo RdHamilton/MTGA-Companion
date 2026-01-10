@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cards } from '@/services/api';
-import { CFBRating, CFBLimitedGrade } from '@/services/api/cards';
+import type { CFBRating, CFBLimitedGrade } from '@/services/api/cards';
 import { gui, models } from '@/types/models';
 import { CFBRatingBadge } from './CFBRatingBadge';
 import './TierList.css';

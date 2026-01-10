@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CFBRatingBadge } from './CFBRatingBadge';
-import { CFBLimitedGrade, getCFBGradeColor } from '@/services/api/cards';
+import type { CFBLimitedGrade } from '@/services/api/cards';
+import { getCFBGradeColor } from '@/services/api/cards';
 
 describe('CFBRatingBadge', () => {
   it('renders the grade text', () => {

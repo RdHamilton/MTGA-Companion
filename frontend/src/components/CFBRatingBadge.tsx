@@ -1,5 +1,5 @@
-import React from 'react';
-import { CFBLimitedGrade, getCFBGradeColor } from '@/services/api/cards';
+import type { CFBLimitedGrade } from '@/services/api/cards';
+import { getCFBGradeColor } from '@/services/api/cards';
 import './CFBRatingBadge.css';
 
 export interface CFBRatingBadgeProps {
