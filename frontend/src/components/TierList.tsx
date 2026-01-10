@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { cards } from '@/services/api';
+import type { CFBRating, CFBLimitedGrade } from '@/services/api/cards';
 import { gui, models } from '@/types/models';
+import { CFBRatingBadge } from './CFBRatingBadge';
 import './TierList.css';
 
 type CardRating = gui.CardRatingWithTier;
@@ -18,6 +20,7 @@ type SortDirection = 'asc' | 'desc';
 const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds, onCardClick }) => {
     const [ratings, setRatings] = useState<CardRating[]>([]);
     const [setCards, setSetCards] = useState<models.SetCard[]>([]);
+    const [cfbRatings, setCfbRatings] = useState<Map<string, CFBRating>>(new Map());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +48,20 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                 ]);
                 setRatings(ratingsData || []);
                 setSetCards(cardsData || []);
+
+                // Load CFB ratings (optional, don't fail if not available)
+                try {
+                    const cfbData = await cards.getCFBRatings(setCode);
+                    const cfbMap = new Map<string, CFBRating>();
+                    (cfbData || []).forEach((cfb: CFBRating) => {
+                        // Index by card name (lowercase for case-insensitive matching)
+                        cfbMap.set(cfb.cardName.toLowerCase(), cfb);
+                    });
+                    setCfbRatings(cfbMap);
+                } catch {
+                    // CFB ratings not available for this set - this is fine
+                    setCfbRatings(new Map());
+                }
             } catch (err) {
                 console.error('Failed to load card ratings:', err);
                 setError(err instanceof Error ? err.message : 'Failed to load card ratings');
@@ -405,11 +422,15 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                                 ALSA {sortColumn === 'alsa' && (sortDirection === 'asc' ? '▲' : '▼')}
                                             </th>
                                             <th title="Card tier based on GIHWR (S = Bomb, A = Excellent, B = Good, C = Playable, D = Below Average, F = Avoid)">TIER</th>
+                                            {cfbRatings.size > 0 && (
+                                                <th title="ChannelFireball expert rating (A+ to F)">CFB</th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {tierCards.map((rating: CardRating) => {
                                             const isPicked = rating.mtga_id ? pickedCardIds.has(String(rating.mtga_id)) : false;
+                                            const cfbRating = cfbRatings.get(rating.name.toLowerCase());
 
                                             return (
                                                 <tr
@@ -437,6 +458,20 @@ const TierList: React.FC<TierListProps> = ({ setCode, draftFormat, pickedCardIds
                                                             {rating.tier}
                                                         </span>
                                                     </td>
+                                                    {cfbRatings.size > 0 && (
+                                                        <td className="card-cfb">
+                                                            {cfbRating ? (
+                                                                <CFBRatingBadge
+                                                                    grade={cfbRating.limitedRating as CFBLimitedGrade}
+                                                                    commentary={cfbRating.commentary}
+                                                                    size="small"
+                                                                    showLabel={false}
+                                                                />
+                                                            ) : (
+                                                                <span className="no-cfb-rating">-</span>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}

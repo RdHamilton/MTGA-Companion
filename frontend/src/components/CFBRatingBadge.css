@@ -1,0 +1,48 @@
+.cfb-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #000;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.cfb-rating-badge__label {
+  font-size: 0.7em;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cfb-rating-badge__grade {
+  font-weight: 700;
+}
+
+/* Size variants */
+.cfb-rating-badge--small {
+  padding: 1px 4px;
+  font-size: 0.75rem;
+  border-radius: 3px;
+}
+
+.cfb-rating-badge--small .cfb-rating-badge__label {
+  font-size: 0.65em;
+}
+
+.cfb-rating-badge--medium {
+  padding: 2px 6px;
+  font-size: 0.85rem;
+}
+
+.cfb-rating-badge--large {
+  padding: 4px 10px;
+  font-size: 1rem;
+  border-radius: 6px;
+}
+
+.cfb-rating-badge--large .cfb-rating-badge__label {
+  font-size: 0.75em;
+}

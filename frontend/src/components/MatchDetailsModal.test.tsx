@@ -29,12 +29,11 @@ import * as gameplays from '@/services/api/gameplays';
 const mockGetMatchGames = vi.mocked(matches.getMatchGames);
 const mockGetMatchTimeline = vi.mocked(gameplays.getMatchTimeline);
 
-const mockMatch: models.Match = {
+const mockMatch = new models.Match({
   ID: 'match-123',
   EventName: 'Standard Event',
   Format: 'Standard',
   DeckID: 'deck-456',
-  DeckName: 'Test Deck',
   Result: 'win',
   PlayerWins: 2,
   OpponentWins: 1,
@@ -42,27 +41,31 @@ const mockMatch: models.Match = {
   OpponentName: 'Opponent123',
   RankBefore: 'Gold 2',
   RankAfter: 'Gold 1',
-};
+  AccountID: 1,
+  EventID: 'event-123',
+  PlayerTeamID: 1,
+  CreatedAt: '2025-01-09T12:00:00Z',
+});
 
 const mockGames: models.Game[] = [
-  {
+  new models.Game({
     ID: 1,
     MatchID: 'match-123',
     GameNumber: 1,
     Result: 'win',
     DurationSeconds: 300,
     ResultReason: 'concede',
-    Timestamp: '2025-01-09T12:00:00Z',
-  },
-  {
+    CreatedAt: '2025-01-09T12:00:00Z',
+  }),
+  new models.Game({
     ID: 2,
     MatchID: 'match-123',
     GameNumber: 2,
     Result: 'loss',
     DurationSeconds: 450,
     ResultReason: 'normal',
-    Timestamp: '2025-01-09T12:10:00Z',
-  },
+    CreatedAt: '2025-01-09T12:10:00Z',
+  }),
 ];
 
 describe('MatchDetailsModal', () => {

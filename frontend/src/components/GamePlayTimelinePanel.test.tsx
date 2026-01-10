@@ -153,8 +153,8 @@ describe('GamePlayTimelinePanel', () => {
       render(<GamePlayTimelinePanel matchId="match-123" isExpanded={true} onToggle={() => {}} />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'T1' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'T2' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Turn 1' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Turn 2' })).toBeInTheDocument();
       });
     });
 
@@ -196,10 +196,10 @@ describe('GamePlayTimelinePanel', () => {
       render(<GamePlayTimelinePanel matchId="match-123" isExpanded={true} onToggle={() => {}} />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'T2' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Turn 2' })).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'T2' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Turn 2' }));
 
       await waitFor(() => {
         expect(screen.getByText('Turn 2')).toBeInTheDocument();
@@ -214,7 +214,7 @@ describe('GamePlayTimelinePanel', () => {
         expect(screen.getByText('Active: You')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'T2' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Turn 2' }));
 
       await waitFor(() => {
         expect(screen.getByText('Active: Opponent')).toBeInTheDocument();
@@ -268,10 +268,10 @@ describe('GamePlayTimelinePanel', () => {
 
       // Navigate to turn 2 which has attack action
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'T2' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Turn 2' })).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'T2' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Turn 2' }));
 
       await waitFor(() => {
         expect(screen.getByText('Attack')).toBeInTheDocument();

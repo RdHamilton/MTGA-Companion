@@ -15,6 +15,12 @@ export const mockCards = {
   getColorRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
   getRatingsStaleness: vi.fn((() => Promise.resolve({ cachedAt: new Date().toISOString(), isStale: false, cardCount: 100 })) as MockFn),
   refreshSetRatings: vi.fn((() => Promise.resolve()) as MockFn),
+  getCFBRatings: vi.fn((() => Promise.resolve([] as unknown[])) as MockFn),
+  getCFBRatingsCount: vi.fn((() => Promise.resolve({ set_code: '', count: 0 })) as MockFn),
+  getCFBRatingByCard: vi.fn((() => Promise.resolve({} as unknown)) as MockFn),
+  importCFBRatings: vi.fn((() => Promise.resolve({ status: 'success', imported: 0, message: '' })) as MockFn),
+  linkCFBArenaIds: vi.fn((() => Promise.resolve({ status: 'success', set_code: '', linked: 0, message: '' })) as MockFn),
+  deleteCFBRatings: vi.fn((() => Promise.resolve()) as MockFn),
 };
 
 export const mockMatches = {
