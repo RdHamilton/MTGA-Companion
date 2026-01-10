@@ -32,7 +32,7 @@ describe('useDeckUndoRedo', () => {
     deck: {} as models.Deck,
     cards,
     tags: [],
-  } as DeckWithCards);
+  } as unknown as DeckWithCards);
 
   beforeEach(() => {
     vi.clearAllMocks();
