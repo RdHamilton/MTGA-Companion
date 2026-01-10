@@ -10,6 +10,8 @@ import type {
   ArchetypeProfile,
 } from '@/services/api/decks';
 import { models } from '@/types/models';
+import ProgressModal from './ProgressModal';
+import ProgressBar from './ProgressBar';
 import './BuildAroundSeedModal.css';
 
 type ArchetypeKey = 'aggro' | 'midrange' | 'control';
@@ -118,6 +120,11 @@ export default function BuildAroundSeedModal({
   const [archetypeProfiles, setArchetypeProfiles] = useState<Record<string, ArchetypeProfile> | null>(null);
   const [generatedDeck, setGeneratedDeck] = useState<GenerateCompleteDeckResponse | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // Progress tracking state (Issue #805)
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationDetail, setGenerationDetail] = useState('');
+  const generationAbortRef = useRef(false);
 
   // Fetch card names for deck cards when modal opens
   useEffect(() => {
@@ -375,19 +382,37 @@ export default function BuildAroundSeedModal({
     setLoading(true);
     setError(null);
     setSuggestions(null);
+    setGenerationProgress(0);
+    setGenerationDetail('Analyzing card synergies...');
 
     try {
+      // Show progress while building
+      setGenerationProgress(20);
+      setGenerationDetail('Finding compatible cards...');
+
+      await new Promise(resolve => setTimeout(resolve, 150));
+      setGenerationProgress(40);
+      setGenerationDetail('Evaluating synergies...');
+
       const response = await decks.buildAroundSeed({
         seed_card_id: selectedCard.arenaID,
         max_results: 40,
         budget_mode: budgetMode,
         set_restriction: 'all',
       });
+
+      setGenerationProgress(80);
+      setGenerationDetail('Calculating lands...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      setGenerationProgress(100);
       setSuggestions(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
     } finally {
       setLoading(false);
+      setGenerationProgress(0);
+      setGenerationDetail('');
     }
   };
 
@@ -473,20 +498,77 @@ export default function BuildAroundSeedModal({
     setSelectedArchetype(archetype);
     setGenerating(true);
     setError(null);
+    setGenerationProgress(0);
+    setGenerationDetail('Initializing deck generation...');
+    generationAbortRef.current = false;
 
     try {
-      const response = await decks.generateCompleteDeck({
+      // Simulate progress stages since the API doesn't provide real-time progress
+      setGenerationProgress(10);
+      setGenerationDetail('Analyzing seed card colors and themes...');
+
+      // Check for abort
+      if (generationAbortRef.current) {
+        throw new Error('Generation cancelled');
+      }
+
+      // Small delay to show progress visually
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setGenerationProgress(25);
+      setGenerationDetail('Finding synergistic cards...');
+
+      if (generationAbortRef.current) {
+        throw new Error('Generation cancelled');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setGenerationProgress(40);
+      setGenerationDetail('Evaluating card combinations...');
+
+      // Perform the actual API call
+      const responsePromise = decks.generateCompleteDeck({
         seed_card_id: selectedCard.arenaID,
         archetype,
         budget_mode: budgetMode,
       });
+
+      // Continue showing progress while waiting
+      setGenerationProgress(60);
+      setGenerationDetail('Building deck composition...');
+
+      const response = await responsePromise;
+
+      if (generationAbortRef.current) {
+        throw new Error('Generation cancelled');
+      }
+
+      setGenerationProgress(85);
+      setGenerationDetail('Calculating mana base...');
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      setGenerationProgress(100);
+      setGenerationDetail('Finalizing deck...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       setGeneratedDeck(response);
       setShowArchetypeSelector(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate deck');
+      if (err instanceof Error && err.message === 'Generation cancelled') {
+        // User cancelled, just reset state
+        setShowArchetypeSelector(true);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to generate deck');
+      }
     } finally {
       setGenerating(false);
+      setGenerationProgress(0);
+      setGenerationDetail('');
     }
+  };
+
+  // Cancel deck generation
+  const handleCancelGeneration = () => {
+    generationAbortRef.current = true;
   };
 
   // Apply generated deck to the current deck
@@ -639,8 +721,17 @@ export default function BuildAroundSeedModal({
               </div>
             )}
 
-            {/* Loading */}
-            {loading && <div className="loading-indicator">Loading suggestions...</div>}
+            {/* Loading - Iterative Mode */}
+            {loading && (
+              <div className="iterative-loading-container">
+                <ProgressBar
+                  progress={-1}
+                  label="Loading suggestions..."
+                  indeterminate={true}
+                  size="medium"
+                />
+              </div>
+            )}
 
             {/* Suggestions Grid */}
             {!loading && iterativeSuggestions.length > 0 && (
@@ -1219,12 +1310,16 @@ export default function BuildAroundSeedModal({
               </div>
             )}
 
-            {/* Loading */}
-            {generating && (
-              <div className="loading-indicator">
-                Generating your {selectedArchetype} deck...
-              </div>
-            )}
+            {/* Progress Modal for Deck Generation */}
+            <ProgressModal
+              isOpen={generating}
+              title={`Generating ${selectedArchetype?.charAt(0).toUpperCase()}${selectedArchetype?.slice(1)} Deck`}
+              progress={generationProgress}
+              detail={generationDetail}
+              cancellable={true}
+              onCancel={handleCancelGeneration}
+              icon="🎴"
+            />
 
             {/* Archetype Options */}
             {!generating && (
@@ -1438,6 +1533,15 @@ export default function BuildAroundSeedModal({
                   <span>Budget Mode (only cards in collection)</span>
                 </label>
               </div>
+
+              {/* Progress Modal for Quick Build */}
+              <ProgressModal
+                isOpen={loading}
+                title="Building Deck Suggestions"
+                progress={generationProgress}
+                detail={generationDetail}
+                icon="🔍"
+              />
 
               {/* Build Mode Buttons */}
               <div className="build-mode-buttons">

@@ -13,6 +13,7 @@ import {
   getConfidenceColor,
   parseReasons,
 } from '@/services/api/mlSuggestions';
+import ProgressBar from './ProgressBar';
 import './MLSuggestionsPanel.css';
 
 interface MLSuggestionsPanelProps {
@@ -38,6 +39,8 @@ export default function MLSuggestionsPanel({
   const [filterType, setFilterType] = useState<MLSuggestionType | 'all'>('all');
   const [showDismissed, setShowDismissed] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationDetail, setGenerationDetail] = useState('');
 
   const loadSuggestions = useCallback(async () => {
     setLoading(true);
@@ -60,8 +63,32 @@ export default function MLSuggestionsPanel({
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
+    setGenerationProgress(0);
+    setGenerationDetail('Initializing ML analysis...');
+
     try {
+      // Show progress stages
+      setGenerationProgress(15);
+      setGenerationDetail('Loading card synergy data...');
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setGenerationProgress(35);
+      setGenerationDetail('Analyzing deck composition...');
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setGenerationProgress(55);
+      setGenerationDetail('Evaluating card combinations...');
+
       const results: MLSuggestionResult[] = await mlApi.generateMLSuggestions(deckId);
+
+      setGenerationProgress(80);
+      setGenerationDetail('Ranking suggestions...');
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      setGenerationProgress(100);
+      setGenerationDetail('Complete!');
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       setSuggestions(results?.map((r) => r.suggestion) || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate ML suggestions';
@@ -72,6 +99,8 @@ export default function MLSuggestionsPanel({
       }
     } finally {
       setGenerating(false);
+      setGenerationProgress(0);
+      setGenerationDetail('');
     }
   };
 
@@ -159,13 +188,25 @@ export default function MLSuggestionsPanel({
       )}
 
       <div className="suggestions-actions">
-        <button
-          className="generate-btn"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
-          {generating ? 'Analyzing synergies...' : 'Generate ML Suggestions'}
-        </button>
+        {generating ? (
+          <div className="generation-progress-container">
+            <ProgressBar
+              progress={generationProgress}
+              label="Generating ML Suggestions"
+              detail={generationDetail}
+              size="medium"
+              showPercentage={true}
+            />
+          </div>
+        ) : (
+          <button
+            className="generate-btn"
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            Generate ML Suggestions
+          </button>
+        )}
         <label className="show-dismissed">
           <input
             type="checkbox"

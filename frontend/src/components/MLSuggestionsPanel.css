@@ -392,3 +392,12 @@
   outline: 2px solid var(--accent-color, #89b4fa);
   outline-offset: 2px;
 }
+
+/* Generation Progress Container - Issue #805 */
+.generation-progress-container {
+  flex: 1;
+  padding: 12px;
+  background: var(--bg-primary, #1a1a2e);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #313244);
+}
