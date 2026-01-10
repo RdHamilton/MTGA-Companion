@@ -53,6 +53,11 @@ type CollectionCard struct {
 	ImageURI      string   `json:"imageUri"`
 	Power         string   `json:"power,omitempty"`
 	Toughness     string   `json:"toughness,omitempty"`
+	// Price fields from Scryfall
+	PriceUSD        *float64 `json:"priceUsd,omitempty"`
+	PriceUSDFoil    *float64 `json:"priceUsdFoil,omitempty"`
+	PriceEUR        *float64 `json:"priceEur,omitempty"`
+	PricesUpdatedAt *int64   `json:"pricesUpdatedAt,omitempty"` // Unix timestamp
 }
 
 // CollectionFilter specifies filter criteria for collection queries.
@@ -143,19 +148,28 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			quantity := collection[arenaID] // Will be 0 if not owned
 
 			card := &CollectionCard{
-				CardID:    arenaID,
-				ArenaID:   arenaID,
-				Quantity:  quantity,
-				Name:      meta.Name,
-				SetCode:   meta.SetCode,
-				Rarity:    meta.Rarity,
-				ManaCost:  meta.ManaCost,
-				CMC:       float64(meta.CMC),
-				TypeLine:  strings.Join(meta.Types, " "),
-				Colors:    meta.Colors,
-				ImageURI:  meta.ImageURL,
-				Power:     meta.Power,
-				Toughness: meta.Toughness,
+				CardID:       arenaID,
+				ArenaID:      arenaID,
+				Quantity:     quantity,
+				Name:         meta.Name,
+				SetCode:      meta.SetCode,
+				Rarity:       meta.Rarity,
+				ManaCost:     meta.ManaCost,
+				CMC:          float64(meta.CMC),
+				TypeLine:     strings.Join(meta.Types, " "),
+				Colors:       meta.Colors,
+				ImageURI:     meta.ImageURL,
+				Power:        meta.Power,
+				Toughness:    meta.Toughness,
+				PriceUSD:     meta.PriceUSD,
+				PriceUSDFoil: meta.PriceUSDFoil,
+				PriceEUR:     meta.PriceEUR,
+			}
+
+			// Set prices updated timestamp
+			if meta.PricesUpdatedAt != nil {
+				ts := meta.PricesUpdatedAt.Unix()
+				card.PricesUpdatedAt = &ts
 			}
 
 			if card.ImageURI == "" {
@@ -200,6 +214,14 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 			}
 			if meta.Toughness != "" {
 				card.Toughness = meta.Toughness
+			}
+			// Add price fields
+			card.PriceUSD = meta.PriceUSD
+			card.PriceUSDFoil = meta.PriceUSDFoil
+			card.PriceEUR = meta.PriceEUR
+			if meta.PricesUpdatedAt != nil {
+				ts := meta.PricesUpdatedAt.Unix()
+				card.PricesUpdatedAt = &ts
 			}
 		} else {
 			// Track this card for potential Scryfall lookup
@@ -286,6 +308,14 @@ func (c *CollectionFacade) GetCollection(ctx context.Context, filter *Collection
 					}
 					if meta.Toughness != "" {
 						card.Toughness = meta.Toughness
+					}
+					// Add price fields
+					card.PriceUSD = meta.PriceUSD
+					card.PriceUSDFoil = meta.PriceUSDFoil
+					card.PriceEUR = meta.PriceEUR
+					if meta.PricesUpdatedAt != nil {
+						ts := meta.PricesUpdatedAt.Unix()
+						card.PricesUpdatedAt = &ts
 					}
 					break
 				}
@@ -823,4 +853,187 @@ func (c *CollectionFacade) GetMissingCardsForSet(ctx context.Context, setCode st
 		WildcardsNeeded: wildcardCost,
 		CompletionPct:   completionPct,
 	}, nil
+}
+
+// CollectionValue represents the estimated value of the collection.
+type CollectionValue struct {
+	TotalValueUSD        float64            `json:"totalValueUsd"`         // Total collection value in USD
+	TotalValueEUR        float64            `json:"totalValueEur"`         // Total collection value in EUR
+	UniqueCardsWithPrice int                `json:"uniqueCardsWithPrice"`  // Cards that have price data
+	CardCount            int                `json:"cardCount"`             // Total card copies counted
+	ValueByRarity        map[string]float64 `json:"valueByRarity"`         // Value breakdown by rarity (USD)
+	TopCards             []*CardValue       `json:"topCards"`              // Top 10 most valuable cards
+	LastUpdated          *int64             `json:"lastUpdated,omitempty"` // Oldest price update timestamp
+}
+
+// CardValue represents a card with its value.
+type CardValue struct {
+	CardID   int     `json:"cardId"`
+	Name     string  `json:"name"`
+	SetCode  string  `json:"setCode"`
+	Rarity   string  `json:"rarity"`
+	Quantity int     `json:"quantity"`
+	PriceUSD float64 `json:"priceUsd"`
+	TotalUSD float64 `json:"totalUsd"` // Price * Quantity
+}
+
+// GetCollectionValue returns the estimated value of the player's collection.
+func (c *CollectionFacade) GetCollectionValue(ctx context.Context) (*CollectionValue, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get collection with full data (only owned cards)
+	filter := &CollectionFilter{OwnedOnly: true}
+	response, err := c.GetCollection(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	value := &CollectionValue{
+		ValueByRarity: make(map[string]float64),
+		TopCards:      make([]*CardValue, 0),
+	}
+
+	var oldestUpdate *int64
+	allCardValues := make([]*CardValue, 0)
+
+	for _, card := range response.Cards {
+		if card.Quantity <= 0 {
+			continue
+		}
+
+		value.CardCount += card.Quantity
+
+		// Calculate value if price is available
+		if card.PriceUSD != nil && *card.PriceUSD > 0 {
+			cardTotal := *card.PriceUSD * float64(card.Quantity)
+			value.TotalValueUSD += cardTotal
+			value.UniqueCardsWithPrice++
+
+			// Track by rarity
+			rarity := strings.ToLower(card.Rarity)
+			value.ValueByRarity[rarity] += cardTotal
+
+			// Track for top cards
+			allCardValues = append(allCardValues, &CardValue{
+				CardID:   card.CardID,
+				Name:     card.Name,
+				SetCode:  card.SetCode,
+				Rarity:   card.Rarity,
+				Quantity: card.Quantity,
+				PriceUSD: *card.PriceUSD,
+				TotalUSD: cardTotal,
+			})
+
+			// Track oldest price update
+			if card.PricesUpdatedAt != nil {
+				if oldestUpdate == nil || *card.PricesUpdatedAt < *oldestUpdate {
+					oldestUpdate = card.PricesUpdatedAt
+				}
+			}
+		}
+
+		// Calculate EUR value
+		if card.PriceEUR != nil && *card.PriceEUR > 0 {
+			value.TotalValueEUR += *card.PriceEUR * float64(card.Quantity)
+		}
+	}
+
+	// Sort by total value and take top 10
+	sort.Slice(allCardValues, func(i, j int) bool {
+		return allCardValues[i].TotalUSD > allCardValues[j].TotalUSD
+	})
+	if len(allCardValues) > 10 {
+		value.TopCards = allCardValues[:10]
+	} else {
+		value.TopCards = allCardValues
+	}
+
+	value.LastUpdated = oldestUpdate
+
+	return value, nil
+}
+
+// DeckValue represents the estimated value of a deck.
+type DeckValue struct {
+	DeckID         string       `json:"deckId"`
+	DeckName       string       `json:"deckName"`
+	TotalValueUSD  float64      `json:"totalValueUsd"`
+	TotalValueEUR  float64      `json:"totalValueEur"`
+	CardCount      int          `json:"cardCount"`
+	CardsWithPrice int          `json:"cardsWithPrice"`
+	TopCards       []*CardValue `json:"topCards"` // Top 5 most valuable cards in deck
+}
+
+// GetDeckValue returns the estimated value of a specific deck.
+func (c *CollectionFacade) GetDeckValue(ctx context.Context, deckID string) (*DeckValue, error) {
+	if c.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized"}
+	}
+
+	// Get the deck
+	deck, err := c.services.Storage.DeckRepo().GetByID(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck: %v", err)}
+	}
+	if deck == nil {
+		return nil, &AppError{Message: "Deck not found"}
+	}
+
+	// Get deck cards
+	deckCards, err := c.services.Storage.DeckRepo().GetCards(ctx, deckID)
+	if err != nil {
+		return nil, &AppError{Message: fmt.Sprintf("Failed to get deck cards: %v", err)}
+	}
+
+	value := &DeckValue{
+		DeckID:   deckID,
+		DeckName: deck.Name,
+		TopCards: make([]*CardValue, 0),
+	}
+
+	allCardValues := make([]*CardValue, 0)
+
+	for _, deckCard := range deckCards {
+		value.CardCount += deckCard.Quantity
+
+		// Get card metadata with price
+		arenaID := fmt.Sprintf("%d", deckCard.CardID)
+		cardMeta, _ := c.services.Storage.SetCardRepo().GetCardByArenaID(ctx, arenaID)
+
+		if cardMeta != nil {
+			if cardMeta.PriceUSD != nil && *cardMeta.PriceUSD > 0 {
+				cardTotal := *cardMeta.PriceUSD * float64(deckCard.Quantity)
+				value.TotalValueUSD += cardTotal
+				value.CardsWithPrice++
+
+				allCardValues = append(allCardValues, &CardValue{
+					CardID:   deckCard.CardID,
+					Name:     cardMeta.Name,
+					SetCode:  cardMeta.SetCode,
+					Rarity:   cardMeta.Rarity,
+					Quantity: deckCard.Quantity,
+					PriceUSD: *cardMeta.PriceUSD,
+					TotalUSD: cardTotal,
+				})
+			}
+
+			if cardMeta.PriceEUR != nil && *cardMeta.PriceEUR > 0 {
+				value.TotalValueEUR += *cardMeta.PriceEUR * float64(deckCard.Quantity)
+			}
+		}
+	}
+
+	// Sort by total value and take top 5
+	sort.Slice(allCardValues, func(i, j int) bool {
+		return allCardValues[i].TotalUSD > allCardValues[j].TotalUSD
+	})
+	if len(allCardValues) > 5 {
+		value.TopCards = allCardValues[:5]
+	} else {
+		value.TopCards = allCardValues
+	}
+
+	return value, nil
 }

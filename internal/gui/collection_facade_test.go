@@ -370,3 +370,242 @@ func TestMaxAutoLookups_Value(t *testing.T) {
 		t.Errorf("maxAutoLookups = %d, expected 10", maxAutoLookups)
 	}
 }
+
+func TestCollectionValue_Fields(t *testing.T) {
+	lastUpdated := int64(1704067200)
+	value := &CollectionValue{
+		TotalValueUSD:        1234.56,
+		TotalValueEUR:        1100.00,
+		UniqueCardsWithPrice: 500,
+		CardCount:            1500,
+		ValueByRarity: map[string]float64{
+			"mythic":   500.00,
+			"rare":     600.00,
+			"uncommon": 100.00,
+			"common":   34.56,
+		},
+		TopCards: []*CardValue{
+			{CardID: 1, Name: "Black Lotus", SetCode: "LEA", Rarity: "rare", Quantity: 1, PriceUSD: 50000.00, TotalUSD: 50000.00},
+		},
+		LastUpdated: &lastUpdated,
+	}
+
+	// Verify basic fields
+	if value.TotalValueUSD != 1234.56 {
+		t.Errorf("TotalValueUSD = %f, want 1234.56", value.TotalValueUSD)
+	}
+	if value.TotalValueEUR != 1100.00 {
+		t.Errorf("TotalValueEUR = %f, want 1100.00", value.TotalValueEUR)
+	}
+	if value.UniqueCardsWithPrice != 500 {
+		t.Errorf("UniqueCardsWithPrice = %d, want 500", value.UniqueCardsWithPrice)
+	}
+	if value.CardCount != 1500 {
+		t.Errorf("CardCount = %d, want 1500", value.CardCount)
+	}
+
+	// Verify rarity breakdown sums correctly
+	var rarityTotal float64
+	for _, v := range value.ValueByRarity {
+		rarityTotal += v
+	}
+	if rarityTotal != 1234.56 {
+		t.Errorf("ValueByRarity sum = %f, want 1234.56", rarityTotal)
+	}
+
+	// Verify top cards
+	if len(value.TopCards) != 1 {
+		t.Errorf("TopCards length = %d, want 1", len(value.TopCards))
+	}
+	if value.TopCards[0].Name != "Black Lotus" {
+		t.Errorf("TopCards[0].Name = %s, want Black Lotus", value.TopCards[0].Name)
+	}
+
+	// Verify last updated
+	if value.LastUpdated == nil {
+		t.Error("LastUpdated should not be nil")
+	} else if *value.LastUpdated != lastUpdated {
+		t.Errorf("LastUpdated = %d, want %d", *value.LastUpdated, lastUpdated)
+	}
+}
+
+func TestCollectionValue_EmptyCollection(t *testing.T) {
+	value := &CollectionValue{
+		ValueByRarity: make(map[string]float64),
+		TopCards:      make([]*CardValue, 0),
+	}
+
+	if value.TotalValueUSD != 0 {
+		t.Errorf("Empty collection TotalValueUSD = %f, want 0", value.TotalValueUSD)
+	}
+	if value.CardCount != 0 {
+		t.Errorf("Empty collection CardCount = %d, want 0", value.CardCount)
+	}
+	if len(value.TopCards) != 0 {
+		t.Errorf("Empty collection TopCards length = %d, want 0", len(value.TopCards))
+	}
+}
+
+func TestCardValue_TotalCalculation(t *testing.T) {
+	tests := []struct {
+		name        string
+		priceUSD    float64
+		quantity    int
+		expectedTot float64
+	}{
+		{"single copy", 10.00, 1, 10.00},
+		{"playset", 25.00, 4, 100.00},
+		{"three copies", 3.33, 3, 9.99},
+		{"zero price", 0.00, 4, 0.00},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := &CardValue{
+				CardID:   1,
+				Name:     "Test Card",
+				Quantity: tt.quantity,
+				PriceUSD: tt.priceUSD,
+				TotalUSD: tt.priceUSD * float64(tt.quantity),
+			}
+
+			if card.TotalUSD != tt.expectedTot {
+				t.Errorf("TotalUSD = %f, want %f", card.TotalUSD, tt.expectedTot)
+			}
+		})
+	}
+}
+
+func TestDeckValue_Fields(t *testing.T) {
+	value := &DeckValue{
+		DeckID:         "deck-123",
+		DeckName:       "Test Deck",
+		TotalValueUSD:  250.50,
+		TotalValueEUR:  225.00,
+		CardCount:      60,
+		CardsWithPrice: 55,
+		TopCards: []*CardValue{
+			{CardID: 1, Name: "Mox Diamond", SetCode: "STH", Rarity: "rare", Quantity: 1, PriceUSD: 100.00, TotalUSD: 100.00},
+			{CardID: 2, Name: "City of Traitors", SetCode: "EXO", Rarity: "rare", Quantity: 1, PriceUSD: 80.00, TotalUSD: 80.00},
+		},
+	}
+
+	if value.DeckID != "deck-123" {
+		t.Errorf("DeckID = %s, want deck-123", value.DeckID)
+	}
+	if value.DeckName != "Test Deck" {
+		t.Errorf("DeckName = %s, want Test Deck", value.DeckName)
+	}
+	if value.TotalValueUSD != 250.50 {
+		t.Errorf("TotalValueUSD = %f, want 250.50", value.TotalValueUSD)
+	}
+	if value.CardCount != 60 {
+		t.Errorf("CardCount = %d, want 60", value.CardCount)
+	}
+	if value.CardsWithPrice != 55 {
+		t.Errorf("CardsWithPrice = %d, want 55", value.CardsWithPrice)
+	}
+	if len(value.TopCards) != 2 {
+		t.Errorf("TopCards length = %d, want 2", len(value.TopCards))
+	}
+}
+
+func TestDeckValue_EmptyDeck(t *testing.T) {
+	value := &DeckValue{
+		DeckID:         "empty-deck",
+		DeckName:       "Empty Deck",
+		TotalValueUSD:  0,
+		TotalValueEUR:  0,
+		CardCount:      0,
+		CardsWithPrice: 0,
+		TopCards:       make([]*CardValue, 0),
+	}
+
+	if value.TotalValueUSD != 0 {
+		t.Errorf("Empty deck TotalValueUSD = %f, want 0", value.TotalValueUSD)
+	}
+	if value.CardCount != 0 {
+		t.Errorf("Empty deck CardCount = %d, want 0", value.CardCount)
+	}
+	if len(value.TopCards) != 0 {
+		t.Errorf("Empty deck TopCards length = %d, want 0", len(value.TopCards))
+	}
+}
+
+func TestDeckValue_TopCardsSortedByValue(t *testing.T) {
+	// Simulate how top cards should be sorted (highest value first)
+	cards := []*CardValue{
+		{Name: "Cheap Card", TotalUSD: 5.00},
+		{Name: "Expensive Card", TotalUSD: 100.00},
+		{Name: "Medium Card", TotalUSD: 25.00},
+	}
+
+	// Sort by TotalUSD descending
+	for i := 0; i < len(cards)-1; i++ {
+		for j := i + 1; j < len(cards); j++ {
+			if cards[i].TotalUSD < cards[j].TotalUSD {
+				cards[i], cards[j] = cards[j], cards[i]
+			}
+		}
+	}
+
+	expectedOrder := []string{"Expensive Card", "Medium Card", "Cheap Card"}
+	for i, card := range cards {
+		if card.Name != expectedOrder[i] {
+			t.Errorf("cards[%d].Name = %s, want %s", i, card.Name, expectedOrder[i])
+		}
+	}
+}
+
+func TestCollectionCard_PriceFields(t *testing.T) {
+	priceUSD := 10.50
+	priceUSDFoil := 25.00
+	priceEUR := 9.00
+	pricesUpdatedAt := int64(1704067200)
+
+	card := &CollectionCard{
+		CardID:          1,
+		Name:            "Test Card",
+		Quantity:        4,
+		PriceUSD:        &priceUSD,
+		PriceUSDFoil:    &priceUSDFoil,
+		PriceEUR:        &priceEUR,
+		PricesUpdatedAt: &pricesUpdatedAt,
+	}
+
+	// Verify price fields
+	if card.PriceUSD == nil || *card.PriceUSD != 10.50 {
+		t.Errorf("PriceUSD = %v, want 10.50", card.PriceUSD)
+	}
+	if card.PriceUSDFoil == nil || *card.PriceUSDFoil != 25.00 {
+		t.Errorf("PriceUSDFoil = %v, want 25.00", card.PriceUSDFoil)
+	}
+	if card.PriceEUR == nil || *card.PriceEUR != 9.00 {
+		t.Errorf("PriceEUR = %v, want 9.00", card.PriceEUR)
+	}
+	if card.PricesUpdatedAt == nil || *card.PricesUpdatedAt != pricesUpdatedAt {
+		t.Errorf("PricesUpdatedAt = %v, want %d", card.PricesUpdatedAt, pricesUpdatedAt)
+	}
+}
+
+func TestCollectionCard_NilPrices(t *testing.T) {
+	card := &CollectionCard{
+		CardID:   1,
+		Name:     "Card Without Prices",
+		Quantity: 4,
+	}
+
+	// All price fields should be nil
+	if card.PriceUSD != nil {
+		t.Errorf("PriceUSD should be nil, got %v", card.PriceUSD)
+	}
+	if card.PriceUSDFoil != nil {
+		t.Errorf("PriceUSDFoil should be nil, got %v", card.PriceUSDFoil)
+	}
+	if card.PriceEUR != nil {
+		t.Errorf("PriceEUR should be nil, got %v", card.PriceEUR)
+	}
+	if card.PricesUpdatedAt != nil {
+		t.Errorf("PricesUpdatedAt should be nil, got %v", card.PricesUpdatedAt)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -223,24 +224,57 @@ func convertScryfallCard(scryfallCard *scryfall.Card, setCode string, fetchedAt 
 		arenaID = fmt.Sprintf("%d", *scryfallCard.ArenaID)
 	}
 
-	return &models.SetCard{
-		SetCode:       setCode,
-		ArenaID:       arenaID,
-		ScryfallID:    scryfallCard.ID,
-		Name:          scryfallCard.Name,
-		ManaCost:      scryfallCard.ManaCost,
-		CMC:           int(scryfallCard.CMC),
-		Types:         types,
-		Colors:        scryfallCard.Colors,
-		Rarity:        scryfallCard.Rarity,
-		Text:          scryfallCard.OracleText,
-		Power:         scryfallCard.Power,
-		Toughness:     scryfallCard.Toughness,
-		ImageURL:      imageURL,
-		ImageURLSmall: imageURLSmall,
-		ImageURLArt:   imageURLArt,
-		FetchedAt:     fetchedAt,
+	// Parse price fields from Scryfall
+	priceUSD := parsePriceString(scryfallCard.Prices.USD)
+	priceUSDFoil := parsePriceString(scryfallCard.Prices.USDFoil)
+	priceEUR := parsePriceString(scryfallCard.Prices.EUR)
+	priceEURFoil := parsePriceString(scryfallCard.Prices.EURFoil)
+	priceTIX := parsePriceString(scryfallCard.Prices.TIX)
+
+	// Set prices updated timestamp if any price is available
+	var pricesUpdatedAt *time.Time
+	if priceUSD != nil || priceUSDFoil != nil || priceEUR != nil || priceEURFoil != nil || priceTIX != nil {
+		t := fetchedAt
+		pricesUpdatedAt = &t
 	}
+
+	return &models.SetCard{
+		SetCode:         setCode,
+		ArenaID:         arenaID,
+		ScryfallID:      scryfallCard.ID,
+		Name:            scryfallCard.Name,
+		ManaCost:        scryfallCard.ManaCost,
+		CMC:             int(scryfallCard.CMC),
+		Types:           types,
+		Colors:          scryfallCard.Colors,
+		Rarity:          scryfallCard.Rarity,
+		Text:            scryfallCard.OracleText,
+		Power:           scryfallCard.Power,
+		Toughness:       scryfallCard.Toughness,
+		ImageURL:        imageURL,
+		ImageURLSmall:   imageURLSmall,
+		ImageURLArt:     imageURLArt,
+		FetchedAt:       fetchedAt,
+		PriceUSD:        priceUSD,
+		PriceUSDFoil:    priceUSDFoil,
+		PriceEUR:        priceEUR,
+		PriceEURFoil:    priceEURFoil,
+		PriceTIX:        priceTIX,
+		PricesUpdatedAt: pricesUpdatedAt,
+	}
+}
+
+// parsePriceString converts a price string (e.g., "2.50") to *float64.
+// Returns nil if the string is nil or cannot be parsed.
+func parsePriceString(priceStr *string) *float64 {
+	if priceStr == nil || *priceStr == "" {
+		return nil
+	}
+	price, err := strconv.ParseFloat(*priceStr, 64)
+	if err != nil {
+		return nil
+	}
+	return &price
 }
 
 // GetCachedSet retrieves all cached cards for a set.

@@ -115,3 +115,56 @@ export async function getMissingCards(setCode: string): Promise<models.MissingCa
 export async function getMissingCardsForDeck(deckId: string): Promise<gui.MissingCardsForDeckResponse> {
   return get<gui.MissingCardsForDeckResponse>(`/collection/decks/${deckId}/missing`);
 }
+
+/**
+ * Card value information.
+ */
+export interface CardValue {
+  cardId: number;
+  name: string;
+  setCode: string;
+  rarity: string;
+  quantity: number;
+  priceUsd: number;
+  totalUsd: number;
+}
+
+/**
+ * Collection value response.
+ */
+export interface CollectionValue {
+  totalValueUsd: number;
+  totalValueEur: number;
+  uniqueCardsWithPrice: number;
+  cardCount: number;
+  valueByRarity: Record<string, number>;
+  topCards: CardValue[];
+  lastUpdated?: number;
+}
+
+/**
+ * Deck value response.
+ */
+export interface DeckValue {
+  deckId: string;
+  deckName: string;
+  totalValueUsd: number;
+  totalValueEur: number;
+  cardCount: number;
+  cardsWithPrice: number;
+  topCards: CardValue[];
+}
+
+/**
+ * Get the estimated value of the collection.
+ */
+export async function getCollectionValue(): Promise<CollectionValue> {
+  return get<CollectionValue>('/collection/value');
+}
+
+/**
+ * Get the estimated value of a specific deck.
+ */
+export async function getDeckValue(deckId: string): Promise<DeckValue> {
+  return get<DeckValue>(`/collection/decks/${deckId}/value`);
+}

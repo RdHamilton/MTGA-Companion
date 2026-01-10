@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { collection, cards as cardsApi } from '@/services/api';
 import { gui } from '@/types/models';
 import { useDownload } from '@/context/DownloadContext';
@@ -43,6 +43,7 @@ export default function Collection() {
   const [filterCount, setFilterCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [showSetCompletion, setShowSetCompletion] = useState(false);
+  const [collectionValue, setCollectionValue] = useState<{ totalValueUsd: number } | null>(null);
 
   const { startDownload, updateProgress, completeDownload } = useDownload();
   const autoRefreshRef = useRef<boolean>(false);
@@ -148,10 +149,20 @@ export default function Collection() {
     }
   }, []);
 
+  const loadCollectionValue = useCallback(async () => {
+    try {
+      const value = await collection.getCollectionValue();
+      setCollectionValue(value);
+    } catch (err) {
+      console.error('Failed to load collection value:', err);
+    }
+  }, []);
+
   // Load collection and sets on mount
   useEffect(() => {
     loadCollection();
     loadSets();
+    loadCollectionValue();
 
     // Cleanup: clear auto-refresh timeout on unmount
     return () => {
@@ -192,7 +203,69 @@ export default function Collection() {
     }));
   };
 
-  const totalPages = Math.ceil(filterCount / ITEMS_PER_PAGE);
+  // Process cards: filter by search, sort, and paginate
+  const processedCards = useMemo(() => {
+    let result = [...cards];
+
+    // Filter by search term (client-side)
+    if (debouncedSearchTerm) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      result = result.filter(
+        (card) =>
+          card.name?.toLowerCase().includes(searchLower) ||
+          card.setCode?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort
+    const rarityOrder: Record<string, number> = {
+      mythic: 4,
+      rare: 3,
+      uncommon: 2,
+      common: 1,
+    };
+
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (filters.sortBy) {
+        case 'name':
+          comparison = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'quantity':
+          comparison = (a.quantity || 0) - (b.quantity || 0);
+          break;
+        case 'rarity':
+          comparison =
+            (rarityOrder[a.rarity?.toLowerCase() || 'common'] || 0) -
+            (rarityOrder[b.rarity?.toLowerCase() || 'common'] || 0);
+          break;
+        case 'cmc':
+          comparison = (a.cmc || 0) - (b.cmc || 0);
+          break;
+        case 'price':
+          comparison = (a.priceUsd || 0) - (b.priceUsd || 0);
+          break;
+        default:
+          comparison = 0;
+      }
+      return filters.sortDesc ? -comparison : comparison;
+    });
+
+    return result;
+  }, [cards, debouncedSearchTerm, filters.sortBy, filters.sortDesc]);
+
+  // Update filter count when processed cards change
+  useEffect(() => {
+    setFilterCount(processedCards.length);
+  }, [processedCards.length]);
+
+  // Paginate
+  const paginatedCards = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return processedCards.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [processedCards, currentPage]);
+
+  const totalPages = Math.ceil(processedCards.length / ITEMS_PER_PAGE);
 
   if (loading && cards.length === 0) {
     return (
@@ -232,6 +305,17 @@ export default function Collection() {
               <span className="stat-label">Total Cards:</span>
               <span className="stat-value">{totalCount}</span>
             </span>
+            {collectionValue && collectionValue.totalValueUsd > 0 && (
+              <>
+                <span className="stat-separator">|</span>
+                <span className="stat-item collection-value">
+                  <span className="stat-label">Est. Value:</span>
+                  <span className="stat-value price-value">
+                    ${collectionValue.totalValueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </span>
+              </>
+            )}
           </div>
         </div>
         {filters.setCode && (
@@ -308,6 +392,8 @@ export default function Collection() {
               <option value="rarity-asc">Rarity (Low)</option>
               <option value="cmc-asc">CMC (Low)</option>
               <option value="cmc-desc">CMC (High)</option>
+              <option value="price-desc">Price (High)</option>
+              <option value="price-asc">Price (Low)</option>
             </select>
           </div>
         </div>
@@ -356,7 +442,7 @@ export default function Collection() {
       )}
 
       {/* Card Grid */}
-      {cards.length === 0 ? (
+      {processedCards.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">!</div>
           <h2>No Cards Found</h2>
@@ -369,7 +455,7 @@ export default function Collection() {
       ) : (
         <>
           <div className="card-grid">
-            {cards.map((card) => {
+            {paginatedCards.map((card) => {
               // Check if we have a real card image (not the card back placeholder)
               const isCardBackPlaceholder = card.imageUri?.includes('back.png');
               const hasImage = card.imageUri && card.imageUri !== '' && !isCardBackPlaceholder;
@@ -379,20 +465,27 @@ export default function Collection() {
                   className={`collection-card ${card.quantity === 0 ? 'not-owned' : ''} ${!hasImage ? 'no-image' : ''}`}
                 >
                   {hasImage ? (
-                    <img
-                      src={card.imageUri}
-                      alt={card.name || `Card #${card.arenaId}`}
-                      style={{ width: '100%', borderRadius: '12px' }}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        // Hide broken image and show fallback info
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent && !parent.querySelector('.card-info-fallback')) {
-                          parent.classList.add('no-image');
-                        }
-                      }}
-                    />
+                    <>
+                      <img
+                        src={card.imageUri}
+                        alt={card.name || `Card #${card.arenaId}`}
+                        style={{ width: '100%', borderRadius: '12px' }}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          // Hide broken image and show fallback info
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector('.card-info-fallback')) {
+                            parent.classList.add('no-image');
+                          }
+                        }}
+                      />
+                      {card.priceUsd !== undefined && card.priceUsd > 0 && (
+                        <div className="card-price-badge">
+                          ${card.priceUsd.toFixed(2)}
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="card-info-fallback">
                       <div className="card-fallback-name">{card.name || 'Unknown Card'}</div>
