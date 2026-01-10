@@ -38,6 +38,11 @@ func (s *Server) setupRoutes() {
 			r.Post("/matchup-matrix", matchHandler.GetMatchupMatrix)
 			r.Get("/rank-progression/{format}", matchHandler.GetRankProgression)
 			r.Get("/rank-progression-timeline", matchHandler.GetRankProgressionTimeline)
+			// Match comparison endpoints
+			r.Post("/compare", matchHandler.CompareMatches)
+			r.Post("/compare/formats", matchHandler.CompareFormats)
+			r.Post("/compare/decks", matchHandler.CompareDecks)
+			r.Post("/compare/time-periods", matchHandler.CompareTimePeriods)
 		})
 
 		// Game Play routes (in-game actions: plays, attacks, blocks, etc.)
