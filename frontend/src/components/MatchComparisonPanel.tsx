@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import {
+import type {
   ComparisonResult,
   ComparisonGroup,
+  StatsFilterRequest,
+} from '@/services/api/matches';
+import {
   compareFormats,
   compareDecks,
   compareTimePeriods,
-  StatsFilterRequest,
 } from '@/services/api/matches';
 import './MatchComparisonPanel.css';
 
