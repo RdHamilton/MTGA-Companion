@@ -44,7 +44,10 @@ func setupDeckPerformanceTestDB(t *testing.T) *sql.DB {
 			games_won INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL,
 			modified_at DATETIME NOT NULL,
-			last_played DATETIME
+			last_played DATETIME,
+			is_app_created BOOLEAN DEFAULT FALSE,
+			created_method TEXT DEFAULT 'imported',
+			seed_card_id INTEGER
 		);
 
 		CREATE TABLE matches (
