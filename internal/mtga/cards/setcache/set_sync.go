@@ -59,6 +59,7 @@ type StandardResponse struct {
 }
 
 // SyncSets fetches all sets from Scryfall and saves them to the database.
+// Returns an error if any sets fail to save.
 func (s *SetSyncer) SyncSets(ctx context.Context) error {
 	log.Println("[SetSyncer] Fetching sets from Scryfall...")
 
@@ -81,6 +82,9 @@ func (s *SetSyncer) SyncSets(ctx context.Context) error {
 	}
 
 	savedCount := 0
+	failedCount := 0
+	var lastErr error
+
 	for _, scryfallSet := range sets.Data {
 		// Skip digital-only sets except Alchemy
 		if scryfallSet.Digital && scryfallSet.SetType != "alchemy" {
@@ -106,12 +110,19 @@ func (s *SetSyncer) SyncSets(ctx context.Context) error {
 
 		if err := s.storage.SaveSet(ctx, set); err != nil {
 			log.Printf("[SetSyncer] Failed to save set %s: %v", scryfallSet.Code, err)
+			failedCount++
+			lastErr = err
 			continue
 		}
 		savedCount++
 	}
 
-	log.Printf("[SetSyncer] Saved %d sets to database", savedCount)
+	log.Printf("[SetSyncer] Saved %d sets to database (%d failed)", savedCount, failedCount)
+
+	if failedCount > 0 {
+		return fmt.Errorf("failed to save %d sets, last error: %w", failedCount, lastErr)
+	}
+
 	return nil
 }
 
@@ -137,6 +148,12 @@ func (s *SetSyncer) SyncStandardLegality(ctx context.Context) error {
 	var standardResp StandardResponse
 	if err := json.NewDecoder(resp.Body).Decode(&standardResp); err != nil {
 		return fmt.Errorf("failed to decode Standard response: %w", err)
+	}
+
+	// Check if API version is deprecated
+	if standardResp.Deprecated {
+		log.Println("[SetSyncer] Warning: whatsinstandard.com API v6 is deprecated, skipping Standard legality update")
+		return nil
 	}
 
 	log.Printf("[SetSyncer] Fetched %d sets from whatsinstandard.com", len(standardResp.Sets))

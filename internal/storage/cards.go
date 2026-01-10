@@ -149,7 +149,13 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 
 // UpdateStandardLegality updates the Standard legality status for all sets.
 // standardCodes maps set codes to their rotation dates.
+// Returns an error if standardCodes is empty to prevent accidentally clearing all Standard flags.
 func (s *Service) UpdateStandardLegality(ctx context.Context, standardCodes map[string]string) error {
+	// Guard against empty input to prevent wiping Standard legality
+	if len(standardCodes) == 0 {
+		return fmt.Errorf("refusing to update Standard legality with empty set list")
+	}
+
 	tx, err := s.db.Conn().BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -184,7 +190,7 @@ func (s *Service) GetStandardSets(ctx context.Context) ([]*Set, error) {
 		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated,
 		       COALESCE(is_standard_legal, FALSE), rotation_date
 		FROM sets
-		WHERE is_standard_legal = TRUE
+		WHERE COALESCE(is_standard_legal, FALSE) = TRUE
 		ORDER BY released_at DESC
 	`
 
