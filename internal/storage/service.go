@@ -2236,6 +2236,11 @@ func (s *Service) NewOpponentRepo() repository.OpponentRepository {
 	return repository.NewOpponentRepository(s.db.Conn())
 }
 
+// NewCFBRatingsRepo creates a new CFB ratings repository using the service's database connection.
+func (s *Service) NewCFBRatingsRepo() repository.CFBRatingsRepository {
+	return repository.NewCFBRatingsRepository(s.db.Conn())
+}
+
 // Close closes the database connection.
 func (s *Service) Close() error {
 	return s.db.Close()

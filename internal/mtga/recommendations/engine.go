@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards"
+	"github.com/ramonehamilton/MTGA-Companion/internal/mtga/cards/seventeenlands"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/models"
 	"github.com/ramonehamilton/MTGA-Companion/internal/storage/repository"
 )
@@ -72,9 +73,10 @@ type ScoreFactors struct {
 
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
-	cardService *cards.Service
-	setCardRepo repository.SetCardRepository // For faster lookups from local DB
-	ratingsRepo repository.DraftRatingsRepository
+	cardService    *cards.Service
+	setCardRepo    repository.SetCardRepository // For faster lookups from local DB
+	ratingsRepo    repository.DraftRatingsRepository
+	cfbRatingsRepo repository.CFBRatingsRepository // ChannelFireball ratings (optional)
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
@@ -92,6 +94,21 @@ func NewRuleBasedEngineWithSetRepo(cardService *cards.Service, setCardRepo repos
 		setCardRepo: setCardRepo,
 		ratingsRepo: ratingsRepo,
 	}
+}
+
+// NewRuleBasedEngineWithCFB creates a new rule-based recommendation engine with CFB ratings support.
+func NewRuleBasedEngineWithCFB(cardService *cards.Service, setCardRepo repository.SetCardRepository, ratingsRepo repository.DraftRatingsRepository, cfbRatingsRepo repository.CFBRatingsRepository) *RuleBasedEngine {
+	return &RuleBasedEngine{
+		cardService:    cardService,
+		setCardRepo:    setCardRepo,
+		ratingsRepo:    ratingsRepo,
+		cfbRatingsRepo: cfbRatingsRepo,
+	}
+}
+
+// SetCFBRatingsRepo sets the CFB ratings repository for the engine.
+func (e *RuleBasedEngine) SetCFBRatingsRepo(cfbRatingsRepo repository.CFBRatingsRepository) {
+	e.cfbRatingsRepo = cfbRatingsRepo
 }
 
 // GetRecommendations returns recommended cards based on deck analysis.
@@ -432,26 +449,48 @@ func scoreManaCurve(card *cards.Card, analysis *DeckAnalysis) float64 {
 }
 
 // scoreCardQuality calculates intrinsic card quality based on ratings.
-// scoreCardQuality scores a card based on 17Lands ratings data.
+// Uses 17Lands data as primary source and CFB ratings as secondary/supplementary.
 func (e *RuleBasedEngine) scoreCardQuality(ctx context.Context, card *cards.Card, deck *DeckContext) float64 {
-	// If we don't have set/format info, fall back to rarity-based scoring
-	if e.ratingsRepo == nil || deck.SetCode == "" || deck.DraftFormat == "" {
-		return e.fallbackQualityScore(card)
+	// Track which rating sources we have
+	seventeenLandsScore := -1.0
+	cfbScore := -1.0
+
+	// Try to get 17Lands score
+	if e.ratingsRepo != nil && deck.SetCode != "" && deck.DraftFormat != "" {
+		arenaIDStr := fmt.Sprintf("%d", card.ArenaID)
+		rating, err := e.ratingsRepo.GetCardRatingByArenaID(ctx, deck.SetCode, deck.DraftFormat, arenaIDStr)
+		if err == nil && rating != nil {
+			seventeenLandsScore = e.calculate17LandsScore(rating)
+		}
 	}
 
-	// Fetch 17Lands ratings for this card
-	arenaIDStr := fmt.Sprintf("%d", card.ArenaID)
-	rating, err := e.ratingsRepo.GetCardRatingByArenaID(ctx, deck.SetCode, deck.DraftFormat, arenaIDStr)
-	if err != nil {
-		// Error fetching ratings, use fallback
-		return e.fallbackQualityScore(card)
-	}
-	if rating == nil {
-		// No ratings available in database, use fallback
-		return e.fallbackQualityScore(card)
+	// Try to get CFB score
+	if e.cfbRatingsRepo != nil {
+		cfbRating, err := e.cfbRatingsRepo.GetRatingByArenaID(ctx, card.ArenaID)
+		if err == nil && cfbRating != nil {
+			cfbScore = cfbRating.LimitedScore
+		}
 	}
 
-	// Calculate quality score from 17Lands metrics
+	// Blend scores based on availability
+	// If both available: 70% 17Lands + 30% CFB (17Lands is data-driven, CFB is expert opinion)
+	// If only 17Lands: 100% 17Lands
+	// If only CFB: 100% CFB
+	// If neither: fallback to rarity
+
+	if seventeenLandsScore >= 0 && cfbScore >= 0 {
+		return (seventeenLandsScore * 0.70) + (cfbScore * 0.30)
+	} else if seventeenLandsScore >= 0 {
+		return seventeenLandsScore
+	} else if cfbScore >= 0 {
+		return cfbScore
+	}
+
+	return e.fallbackQualityScore(card)
+}
+
+// calculate17LandsScore calculates quality score from 17Lands metrics.
+func (e *RuleBasedEngine) calculate17LandsScore(rating *seventeenlands.CardRating) float64 {
 	// Weight: 50% GIHWR, 30% OHWR, 10% ATA, 10% ALSA
 
 	// Normalize GIHWR and OHWR (they're percentages, typically 45-60% range)
@@ -489,9 +528,7 @@ func (e *RuleBasedEngine) scoreCardQuality(ctx context.Context, card *cards.Card
 	}
 
 	// Weighted combination
-	qualityScore := (gihScore * 0.50) + (ohScore * 0.30) + (ataScore * 0.10) + (alsaScore * 0.10)
-
-	return qualityScore
+	return (gihScore * 0.50) + (ohScore * 0.30) + (ataScore * 0.10) + (alsaScore * 0.10)
 }
 
 // fallbackQualityScore provides quality score based on rarity when ratings unavailable.

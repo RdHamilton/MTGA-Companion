@@ -633,3 +633,151 @@ func (c *CardFacade) GetAllSetInfo(ctx context.Context) ([]*SetInfo, error) {
 
 	return result, nil
 }
+
+// GetCFBRatings returns all CFB ratings for a set.
+func (c *CardFacade) GetCFBRatings(ctx context.Context, setCode string) ([]*models.CFBRating, error) {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	return cfbRepo.GetRatingsForSet(ctx, strings.ToUpper(setCode))
+}
+
+// GetCFBRatingByCardName returns a CFB rating by card name and set code.
+func (c *CardFacade) GetCFBRatingByCardName(ctx context.Context, cardName, setCode string) (*models.CFBRating, error) {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	return cfbRepo.GetRating(ctx, cardName, strings.ToUpper(setCode))
+}
+
+// GetCFBRatingByArenaID returns a CFB rating by Arena ID.
+func (c *CardFacade) GetCFBRatingByArenaID(ctx context.Context, arenaID int) (*models.CFBRating, error) {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	return cfbRepo.GetRatingByArenaID(ctx, arenaID)
+}
+
+// ImportCFBRatings imports CFB ratings from structured data.
+func (c *CardFacade) ImportCFBRatings(ctx context.Context, ratings interface{}) (int, error) {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+
+	// Type assert to get the slice of ratings
+	cfbRatings, ok := ratings.([]interface{})
+	if !ok {
+		return 0, fmt.Errorf("invalid ratings data type")
+	}
+
+	imported := 0
+	for _, r := range cfbRatings {
+		ratingMap, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		cardName, _ := ratingMap["card_name"].(string)
+		setCode, _ := ratingMap["set_code"].(string)
+		limitedRating, _ := ratingMap["limited_rating"].(string)
+
+		if cardName == "" || setCode == "" || limitedRating == "" {
+			continue
+		}
+
+		rating := &models.CFBRating{
+			CardName:      cardName,
+			SetCode:       strings.ToUpper(setCode),
+			LimitedRating: limitedRating,
+			LimitedScore:  models.LimitedGradeToScore(limitedRating),
+		}
+
+		// Optional fields
+		if constructedRating, ok := ratingMap["constructed_rating"].(string); ok {
+			rating.ConstructedRating = constructedRating
+			rating.ConstructedScore = models.ConstructedRatingToScore(constructedRating)
+		}
+		if archetypeFit, ok := ratingMap["archetype_fit"].(string); ok {
+			rating.ArchetypeFit = archetypeFit
+		}
+		if commentary, ok := ratingMap["commentary"].(string); ok {
+			rating.Commentary = commentary
+		}
+		if sourceURL, ok := ratingMap["source_url"].(string); ok {
+			rating.SourceURL = sourceURL
+		}
+		if author, ok := ratingMap["author"].(string); ok {
+			rating.Author = author
+		}
+
+		if err := cfbRepo.UpsertRating(ctx, rating); err != nil {
+			log.Printf("[CardFacade] Warning: failed to import CFB rating for %s: %v", cardName, err)
+			continue
+		}
+		imported++
+	}
+
+	return imported, nil
+}
+
+// LinkCFBArenaIDs links CFB ratings to Arena IDs for a set.
+func (c *CardFacade) LinkCFBArenaIDs(ctx context.Context, setCode string) (int, error) {
+	setCode = strings.ToUpper(setCode)
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	setCardRepo := c.services.Storage.SetCardRepo()
+
+	// Get all set cards for this set
+	cards, err := setCardRepo.GetCardsBySet(ctx, setCode)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get set cards: %w", err)
+	}
+
+	if len(cards) == 0 {
+		return 0, nil
+	}
+
+	// Build name to Arena ID map
+	cardNameToArenaID := make(map[string]int)
+	for _, card := range cards {
+		normalizedName := strings.TrimSpace(strings.ToLower(card.Name))
+		var arenaID int
+		if _, err := fmt.Sscanf(card.ArenaID, "%d", &arenaID); err == nil {
+			cardNameToArenaID[normalizedName] = arenaID
+			cardNameToArenaID[strings.TrimSpace(card.Name)] = arenaID
+		}
+	}
+
+	// Get CFB ratings for this set
+	ratings, err := cfbRepo.GetRatingsForSet(ctx, setCode)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get CFB ratings: %w", err)
+	}
+
+	linked := 0
+	for _, rating := range ratings {
+		if rating.ArenaID != nil {
+			continue
+		}
+
+		normalizedName := strings.TrimSpace(strings.ToLower(rating.CardName))
+		if arenaID, found := cardNameToArenaID[normalizedName]; found {
+			rating.ArenaID = &arenaID
+			if err := cfbRepo.UpsertRating(ctx, rating); err != nil {
+				continue
+			}
+			linked++
+		} else if arenaID, found := cardNameToArenaID[rating.CardName]; found {
+			rating.ArenaID = &arenaID
+			if err := cfbRepo.UpsertRating(ctx, rating); err != nil {
+				continue
+			}
+			linked++
+		}
+	}
+
+	return linked, nil
+}
+
+// DeleteCFBRatings deletes all CFB ratings for a set.
+func (c *CardFacade) DeleteCFBRatings(ctx context.Context, setCode string) error {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	return cfbRepo.DeleteRatingsForSet(ctx, strings.ToUpper(setCode))
+}
+
+// GetCFBRatingsCount returns the count of CFB ratings for a set.
+func (c *CardFacade) GetCFBRatingsCount(ctx context.Context, setCode string) (int, error) {
+	cfbRepo := c.services.Storage.NewCFBRatingsRepo()
+	return cfbRepo.GetRatingsCount(ctx, strings.ToUpper(setCode))
+}
