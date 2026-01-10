@@ -51,7 +51,8 @@ function normalizeCards(cards: models.DeckCard[]): DeckCardState[] {
     cardID: card.CardID,
     quantity: card.Quantity,
     board: card.Board,
-    cardName: card.CardName,
+    // DeckCard doesn't have CardName, so we leave it undefined
+    // The generateChangeDescription function will use a fallback
   }));
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDeckUndoRedo } from './useDeckUndoRedo';
-import { decks } from '@/services/api';
+import { decks, DeckWithCards } from '@/services/api';
 import type { models } from '@/types/models';
 
 // Mock the API
@@ -19,21 +19,19 @@ describe('useDeckUndoRedo', () => {
   const mockDeckId = 'test-deck-123';
 
   const createMockCard = (id: number, quantity: number, board: string = 'main'): models.DeckCard => ({
-    ID: `card-${id}`,
+    ID: id,
     DeckID: mockDeckId,
     CardID: id,
     Quantity: quantity,
     Board: board,
-    CardName: `Card ${id}`,
-    ManaCost: '{1}{R}',
-    CMC: 2,
-    TypeLine: 'Creature',
-    Colors: ['R'],
-    Rarity: 'common',
-    SetCode: 'TST',
-    ImageURI: '',
-    IsSideboard: board === 'sideboard',
+    FromDraftPick: false,
   });
+
+  const createMockDeckWithCards = (cards: models.DeckCard[]): DeckWithCards => ({
+    deck: {} as models.Deck,
+    cards,
+    tags: [],
+  } as DeckWithCards);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,11 +103,7 @@ describe('useDeckUndoRedo', () => {
 
       // Mock API for undo - should remove card 2
       mockDecks.removeCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsBefore,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsBefore));
 
       let undoResult: models.DeckCard[] | null = null;
       await act(async () => {
@@ -151,11 +145,7 @@ describe('useDeckUndoRedo', () => {
       });
 
       mockDecks.removeCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsBefore,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsBefore));
 
       await act(async () => {
         await result.current.undo();
@@ -181,11 +171,7 @@ describe('useDeckUndoRedo', () => {
 
       // Undo first
       mockDecks.removeCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsBefore,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsBefore));
 
       await act(async () => {
         await result.current.undo();
@@ -193,11 +179,7 @@ describe('useDeckUndoRedo', () => {
 
       // Now redo - should add back card 2
       mockDecks.addCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsAfter,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsAfter));
 
       let redoResult: models.DeckCard[] | null = null;
       await act(async () => {
@@ -345,11 +327,7 @@ describe('useDeckUndoRedo', () => {
       });
 
       mockDecks.removeCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsBefore,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsBefore));
 
       await act(async () => {
         await result.current.undo();
@@ -374,11 +352,7 @@ describe('useDeckUndoRedo', () => {
       });
 
       mockDecks.removeCard.mockResolvedValue(undefined);
-      mockDecks.getDeck.mockResolvedValue({
-        deck: {} as models.Deck,
-        cards: cardsBefore,
-        tags: [],
-      });
+      mockDecks.getDeck.mockResolvedValue(createMockDeckWithCards(cardsBefore));
 
       await act(async () => {
         await result.current.undo();
