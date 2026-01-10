@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as standardApi from '@/services/api/standard';
 import type { RotationAffectedDeck, UpcomingRotation } from '@/services/api/standard';
 
@@ -30,6 +30,9 @@ export function useRotationNotifications(): UseRotationNotificationsReturn {
     hasNotified: false,
   });
 
+  // Track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
   // Check if we've already shown notification today
   const checkIfAlreadyNotified = useCallback((): boolean => {
     const lastShown = localStorage.getItem(STORAGE_KEY);
@@ -42,6 +45,9 @@ export function useRotationNotifications(): UseRotationNotificationsReturn {
 
   // Fetch rotation data from API
   const checkRotation = useCallback(async () => {
+    // Don't start loading if unmounted
+    if (!isMountedRef.current) return;
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -49,6 +55,9 @@ export function useRotationNotifications(): UseRotationNotificationsReturn {
         standardApi.getUpcomingRotation(),
         standardApi.getRotationAffectedDecks(),
       ]);
+
+      // Only update state if still mounted
+      if (!isMountedRef.current) return;
 
       setState({
         rotation,
@@ -59,6 +68,9 @@ export function useRotationNotifications(): UseRotationNotificationsReturn {
         hasNotified: checkIfAlreadyNotified(),
       });
     } catch (err) {
+      // Only update state if still mounted
+      if (!isMountedRef.current) return;
+
       console.error('Failed to check rotation:', err);
       setState((prev) => ({
         ...prev,
@@ -99,9 +111,14 @@ export function useRotationNotifications(): UseRotationNotificationsReturn {
     return null;
   }, [state.rotation, state.affectedDecks]);
 
-  // Check rotation on mount
+  // Check rotation on mount, cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     checkRotation();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [checkRotation]);
 
   return {
