@@ -393,6 +393,13 @@ type SetCard struct {
 	ImageURLSmall string
 	ImageURLArt   string
 	FetchedAt     time.Time
+	// Price fields from Scryfall
+	PriceUSD        *float64   // USD price (non-foil)
+	PriceUSDFoil    *float64   // USD foil price
+	PriceEUR        *float64   // EUR price (non-foil)
+	PriceEURFoil    *float64   // EUR foil price
+	PriceTIX        *float64   // MTGO tix price
+	PricesUpdatedAt *time.Time // When prices were last updated
 }
 
 // DeckPerformanceHistory records individual match results with deck state snapshots for ML training.

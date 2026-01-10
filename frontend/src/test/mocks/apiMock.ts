@@ -91,6 +91,23 @@ export const mockCollection = {
   getSetCompletion: vi.fn(() => Promise.resolve([] as unknown[])),
   getMissingCards: vi.fn(() => Promise.resolve(null as unknown)),
   getRecentChanges: vi.fn(() => Promise.resolve([] as unknown[])),
+  getCollectionValue: vi.fn(() => Promise.resolve({
+    totalValueUsd: 0,
+    totalValueEur: 0,
+    uniqueCardsWithPrice: 0,
+    cardCount: 0,
+    valueByRarity: {},
+    topCards: [],
+  })),
+  getDeckValue: vi.fn(() => Promise.resolve({
+    deckId: '',
+    deckName: '',
+    totalValueUsd: 0,
+    totalValueEur: 0,
+    cardCount: 0,
+    cardsWithPrice: 0,
+    topCards: [],
+  })),
 };
 
 export const mockMeta = {

@@ -886,7 +886,7 @@ describe('Collection', () => {
       });
     });
 
-    it('should have all sort options', async () => {
+    it('should have all sort options including price', async () => {
       mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse([createMockCollectionCard()]));
       mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
       mockCardsApi.getAllSetInfo.mockResolvedValue([]);
@@ -911,6 +911,169 @@ describe('Collection', () => {
       expect(options).toContain('Rarity (Low)');
       expect(options).toContain('CMC (Low)');
       expect(options).toContain('CMC (High)');
+      expect(options).toContain('Price (High)');
+      expect(options).toContain('Price (Low)');
+    });
+
+    it('should sort cards by price when price sort is selected', async () => {
+      const mockCards = [
+        createMockCollectionCard({ cardId: 1, arenaId: 1, name: 'Cheap Card', priceUsd: 0.25 }),
+        createMockCollectionCard({ cardId: 2, arenaId: 2, name: 'Expensive Card', priceUsd: 10.00 }),
+        createMockCollectionCard({ cardId: 3, arenaId: 3, name: 'Medium Card', priceUsd: 2.50 }),
+      ];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Name (A-Z)')).toBeInTheDocument();
+      });
+
+      // Change sort to Price (High)
+      const sortSelect = screen.getByDisplayValue('Name (A-Z)');
+      fireEvent.change(sortSelect, { target: { value: 'price-desc' } });
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // With Price (High) sort, Expensive Card should be first in the card grid
+      // Filter to only card images (excluding color icons)
+      await waitFor(() => {
+        const expensiveCard = screen.getByRole('img', { name: 'Expensive Card' });
+        const cheapCard = screen.getByRole('img', { name: 'Cheap Card' });
+        // Expensive should appear before Cheap in DOM order
+        expect(expensiveCard.compareDocumentPosition(cheapCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+    });
+  });
+
+  describe('Price Display Features', () => {
+    it('should display price badge on cards with price', async () => {
+      const mockCards = [
+        createMockCollectionCard({ cardId: 1, name: 'Priced Card', priceUsd: 5.99 }),
+      ];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('$5.99')).toBeInTheDocument();
+      });
+    });
+
+    it('should not display price badge when price is 0', async () => {
+      const mockCards = [
+        createMockCollectionCard({ cardId: 1, name: 'Free Card', priceUsd: 0 }),
+      ];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'Free Card' })).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    });
+
+    it('should not display price badge when price is undefined', async () => {
+      const mockCards = [
+        createMockCollectionCard({ cardId: 1, name: 'No Price Card' }), // priceUsd not set
+      ];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'No Price Card' })).toBeInTheDocument();
+      });
+
+      // Should not have any price badge
+      expect(screen.queryByText(/^\$/)).not.toBeInTheDocument();
+    });
+
+    it('should display collection value in header when value > 0', async () => {
+      const mockCards = [createMockCollectionCard()];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollectionValue.mockResolvedValue({
+        totalValueUsd: 1234.56,
+        totalValueEur: 1100.00,
+        uniqueCardsWithPrice: 50,
+        cardCount: 100,
+        valueByRarity: {},
+        topCards: [],
+      });
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByText('Est. Value:')).toBeInTheDocument();
+      });
+      expect(screen.getByText('$1,234.56')).toBeInTheDocument();
+    });
+
+    it('should not display collection value when value is 0', async () => {
+      const mockCards = [createMockCollectionCard()];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollectionValue.mockResolvedValue({
+        totalValueUsd: 0,
+        totalValueEur: 0,
+        uniqueCardsWithPrice: 0,
+        cardCount: 0,
+        valueByRarity: {},
+        topCards: [],
+      });
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Est. Value:')).not.toBeInTheDocument();
+    });
+
+    it('should handle collection value API error gracefully', async () => {
+      const mockCards = [createMockCollectionCard()];
+      mockCollection.getCollectionWithMetadata.mockResolvedValue(createMockCollectionResponse(mockCards));
+      mockCollection.getCollectionStats.mockResolvedValue(createMockCollectionStats());
+      mockCardsApi.getAllSetInfo.mockResolvedValue([]);
+      mockCollection.getCollectionValue.mockRejectedValue(new Error('API error'));
+
+      renderWithRouter(<Collection />);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Should render collection without crashing
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+      });
+
+      // Value should not be shown
+      expect(screen.queryByText('Est. Value:')).not.toBeInTheDocument();
     });
   });
 

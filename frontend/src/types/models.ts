@@ -448,11 +448,16 @@ export namespace gui {
 	    imageUri: string;
 	    power?: string;
 	    toughness?: string;
-	
+	    // Price fields from Scryfall
+	    priceUsd?: number;
+	    priceUsdFoil?: number;
+	    priceEur?: number;
+	    pricesUpdatedAt?: number;
+
 	    static createFrom(source: any = {}) {
 	        return new CollectionCard(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cardId = source["cardId"];
@@ -470,6 +475,10 @@ export namespace gui {
 	        this.imageUri = source["imageUri"];
 	        this.power = source["power"];
 	        this.toughness = source["toughness"];
+	        this.priceUsd = source["priceUsd"];
+	        this.priceUsdFoil = source["priceUsdFoil"];
+	        this.priceEur = source["priceEur"];
+	        this.pricesUpdatedAt = source["pricesUpdatedAt"];
 	    }
 	}
 	export class CollectionChangeEntry {

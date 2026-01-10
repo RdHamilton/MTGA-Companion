@@ -105,8 +105,9 @@ func (r *setCardRepository) SaveCard(ctx context.Context, card *models.SetCard) 
 	query := `
 		INSERT INTO set_cards (
 			set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+			price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(set_code, arena_id) DO UPDATE SET
 			scryfall_id = excluded.scryfall_id,
 			name = excluded.name,
@@ -121,7 +122,13 @@ func (r *setCardRepository) SaveCard(ctx context.Context, card *models.SetCard) 
 			image_url = excluded.image_url,
 			image_url_small = excluded.image_url_small,
 			image_url_art = excluded.image_url_art,
-			fetched_at = excluded.fetched_at
+			fetched_at = excluded.fetched_at,
+			price_usd = excluded.price_usd,
+			price_usd_foil = excluded.price_usd_foil,
+			price_eur = excluded.price_eur,
+			price_eur_foil = excluded.price_eur_foil,
+			price_tix = excluded.price_tix,
+			prices_updated_at = excluded.prices_updated_at
 	`
 	result, err := r.db.ExecContext(ctx, query,
 		card.SetCode,
@@ -140,6 +147,12 @@ func (r *setCardRepository) SaveCard(ctx context.Context, card *models.SetCard) 
 		card.ImageURLSmall,
 		card.ImageURLArt,
 		card.FetchedAt,
+		card.PriceUSD,
+		card.PriceUSDFoil,
+		card.PriceEUR,
+		card.PriceEURFoil,
+		card.PriceTIX,
+		card.PricesUpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -167,8 +180,9 @@ func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCa
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO set_cards (
 			set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+			price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(set_code, arena_id) DO UPDATE SET
 			scryfall_id = excluded.scryfall_id,
 			name = excluded.name,
@@ -183,7 +197,13 @@ func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCa
 			image_url = excluded.image_url,
 			image_url_small = excluded.image_url_small,
 			image_url_art = excluded.image_url_art,
-			fetched_at = excluded.fetched_at
+			fetched_at = excluded.fetched_at,
+			price_usd = excluded.price_usd,
+			price_usd_foil = excluded.price_usd_foil,
+			price_eur = excluded.price_eur,
+			price_eur_foil = excluded.price_eur_foil,
+			price_tix = excluded.price_tix,
+			prices_updated_at = excluded.prices_updated_at
 	`)
 	if err != nil {
 		return err
@@ -220,6 +240,12 @@ func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCa
 			card.ImageURLSmall,
 			card.ImageURLArt,
 			card.FetchedAt,
+			card.PriceUSD,
+			card.PriceUSDFoil,
+			card.PriceEUR,
+			card.PriceEURFoil,
+			card.PriceTIX,
+			card.PricesUpdatedAt,
 		)
 		if err != nil {
 			return err
@@ -233,7 +259,8 @@ func (r *setCardRepository) SaveCards(ctx context.Context, cards []*models.SetCa
 func (r *setCardRepository) GetCardByArenaID(ctx context.Context, arenaID string) (*models.SetCard, error) {
 	query := `
 		SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+			   price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
 		FROM set_cards
 		WHERE arena_id = ?
 		LIMIT 1
@@ -261,6 +288,12 @@ func (r *setCardRepository) GetCardByArenaID(ctx context.Context, arenaID string
 		&card.ImageURLSmall,
 		&card.ImageURLArt,
 		&card.FetchedAt,
+		&card.PriceUSD,
+		&card.PriceUSDFoil,
+		&card.PriceEUR,
+		&card.PriceEURFoil,
+		&card.PriceTIX,
+		&card.PricesUpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -284,7 +317,8 @@ func (r *setCardRepository) GetCardByArenaID(ctx context.Context, arenaID string
 func (r *setCardRepository) GetCardsBySet(ctx context.Context, setCode string) ([]*models.SetCard, error) {
 	query := `
 		SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+			   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+			   price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
 		FROM set_cards
 		WHERE set_code = ?
 		ORDER BY name
@@ -320,6 +354,12 @@ func (r *setCardRepository) GetCardsBySet(ctx context.Context, setCode string) (
 			&card.ImageURLSmall,
 			&card.ImageURLArt,
 			&card.FetchedAt,
+			&card.PriceUSD,
+			&card.PriceUSDFoil,
+			&card.PriceEUR,
+			&card.PriceEURFoil,
+			&card.PriceTIX,
+			&card.PricesUpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -404,7 +444,8 @@ func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCo
 		}
 		sqlQuery = `
 			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+				   price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
 			FROM set_cards
 			WHERE (name LIKE ? OR text LIKE ?) AND set_code IN (` + joinStrings(placeholders, ",") + `)
 			ORDER BY
@@ -419,7 +460,8 @@ func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCo
 	} else {
 		sqlQuery = `
 			SELECT id, set_code, arena_id, scryfall_id, name, mana_cost, cmc, types, colors,
-				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at
+				   rarity, text, power, toughness, image_url, image_url_small, image_url_art, fetched_at,
+				   price_usd, price_usd_foil, price_eur, price_eur_foil, price_tix, prices_updated_at
 			FROM set_cards
 			WHERE name LIKE ? OR text LIKE ?
 			ORDER BY
@@ -461,6 +503,12 @@ func (r *setCardRepository) SearchCards(ctx context.Context, query string, setCo
 			&card.ImageURLSmall,
 			&card.ImageURLArt,
 			&card.FetchedAt,
+			&card.PriceUSD,
+			&card.PriceUSDFoil,
+			&card.PriceEUR,
+			&card.PriceEURFoil,
+			&card.PriceTIX,
+			&card.PricesUpdatedAt,
 		)
 		if err != nil {
 			return nil, err

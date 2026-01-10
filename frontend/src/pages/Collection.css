@@ -119,6 +119,11 @@
   margin: 0 0.5rem;
 }
 
+.collection-value .price-value {
+  color: #90ee90;
+  font-weight: 700;
+}
+
 .set-completion-button {
   padding: 0.5rem 1rem;
   background: rgba(74, 158, 255, 0.2);
@@ -400,6 +405,24 @@
   font-weight: 600;
   font-size: 0.875rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.card-price-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 100, 0, 0.9);
+  color: #90ee90;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.collection-card:hover .card-price-badge {
+  background: rgba(0, 128, 0, 0.95);
 }
 
 .card-info {

@@ -163,3 +163,31 @@ func (h *CollectionHandler) GetMissingCardsForDeck(w http.ResponseWriter, r *htt
 
 	response.Success(w, missing)
 }
+
+// GetCollectionValue returns the estimated value of the collection.
+func (h *CollectionHandler) GetCollectionValue(w http.ResponseWriter, r *http.Request) {
+	value, err := h.facade.GetCollectionValue(r.Context())
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, value)
+}
+
+// GetDeckValue returns the estimated value of a specific deck.
+func (h *CollectionHandler) GetDeckValue(w http.ResponseWriter, r *http.Request) {
+	deckID := chi.URLParam(r, "deckID")
+	if deckID == "" {
+		response.BadRequest(w, errors.New("deck ID is required"))
+		return
+	}
+
+	value, err := h.facade.GetDeckValue(r.Context(), deckID)
+	if err != nil {
+		response.InternalError(w, err)
+		return
+	}
+
+	response.Success(w, value)
+}

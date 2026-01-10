@@ -182,6 +182,8 @@ func (s *Server) setupRoutes() {
 			r.Get("/missing/{setCode}", collectionHandler.GetMissingCards)
 			r.Get("/decks/{deckID}/missing", collectionHandler.GetMissingCardsForDeck)
 			r.Post("/search", collectionHandler.SearchCollection)
+			r.Get("/value", collectionHandler.GetCollectionValue)
+			r.Get("/decks/{deckID}/value", collectionHandler.GetDeckValue)
 		})
 
 		// Standard format routes
