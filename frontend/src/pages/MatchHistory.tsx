@@ -8,6 +8,7 @@ import Tooltip from '../components/Tooltip';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import MatchDetailsModal from '../components/MatchDetailsModal';
+import MatchNotesModal from '../components/MatchNotesModal';
 import { useAppContext } from '../context/AppContext';
 import './MatchHistory.css';
 
@@ -32,6 +33,9 @@ const MatchHistory = () => {
 
   // Match details modal
   const [selectedMatch, setSelectedMatch] = useState<models.Match | null>(null);
+
+  // Match notes modal
+  const [notesMatchId, setNotesMatchId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -433,6 +437,11 @@ const MatchHistory = () => {
                     <span>Opponent</span>
                   </Tooltip>
                 </th>
+                <th>
+                  <Tooltip content="Add notes about this match">
+                    <span>Notes</span>
+                  </Tooltip>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -453,6 +462,18 @@ const MatchHistory = () => {
                   <td>{getDisplayEventName(match)}</td>
                   <td>{formatScore(match.PlayerWins, match.OpponentWins)}</td>
                   <td>{match.OpponentName || '—'}</td>
+                  <td>
+                    <button
+                      className="notes-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNotesMatchId(match.ID);
+                      }}
+                      title="Add/view notes for this match"
+                    >
+                      📝
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -507,6 +528,13 @@ const MatchHistory = () => {
           onClose={() => setSelectedMatch(null)}
         />
       )}
+
+      {/* Match Notes Modal */}
+      <MatchNotesModal
+        matchId={notesMatchId || ''}
+        isOpen={!!notesMatchId}
+        onClose={() => setNotesMatchId(null)}
+      />
     </div>
   );
 };
