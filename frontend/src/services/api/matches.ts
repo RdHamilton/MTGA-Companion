@@ -214,3 +214,115 @@ export function statsFilterToRequest(filter: StatsFilter): StatsFilterRequest {
     result_reason: filter.ResultReason,
   };
 }
+
+// ==================
+// Comparison Types
+// ==================
+
+/**
+ * ComparisonGroup represents a labeled group of matches for comparison.
+ */
+export interface ComparisonGroup {
+  Label: string;
+  Filter: StatsFilter;
+  Statistics: Statistics | null;
+  MatchCount: number;
+}
+
+/**
+ * ComparisonResult represents the result of comparing two or more groups.
+ */
+export interface ComparisonResult {
+  Groups: ComparisonGroup[];
+  BestGroup: ComparisonGroup | null;
+  WorstGroup: ComparisonGroup | null;
+  WinRateDiff: number;
+  TotalMatches: number;
+  ComparisonDate: string;
+}
+
+/**
+ * ComparisonDiff represents the difference between two specific groups.
+ */
+export interface ComparisonDiff {
+  Group1Label: string;
+  Group2Label: string;
+  WinRateDiff: number;
+  GameWinRateDiff: number;
+  MatchCountDiff: number;
+  GamesPlayedDiff: number;
+  Trend: string;
+}
+
+/**
+ * Request types for comparison API calls.
+ */
+export interface ComparisonGroupRequest {
+  label: string;
+  filter: StatsFilterRequest;
+}
+
+export interface CompareMatchesRequest {
+  groups: ComparisonGroupRequest[];
+}
+
+export interface CompareFormatsRequest {
+  formats: string[];
+  base_filter?: StatsFilterRequest;
+}
+
+export interface CompareDecksRequest {
+  deck_ids: string[];
+  base_filter?: StatsFilterRequest;
+}
+
+export interface TimePeriodRequest {
+  label: string;
+  start_date: string;
+  end_date: string;
+}
+
+export interface CompareTimePeriodsRequest {
+  periods: TimePeriodRequest[];
+  base_filter?: StatsFilterRequest;
+}
+
+// ==================
+// Comparison API Functions
+// ==================
+
+/**
+ * Compare multiple groups of matches.
+ */
+export async function compareMatches(
+  request: CompareMatchesRequest
+): Promise<ComparisonResult> {
+  return post<ComparisonResult>('/matches/compare', request);
+}
+
+/**
+ * Compare performance across different formats.
+ */
+export async function compareFormats(
+  request: CompareFormatsRequest
+): Promise<ComparisonResult> {
+  return post<ComparisonResult>('/matches/compare/formats', request);
+}
+
+/**
+ * Compare performance across different decks.
+ */
+export async function compareDecks(
+  request: CompareDecksRequest
+): Promise<ComparisonResult> {
+  return post<ComparisonResult>('/matches/compare/decks', request);
+}
+
+/**
+ * Compare performance across different time periods.
+ */
+export async function compareTimePeriods(
+  request: CompareTimePeriodsRequest
+): Promise<ComparisonResult> {
+  return post<ComparisonResult>('/matches/compare/time-periods', request);
+}

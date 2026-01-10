@@ -243,3 +243,62 @@ func (m *MatchFacade) GetWeeklyWins(ctx context.Context) (int, error) {
 
 	return m.services.Storage.MatchRepo().GetWeeklyWins(ctx, accountID)
 }
+
+// CompareMatches compares multiple groups of matches based on different filters.
+func (m *MatchFacade) CompareMatches(ctx context.Context, groups []storage.ComparisonGroup) (*storage.ComparisonResult, error) {
+	if m.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+	return m.services.Storage.CompareMatches(ctx, groups)
+}
+
+// CompareTwoGroups compares exactly two groups and returns detailed differences.
+func (m *MatchFacade) CompareTwoGroups(ctx context.Context, group1, group2 storage.ComparisonGroup) (*storage.ComparisonDiff, error) {
+	if m.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+	return m.services.Storage.CompareTwoGroups(ctx, group1, group2)
+}
+
+// CompareFormats compares performance across different formats.
+func (m *MatchFacade) CompareFormats(ctx context.Context, formats []string, baseFilter models.StatsFilter) (*storage.ComparisonResult, error) {
+	if m.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+	return m.services.Storage.CompareFormats(ctx, formats, baseFilter)
+}
+
+// CompareDecks compares performance across different decks.
+func (m *MatchFacade) CompareDecks(ctx context.Context, deckIDs []string, baseFilter models.StatsFilter) (*storage.ComparisonResult, error) {
+	if m.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+	return m.services.Storage.CompareDecks(ctx, deckIDs, baseFilter)
+}
+
+// CompareTimePeriods compares performance across different time periods.
+func (m *MatchFacade) CompareTimePeriods(ctx context.Context, periods []storage.TimePeriod, baseFilter models.StatsFilter) (*storage.ComparisonResult, error) {
+	if m.services.Storage == nil {
+		return nil, &AppError{Message: "Database not initialized. Please configure database path in Settings."}
+	}
+
+	// Convert to the format expected by storage
+	storagePeriods := make([]struct {
+		Label string
+		Start time.Time
+		End   time.Time
+	}, len(periods))
+	for i, p := range periods {
+		storagePeriods[i] = struct {
+			Label string
+			Start time.Time
+			End   time.Time
+		}{
+			Label: p.Label,
+			Start: p.Start,
+			End:   p.End,
+		}
+	}
+
+	return m.services.Storage.CompareTimePeriods(ctx, storagePeriods, baseFilter)
+}

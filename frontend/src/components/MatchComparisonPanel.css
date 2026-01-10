@@ -1,0 +1,261 @@
+.match-comparison-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.match-comparison-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.match-comparison-panel .panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.match-comparison-panel .close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  line-height: 1;
+}
+
+.match-comparison-panel .close-button:hover {
+  color: var(--text-primary);
+}
+
+.comparison-type-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.type-button {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.type-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.type-button.active {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.comparison-selector {
+  margin-bottom: 16px;
+}
+
+.comparison-selector h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.selector-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.selector-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.selector-option:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+}
+
+.selector-option input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.selector-option input[type="checkbox"]:checked + span {
+  color: var(--text-primary);
+}
+
+.no-options {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.comparison-error {
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  color: #ef4444;
+  margin-bottom: 16px;
+}
+
+.comparison-actions {
+  margin-bottom: 16px;
+}
+
+.compare-button {
+  padding: 10px 24px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.compare-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.compare-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.comparison-results {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.results-header h4 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.results-summary {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.comparison-table th {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comparison-table td {
+  color: var(--text-primary);
+}
+
+.comparison-table .group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comparison-table .stat-value {
+  font-family: var(--font-mono);
+}
+
+.comparison-table .win-rate {
+  font-weight: 600;
+}
+
+.comparison-table tr.best-group {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.comparison-table tr.worst-group {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-best {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.badge-worst {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.diff-positive {
+  color: #22c55e;
+}
+
+.diff-negative {
+  color: #ef4444;
+}
+
+.diff-neutral {
+  color: var(--text-secondary);
+}
+
+.comparison-insight {
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.comparison-insight .highlight {
+  color: var(--accent-color);
+  font-weight: 500;
+}

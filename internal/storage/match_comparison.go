@@ -37,6 +37,13 @@ type ComparisonDiff struct {
 	Trend           string // "improving", "declining", "stable"
 }
 
+// TimePeriod represents a labeled time period for comparison.
+type TimePeriod struct {
+	Label string
+	Start time.Time
+	End   time.Time
+}
+
 // CompareMatches compares multiple groups of matches based on different filters.
 // Each group is defined by a filter and a label.
 func (s *Service) CompareMatches(ctx context.Context, groups []ComparisonGroup) (*ComparisonResult, error) {
