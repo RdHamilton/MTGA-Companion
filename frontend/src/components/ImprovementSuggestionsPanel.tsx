@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { notes as notesApi } from '@/services/api';
 import type { ImprovementSuggestion, SuggestionType, SuggestionPriority } from '@/services/api/notes';
 import { getSuggestionTypeLabel, getPriorityLabel, getPriorityColor } from '@/services/api/notes';
+import HelpIcon from './HelpIcon';
+import Tooltip from './Tooltip';
 import './ImprovementSuggestionsPanel.css';
 
 interface ImprovementSuggestionsPanelProps {
@@ -146,7 +148,26 @@ export default function ImprovementSuggestionsPanel({
   return (
     <div className="suggestions-panel">
       <div className="suggestions-header">
-        <h3>Improvement Suggestions</h3>
+        <h3>
+          Improvement Suggestions{' '}
+          <HelpIcon title="Play Pattern Analysis" position="right">
+            <p>
+              Analyzes your <strong>play patterns</strong> from match history
+              to suggest deck improvements.
+            </p>
+            <p>Categories:</p>
+            <ul>
+              <li><strong>Mana Curve</strong> - Issues with spell distribution</li>
+              <li><strong>Mana Base</strong> - Land count/color problems</li>
+              <li><strong>Removal</strong> - Interaction spell balance</li>
+              <li><strong>Sequencing</strong> - Play order patterns</li>
+              <li><strong>Sideboard</strong> - Matchup-specific tweaks</li>
+            </ul>
+            <p>
+              <strong>Requires:</strong> At least 5 games played with this deck.
+            </p>
+          </HelpIcon>
+        </h3>
         <div className="header-controls">
           <select
             value={filterType}
@@ -214,9 +235,14 @@ export default function ImprovementSuggestionsPanel({
                 <div className="suggestion-icon">{getTypeIcon(suggestion.suggestionType)}</div>
                 <div className="suggestion-content">
                   <div className="suggestion-title-row">
-                    <span className={`priority-badge ${suggestion.priority}`}>
-                      {getPriorityIcon(suggestion.priority)}
-                    </span>
+                    <Tooltip
+                      content={`Priority: ${suggestion.priority === 'high' ? 'Address soon - significant impact on win rate' : suggestion.priority === 'medium' ? 'Worth considering - moderate impact' : 'Nice to have - minor optimization'}`}
+                      position="top"
+                    >
+                      <span className={`priority-badge ${suggestion.priority}`}>
+                        {getPriorityIcon(suggestion.priority)}
+                      </span>
+                    </Tooltip>
                     <h4 className="suggestion-title">{suggestion.title}</h4>
                   </div>
                   <span className="suggestion-type">

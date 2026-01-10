@@ -12,6 +12,7 @@ import type {
 import { models } from '@/types/models';
 import ProgressModal from './ProgressModal';
 import ProgressBar from './ProgressBar';
+import HelpIcon from './HelpIcon';
 import './BuildAroundSeedModal.css';
 
 type ArchetypeKey = 'aggro' | 'midrange' | 'control';
@@ -1288,7 +1289,18 @@ export default function BuildAroundSeedModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="build-around-header">
-            <h2 id="archetype-selector-title">Choose Deck Archetype</h2>
+            <h2 id="archetype-selector-title">
+              Choose Deck Archetype{' '}
+              <HelpIcon title="Archetypes" position="bottom">
+                <p>Each archetype has a different playstyle:</p>
+                <ul>
+                  <li><strong>Aggro</strong> - Fast, low-cost creatures. Win quickly before opponent stabilizes.</li>
+                  <li><strong>Midrange</strong> - Balanced threats and removal. Flexible gameplan.</li>
+                  <li><strong>Control</strong> - Removal and card draw. Win with late-game power.</li>
+                </ul>
+                <p>Stats show average mana curve and expected land count.</p>
+              </HelpIcon>
+            </h2>
             <button className="close-button" onClick={handleClose} aria-label="Close dialog">
               &times;
             </button>
@@ -1420,7 +1432,19 @@ export default function BuildAroundSeedModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="build-around-header">
-          <h2 id="seed-modal-title">Build Around Card</h2>
+          <h2 id="seed-modal-title">
+            Build Around Card{' '}
+            <HelpIcon title="Deck Builder" position="bottom">
+              <p>Build a complete deck around a key card or strategy.</p>
+              <p><strong>Two ways to build:</strong></p>
+              <ul>
+                <li><strong>Quick Generate</strong> - Select an archetype and get a complete 60-card deck instantly</li>
+                <li><strong>Start Building</strong> - Add cards one at a time with live suggestions</li>
+              </ul>
+              <p><strong>Budget Mode</strong> filters to cards you already own.</p>
+              <p><strong>Score Breakdown</strong> shows why cards are recommended (color fit, curve, synergy, quality).</p>
+            </HelpIcon>
+          </h2>
           <button className="close-button" onClick={handleClose} aria-label="Close dialog">
             &times;
           </button>

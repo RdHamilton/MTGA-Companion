@@ -75,6 +75,21 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 - **Card Type Categorization**: Set guide uses card types for better organization
 - **Keyword Extraction**: Sophisticated keyword analysis for card recommendations
 
+### Enhanced Deck Builder (v1.4.1)
+- **Undo/Redo Support**: Full undo/redo functionality with Ctrl+Z/Ctrl+Y keyboard shortcuts
+- **Build Around Mode**: Generate complete decks around key cards with archetype selection (Aggro, Midrange, Control)
+- **Iterative Building**: Add cards one at a time with live suggestions that update based on your choices
+- **Quick Generate**: Instantly generate a complete 60-card deck with optimal land distribution
+- **Budget Mode**: Filter suggestions to cards you already own
+- **Score Breakdown**: See why cards are recommended (color fit, curve fit, synergy, card quality)
+
+### In-App Documentation (v1.4.1)
+- **Contextual Help Icons**: Click "?" icons throughout the app for detailed feature explanations
+- **Enhanced Tooltips**: Hover over stats, badges, and buttons for quick help
+- **ML Suggestions Help**: Learn how ML recommendations work and how to use confidence scores
+- **Archetype Explanations**: Understand Aggro, Midrange, and Control playstyles
+- **Play Pattern Insights**: Documentation for improvement suggestions based on your matches
+
 ### Settings Improvements (v1.3)
 - **Collapsible Accordion Navigation**: Organized settings into collapsible sections
 - **URL Hash Navigation**: Direct links to settings sections (e.g., `#connection`, `#17lands`)
