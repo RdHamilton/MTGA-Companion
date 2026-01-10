@@ -71,12 +71,19 @@ type ScoreFactors struct {
 	Playable  float64 // Playability in format/context (0.0-1.0)
 }
 
+// EmbeddingService is an interface for card embedding operations.
+type EmbeddingService interface {
+	GetSynergyBonus(ctx context.Context, cardArenaID int, deckCardArenaIDs []int) float64
+	ComputeSimilarity(ctx context.Context, arenaID1, arenaID2 int) (float64, error)
+}
+
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
-	cardService    *cards.Service
-	setCardRepo    repository.SetCardRepository // For faster lookups from local DB
-	ratingsRepo    repository.DraftRatingsRepository
-	cfbRatingsRepo repository.CFBRatingsRepository // ChannelFireball ratings (optional)
+	cardService      *cards.Service
+	setCardRepo      repository.SetCardRepository // For faster lookups from local DB
+	ratingsRepo      repository.DraftRatingsRepository
+	cfbRatingsRepo   repository.CFBRatingsRepository // ChannelFireball ratings (optional)
+	embeddingService EmbeddingService                // Card embeddings for semantic similarity (optional)
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
@@ -109,6 +116,11 @@ func NewRuleBasedEngineWithCFB(cardService *cards.Service, setCardRepo repositor
 // SetCFBRatingsRepo sets the CFB ratings repository for the engine.
 func (e *RuleBasedEngine) SetCFBRatingsRepo(cfbRatingsRepo repository.CFBRatingsRepository) {
 	e.cfbRatingsRepo = cfbRatingsRepo
+}
+
+// SetEmbeddingService sets the embedding service for semantic similarity scoring.
+func (e *RuleBasedEngine) SetEmbeddingService(embeddingService EmbeddingService) {
+	e.embeddingService = embeddingService
 }
 
 // GetRecommendations returns recommended cards based on deck analysis.
@@ -235,7 +247,7 @@ func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck 
 	factors.Quality = e.scoreCardQuality(ctx, card, deck)
 
 	// Factor 4: Synergy (15% weight)
-	factors.Synergy = scoreSynergy(card, deck, analysis)
+	factors.Synergy = e.scoreSynergy(ctx, card, deck, analysis)
 
 	// Factor 5: Playability (5% weight)
 	factors.Playable = scorePlayability(card, deck)
@@ -548,7 +560,8 @@ func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 }
 
 // scoreSynergy calculates synergy with existing deck cards.
-func scoreSynergy(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
+// Uses keyword matching, tribal synergy, and optional embedding-based semantic similarity.
+func (e *RuleBasedEngine) scoreSynergy(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
 	synergy := 0.0
 	synergyCount := 0
 
@@ -585,6 +598,26 @@ func scoreSynergy(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) f
 				synergy += tribalBonus
 				synergyCount++
 			}
+		}
+	}
+
+	// Embedding-based semantic similarity (if available)
+	if e.embeddingService != nil && len(deck.Cards) > 0 {
+		// Get deck card IDs for embedding comparison
+		deckCardIDs := make([]int, 0, len(deck.Cards))
+		for _, deckCard := range deck.Cards {
+			if deckCard.Board == "main" {
+				deckCardIDs = append(deckCardIDs, deckCard.CardID)
+			}
+		}
+
+		// Get embedding-based synergy bonus
+		embeddingBonus := e.embeddingService.GetSynergyBonus(ctx, card.ArenaID, deckCardIDs)
+		if embeddingBonus > 0 {
+			// Scale embedding bonus to 0.0-0.6 range (embeddings are good at finding similar cards)
+			scaledBonus := embeddingBonus * 0.6
+			synergy += scaledBonus
+			synergyCount++
 		}
 	}
 
