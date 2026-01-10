@@ -117,8 +117,9 @@ func (r *deckRepository) Create(ctx context.Context, deck *models.Deck) error {
 		INSERT INTO decks (
 			id, account_id, name, format, description, color_identity, source, draft_event_id,
 			matches_played, matches_won, games_played, games_won,
-			created_at, modified_at, last_played
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			created_at, modified_at, last_played,
+			is_app_created, created_method, seed_card_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// Format timestamps using UTC ISO 8601 without timezone suffixes (SQLite best practice)
@@ -129,6 +130,12 @@ func (r *deckRepository) Create(ctx context.Context, deck *models.Deck) error {
 	if deck.LastPlayed != nil {
 		formatted := deck.LastPlayed.UTC().Format("2006-01-02 15:04:05.999999")
 		lastPlayedStr = &formatted
+	}
+
+	// Default created_method to "imported" if not set
+	createdMethod := deck.CreatedMethod
+	if createdMethod == "" {
+		createdMethod = "imported"
 	}
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -147,6 +154,9 @@ func (r *deckRepository) Create(ctx context.Context, deck *models.Deck) error {
 		createdAtStr,
 		modifiedAtStr,
 		lastPlayedStr,
+		deck.IsAppCreated,
+		createdMethod,
+		deck.SeedCardID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create deck: %w", err)
@@ -194,7 +204,8 @@ func (r *deckRepository) GetByID(ctx context.Context, id string) (*models.Deck, 
 	query := `
 		SELECT id, account_id, name, format, description, color_identity, source, draft_event_id,
 		       matches_played, matches_won, games_played, games_won,
-		       created_at, modified_at, last_played
+		       created_at, modified_at, last_played,
+		       is_app_created, created_method, seed_card_id
 		FROM decks
 		WHERE id = ?
 	`
@@ -216,6 +227,9 @@ func (r *deckRepository) GetByID(ctx context.Context, id string) (*models.Deck, 
 		&deck.CreatedAt,
 		&deck.ModifiedAt,
 		&deck.LastPlayed,
+		&deck.IsAppCreated,
+		&deck.CreatedMethod,
+		&deck.SeedCardID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -233,7 +247,8 @@ func (r *deckRepository) List(ctx context.Context, accountID int) ([]*models.Dec
 	query := `
 		SELECT id, account_id, name, format, description, color_identity, source, draft_event_id,
 		       matches_played, matches_won, games_played, games_won,
-		       created_at, modified_at, last_played
+		       created_at, modified_at, last_played,
+		       is_app_created, created_method, seed_card_id
 		FROM decks
 		WHERE account_id = ?
 		ORDER BY modified_at DESC
@@ -255,7 +270,8 @@ func (r *deckRepository) GetByFormat(ctx context.Context, accountID int, format 
 	query := `
 		SELECT id, account_id, name, format, description, color_identity, source, draft_event_id,
 		       matches_played, matches_won, games_played, games_won,
-		       created_at, modified_at, last_played
+		       created_at, modified_at, last_played,
+		       is_app_created, created_method, seed_card_id
 		FROM decks
 		WHERE account_id = ? AND format = ?
 		ORDER BY modified_at DESC
@@ -467,7 +483,8 @@ func (r *deckRepository) GetBySource(ctx context.Context, accountID int, source 
 	query := `
 		SELECT id, account_id, name, format, description, color_identity, source, draft_event_id,
 		       matches_played, matches_won, games_played, games_won,
-		       created_at, modified_at, last_played
+		       created_at, modified_at, last_played,
+		       is_app_created, created_method, seed_card_id
 		FROM decks
 		WHERE account_id = ? AND source = ?
 		ORDER BY modified_at DESC
@@ -489,7 +506,8 @@ func (r *deckRepository) GetByDraftEvent(ctx context.Context, draftEventID strin
 	query := `
 		SELECT id, account_id, name, format, description, color_identity, source, draft_event_id,
 		       matches_played, matches_won, games_played, games_won,
-		       created_at, modified_at, last_played
+		       created_at, modified_at, last_played,
+		       is_app_created, created_method, seed_card_id
 		FROM decks
 		WHERE draft_event_id = ?
 	`
@@ -511,6 +529,9 @@ func (r *deckRepository) GetByDraftEvent(ctx context.Context, draftEventID strin
 		&deck.CreatedAt,
 		&deck.ModifiedAt,
 		&deck.LastPlayed,
+		&deck.IsAppCreated,
+		&deck.CreatedMethod,
+		&deck.SeedCardID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -892,6 +913,9 @@ func (r *deckRepository) Clone(ctx context.Context, deckID, newName string) (*mo
 		GamesWon:      0,
 		CreatedAt:     time.Now(),
 		ModifiedAt:    time.Now(),
+		IsAppCreated:  true,     // Clones are app-created
+		CreatedMethod: "manual", // Cloning is a manual action
+		SeedCardID:    nil,      // Don't copy seed card
 	}
 
 	// Create the new deck
@@ -948,7 +972,8 @@ func (r *deckRepository) GetByTags(ctx context.Context, accountID int, tags []st
 	query := `
 		SELECT DISTINCT d.id, d.account_id, d.name, d.format, d.description, d.color_identity, d.source, d.draft_event_id,
 		       d.matches_played, d.matches_won, d.games_played, d.games_won,
-		       d.created_at, d.modified_at, d.last_played
+		       d.created_at, d.modified_at, d.last_played,
+		       d.is_app_created, d.created_method, d.seed_card_id
 		FROM decks d
 	`
 
@@ -994,7 +1019,8 @@ func (r *deckRepository) GetByFilters(ctx context.Context, filter *DeckFilter) (
 	query := `
 		SELECT DISTINCT d.id, d.account_id, d.name, d.format, d.description, d.color_identity, d.source, d.draft_event_id,
 		       d.matches_played, d.matches_won, d.games_played, d.games_won,
-		       d.created_at, d.modified_at, d.last_played
+		       d.created_at, d.modified_at, d.last_played,
+		       d.is_app_created, d.created_method, d.seed_card_id
 		FROM decks d
 	`
 
@@ -1083,6 +1109,9 @@ func (r *deckRepository) scanDecks(rows *sql.Rows) ([]*models.Deck, error) {
 			&deck.CreatedAt,
 			&deck.ModifiedAt,
 			&deck.LastPlayed,
+			&deck.IsAppCreated,
+			&deck.CreatedMethod,
+			&deck.SeedCardID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan deck: %w", err)

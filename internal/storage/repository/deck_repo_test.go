@@ -43,6 +43,9 @@ func setupDeckTestDB(t *testing.T) *sql.DB {
 			created_at DATETIME NOT NULL,
 			modified_at DATETIME NOT NULL,
 			last_played DATETIME,
+			is_app_created BOOLEAN DEFAULT FALSE,
+			created_method TEXT DEFAULT 'imported',
+			seed_card_id INTEGER,
 			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 			FOREIGN KEY (draft_event_id) REFERENCES draft_sessions(id) ON DELETE SET NULL,
 			CHECK(source IN ('draft', 'constructed', 'imported', 'arena'))
@@ -1395,6 +1398,116 @@ func TestDeckRepository_Clone(t *testing.T) {
 
 	if len(clonedTags) != 2 {
 		t.Errorf("expected 2 tags in cloned deck, got %d", len(clonedTags))
+	}
+
+	// Verify cloned deck is marked as app-created
+	if !clonedDeck.IsAppCreated {
+		t.Error("expected cloned deck to have IsAppCreated=true")
+	}
+
+	if clonedDeck.CreatedMethod != "manual" {
+		t.Errorf("expected cloned deck to have CreatedMethod='manual', got '%s'", clonedDeck.CreatedMethod)
+	}
+
+	if clonedDeck.SeedCardID != nil {
+		t.Error("expected cloned deck to have SeedCardID=nil")
+	}
+}
+
+func TestDeckRepository_AppCreatedTracking(t *testing.T) {
+	db := setupDeckTestDB(t)
+	defer db.Close()
+
+	repo := NewDeckRepository(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	seedCardID := 12345
+
+	// Create a deck with app-created tracking fields
+	deck := &models.Deck{
+		ID:            "deck-app-created",
+		AccountID:     1,
+		Name:          "Build Around Deck",
+		Format:        "Standard",
+		Source:        "constructed",
+		MatchesPlayed: 0,
+		MatchesWon:    0,
+		GamesPlayed:   0,
+		GamesWon:      0,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+		IsAppCreated:  true,
+		CreatedMethod: "build_around",
+		SeedCardID:    &seedCardID,
+	}
+
+	err := repo.Create(ctx, deck)
+	if err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+
+	// Retrieve and verify
+	retrieved, err := repo.GetByID(ctx, "deck-app-created")
+	if err != nil {
+		t.Fatalf("failed to retrieve deck: %v", err)
+	}
+
+	if retrieved == nil {
+		t.Fatal("expected deck to be found")
+	}
+
+	if !retrieved.IsAppCreated {
+		t.Error("expected IsAppCreated to be true")
+	}
+
+	if retrieved.CreatedMethod != "build_around" {
+		t.Errorf("expected CreatedMethod 'build_around', got '%s'", retrieved.CreatedMethod)
+	}
+
+	if retrieved.SeedCardID == nil {
+		t.Error("expected SeedCardID to be set")
+	} else if *retrieved.SeedCardID != 12345 {
+		t.Errorf("expected SeedCardID 12345, got %d", *retrieved.SeedCardID)
+	}
+
+	// Test imported deck defaults
+	importedDeck := &models.Deck{
+		ID:            "deck-imported",
+		AccountID:     1,
+		Name:          "Imported Deck",
+		Format:        "Standard",
+		Source:        "imported",
+		MatchesPlayed: 0,
+		MatchesWon:    0,
+		GamesPlayed:   0,
+		GamesWon:      0,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+		// IsAppCreated defaults to false
+		// CreatedMethod defaults to "imported"
+	}
+
+	err = repo.Create(ctx, importedDeck)
+	if err != nil {
+		t.Fatalf("failed to create imported deck: %v", err)
+	}
+
+	retrieved, err = repo.GetByID(ctx, "deck-imported")
+	if err != nil {
+		t.Fatalf("failed to retrieve imported deck: %v", err)
+	}
+
+	if retrieved.IsAppCreated {
+		t.Error("expected imported deck to have IsAppCreated=false")
+	}
+
+	if retrieved.CreatedMethod != "imported" {
+		t.Errorf("expected imported deck to have CreatedMethod='imported', got '%s'", retrieved.CreatedMethod)
+	}
+
+	if retrieved.SeedCardID != nil {
+		t.Error("expected imported deck to have SeedCardID=nil")
 	}
 }
 

@@ -84,6 +84,10 @@ type Deck struct {
 	CreatedAt     time.Time
 	ModifiedAt    time.Time
 	LastPlayed    *time.Time // Nullable
+	// ML training tracking fields
+	IsAppCreated  bool   // True if deck was created/managed by the app
+	CreatedMethod string // How the deck was created: "build_around", "suggest_decks", "manual", "imported"
+	SeedCardID    *int   // Card ID used to seed Build Around feature (nullable)
 }
 
 // DeckCard represents a card in a deck.
