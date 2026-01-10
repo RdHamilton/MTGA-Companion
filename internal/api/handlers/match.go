@@ -444,6 +444,23 @@ func (h *MatchHandler) CompareMatches(w http.ResponseWriter, r *http.Request) {
 
 	groups := make([]storage.ComparisonGroup, 0, len(req.Groups))
 	for _, g := range req.Groups {
+		if g.Label == "" {
+			response.BadRequest(w, errors.New("group label is required"))
+			return
+		}
+		// Validate date strings if provided
+		if g.Filter.StartDate != nil && *g.Filter.StartDate != "" {
+			if _, err := time.Parse("2006-01-02", *g.Filter.StartDate); err != nil {
+				response.BadRequest(w, errors.New("invalid start_date format, expected YYYY-MM-DD"))
+				return
+			}
+		}
+		if g.Filter.EndDate != nil && *g.Filter.EndDate != "" {
+			if _, err := time.Parse("2006-01-02", *g.Filter.EndDate); err != nil {
+				response.BadRequest(w, errors.New("invalid end_date format, expected YYYY-MM-DD"))
+				return
+			}
+		}
 		groups = append(groups, storage.ComparisonGroup{
 			Label:  g.Label,
 			Filter: g.Filter.ToStatsFilter(),
@@ -548,6 +565,10 @@ func (h *MatchHandler) CompareTimePeriods(w http.ResponseWriter, r *http.Request
 		end, err := time.Parse("2006-01-02", p.EndDate)
 		if err != nil {
 			response.BadRequest(w, errors.New("invalid end_date format, expected YYYY-MM-DD"))
+			return
+		}
+		if start.After(end) {
+			response.BadRequest(w, errors.New("start_date must be on/before end_date"))
 			return
 		}
 		periods = append(periods, storage.TimePeriod{
