@@ -20,6 +20,7 @@ const GamePlayTimelinePanel = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedTurn, setSelectedTurn] = useState<number | null>(null);
   const isMountedRef = useRef(true);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -28,8 +29,16 @@ const GamePlayTimelinePanel = ({
     };
   }, []);
 
+  // Reset fetch status when matchId changes
   useEffect(() => {
-    if (isExpanded && timeline.length === 0 && !loading) {
+    hasFetchedRef.current = false;
+    setTimeline([]);
+    setSelectedTurn(null);
+  }, [matchId]);
+
+  useEffect(() => {
+    if (isExpanded && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       loadTimeline();
     }
   }, [isExpanded, matchId]);
