@@ -467,13 +467,21 @@ func (h *MatchHandler) CompareFormats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Formats) < 2 {
-		response.BadRequest(w, errors.New("need at least 2 formats to compare"))
+	// Filter out empty strings
+	validFormats := make([]string, 0, len(req.Formats))
+	for _, f := range req.Formats {
+		if f != "" {
+			validFormats = append(validFormats, f)
+		}
+	}
+
+	if len(validFormats) < 2 {
+		response.BadRequest(w, errors.New("need at least 2 non-empty formats to compare"))
 		return
 	}
 
 	baseFilter := req.BaseFilter.ToStatsFilter()
-	result, err := h.facade.CompareFormats(r.Context(), req.Formats, baseFilter)
+	result, err := h.facade.CompareFormats(r.Context(), validFormats, baseFilter)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -490,13 +498,21 @@ func (h *MatchHandler) CompareDecks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.DeckIDs) < 2 {
-		response.BadRequest(w, errors.New("need at least 2 decks to compare"))
+	// Filter out empty strings
+	validDeckIDs := make([]string, 0, len(req.DeckIDs))
+	for _, id := range req.DeckIDs {
+		if id != "" {
+			validDeckIDs = append(validDeckIDs, id)
+		}
+	}
+
+	if len(validDeckIDs) < 2 {
+		response.BadRequest(w, errors.New("need at least 2 non-empty deck IDs to compare"))
 		return
 	}
 
 	baseFilter := req.BaseFilter.ToStatsFilter()
-	result, err := h.facade.CompareDecks(r.Context(), req.DeckIDs, baseFilter)
+	result, err := h.facade.CompareDecks(r.Context(), validDeckIDs, baseFilter)
 	if err != nil {
 		response.InternalError(w, err)
 		return
@@ -520,6 +536,10 @@ func (h *MatchHandler) CompareTimePeriods(w http.ResponseWriter, r *http.Request
 
 	periods := make([]storage.TimePeriod, 0, len(req.Periods))
 	for _, p := range req.Periods {
+		// Skip periods with empty labels or dates
+		if p.Label == "" || p.StartDate == "" || p.EndDate == "" {
+			continue
+		}
 		start, err := time.Parse("2006-01-02", p.StartDate)
 		if err != nil {
 			response.BadRequest(w, errors.New("invalid start_date format, expected YYYY-MM-DD"))
@@ -535,6 +555,11 @@ func (h *MatchHandler) CompareTimePeriods(w http.ResponseWriter, r *http.Request
 			Start: start,
 			End:   end,
 		})
+	}
+
+	if len(periods) < 2 {
+		response.BadRequest(w, errors.New("need at least 2 valid time periods to compare"))
+		return
 	}
 
 	baseFilter := req.BaseFilter.ToStatsFilter()

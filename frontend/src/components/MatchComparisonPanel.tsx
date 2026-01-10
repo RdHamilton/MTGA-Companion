@@ -178,7 +178,7 @@ export default function MatchComparisonPanel({
                       checked={selectedFormats.includes(format)}
                       onChange={() => toggleFormat(format)}
                     />
-                    {format}
+                    <span>{format}</span>
                   </label>
                 ))
               ) : (
@@ -200,7 +200,7 @@ export default function MatchComparisonPanel({
                       checked={selectedDecks.includes(deck.id)}
                       onChange={() => toggleDeck(deck.id)}
                     />
-                    {deck.name}
+                    <span>{deck.name}</span>
                   </label>
                 ))
               ) : (
@@ -221,7 +221,7 @@ export default function MatchComparisonPanel({
                     checked={selectedPeriods.some((p) => p.label === period.label)}
                     onChange={() => togglePeriod(period)}
                   />
-                  {period.label}
+                  <span>{period.label}</span>
                 </label>
               ))}
             </div>
@@ -288,7 +288,7 @@ export default function MatchComparisonPanel({
           </tbody>
         </table>
 
-        {result.BestGroup && result.WorstGroup && result.BestGroup !== result.WorstGroup && (
+        {result.BestGroup && result.WorstGroup && result.BestGroup.Label !== result.WorstGroup.Label && (
           <div className="comparison-insight">
             <strong>Insight:</strong> Your best performance is in{' '}
             <span className="highlight">{result.BestGroup.Label}</span> with a{' '}
