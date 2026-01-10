@@ -3,6 +3,7 @@ import { matches } from '@/services/api';
 import { models } from '@/types/models';
 import LoadingSpinner from './LoadingSpinner';
 import OpponentAnalysisPanel from './OpponentAnalysisPanel';
+import GamePlayTimelinePanel from './GamePlayTimelinePanel';
 import './MatchDetailsModal.css';
 
 interface MatchDetailsModalProps {
@@ -15,6 +16,7 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [opponentAnalysisExpanded, setOpponentAnalysisExpanded] = useState(false);
+  const [gameTimelineExpanded, setGameTimelineExpanded] = useState(false);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -65,9 +67,10 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
     return `${match.RankBefore} → ${match.RankAfter}`;
   };
 
-  // Reset opponent analysis expansion when match changes
+  // Reset panel expansions when match changes
   useEffect(() => {
     setOpponentAnalysisExpanded(false);
+    setGameTimelineExpanded(false);
   }, [match.ID]);
 
   // Handle click on backdrop to close modal
@@ -182,6 +185,13 @@ const MatchDetailsModal = ({ match, onClose }: MatchDetailsModalProps) => {
             matchId={match.ID}
             isExpanded={opponentAnalysisExpanded}
             onToggle={() => setOpponentAnalysisExpanded(prev => !prev)}
+          />
+
+          {/* Game Play Timeline */}
+          <GamePlayTimelinePanel
+            matchId={match.ID}
+            isExpanded={gameTimelineExpanded}
+            onToggle={() => setGameTimelineExpanded(prev => !prev)}
           />
         </div>
 
