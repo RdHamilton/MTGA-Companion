@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useProgressTask } from './useProgressTask';
 import { TaskProgressProvider } from '@/context/TaskProgressContext';
 import type { ReactNode } from 'react';
@@ -33,7 +33,7 @@ describe('useProgressTask', () => {
     it('tracks progress during execution', async () => {
       const { result } = renderHook(() => useProgressTask('test-task'), { wrapper });
 
-      let progressUpdates: number[] = [];
+      const progressUpdates: number[] = [];
 
       await act(async () => {
         await result.current.execute(async (updateProgress) => {
@@ -43,7 +43,6 @@ describe('useProgressTask', () => {
           progressUpdates.push(50);
           updateProgress(75, 'Step 3');
           progressUpdates.push(75);
-          return 'result';
         }, 'Test Operation');
       });
 
@@ -69,7 +68,7 @@ describe('useProgressTask', () => {
 
       await act(async () => {
         await result.current.execute(async () => {
-          return 'done';
+          // Task completes
         }, 'Test Operation');
       });
 
@@ -104,7 +103,7 @@ describe('useProgressTask', () => {
 
       await act(async () => {
         await result.current.execute(async () => {
-          return 'done';
+          // Task with category
         }, 'Deck Generation');
       });
 
@@ -123,7 +122,6 @@ describe('useProgressTask', () => {
       await act(async () => {
         await result.current.execute(async () => {
           executed = true;
-          return 'done';
         }, 'Slow Operation');
       });
 
@@ -156,7 +154,9 @@ describe('useProgressTask', () => {
       expect(result2.current.isRunning).toBe(false);
 
       await act(async () => {
-        await result1.current.execute(async () => 'result-1', 'Task 1');
+        await result1.current.execute(async () => {
+          // Task 1 operation
+        }, 'Task 1');
       });
 
       // Task 1 completed
