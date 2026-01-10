@@ -424,4 +424,272 @@ describe('TierList Component', () => {
       });
     });
   });
+
+  describe('CFB Ratings Integration', () => {
+    beforeEach(() => {
+      mockCards.getCFBRatings.mockResolvedValue([]);
+    });
+
+    it('should not show CFB column when no CFB ratings are available', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Test Card', mtga_id: 1, tier: 'S' }),
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue([]);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Card')).toBeInTheDocument();
+      });
+
+      // CFB column should not be present
+      expect(screen.queryByText('CFB')).not.toBeInTheDocument();
+    });
+
+    it('should show CFB column when CFB ratings are available', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'Lightning Bolt',
+          setCode: 'TST',
+          limitedRating: 'A+',
+          limitedScore: 10,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+      });
+
+      // CFB column header should be present
+      await waitFor(() => {
+        const headers = screen.getAllByRole('columnheader');
+        const cfbHeader = headers.find(h => h.textContent === 'CFB');
+        expect(cfbHeader).toBeInTheDocument();
+      });
+    });
+
+    it('should display CFB rating badge for cards with ratings', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'Lightning Bolt',
+          setCode: 'TST',
+          limitedRating: 'A+',
+          limitedScore: 10,
+          commentary: 'Top tier removal',
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+      });
+
+      // CFB rating badge should be present with the grade
+      await waitFor(() => {
+        const badge = screen.getByTestId('cfb-rating-badge');
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveTextContent('A+');
+      });
+    });
+
+    it('should show dash for cards without CFB rating', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
+        createMockCardRating({ name: 'Counterspell', mtga_id: 2, tier: 'A' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'Lightning Bolt',
+          setCode: 'TST',
+          limitedRating: 'A+',
+          limitedScore: 10,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+        // Note: No CFB rating for Counterspell
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Counterspell')).toBeInTheDocument();
+      });
+
+      // Should have a dash for the missing CFB rating
+      await waitFor(() => {
+        const noCfbElements = document.querySelectorAll('.no-cfb-rating');
+        expect(noCfbElements.length).toBeGreaterThan(0);
+        expect(noCfbElements[0]).toHaveTextContent('-');
+      });
+    });
+
+    it('should match CFB ratings case-insensitively', async () => {
+      const cards = [
+        createMockCardRating({ name: 'LIGHTNING BOLT', mtga_id: 1, tier: 'S' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'lightning bolt', // lowercase
+          setCode: 'TST',
+          limitedRating: 'B+',
+          limitedScore: 7,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('LIGHTNING BOLT')).toBeInTheDocument();
+      });
+
+      // CFB rating should still be found and displayed
+      await waitFor(() => {
+        const badge = screen.getByTestId('cfb-rating-badge');
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveTextContent('B+');
+      });
+    });
+
+    it('should handle CFB ratings API failure gracefully', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockRejectedValue(new Error('CFB ratings not available'));
+
+      render(<TierList {...defaultProps} />);
+
+      // Should still render the tier list without CFB column
+      await waitFor(() => {
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+      });
+
+      // CFB column should not be present when API fails
+      expect(screen.queryByText('CFB')).not.toBeInTheDocument();
+    });
+
+    it('should display CFB rating tooltip with commentary', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Lightning Bolt', mtga_id: 1, tier: 'S' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'Lightning Bolt',
+          setCode: 'TST',
+          limitedRating: 'A+',
+          limitedScore: 10,
+          commentary: 'Best removal in the format',
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightning Bolt')).toBeInTheDocument();
+      });
+
+      // Badge should have commentary as tooltip
+      await waitFor(() => {
+        const badge = screen.getByTestId('cfb-rating-badge');
+        expect(badge).toHaveAttribute('title', 'Best removal in the format');
+      });
+    });
+
+    it('should display multiple cards with different CFB grades', async () => {
+      const cards = [
+        createMockCardRating({ name: 'Bomb Rare', mtga_id: 1, tier: 'S' }),
+        createMockCardRating({ name: 'Good Card', mtga_id: 2, tier: 'A' }),
+        createMockCardRating({ name: 'Filler', mtga_id: 3, tier: 'C' }),
+      ];
+      const cfbRatings = [
+        {
+          id: 1,
+          cardName: 'Bomb Rare',
+          setCode: 'TST',
+          limitedRating: 'A+',
+          limitedScore: 10,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+        {
+          id: 2,
+          cardName: 'Good Card',
+          setCode: 'TST',
+          limitedRating: 'B',
+          limitedScore: 6,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+        {
+          id: 3,
+          cardName: 'Filler',
+          setCode: 'TST',
+          limitedRating: 'C-',
+          limitedScore: 2,
+          importedAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockCards.getCardRatings.mockResolvedValue(cards);
+      mockCards.getSetCards.mockResolvedValue([]);
+      mockCards.getCFBRatings.mockResolvedValue(cfbRatings);
+
+      render(<TierList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bomb Rare')).toBeInTheDocument();
+        expect(screen.getByText('Good Card')).toBeInTheDocument();
+        expect(screen.getByText('Filler')).toBeInTheDocument();
+      });
+
+      // All CFB badges should be present
+      await waitFor(() => {
+        const badges = screen.getAllByTestId('cfb-rating-badge');
+        expect(badges).toHaveLength(3);
+        expect(badges[0]).toHaveTextContent('A+');
+        expect(badges[1]).toHaveTextContent('B');
+        expect(badges[2]).toHaveTextContent('C-');
+      });
+    });
+  });
 });

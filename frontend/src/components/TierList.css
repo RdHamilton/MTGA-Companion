@@ -353,6 +353,16 @@
     font-size: 14px;
 }
 
+.card-cfb {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.no-cfb-rating {
+    color: #666666;
+    font-style: italic;
+}
+
 /* Loading & Error States */
 .tier-list-loading,
 .tier-list-error,
