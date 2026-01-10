@@ -1,0 +1,269 @@
+/* Game Play Timeline Panel */
+.game-play-timeline-panel {
+  margin-top: 16px;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  background-color: #1e1e1e;
+}
+
+.game-play-timeline-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ffffff;
+  transition: background-color 0.2s;
+}
+
+.game-play-timeline-panel .panel-header:hover {
+  background-color: #2d2d2d;
+}
+
+.game-play-timeline-panel .panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.game-play-timeline-panel .expand-icon {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.game-play-timeline-panel .expand-icon.expanded {
+  transform: rotate(0deg);
+}
+
+.game-play-timeline-panel .panel-content {
+  padding: 16px;
+  border-top: 1px solid #3d3d3d;
+}
+
+/* Turn Navigation */
+.turn-navigation {
+  margin-bottom: 16px;
+}
+
+.turn-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.turn-btn {
+  padding: 6px 12px;
+  background-color: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  color: #aaaaaa;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.turn-btn:hover {
+  background-color: #3d3d3d;
+  color: #ffffff;
+}
+
+.turn-btn.active {
+  background-color: #4a9eff;
+  border-color: #4a9eff;
+  color: #ffffff;
+}
+
+/* Selected Turn */
+.selected-turn {
+  background-color: #252525;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.turn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.turn-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.active-player {
+  font-size: 14px;
+  color: #aaaaaa;
+}
+
+/* Turn Snapshot */
+.turn-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+}
+
+.snapshot-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.snapshot-label {
+  font-size: 11px;
+  color: #888888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.snapshot-value {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.life-values .player-life,
+.snapshot-value .player-cards,
+.snapshot-value .player-lands {
+  color: #7dff7d;
+}
+
+.life-values .opponent-life,
+.snapshot-value .opponent-cards,
+.snapshot-value .opponent-lands {
+  color: #ff7d7d;
+}
+
+.separator {
+  color: #555555;
+  margin: 0 6px;
+}
+
+/* Plays Columns */
+.plays-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.plays-column {
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.plays-column h5 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.player-column h5 {
+  color: #7dff7d;
+}
+
+.opponent-column h5 {
+  color: #ff7d7d;
+}
+
+.plays-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no-plays {
+  color: #666666;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Play Item */
+.play-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: #252525;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.play-item.player {
+  border-left: 2px solid #7dff7d;
+}
+
+.play-item.opponent {
+  border-left: 2px solid #ff7d7d;
+}
+
+.play-icon {
+  font-size: 14px;
+}
+
+.play-action {
+  color: #aaaaaa;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.play-card {
+  color: #ffffff;
+  font-weight: 500;
+  flex: 1;
+}
+
+.play-zones {
+  font-size: 11px;
+  color: #666666;
+}
+
+/* States */
+.empty-state {
+  text-align: center;
+  padding: 24px;
+  color: #888888;
+  font-size: 14px;
+}
+
+.error-message {
+  padding: 12px;
+  background-color: rgba(255, 77, 77, 0.1);
+  border: 1px solid #5f2d2d;
+  border-radius: 4px;
+  color: #ff7d7d;
+  font-size: 14px;
+}
+
+/* Timeline Container */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .plays-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .turn-snapshot {
+    grid-template-columns: 1fr;
+  }
+}
