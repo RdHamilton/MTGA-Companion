@@ -858,3 +858,548 @@ func (s *DeckSuggester) getCard(ctx context.Context, arenaID int) *cards.Card {
 
 	return nil
 }
+
+// SuggestDeckByArchetype generates a deck suggestion optimized for a specific archetype (aggro/midrange/control).
+func (s *DeckSuggester) SuggestDeckByArchetype(
+	ctx context.Context,
+	draftPool []int,
+	setCode string,
+	draftFormat string,
+	archetypeKey string,
+) (*SuggestedDeck, error) {
+	target, ok := archetypeTargets[archetypeKey]
+	if !ok {
+		return nil, fmt.Errorf("unknown archetype: %s", archetypeKey)
+	}
+
+	if len(draftPool) == 0 {
+		return nil, fmt.Errorf("no cards in draft pool")
+	}
+
+	// Load all cards from the draft pool
+	poolCards := make([]*cards.Card, 0, len(draftPool))
+	for _, arenaID := range draftPool {
+		card := s.getCard(ctx, arenaID)
+		if card != nil {
+			poolCards = append(poolCards, card)
+		}
+	}
+
+	if len(poolCards) == 0 {
+		return nil, fmt.Errorf("could not load any cards from draft pool")
+	}
+
+	// Find the best color combination for this archetype
+	bestDeck := (*SuggestedDeck)(nil)
+	bestScore := 0.0
+
+	for _, combo := range allColorCombinations {
+		candidates := s.filterByColorFit(poolCards, combo)
+		if !s.isViableForArchetype(candidates, target) {
+			continue
+		}
+
+		deck := s.buildArchetypeDeck(ctx, combo, candidates, setCode, draftFormat, target)
+		if deck != nil && deck.Score > bestScore {
+			bestScore = deck.Score
+			bestDeck = deck
+		}
+	}
+
+	if bestDeck == nil {
+		return nil, fmt.Errorf("no viable %s deck found in pool", target.Name)
+	}
+
+	return bestDeck, nil
+}
+
+// archetypeTarget defines targets for deck building by archetype.
+type archetypeTarget struct {
+	Name           string
+	CreatureMin    int
+	CreatureMax    int
+	MaxAvgCMC      float64
+	LandCount      int
+	PreferredCurve map[int]int // CMC -> ideal count
+}
+
+// archetypeTargets defines the archetype-specific deck building targets.
+var archetypeTargets = map[string]archetypeTarget{
+	"aggro": {
+		Name:        "Aggro",
+		CreatureMin: 16,
+		CreatureMax: 18,
+		MaxAvgCMC:   2.5,
+		LandCount:   16,
+		PreferredCurve: map[int]int{
+			1: 4,
+			2: 8,
+			3: 5,
+			4: 1,
+			5: 0,
+		},
+	},
+	"midrange": {
+		Name:        "Midrange",
+		CreatureMin: 14,
+		CreatureMax: 16,
+		MaxAvgCMC:   3.0,
+		LandCount:   17,
+		PreferredCurve: map[int]int{
+			1: 2,
+			2: 5,
+			3: 5,
+			4: 3,
+			5: 2,
+		},
+	},
+	"control": {
+		Name:        "Control",
+		CreatureMin: 10,
+		CreatureMax: 12,
+		MaxAvgCMC:   3.5,
+		LandCount:   18,
+		PreferredCurve: map[int]int{
+			1: 1,
+			2: 4,
+			3: 4,
+			4: 3,
+			5: 3,
+		},
+	},
+}
+
+// isViableForArchetype checks if a candidate pool can support the archetype.
+func (s *DeckSuggester) isViableForArchetype(candidates []*cards.Card, target archetypeTarget) bool {
+	if len(candidates) < 15 {
+		return false
+	}
+
+	creatureCount := 0
+	for _, card := range candidates {
+		if containsTypeInTypeLine(card.TypeLine, "Creature") {
+			creatureCount++
+		}
+	}
+
+	// Must have enough creatures for the archetype minimum
+	return creatureCount >= target.CreatureMin-4 // Allow some flexibility
+}
+
+// buildArchetypeDeck builds a deck optimized for the given archetype target.
+func (s *DeckSuggester) buildArchetypeDeck(
+	ctx context.Context,
+	combo ColorCombination,
+	candidates []*cards.Card,
+	setCode string,
+	draftFormat string,
+	target archetypeTarget,
+) *SuggestedDeck {
+	// Score cards with archetype-specific priorities
+	scoredCards := make([]*scoredCard, 0, len(candidates))
+	for _, card := range candidates {
+		score, reasoning := s.scoreCardForArchetype(ctx, card, candidates, setCode, draftFormat, target)
+		scoredCards = append(scoredCards, &scoredCard{
+			card:      card,
+			score:     score,
+			reasoning: reasoning,
+		})
+	}
+
+	// Select cards according to archetype curve
+	nonLandCount := 40 - target.LandCount
+	selectedCards := s.selectCardsForArchetype(scoredCards, nonLandCount, target)
+
+	if len(selectedCards) < nonLandCount-3 { // Allow some flexibility
+		return nil
+	}
+
+	// Build lands
+	lands := s.distributeArchetypeLands(selectedCards, combo, target.LandCount)
+
+	// Convert to suggested cards
+	spells := make([]*SuggestedCard, len(selectedCards))
+	for i, sc := range selectedCards {
+		spells[i] = s.toSuggestedCard(sc)
+	}
+
+	// Build analysis
+	analysis := s.analyzeDeckSuggestion(selectedCards, candidates)
+
+	// Calculate archetype-specific score
+	deckScore := s.calculateArchetypeScore(selectedCards, analysis, combo, target)
+
+	// Determine viability
+	viability := "weak"
+	if deckScore >= 0.7 {
+		viability = "strong"
+	} else if deckScore >= 0.5 {
+		viability = "viable"
+	}
+
+	return &SuggestedDeck{
+		ColorCombo: combo,
+		Spells:     spells,
+		Lands:      lands,
+		TotalCards: len(spells) + s.countLands(lands),
+		Score:      deckScore,
+		Viability:  viability,
+		Analysis:   analysis,
+	}
+}
+
+// scoreCardForArchetype scores a card with archetype-specific weights.
+func (s *DeckSuggester) scoreCardForArchetype(
+	ctx context.Context,
+	card *cards.Card,
+	poolCards []*cards.Card,
+	setCode string,
+	draftFormat string,
+	target archetypeTarget,
+) (float64, string) {
+	reasons := make([]string, 0)
+
+	// Quality score (35%)
+	qualityScore := s.scoreQuality(ctx, card, setCode, draftFormat)
+	if qualityScore >= 0.7 {
+		reasons = append(reasons, "high-quality card")
+	}
+
+	// CMC fit for archetype (30%)
+	cmcScore := s.scoreCMCForArchetype(card, target)
+	if cmcScore >= 0.8 {
+		reasons = append(reasons, fmt.Sprintf("great %d-drop for %s", int(card.CMC), target.Name))
+	}
+
+	// Type fit for archetype (20%)
+	typeScore := s.scoreTypeForArchetype(card, target)
+	if typeScore >= 0.8 {
+		isCreature := containsTypeInTypeLine(card.TypeLine, "Creature")
+		if isCreature && target.CreatureMax >= 16 {
+			reasons = append(reasons, "creature for aggro")
+		} else if !isCreature && target.CreatureMax <= 12 {
+			reasons = append(reasons, "spell for control")
+		}
+	}
+
+	// Synergy (15%)
+	synergyScore := s.scoreSynergyWithPool(card, poolCards)
+	if synergyScore >= 0.7 {
+		reasons = append(reasons, "synergy bonus")
+	}
+
+	score := (qualityScore * 0.35) + (cmcScore * 0.30) + (typeScore * 0.20) + (synergyScore * 0.15)
+
+	reasoning := fmt.Sprintf("Good for %s", target.Name)
+	if len(reasons) > 0 {
+		reasoning = strings.Join(reasons, ", ")
+	}
+
+	return score, reasoning
+}
+
+// scoreCMCForArchetype scores a card's CMC fit for the archetype.
+func (s *DeckSuggester) scoreCMCForArchetype(card *cards.Card, target archetypeTarget) float64 {
+	cmc := int(card.CMC)
+	if cmc > 5 {
+		cmc = 5
+	}
+
+	idealCount := target.PreferredCurve[cmc]
+	if idealCount == 0 && cmc >= 5 {
+		// High CMC cards are less desirable in aggro
+		if target.MaxAvgCMC <= 2.5 {
+			return 0.2
+		}
+		return 0.5
+	}
+
+	// Higher ideal count = better score
+	if idealCount >= 5 {
+		return 1.0
+	} else if idealCount >= 3 {
+		return 0.8
+	} else if idealCount >= 1 {
+		return 0.6
+	}
+	return 0.4
+}
+
+// scoreTypeForArchetype scores a card's type fit for the archetype.
+func (s *DeckSuggester) scoreTypeForArchetype(card *cards.Card, target archetypeTarget) float64 {
+	isCreature := containsTypeInTypeLine(card.TypeLine, "Creature")
+
+	// Aggro wants lots of creatures
+	if target.CreatureMax >= 16 && isCreature {
+		return 1.0
+	}
+
+	// Control wants more spells
+	if target.CreatureMax <= 12 && !isCreature {
+		// Bonus for removal and card draw
+		if card.OracleText != nil {
+			text := strings.ToLower(*card.OracleText)
+			if strings.Contains(text, "destroy") ||
+				strings.Contains(text, "exile") ||
+				strings.Contains(text, "draw") ||
+				strings.Contains(text, "counter") {
+				return 1.0
+			}
+		}
+		return 0.8
+	}
+
+	// Midrange is balanced
+	return 0.7
+}
+
+// selectCardsForArchetype selects cards according to archetype curve preferences.
+func (s *DeckSuggester) selectCardsForArchetype(scoredCards []*scoredCard, targetCount int, target archetypeTarget) []*scoredCard {
+	// Sort by score
+	sort.Slice(scoredCards, func(i, j int) bool {
+		return scoredCards[i].score > scoredCards[j].score
+	})
+
+	curveSlots := make(map[int]int)
+	for cmc := range target.PreferredCurve {
+		curveSlots[cmc] = 0
+	}
+
+	selected := make([]*scoredCard, 0, targetCount)
+	usedCards := make(map[int]bool)
+
+	// First pass: fill curve according to archetype targets
+	for _, sc := range scoredCards {
+		if len(selected) >= targetCount {
+			break
+		}
+		if usedCards[sc.card.ArenaID] {
+			continue
+		}
+
+		cmc := int(sc.card.CMC)
+		if cmc > 5 {
+			cmc = 5
+		}
+
+		idealCount := target.PreferredCurve[cmc]
+		if curveSlots[cmc] < idealCount {
+			selected = append(selected, sc)
+			usedCards[sc.card.ArenaID] = true
+			curveSlots[cmc]++
+		}
+	}
+
+	// Second pass: fill remaining slots with best available
+	for _, sc := range scoredCards {
+		if len(selected) >= targetCount {
+			break
+		}
+		if usedCards[sc.card.ArenaID] {
+			continue
+		}
+
+		selected = append(selected, sc)
+		usedCards[sc.card.ArenaID] = true
+	}
+
+	return selected
+}
+
+// distributeArchetypeLands distributes lands for archetype-specific land count.
+func (s *DeckSuggester) distributeArchetypeLands(selectedCards []*scoredCard, combo ColorCombination, landCount int) []*SuggestedLand {
+	pipCounts := make(map[string]int)
+	for _, color := range combo.Colors {
+		pipCounts[color] = 0
+	}
+
+	for _, sc := range selectedCards {
+		if sc.card.ManaCost == nil {
+			continue
+		}
+		manaCost := *sc.card.ManaCost
+		for _, color := range combo.Colors {
+			pipCounts[color] += strings.Count(manaCost, "{"+color+"}")
+		}
+	}
+
+	totalPips := 0
+	for _, count := range pipCounts {
+		totalPips += count
+	}
+
+	lands := make([]*SuggestedLand, 0)
+
+	if totalPips == 0 {
+		// Equal distribution
+		numColors := len(combo.Colors)
+		baseCount := landCount / numColors
+		remainder := landCount % numColors
+
+		for i, color := range combo.Colors {
+			land := basicLandsByColor[color]
+			count := baseCount
+			if i < remainder {
+				count++
+			}
+			lands = append(lands, &SuggestedLand{
+				CardID:   land.ArenaID,
+				Name:     land.Name,
+				Quantity: count,
+				Color:    color,
+			})
+		}
+		return lands
+	}
+
+	// Proportional distribution
+	landCounts := make(map[string]int)
+	allocated := 0
+
+	for color, pips := range pipCounts {
+		proportion := float64(pips) / float64(totalPips)
+		count := int(float64(landCount) * proportion)
+		landCounts[color] = count
+		allocated += count
+	}
+
+	// Distribute remaining
+	remaining := landCount - allocated
+	if remaining > 0 {
+		maxPips := 0
+		maxColor := combo.Colors[0]
+		for color, pips := range pipCounts {
+			if pips > maxPips {
+				maxPips = pips
+				maxColor = color
+			}
+		}
+		landCounts[maxColor] += remaining
+	}
+
+	for color, count := range landCounts {
+		if count > 0 {
+			land := basicLandsByColor[color]
+			lands = append(lands, &SuggestedLand{
+				CardID:   land.ArenaID,
+				Name:     land.Name,
+				Quantity: count,
+				Color:    color,
+			})
+		}
+	}
+
+	return lands
+}
+
+// calculateArchetypeScore calculates a deck score relative to archetype targets.
+func (s *DeckSuggester) calculateArchetypeScore(
+	selectedCards []*scoredCard,
+	analysis *DeckSuggestionAnalysis,
+	combo ColorCombination,
+	target archetypeTarget,
+) float64 {
+	if len(selectedCards) == 0 {
+		return 0.0
+	}
+
+	// Average card quality (40%)
+	totalScore := 0.0
+	for _, sc := range selectedCards {
+		totalScore += sc.score
+	}
+	avgCardScore := totalScore / float64(len(selectedCards))
+
+	// Creature count fit (20%)
+	creatureScore := 0.0
+	if analysis.CreatureCount >= target.CreatureMin && analysis.CreatureCount <= target.CreatureMax {
+		creatureScore = 1.0
+	} else if analysis.CreatureCount >= target.CreatureMin-2 && analysis.CreatureCount <= target.CreatureMax+2 {
+		creatureScore = 0.7
+	} else {
+		creatureScore = 0.4
+	}
+
+	// CMC fit (20%)
+	cmcScore := 0.0
+	if analysis.AverageCMC <= target.MaxAvgCMC {
+		cmcScore = 1.0
+	} else if analysis.AverageCMC <= target.MaxAvgCMC+0.3 {
+		cmcScore = 0.7
+	} else {
+		cmcScore = 0.4
+	}
+
+	// Mana consistency (20%)
+	manaScore := 1.0
+	switch len(combo.Colors) {
+	case 1:
+		manaScore = 1.0
+	case 2:
+		manaScore = 0.9
+	case 3:
+		manaScore = 0.7
+	}
+
+	return (avgCardScore * 0.40) + (creatureScore * 0.20) + (cmcScore * 0.20) + (manaScore * 0.20)
+}
+
+// ExportToArenaFormat exports a suggested deck to MTG Arena import format.
+func ExportToArenaFormat(deck *SuggestedDeck) string {
+	if deck == nil {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Deck: %s Draft\n", deck.ColorCombo.Name))
+	builder.WriteString("\n")
+
+	// Group cards by name for quantity
+	cardCounts := make(map[string]int)
+	cardNames := make([]string, 0)
+
+	for _, spell := range deck.Spells {
+		if _, exists := cardCounts[spell.Name]; !exists {
+			cardNames = append(cardNames, spell.Name)
+		}
+		cardCounts[spell.Name]++
+	}
+
+	// Sort card names alphabetically
+	sort.Strings(cardNames)
+
+	// Write spells
+	for _, name := range cardNames {
+		count := cardCounts[name]
+		builder.WriteString(fmt.Sprintf("%d %s\n", count, name))
+	}
+
+	builder.WriteString("\n")
+
+	// Write lands
+	for _, land := range deck.Lands {
+		if land.Quantity > 0 {
+			builder.WriteString(fmt.Sprintf("%d %s\n", land.Quantity, land.Name))
+		}
+	}
+
+	return builder.String()
+}
+
+// GetAvailableDraftArchetypes returns the available draft archetype options for deck building.
+func GetAvailableDraftArchetypes() []string {
+	return []string{"aggro", "midrange", "control"}
+}
+
+// GetDraftArchetypeDescription returns the description for a draft archetype.
+func GetDraftArchetypeDescription(archetypeKey string) string {
+	descriptions := map[string]string{
+		"aggro":    "Aggro: Fast, creature-heavy decks that aim to win early (16-18 creatures, low curve)",
+		"midrange": "Midrange: Balanced decks with good creatures and removal (14-16 creatures)",
+		"control":  "Control: Slower decks focused on removal and card advantage (10-12 creatures, higher curve)",
+	}
+	if desc, ok := descriptions[archetypeKey]; ok {
+		return desc
+	}
+	return ""
+}
