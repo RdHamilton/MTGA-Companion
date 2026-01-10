@@ -252,6 +252,56 @@ describe('useRotationNotifications', () => {
     });
   });
 
+  describe('unmount behavior', () => {
+    it('does not update state after unmount', async () => {
+      // Create a delayed promise to simulate slow API
+      let resolveRotation: (value: typeof mockRotation) => void;
+      const slowRotationPromise = new Promise<typeof mockRotation>((resolve) => {
+        resolveRotation = resolve;
+      });
+      mockGetUpcomingRotation.mockReturnValue(slowRotationPromise);
+
+      const { unmount, result } = renderHook(() => useRotationNotifications());
+
+      // Should be loading
+      expect(result.current.isLoading).toBe(true);
+
+      // Unmount before API resolves
+      unmount();
+
+      // Now resolve the API - should not cause state update (no error)
+      await act(async () => {
+        resolveRotation!(mockRotation);
+      });
+
+      // No warnings or errors should occur - test passes if no "Can't perform state update" warning
+    });
+
+    it('does not update state on error after unmount', async () => {
+      // Create a delayed promise that rejects
+      let rejectRotation: (error: Error) => void;
+      const slowRotationPromise = new Promise<typeof mockRotation>((_, reject) => {
+        rejectRotation = reject;
+      });
+      mockGetUpcomingRotation.mockReturnValue(slowRotationPromise);
+
+      const { unmount, result } = renderHook(() => useRotationNotifications());
+
+      // Should be loading
+      expect(result.current.isLoading).toBe(true);
+
+      // Unmount before API rejects
+      unmount();
+
+      // Now reject the API - should not cause state update (no error)
+      await act(async () => {
+        rejectRotation!(new Error('Network error'));
+      });
+
+      // No warnings or errors should occur - test passes if no "Can't perform state update" warning
+    });
+  });
+
   describe('getUrgencyLevel', () => {
     it('returns critical when <= 7 days', async () => {
       mockGetUpcomingRotation.mockResolvedValue({
