@@ -37,33 +37,33 @@ const GamePlayTimelinePanel = ({
   }, [matchId]);
 
   useEffect(() => {
+    const loadTimeline = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await gameplays.getMatchTimeline(matchId);
+        if (!isMountedRef.current) return;
+        setTimeline(data || []);
+        // Auto-select first turn if available
+        if (data && data.length > 0) {
+          setSelectedTurn(data[0].turn);
+        }
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to load game timeline');
+        console.error('Error loading game timeline:', err);
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+
     if (isExpanded && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
       loadTimeline();
     }
   }, [isExpanded, matchId]);
-
-  const loadTimeline = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await gameplays.getMatchTimeline(matchId);
-      if (!isMountedRef.current) return;
-      setTimeline(data || []);
-      // Auto-select first turn if available
-      if (data && data.length > 0) {
-        setSelectedTurn(data[0].turn);
-      }
-    } catch (err) {
-      if (!isMountedRef.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to load game timeline');
-      console.error('Error loading game timeline:', err);
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  };
 
   const formatActionType = (actionType: string): string => {
     switch (actionType) {
@@ -220,6 +220,7 @@ const GamePlayTimelinePanel = ({
                       type="button"
                       className={`turn-btn ${selectedTurn === entry.turn ? 'active' : ''}`}
                       onClick={() => setSelectedTurn(entry.turn)}
+                      aria-label={`Turn ${entry.turn}`}
                     >
                       T{entry.turn}
                     </button>
