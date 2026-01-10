@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { decks, drafts } from '@/services/api';
 import type { CardWithOwnership, SuggestedLandResponse } from '@/services/api/decks';
@@ -6,6 +6,7 @@ import { ApiRequestError } from '@/services/apiClient';
 import { downloadTextFile } from '@/utils/download';
 import { models, gui } from '@/types/models';
 import { useDeckValidation } from '@/hooks/useDeckValidation';
+import { useDeckUndoRedo, useDeckUndoRedoKeyboard } from '@/hooks/useDeckUndoRedo';
 import DeckList from '../components/DeckList';
 import CardSearch from '../components/CardSearch';
 import RecommendationCard from '../components/RecommendationCard';
@@ -52,6 +53,56 @@ export default function DeckBuilder() {
     validateDeck,
     hasLegalityIssues,
   } = useDeckValidation();
+
+  // Undo/redo state management
+  const [undoRedoProcessing, setUndoRedoProcessing] = useState(false);
+  const {
+    canUndo,
+    canRedo,
+    saveSnapshot,
+    updateCurrentState,
+    undo: undoAction,
+    redo: redoAction,
+    getUndoDescription,
+    getRedoDescription,
+  } = useDeckUndoRedo({
+    deckId: deckID || '',
+    onStateRestored: async (newCards) => {
+      setCards(newCards);
+      // Reload statistics after undo/redo
+      if (deckID) {
+        try {
+          const stats = await decks.getDeckStatistics(deckID);
+          setStatistics(stats);
+        } catch {
+          setStatistics(null);
+        }
+      }
+    },
+  });
+
+  const handleUndo = useCallback(async () => {
+    if (undoRedoProcessing || !canUndo) return;
+    setUndoRedoProcessing(true);
+    try {
+      await undoAction();
+    } finally {
+      setUndoRedoProcessing(false);
+    }
+  }, [undoRedoProcessing, canUndo, undoAction]);
+
+  const handleRedo = useCallback(async () => {
+    if (undoRedoProcessing || !canRedo) return;
+    setUndoRedoProcessing(true);
+    try {
+      await redoAction();
+    } finally {
+      setUndoRedoProcessing(false);
+    }
+  }, [undoRedoProcessing, canRedo, redoAction]);
+
+  // Keyboard shortcuts for undo/redo (Ctrl+Z, Ctrl+Y, Cmd+Shift+Z)
+  useDeckUndoRedoKeyboard(handleUndo, handleRedo, !loading && !!deck);
 
   // Load deck data
   useEffect(() => {
@@ -169,6 +220,7 @@ export default function DeckBuilder() {
 
         setDeck(deckData.deck);
         setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
         setTags(deckData.tags || []);
 
         // Load statistics (may not exist for new decks)
@@ -208,7 +260,7 @@ export default function DeckBuilder() {
     } else {
       setLoading(false);
     }
-  }, [deckID, draftEventID]);
+  }, [deckID, draftEventID, updateCurrentState]);
 
   // Validate deck for legality when deck loads or cards change
   useEffect(() => {
@@ -219,6 +271,9 @@ export default function DeckBuilder() {
 
   const handleAddCard = async (cardID: number, quantity: number, board: 'main' | 'sideboard') => {
     if (!deck) return;
+
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
 
     try {
       await decks.addCard({
@@ -232,6 +287,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -258,6 +314,9 @@ export default function DeckBuilder() {
   const handleRemoveCard = async (cardID: number, board: string) => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     try {
       await decks.removeCard({
         deck_id: deck.ID,
@@ -268,6 +327,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -284,6 +344,9 @@ export default function DeckBuilder() {
   const handleRemoveAllCopies = async (cardID: number, board: string) => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     try {
       await decks.removeAllCopies({
         deck_id: deck.ID,
@@ -294,6 +357,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -310,6 +374,9 @@ export default function DeckBuilder() {
   const handleAddOneCard = async (cardID: number, board: string) => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     try {
       await decks.addCard({
         deck_id: deck.ID,
@@ -322,6 +389,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -376,6 +444,9 @@ export default function DeckBuilder() {
       console.error('Missing deck or statistics:', { deck, statistics });
       return;
     }
+
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
 
     setAddingLands(true);
     try {
@@ -480,6 +551,7 @@ export default function DeckBuilder() {
       console.log('Reloading deck data...');
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -528,12 +600,16 @@ export default function DeckBuilder() {
   const handleDeckApplied = async () => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     // Reload deck data after a suggested deck is applied
     const deckData = await decks.getDeck(deck.ID);
     if (deckData.deck) {
       setDeck(deckData.deck);
     }
     setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
     setTags(deckData.tags || []);
 
     // Reload statistics (may not exist for new/small decks)
@@ -547,6 +623,9 @@ export default function DeckBuilder() {
 
   const handleApplyBuildAround = async (suggestions: CardWithOwnership[], lands: SuggestedLandResponse[]) => {
     if (!deck) return;
+
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
 
     try {
       // Clear existing cards first
@@ -588,6 +667,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -605,6 +685,9 @@ export default function DeckBuilder() {
   // Handle adding a single card in iterative build-around mode
   const handleBuildAroundCardAdded = async (card: CardWithOwnership) => {
     if (!deck) return;
+
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
 
     try {
       // Check if deck is already at 60 cards (excluding lands for now, lands added at finish)
@@ -626,6 +709,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -644,6 +728,9 @@ export default function DeckBuilder() {
   const handleBuildAroundCardRemoved = async (cardId: number) => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     try {
       // Remove 1 copy at a time
       await decks.removeCard({
@@ -655,6 +742,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -673,6 +761,9 @@ export default function DeckBuilder() {
   const handleBuildAroundFinishDeck = async (lands: SuggestedLandResponse[]) => {
     if (!deck) return;
 
+    // Save snapshot before change for undo
+    saveSnapshot(cards);
+
     try {
       // Add suggested lands
       for (const land of lands) {
@@ -688,6 +779,7 @@ export default function DeckBuilder() {
       // Reload deck data
       const deckData = await decks.getDeck(deck.ID);
       setCards(deckData.cards || []);
+      updateCurrentState(deckData.cards || []);
 
       // Reload statistics (may not exist for new/small decks)
       try {
@@ -870,6 +962,23 @@ export default function DeckBuilder() {
           <span>Avg CMC: {statistics?.averageCMC?.toFixed(2) || 'N/A'}</span>
         </div>
         <div className="quick-actions">
+          <button
+            className="action-button undo-btn"
+            title={getUndoDescription() || 'Undo (Ctrl+Z)'}
+            disabled={!canUndo || undoRedoProcessing}
+            onClick={handleUndo}
+          >
+            ↩ Undo
+          </button>
+          <button
+            className="action-button redo-btn"
+            title={getRedoDescription() || 'Redo (Ctrl+Y)'}
+            disabled={!canRedo || undoRedoProcessing}
+            onClick={handleRedo}
+          >
+            ↪ Redo
+          </button>
+          <span className="action-divider" />
           <button className="action-button" title="Export deck" onClick={handleExportDeck}>
             ⤓ Export
           </button>

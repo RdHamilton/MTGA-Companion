@@ -227,6 +227,20 @@
   box-shadow: none;
 }
 
+/* Undo/Redo Buttons */
+.action-button.undo-btn,
+.action-button.redo-btn {
+  min-width: 70px;
+}
+
+.action-divider {
+  width: 1px;
+  height: 24px;
+  background: #444;
+  margin: 0 0.25rem;
+  align-self: center;
+}
+
 /* Scrollbar Styling */
 .deck-list-panel::-webkit-scrollbar,
 .card-search-panel::-webkit-scrollbar {
