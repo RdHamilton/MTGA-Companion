@@ -121,3 +121,18 @@ th[style*="cursor: pointer"]:hover {
   background: rgba(74, 158, 255, 0.1);
   border-radius: 4px;
 }
+
+/* Notes Button */
+.notes-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.notes-btn:hover {
+  background-color: rgba(74, 158, 255, 0.2);
+}

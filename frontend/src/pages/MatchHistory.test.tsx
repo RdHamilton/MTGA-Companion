@@ -516,7 +516,7 @@ describe('MatchHistory', () => {
 
       // Check headers exist in thead
       const headers = screen.getAllByRole('columnheader');
-      expect(headers.length).toBe(6);
+      expect(headers.length).toBe(7);
 
       // Verify header text content
       const headerTexts = headers.map((h) => h.textContent);
@@ -526,6 +526,7 @@ describe('MatchHistory', () => {
       expect(headerTexts.some((t) => t?.includes('Event'))).toBe(true);
       expect(headerTexts.some((t) => t?.includes('Score'))).toBe(true);
       expect(headerTexts.some((t) => t?.includes('Opponent'))).toBe(true);
+      expect(headerTexts.some((t) => t?.includes('Notes'))).toBe(true);
     });
   });
 
