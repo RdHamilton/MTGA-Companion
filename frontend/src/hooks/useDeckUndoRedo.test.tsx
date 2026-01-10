@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDeckUndoRedo } from './useDeckUndoRedo';
-import { decks, DeckWithCards } from '@/services/api';
+import { decks } from '@/services/api';
+import { type DeckWithCards } from '@/services/api/decks';
 import type { models } from '@/types/models';
 
 // Mock the API
