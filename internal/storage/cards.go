@@ -146,3 +146,70 @@ func (s *Service) GetStaleSets(ctx context.Context, olderThan time.Duration) ([]
 
 	return sets, nil
 }
+
+// UpdateStandardLegality updates the Standard legality status for all sets.
+// standardCodes maps set codes to their rotation dates.
+func (s *Service) UpdateStandardLegality(ctx context.Context, standardCodes map[string]string) error {
+	tx, err := s.db.Conn().BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// First, mark all sets as not Standard-legal
+	_, err = tx.ExecContext(ctx, "UPDATE sets SET is_standard_legal = FALSE, rotation_date = NULL")
+	if err != nil {
+		return fmt.Errorf("failed to reset Standard legality: %w", err)
+	}
+
+	// Then, mark the Standard-legal sets
+	updateQuery := "UPDATE sets SET is_standard_legal = TRUE, rotation_date = ? WHERE code = ?"
+	for code, rotationDate := range standardCodes {
+		_, err = tx.ExecContext(ctx, updateQuery, rotationDate, code)
+		if err != nil {
+			return fmt.Errorf("failed to update Standard legality for %s: %w", code, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit Standard legality update: %w", err)
+	}
+
+	return nil
+}
+
+// GetStandardSets retrieves all Standard-legal sets ordered by release date (newest first).
+func (s *Service) GetStandardSets(ctx context.Context) ([]*Set, error) {
+	query := `
+		SELECT code, name, released_at, card_count, set_type, icon_svg_uri, cached_at, last_updated,
+		       COALESCE(is_standard_legal, FALSE), rotation_date
+		FROM sets
+		WHERE is_standard_legal = TRUE
+		ORDER BY released_at DESC
+	`
+
+	rows, err := s.db.Conn().QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Standard sets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sets []*Set
+	for rows.Next() {
+		var set Set
+		err := rows.Scan(
+			&set.Code, &set.Name, &set.ReleasedAt, &set.CardCount, &set.SetType, &set.IconSVGURI,
+			&set.CachedAt, &set.LastUpdated, &set.IsStandardLegal, &set.RotationDate,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan set: %w", err)
+		}
+		sets = append(sets, &set)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sets: %w", err)
+	}
+
+	return sets, nil
+}
