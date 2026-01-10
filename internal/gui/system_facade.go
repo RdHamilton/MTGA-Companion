@@ -121,6 +121,17 @@ func (s *SystemFacade) Initialize(ctx context.Context, dbPath string) error {
 	s.services.RecommendationEngine = recommendations.NewRuleBasedEngineWithSetRepo(cardService, setCardRepo, ratingsRepo)
 
 	log.Println("Card services initialized successfully")
+
+	// Initialize SetSyncer and sync sets if table is empty (async to not block startup)
+	setSyncer := setcache.NewSetSyncer(scryfallClient, s.services.Storage)
+	go func() {
+		syncCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := setSyncer.SyncIfEmpty(syncCtx); err != nil {
+			log.Printf("Warning: Failed to sync sets: %v", err)
+		}
+	}()
+
 	return nil
 }
 
