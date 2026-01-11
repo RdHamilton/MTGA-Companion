@@ -410,14 +410,17 @@ func BenchmarkSliceGrowth(b *testing.B) {
 }
 
 // BenchmarkConcurrentAllocation tests concurrent allocation patterns.
+// Uses different parallelism levels to stress GC under concurrent load.
 func BenchmarkConcurrentAllocation(b *testing.B) {
-	goroutines := []int{4, 8, 16}
+	// SetParallelism sets the number of goroutines to p * GOMAXPROCS.
+	// So parallelism=2 with GOMAXPROCS=8 runs 16 goroutines.
+	parallelismLevels := []int{1, 2, 4}
 	itemsPerGoroutine := 1000
 
-	for _, g := range goroutines {
-		b.Run(goroutineName(g), func(b *testing.B) {
+	for _, p := range parallelismLevels {
+		b.Run(fmt.Sprintf("parallelism%dx", p), func(b *testing.B) {
 			b.ReportAllocs()
-			b.SetParallelism(g)
+			b.SetParallelism(p)
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
 					cards := make([]Card, itemsPerGoroutine)
@@ -463,7 +466,7 @@ func generateReason(card Card, score float64) string {
 }
 
 func formatFloat(f float64) string {
-	return string(rune(int(f*100))) + "%"
+	return fmt.Sprintf("%.0f%%", f*100)
 }
 
 func qualityDescription(score float64) string {
@@ -486,8 +489,4 @@ func pickName(n int) string {
 
 func matchName(n int) string {
 	return fmt.Sprintf("%dmatches", n)
-}
-
-func goroutineName(n int) string {
-	return fmt.Sprintf("%dgoroutines", n)
 }
