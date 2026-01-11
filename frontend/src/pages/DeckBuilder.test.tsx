@@ -418,9 +418,9 @@ describe('DeckBuilder Component - Export and Validate', () => {
       const buildAroundButton = screen.getByRole('button', { name: /Build Around/i });
       await userEvent.click(buildAroundButton);
 
-      // Modal should be open (check for modal heading)
+      // Modal should be open with mode selector (since deck has cards)
       await waitFor(() => {
-        expect(screen.getByText('Build Around Card')).toBeInTheDocument();
+        expect(screen.getByText(/Build Around Your Deck/)).toBeInTheDocument();
       });
     });
 
@@ -447,7 +447,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
       await userEvent.click(buildAroundButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Build Around Card')).toBeInTheDocument();
+        expect(screen.getByText(/Build Around Your Deck/)).toBeInTheDocument();
       });
 
       // Close modal using close button (within the modal header)
@@ -457,7 +457,7 @@ describe('DeckBuilder Component - Export and Validate', () => {
 
       // Modal should be closed
       await waitFor(() => {
-        expect(screen.queryByText('Build Around Card')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Build Around Your Deck/)).not.toBeInTheDocument();
       });
     });
 
