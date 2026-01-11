@@ -102,23 +102,27 @@ func (c *CommunityComparisonAnalyzer) CompareToCommunity(ctx context.Context, se
 	return comparison, nil
 }
 
-// calculatePercentile estimates user's percentile based on win rate.
+// calculatePercentile estimates user's percentile based on win rate relative to community average.
 // This uses a simplified model based on typical draft win rate distribution.
 func (c *CommunityComparisonAnalyzer) calculatePercentile(userWinRate, communityAvg float64) float64 {
-	// Win rates in draft typically follow a normal-ish distribution
-	// centered around 50% with standard deviation ~10%
-	//
-	// Rough percentile mapping:
-	// - 40% win rate = ~25th percentile
-	// - 50% win rate = ~50th percentile
-	// - 55% win rate = ~65th percentile
-	// - 60% win rate = ~80th percentile
-	// - 65% win rate = ~90th percentile
-	// - 70% win rate = ~95th percentile
+	// Clamp inputs to valid range
+	if userWinRate < 0 {
+		userWinRate = 0
+	} else if userWinRate > 1 {
+		userWinRate = 1
+	}
+	if communityAvg < 0 {
+		communityAvg = 0
+	} else if communityAvg > 1 {
+		communityAvg = 1
+	}
 
-	// Simplified linear approximation
-	// Each 1% above 50% is roughly 3 percentile points
-	delta := (userWinRate - 0.50) * 300
+	// Win rates in draft typically follow a normal-ish distribution
+	// centered around community average with standard deviation ~10%
+	//
+	// Simplified linear approximation centered on communityAvg
+	// Each 1% above community avg is roughly 3 percentile points
+	delta := (userWinRate - communityAvg) * 300
 
 	percentile := 50 + delta
 
@@ -298,9 +302,15 @@ func (p *Default17LandsProvider) GetSetAverageWinRate(setCode, format string) (f
 }
 
 // GetColorPairWinRates returns community win rates by color pair.
+// Returns a copy of the data to prevent mutation of internal state.
 func (p *Default17LandsProvider) GetColorPairWinRates(setCode, format string) (map[string]float64, error) {
 	if rates, ok := p.colorPairData[setCode]; ok {
-		return rates, nil
+		// Return a copy to prevent mutation of internal state
+		out := make(map[string]float64, len(rates))
+		for k, v := range rates {
+			out[k] = v
+		}
+		return out, nil
 	}
 	// Return default rates
 	return map[string]float64{

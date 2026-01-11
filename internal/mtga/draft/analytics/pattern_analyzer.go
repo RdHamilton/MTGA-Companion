@@ -140,22 +140,23 @@ type pickWithCard struct {
 func (p *PatternAnalyzer) calculateColorPreferences(picks []*pickWithCard) []models.ColorPreference {
 	colorCounts := make(map[string]int)
 	colorPickOrder := make(map[string][]int)
-	totalPicks := 0
+	totalColorAttributions := 0 // Track total color attributions (multicolor cards contribute multiple)
 
 	for _, pwc := range picks {
 		if pwc.card == nil {
 			continue
 		}
-		totalPicks++
 
-		// Count colors
+		// Count colors - each color on a card contributes one attribution
 		if len(pwc.card.Colors) == 0 {
 			colorCounts["C"]++ // Colorless
 			colorPickOrder["C"] = append(colorPickOrder["C"], pwc.pick.PickNumber)
+			totalColorAttributions++
 		} else {
 			for _, color := range pwc.card.Colors {
 				colorCounts[color]++
 				colorPickOrder[color] = append(colorPickOrder[color], pwc.pick.PickNumber)
+				totalColorAttributions++
 			}
 		}
 	}
@@ -173,8 +174,8 @@ func (p *PatternAnalyzer) calculateColorPreferences(picks []*pickWithCard) []mod
 		}
 
 		percentOfPool := 0.0
-		if totalPicks > 0 {
-			percentOfPool = float64(count) / float64(totalPicks) * 100
+		if totalColorAttributions > 0 {
+			percentOfPool = float64(count) / float64(totalColorAttributions) * 100
 		}
 
 		prefs = append(prefs, models.ColorPreference{

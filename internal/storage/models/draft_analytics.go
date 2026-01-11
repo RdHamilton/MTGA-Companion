@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"sort"
 	"time"
 )
 
@@ -235,10 +236,16 @@ func AnalyzeTrendDirection(trends []DraftTemporalTrend) TrendDirection {
 		return TrendDirectionStable
 	}
 
-	// Sort by period start (ascending)
+	// Sort by period start (ascending) - make a copy to avoid mutating input
+	sorted := make([]DraftTemporalTrend, len(trends))
+	copy(sorted, trends)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].PeriodStart.Before(sorted[j].PeriodStart)
+	})
+
 	// Calculate win rate change from first to last
-	firstWinRate := trends[0].WinRate()
-	lastWinRate := trends[len(trends)-1].WinRate()
+	firstWinRate := sorted[0].WinRate()
+	lastWinRate := sorted[len(sorted)-1].WinRate()
 	delta := lastWinRate - firstWinRate
 
 	const threshold = 0.03 // 3% change threshold

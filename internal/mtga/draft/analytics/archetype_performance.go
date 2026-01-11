@@ -222,12 +222,8 @@ func (a *ArchetypePerformanceAnalyzer) isMatchFromDraft(match *models.Match, ses
 		}
 	}
 
-	// Check if set code matches
-	if containsIgnoreCase(eventName, session.SetCode) {
-		return true
-	}
-
-	return true // Default to including if other checks pass
+	// Check if set code matches - require this to link matches to correct draft
+	return containsIgnoreCase(eventName, session.SetCode)
 }
 
 func containsIgnoreCase(s, substr string) bool {

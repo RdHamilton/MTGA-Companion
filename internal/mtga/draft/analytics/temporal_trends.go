@@ -153,16 +153,17 @@ func (t *TemporalTrendAnalyzer) calculatePeriodBoundaries(periodType string, num
 		}
 
 	case models.PeriodTypeMonth:
-		// Start from the beginning of the current month
-		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		// Start from the beginning of the current month using consistent timezone
+		loc := now.Location()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 
 		for i := 0; i < numPeriods; i++ {
 			end := monthStart
 			// Go back one month
 			if monthStart.Month() == time.January {
-				monthStart = time.Date(monthStart.Year()-1, time.December, 1, 0, 0, 0, 0, time.UTC)
+				monthStart = time.Date(monthStart.Year()-1, time.December, 1, 0, 0, 0, 0, loc)
 			} else {
-				monthStart = time.Date(monthStart.Year(), monthStart.Month()-1, 1, 0, 0, 0, 0, time.UTC)
+				monthStart = time.Date(monthStart.Year(), monthStart.Month()-1, 1, 0, 0, 0, 0, loc)
 			}
 			periods = append(periods, periodBoundary{start: monthStart, end: end})
 		}
@@ -183,10 +184,13 @@ func (t *TemporalTrendAnalyzer) GetTrendsBySet(ctx context.Context, setCode, per
 
 // AnalyzeTrendDirection determines if performance is improving, stable, or declining.
 func (t *TemporalTrendAnalyzer) AnalyzeTrendDirection(trends []*models.DraftTemporalTrend) models.TrendDirection {
-	// Convert from pointer slice to value slice for the model function
-	valueTrends := make([]models.DraftTemporalTrend, len(trends))
-	for i, tr := range trends {
-		valueTrends[i] = *tr
+	// Convert from pointer slice to value slice, filtering nil entries
+	valueTrends := make([]models.DraftTemporalTrend, 0, len(trends))
+	for _, tr := range trends {
+		if tr == nil {
+			continue
+		}
+		valueTrends = append(valueTrends, *tr)
 	}
 	return models.AnalyzeTrendDirection(valueTrends)
 }
