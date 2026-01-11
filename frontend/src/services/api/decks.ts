@@ -496,6 +496,8 @@ export interface GenerateCompleteDeckRequest {
   budget_mode?: boolean;
   set_restriction?: string;
   allowed_sets?: string[];
+  /** Optional existing deck cards to build around (instead of just seed card) */
+  deck_card_ids?: number[];
 }
 
 /**
