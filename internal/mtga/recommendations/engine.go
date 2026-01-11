@@ -80,7 +80,7 @@ type EmbeddingService interface {
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
 	cardService      *cards.Service
-	setCardRepo      repository.SetCardRepository      // For faster lookups from local DB
+	setCardRepo      repository.SetCardRepository // For faster lookups from local DB
 	ratingsRepo      repository.DraftRatingsRepository
 	cfbRatingsRepo   repository.CFBRatingsRepository   // ChannelFireball ratings (optional)
 	cooccurrenceRepo repository.CooccurrenceRepository // Co-occurrence data (optional)
@@ -577,36 +577,53 @@ func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 	return 0.5 // Default neutral score
 }
 
-// scoreSynergyEnhanced calculates synergy using rule-based, co-occurrence, and EDHREC analysis.
-// Blending strategy depends on available data sources:
-// - All three sources: 45% rule-based + 30% co-occurrence + 25% EDHREC
-// - Rule-based + co-occurrence: 60% rule-based + 40% co-occurrence
-// - Rule-based + EDHREC: 60% rule-based + 40% EDHREC
-// - Rule-based only: 100% rule-based
+// scoreSynergyEnhanced calculates synergy using rule-based, co-occurrence, EDHREC, and archetype analysis.
+// Blending strategy dynamically weights available data sources.
 func (e *RuleBasedEngine) scoreSynergyEnhanced(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
-	// Get rule-based synergy score
+	// Get rule-based synergy score (always available)
 	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
+
+	// Collect available data sources
+	var scores []float64
+	var weights []float64
+
+	scores = append(scores, ruleBasedScore)
+	weights = append(weights, 0.40) // Base weight for rule-based
 
 	// Calculate co-occurrence score
 	coocScore, hasCoocData := e.calculateCooccurrenceScore(ctx, card, deck)
+	if hasCoocData {
+		scores = append(scores, coocScore)
+		weights = append(weights, 0.25)
+	}
 
 	// Calculate EDHREC score
 	edhrecScore, hasEDHRECData := e.calculateEDHRECScore(ctx, card, deck)
-
-	// Blend scores based on available data
-	if hasCoocData && hasEDHRECData {
-		// All three sources available: 45% rule-based + 30% co-occurrence + 25% EDHREC
-		return (ruleBasedScore * 0.45) + (coocScore * 0.30) + (edhrecScore * 0.25)
-	} else if hasCoocData {
-		// Rule-based + co-occurrence: 60% rule-based + 40% co-occurrence
-		return (ruleBasedScore * 0.60) + (coocScore * 0.40)
-	} else if hasEDHRECData {
-		// Rule-based + EDHREC: 60% rule-based + 40% EDHREC
-		return (ruleBasedScore * 0.60) + (edhrecScore * 0.40)
+	if hasEDHRECData {
+		scores = append(scores, edhrecScore)
+		weights = append(weights, 0.20)
 	}
 
-	// Rule-based only
-	return ruleBasedScore
+	// Calculate MTGZone archetype score
+	archetypeScore, hasArchetypeData := e.calculateArchetypeSynergy(ctx, card, deck)
+	if hasArchetypeData {
+		scores = append(scores, archetypeScore)
+		weights = append(weights, 0.15)
+	}
+
+	// Normalize weights to sum to 1.0
+	totalWeight := 0.0
+	for _, w := range weights {
+		totalWeight += w
+	}
+
+	// Calculate weighted average
+	blendedScore := 0.0
+	for i, score := range scores {
+		blendedScore += score * (weights[i] / totalWeight)
+	}
+
+	return blendedScore
 }
 
 // calculateCooccurrenceScore calculates synergy from PMI co-occurrence data.
@@ -1714,29 +1731,6 @@ func convertSetCardToCardsCard(setCard *models.SetCard) *cards.Card {
 	}
 
 	return card
-}
-
-// scoreSynergyWithArchetype calculates synergy using both rule-based and MTGZone archetype data.
-// If archetype data is available, it enhances the score with archetype-specific synergies.
-func (e *RuleBasedEngine) scoreSynergyWithArchetype(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
-	// Get rule-based synergy score
-	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
-
-	// If no MTGZone repo, use pure rule-based
-	if e.mtgzoneRepo == nil {
-		return ruleBasedScore
-	}
-
-	// Calculate archetype-based synergy
-	archetypeScore, hasArchetypeData := e.calculateArchetypeSynergy(ctx, card, deck)
-
-	// Blend scores if we have archetype data
-	if hasArchetypeData {
-		// 70% rule-based + 30% archetype
-		return (ruleBasedScore * 0.70) + (archetypeScore * 0.30)
-	}
-
-	return ruleBasedScore
 }
 
 // calculateArchetypeSynergy calculates synergy based on MTGZone archetype data.
