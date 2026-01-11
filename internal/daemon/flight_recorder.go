@@ -61,7 +61,7 @@ func NewFlightRecorder(config FlightRecorderConfig) *FlightRecorder {
 	if config.MaxBytes == 0 {
 		config.MaxBytes = 10 * 1024 * 1024
 	}
-	if config.MaxTraceFiles == 0 {
+	if config.MaxTraceFiles <= 0 {
 		config.MaxTraceFiles = 5
 	}
 	if config.OutputDir == "" {
@@ -90,6 +90,11 @@ func (fr *FlightRecorder) Start() error {
 
 	if fr.started {
 		return nil
+	}
+
+	// Ensure output directory exists
+	if err := os.MkdirAll(fr.config.OutputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create flight recorder output dir %q: %w", fr.config.OutputDir, err)
 	}
 
 	if err := fr.recorder.Start(); err != nil {
@@ -132,14 +137,14 @@ func (fr *FlightRecorder) CaptureTrace(reason string) (string, error) {
 		return "", fmt.Errorf("flight recorder not started")
 	}
 
-	// Generate filename with timestamp and reason
-	timestamp := time.Now().Format("20060102-150405")
+	// Generate filename with nanosecond timestamp for uniqueness
+	timestamp := time.Now().UTC().Format("20060102-150405.000000000")
 	safeReason := sanitizeFilename(reason)
-	filename := fmt.Sprintf("trace-%s-%s.out", timestamp, safeReason)
+	filename := fmt.Sprintf("mtga-companion-trace-%s-%s.out", timestamp, safeReason)
 	tracePath := filepath.Join(fr.config.OutputDir, filename)
 
-	// Create trace file
-	f, err := os.Create(tracePath)
+	// Create trace file with O_EXCL to prevent overwrites
+	f, err := os.OpenFile(tracePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return "", fmt.Errorf("failed to create trace file: %w", err)
 	}
@@ -151,9 +156,11 @@ func (fr *FlightRecorder) CaptureTrace(reason string) (string, error) {
 	closeErr := f.Close()
 
 	if writeErr != nil {
+		_ = os.Remove(tracePath) // Clean up failed trace file
 		return "", fmt.Errorf("failed to write trace: %w", writeErr)
 	}
 	if closeErr != nil {
+		_ = os.Remove(tracePath) // Clean up failed trace file
 		return "", fmt.Errorf("failed to close trace file: %w", closeErr)
 	}
 
@@ -179,7 +186,7 @@ func (fr *FlightRecorder) WriteTo(w io.Writer) (int64, error) {
 
 // cleanupOldTraces removes old trace files exceeding MaxTraceFiles limit.
 func (fr *FlightRecorder) cleanupOldTraces() {
-	pattern := filepath.Join(fr.config.OutputDir, "trace-*.out")
+	pattern := filepath.Join(fr.config.OutputDir, "mtga-companion-trace-*.out")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return

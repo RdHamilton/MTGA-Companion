@@ -185,7 +185,7 @@ func TestFlightRecorder_CleanupOldTraces(t *testing.T) {
 	}
 
 	// Check that only MaxTraceFiles remain
-	pattern := filepath.Join(tempDir, "trace-*.out")
+	pattern := filepath.Join(tempDir, "mtga-companion-trace-*.out")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		t.Fatalf("Failed to glob trace files: %v", err)
