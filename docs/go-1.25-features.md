@@ -1,6 +1,16 @@
-# Go 1.25 Features and Codebase Opportunities
+# Go 1.25 Features in MTGA-Companion
 
-This document explores Go 1.25 features and identifies areas of the MTGA-Companion codebase that could benefit from them.
+This document describes Go 1.25 features implemented in MTGA-Companion and identifies areas for future adoption.
+
+## Implementation Status (v1.4.1)
+
+| Feature | Status | PR | Notes |
+|---------|--------|----|----|
+| Flight Recorder | ✅ Implemented | #873 | Low-overhead execution tracing |
+| GC Benchmarks | ✅ Implemented | #874 | Compare default vs greenteagc |
+| JSON v2 Benchmarks | ✅ Implemented | #875 | Compare v1 vs v2 performance |
+| sync.WaitGroup.Go() | ✅ Implemented | #791 | Cleaner goroutine management |
+| testing/synctest | 🔄 Planned | - | Future test improvement |
 
 ## Go 1.25 Key Features
 
@@ -75,7 +85,87 @@ Major revision of JSON handling with performance improvements.
 - `go/ast.MergePackageFiles()` - Not used
 - `go/parser.ParseDir()` - Not used
 
-## Recommended Follow-up Issues
+## Implemented Features
+
+### Flight Recorder (#794, PR #873)
+
+**Location**: `internal/daemon/flight_recorder.go`
+
+Uses `runtime/trace.FlightRecorder` for low-overhead execution tracing:
+
+```go
+// Create and start flight recorder
+config := DefaultFlightRecorderConfig()
+fr := NewFlightRecorder(config)
+fr.Start()
+
+// Capture trace on error
+tracePath, err := fr.CaptureTrace("error-reason")
+
+// Stop when done
+fr.Stop()
+```
+
+**Configuration**:
+- `MinAge`: Minimum age of events to keep (default: 10s)
+- `MaxBytes`: Maximum buffer size (default: 10MB)
+- `OutputDir`: Trace file directory (default: temp)
+- `MaxTraceFiles`: Maximum retained files (default: 5)
+
+### GC Benchmarks (#795, PR #874)
+
+**Location**: `benchmarks/gc_bench_test.go`
+
+Compare default GC vs experimental `greenteagc`:
+
+```bash
+# Run comparison
+./benchmarks/run_gc_comparison.sh
+
+# Or manually
+go test -bench=. -benchmem ./benchmarks/...
+GOEXPERIMENT=greenteagc go test -bench=. -benchmem ./benchmarks/...
+```
+
+Available benchmarks:
+- `BenchmarkCollectionAllocation` - Card collection loading
+- `BenchmarkDraftSessionAllocation` - Draft pick processing
+- `BenchmarkMatchHistoryAllocation` - Match history loading
+- `BenchmarkJSONMarshal/Unmarshal` - JSON serialization
+- `BenchmarkMapOperations` - Card lookup
+- `BenchmarkSliceGrowth` - Dynamic arrays
+- `BenchmarkConcurrentAllocation` - Parallel allocation
+
+### JSON v2 Benchmarks (#793, PR #875)
+
+**Location**: `benchmarks/json_bench_test.go`
+
+Compare `encoding/json` (v1) vs experimental `encoding/json/v2`:
+
+```bash
+# Run comparison
+./benchmarks/run_json_comparison.sh
+```
+
+Requires `GOEXPERIMENT=jsonv2` build tag.
+
+### sync.WaitGroup.Go() (#791)
+
+Adopted cleaner goroutine pattern:
+
+```go
+// Before
+s.wg.Add(1)
+go func() {
+    defer s.wg.Done()
+    s.refreshWorker(ctx)
+}()
+
+// After
+s.wg.Go(func() { s.refreshWorker(ctx) })
+```
+
+## Remaining Opportunities
 
 ### High Priority
 
@@ -86,27 +176,17 @@ Major revision of JSON handling with performance improvements.
 
 ### Medium Priority
 
-2. **Adopt `sync.WaitGroup.Go()` pattern**
-   - Estimated impact: Cleaner code, less boilerplate
-   - Files: 4 files with WaitGroup patterns
-   - Effort: Low
+2. **Production JSON v2 adoption**
+   - Once `encoding/json/v2` graduates to stable
+   - 56 files currently using encoding/json
+   - Would provide performance improvements
 
-3. **Benchmark `encoding/json/v2`**
-   - Estimated impact: Potential performance improvement
-   - Files: 56 files using encoding/json
-   - Effort: Low (just benchmarking)
+### Low Priority
 
-### Low Priority (Future)
-
-4. **Add Flight Recorder for daemon debugging**
-   - Estimated impact: Better debugging capabilities
-   - New feature, not a migration
-   - Effort: Medium
-
-5. **Benchmark `greenteagc` garbage collector**
-   - Estimated impact: Reduced memory overhead
-   - Experimental, wait for stability
-   - Effort: Low
+3. **Production greenteagc adoption**
+   - Once garbage collector is stable
+   - Monitor benchmarks for improvements
+   - No code changes required
 
 ## Platform Notes
 

@@ -92,6 +92,18 @@ MTGA-Companion uses a **REST API + Browser SPA** architecture (v1.4+) that decou
 │  │  │  Engine  │ │  Client  │ │ Service  │              │ │
 │  │  └──────────┘ └──────────┘ └──────────┘              │ │
 │  └────────────────────────────────────────────────────────┘ │
+│                          │                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │            v1.4.1 Services                             │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │ │
+│  │  │ Flight   │ │  Draft   │ │ Synergy  │ │ Standard │ │ │
+│  │  │ Recorder │ │Analytics │ │ Sources  │ │ Legality │ │ │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐              │ │
+│  │  │   CFB    │ │  Price   │ │   Set    │              │ │
+│  │  │ Ratings  │ │ Service  │ │  Syncer  │              │ │
+│  │  └──────────┘ └──────────┘ └──────────┘              │ │
+│  └────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
                           │
                           │ REST API + WebSocket
@@ -623,13 +635,14 @@ The daemon can support multiple frontend types:
 
 ### Backend (Go)
 
-- **Language**: Go 1.24+
+- **Language**: Go 1.25+
 - **HTTP Router**: Chi (lightweight, idiomatic)
 - **Database**: SQLite3 via `modernc.org/sqlite` (pure Go, no CGo)
 - **Migrations**: `golang-migrate/migrate`
 - **WebSocket**: `gorilla/websocket`
 - **File Watching**: `fsnotify/fsnotify`
 - **Service Management**: `kardianos/service`
+- **Runtime Tracing**: `runtime/trace.FlightRecorder` (v1.4.1+)
 
 ### Frontend (React SPA)
 
@@ -710,9 +723,80 @@ Expected response:
 {"status": "ok", "version": "1.0.0"}
 ```
 
+## v1.4.1 Architecture Additions
+
+### Flight Recorder
+
+**Location**: `internal/daemon/flight_recorder.go`
+
+Low-overhead execution tracing using Go 1.25's `runtime/trace.FlightRecorder`:
+- Continuous trace capture into ring buffer
+- Automatic trace dump on errors exceeding threshold
+- Configurable buffer size and retention
+- Trace files saved to temp directory for debugging
+
+### Draft Analytics Services
+
+**Location**: `internal/mtga/draft/analytics/`
+
+Comprehensive draft performance analysis:
+- `pattern_analyzer.go` - Color/type preferences, pick patterns
+- `archetype_performance.go` - Win rates by color pair
+- `temporal_trends.go` - Weekly/monthly performance trends
+- `community_comparison.go` - Comparison vs 17Lands averages
+
+### Synergy Data Sources
+
+**Location**: Various internal packages
+
+Multiple data sources for card synergy detection:
+- **ChannelFireball Ratings** - `internal/mtga/cards/cfb/` - Card ratings A+ to F
+- **EDHREC Integration** - Commander synergy data
+- **Archidekt Co-occurrence** - Card co-occurrence analysis
+- **MTGZone Archetypes** - Archetype classification data
+- **Tribal Database** - Creature type synergies
+- **Oracle Patterns** - Text pattern matching
+
+### Standard Format Services
+
+**Location**: `internal/mtga/cards/setcache/`
+
+Standard format support:
+- `set_sync.go` - Automatic set metadata sync from Scryfall
+- Standard legality detection from whatsinstandard.com
+- Set rotation tracking and notifications
+- Banned card detection
+
+### Price Service
+
+**Location**: `internal/mtga/cards/scryfall/`
+
+Card price integration:
+- Scryfall price data fetching
+- Collection value calculations
+- Deck value estimations
+- Price caching and refresh
+
+### External Data Sources
+
+The system integrates with multiple external APIs:
+
+| Source | Purpose | API Type |
+|--------|---------|----------|
+| 17Lands | Draft ratings, community stats | REST |
+| Scryfall | Card metadata, images, prices | REST |
+| ChannelFireball | Card ratings | JSON import |
+| MTGGoldfish | Meta data | Web scraping |
+| MTGTop8 | Tournament results | Web scraping |
+| whatsinstandard.com | Standard legality | REST |
+| EDHREC | Commander synergies | REST |
+| Archidekt | Co-occurrence data | REST |
+| MTGZone | Archetype data | Web scraping |
+
 ## References
 
 - [DAEMON_INSTALLATION.md](DAEMON_INSTALLATION.md) - Service installation guide
 - [DAEMON_API.md](DAEMON_API.md) - WebSocket API reference
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Developer guide
 - [MIGRATION_TO_SERVICE_ARCHITECTURE.md](MIGRATION_TO_SERVICE_ARCHITECTURE.md) - User migration guide
+- [go-1.25-features.md](go-1.25-features.md) - Go 1.25 feature documentation
