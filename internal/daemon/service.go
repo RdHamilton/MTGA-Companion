@@ -41,6 +41,9 @@ type Service struct {
 	// Replay engine for testing
 	replayEngine *ReplayEngine
 
+	// Flight recorder for debugging (Go 1.25+)
+	flightRecorder *FlightRecorder
+
 	// Event forwarders for external systems (e.g., API server WebSocket)
 	forwarders   []EventForwarder
 	forwardersMu sync.RWMutex
@@ -69,6 +72,9 @@ func New(config *Config, storage *storage.Service) *Service {
 	// Initialize replay engine
 	s.replayEngine = NewReplayEngine(s)
 
+	// Initialize flight recorder for debugging (Go 1.25+)
+	s.flightRecorder = NewFlightRecorder(DefaultFlightRecorderConfig())
+
 	return s
 }
 
@@ -76,6 +82,11 @@ func New(config *Config, storage *storage.Service) *Service {
 func (s *Service) Start() error {
 	s.startTime = time.Now()
 	log.Println("Starting MTGA Companion daemon...")
+
+	// Start flight recorder for debugging
+	if err := s.flightRecorder.Start(); err != nil {
+		log.Printf("Warning: Failed to start flight recorder: %v", err)
+	}
 
 	// Determine log path
 	logPath := s.config.LogPath
@@ -186,6 +197,11 @@ func (s *Service) Stop(ctx context.Context) error {
 			}
 		}
 
+		// Stop flight recorder
+		if s.flightRecorder != nil {
+			s.flightRecorder.Stop()
+		}
+
 		close(done)
 	}()
 
@@ -253,10 +269,8 @@ func (s *Service) processUpdates(updates <-chan *logreader.LogEntry, errChan <-c
 			}
 			log.Printf("Poller error: %v", err)
 
-			// Track error
-			s.healthMu.Lock()
-			s.totalErrors++
-			s.healthMu.Unlock()
+			// Track error and capture trace if significant
+			s.trackError("poller-error")
 
 			// Broadcast error event
 			s.broadcastEvent(Event{
@@ -282,10 +296,8 @@ func (s *Service) processEntries(entries []*logreader.LogEntry) {
 	if err != nil {
 		log.Printf("Error processing log entries: %v", err)
 
-		// Track error
-		s.healthMu.Lock()
-		s.totalErrors++
-		s.healthMu.Unlock()
+		// Track error and capture trace if significant
+		s.trackError("log-processing-error")
 		return
 	}
 
@@ -480,6 +492,49 @@ func (s *Service) GetHealth() *HealthStatus {
 	}
 
 	return status
+}
+
+// trackError tracks an error and optionally captures a trace if conditions are met.
+// It captures a trace when errors become significant (e.g., high error rate).
+func (s *Service) trackError(reason string) {
+	s.healthMu.Lock()
+	s.totalErrors++
+	errorCount := s.totalErrors
+	processedCount := s.totalProcessed
+	s.healthMu.Unlock()
+
+	// Capture trace on significant errors:
+	// - First 3 errors (for debugging startup issues)
+	// - Every 10th error thereafter
+	// - When error rate exceeds 10%
+	shouldCapture := errorCount <= 3 ||
+		errorCount%10 == 0 ||
+		(processedCount > 0 && float64(errorCount)/float64(processedCount) > 0.1)
+
+	if shouldCapture && s.flightRecorder != nil && s.flightRecorder.Enabled() {
+		if path, err := s.flightRecorder.CaptureTrace(reason); err != nil {
+			log.Printf("Failed to capture trace: %v", err)
+		} else {
+			log.Printf("Captured debug trace: %s", path)
+		}
+	}
+}
+
+// CaptureTrace manually captures a flight recorder trace.
+// Useful for debugging or when investigating issues.
+func (s *Service) CaptureTrace(reason string) (string, error) {
+	if s.flightRecorder == nil {
+		return "", fmt.Errorf("flight recorder not initialized")
+	}
+	return s.flightRecorder.CaptureTrace(reason)
+}
+
+// GetFlightRecorderEnabled returns whether flight recording is active.
+func (s *Service) GetFlightRecorderEnabled() bool {
+	if s.flightRecorder == nil {
+		return false
+	}
+	return s.flightRecorder.Enabled()
 }
 
 // ReplayHistoricalLogs replays all historical log files through the processing pipeline.
