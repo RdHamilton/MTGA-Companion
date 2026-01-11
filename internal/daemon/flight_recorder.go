@@ -136,10 +136,10 @@ func (fr *FlightRecorder) CaptureTrace(reason string) (string, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	safeReason := sanitizeFilename(reason)
 	filename := fmt.Sprintf("trace-%s-%s.out", timestamp, safeReason)
-	filepath := filepath.Join(fr.config.OutputDir, filename)
+	tracePath := filepath.Join(fr.config.OutputDir, filename)
 
 	// Create trace file
-	f, err := os.Create(filepath)
+	f, err := os.Create(tracePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create trace file: %w", err)
 	}
@@ -157,12 +157,12 @@ func (fr *FlightRecorder) CaptureTrace(reason string) (string, error) {
 		return "", fmt.Errorf("failed to close trace file: %w", closeErr)
 	}
 
-	log.Printf("Captured trace: %s (%d bytes, reason: %s)", filepath, n, reason)
+	log.Printf("Captured trace: %s (%d bytes, reason: %s)", tracePath, n, reason)
 
 	// Clean up old trace files
 	fr.cleanupOldTraces()
 
-	return filepath, nil
+	return tracePath, nil
 }
 
 // WriteTo writes the current trace buffer to the given writer.
