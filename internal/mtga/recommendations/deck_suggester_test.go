@@ -427,3 +427,518 @@ func TestBasicLandsByColor(t *testing.T) {
 func ptr(s string) *string {
 	return &s
 }
+
+// Tests for archetype-based deck building (#180)
+
+func TestArchetypeTargets(t *testing.T) {
+	// Verify all three archetypes are defined
+	expected := []string{"aggro", "midrange", "control"}
+	for _, key := range expected {
+		target, ok := archetypeTargets[key]
+		if !ok {
+			t.Errorf("missing archetype target: %s", key)
+			continue
+		}
+		if target.Name == "" {
+			t.Errorf("archetype %s has empty name", key)
+		}
+		if target.CreatureMin <= 0 || target.CreatureMax <= 0 {
+			t.Errorf("archetype %s has invalid creature counts", key)
+		}
+		if target.MaxAvgCMC <= 0 {
+			t.Errorf("archetype %s has invalid max avg CMC", key)
+		}
+		if target.LandCount <= 0 {
+			t.Errorf("archetype %s has invalid land count", key)
+		}
+		if len(target.PreferredCurve) == 0 {
+			t.Errorf("archetype %s has empty preferred curve", key)
+		}
+	}
+}
+
+func TestScoreCMCForArchetype(t *testing.T) {
+	suggester := &DeckSuggester{}
+
+	tests := []struct {
+		name      string
+		card      *cards.Card
+		archetype string
+		minScore  float64
+		maxScore  float64
+	}{
+		{
+			name:      "1-drop for aggro (good)",
+			card:      &cards.Card{CMC: 1},
+			archetype: "aggro",
+			minScore:  0.7,
+			maxScore:  1.0,
+		},
+		{
+			name:      "2-drop for aggro (best)",
+			card:      &cards.Card{CMC: 2},
+			archetype: "aggro",
+			minScore:  0.9,
+			maxScore:  1.0,
+		},
+		{
+			name:      "5-drop for aggro (poor)",
+			card:      &cards.Card{CMC: 5},
+			archetype: "aggro",
+			minScore:  0.0,
+			maxScore:  0.3,
+		},
+		{
+			name:      "5-drop for control (acceptable)",
+			card:      &cards.Card{CMC: 5},
+			archetype: "control",
+			minScore:  0.5,
+			maxScore:  0.9,
+		},
+		{
+			name:      "3-drop for midrange (good)",
+			card:      &cards.Card{CMC: 3},
+			archetype: "midrange",
+			minScore:  0.8,
+			maxScore:  1.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := archetypeTargets[tt.archetype]
+			score := suggester.scoreCMCForArchetype(tt.card, target)
+			if score < tt.minScore || score > tt.maxScore {
+				t.Errorf("expected score between %.2f and %.2f, got %.2f", tt.minScore, tt.maxScore, score)
+			}
+		})
+	}
+}
+
+func TestScoreTypeForDraftArchetype(t *testing.T) {
+	suggester := &DeckSuggester{}
+	oracleDestroy := "Destroy target creature."
+	oracleDraw := "Draw two cards."
+
+	tests := []struct {
+		name      string
+		card      *cards.Card
+		archetype string
+		minScore  float64
+		maxScore  float64
+	}{
+		{
+			name:      "creature for aggro (best)",
+			card:      &cards.Card{TypeLine: "Creature — Human"},
+			archetype: "aggro",
+			minScore:  0.9,
+			maxScore:  1.0,
+		},
+		{
+			name:      "spell for aggro (worse)",
+			card:      &cards.Card{TypeLine: "Instant"},
+			archetype: "aggro",
+			minScore:  0.5,
+			maxScore:  0.8,
+		},
+		{
+			name:      "removal spell for control (best)",
+			card:      &cards.Card{TypeLine: "Instant", OracleText: &oracleDestroy},
+			archetype: "control",
+			minScore:  0.9,
+			maxScore:  1.0,
+		},
+		{
+			name:      "draw spell for control (best)",
+			card:      &cards.Card{TypeLine: "Sorcery", OracleText: &oracleDraw},
+			archetype: "control",
+			minScore:  0.9,
+			maxScore:  1.0,
+		},
+		{
+			name:      "creature for midrange (balanced)",
+			card:      &cards.Card{TypeLine: "Creature"},
+			archetype: "midrange",
+			minScore:  0.6,
+			maxScore:  1.0, // Midrange also benefits from creatures
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := archetypeTargets[tt.archetype]
+			score := suggester.scoreTypeForArchetype(tt.card, target)
+			if score < tt.minScore || score > tt.maxScore {
+				t.Errorf("expected score between %.2f and %.2f, got %.2f", tt.minScore, tt.maxScore, score)
+			}
+		})
+	}
+}
+
+func TestIsViableForArchetype(t *testing.T) {
+	suggester := &DeckSuggester{}
+
+	tests := []struct {
+		name       string
+		candidates []*cards.Card
+		archetype  string
+		expected   bool
+	}{
+		{
+			name: "viable aggro pool",
+			candidates: func() []*cards.Card {
+				result := make([]*cards.Card, 25)
+				for i := range result {
+					if i < 15 {
+						result[i] = &cards.Card{TypeLine: "Creature"}
+					} else {
+						result[i] = &cards.Card{TypeLine: "Instant"}
+					}
+				}
+				return result
+			}(),
+			archetype: "aggro",
+			expected:  true,
+		},
+		{
+			name: "not viable aggro - too few creatures",
+			candidates: func() []*cards.Card {
+				result := make([]*cards.Card, 20)
+				for i := range result {
+					if i < 8 {
+						result[i] = &cards.Card{TypeLine: "Creature"}
+					} else {
+						result[i] = &cards.Card{TypeLine: "Instant"}
+					}
+				}
+				return result
+			}(),
+			archetype: "aggro",
+			expected:  false,
+		},
+		{
+			name: "viable control pool",
+			candidates: func() []*cards.Card {
+				result := make([]*cards.Card, 20)
+				for i := range result {
+					if i < 10 {
+						result[i] = &cards.Card{TypeLine: "Creature"}
+					} else {
+						result[i] = &cards.Card{TypeLine: "Instant"}
+					}
+				}
+				return result
+			}(),
+			archetype: "control",
+			expected:  true, // Control needs fewer creatures
+		},
+		{
+			name:       "not viable - too few total cards",
+			candidates: make([]*cards.Card, 10),
+			archetype:  "midrange",
+			expected:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := archetypeTargets[tt.archetype]
+			result := suggester.isViableForArchetype(tt.candidates, target)
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestSelectCardsForArchetype(t *testing.T) {
+	suggester := &DeckSuggester{}
+
+	// Create a pool of cards at various CMCs
+	scoredCards := []*scoredCard{
+		{card: &cards.Card{ArenaID: 1, CMC: 1}, score: 0.9},
+		{card: &cards.Card{ArenaID: 2, CMC: 1}, score: 0.85},
+		{card: &cards.Card{ArenaID: 3, CMC: 2}, score: 0.8},
+		{card: &cards.Card{ArenaID: 4, CMC: 2}, score: 0.75},
+		{card: &cards.Card{ArenaID: 5, CMC: 2}, score: 0.7},
+		{card: &cards.Card{ArenaID: 6, CMC: 3}, score: 0.65},
+		{card: &cards.Card{ArenaID: 7, CMC: 3}, score: 0.6},
+		{card: &cards.Card{ArenaID: 8, CMC: 4}, score: 0.55},
+		{card: &cards.Card{ArenaID: 9, CMC: 5}, score: 0.5},
+	}
+
+	tests := []struct {
+		name        string
+		archetype   string
+		targetCount int
+	}{
+		{
+			name:        "aggro selection",
+			archetype:   "aggro",
+			targetCount: 5,
+		},
+		{
+			name:        "control selection",
+			archetype:   "control",
+			targetCount: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := archetypeTargets[tt.archetype]
+			result := suggester.selectCardsForArchetype(scoredCards, tt.targetCount, target)
+
+			if len(result) > tt.targetCount {
+				t.Errorf("selected too many cards: got %d, max %d", len(result), tt.targetCount)
+			}
+
+			// Verify no duplicates
+			seen := make(map[int]bool)
+			for _, sc := range result {
+				if seen[sc.card.ArenaID] {
+					t.Errorf("duplicate card selected: ArenaID %d", sc.card.ArenaID)
+				}
+				seen[sc.card.ArenaID] = true
+			}
+		})
+	}
+}
+
+func TestDistributeArchetypeLands(t *testing.T) {
+	suggester := &DeckSuggester{}
+
+	tests := []struct {
+		name          string
+		selectedCards []*scoredCard
+		combo         ColorCombination
+		landCount     int
+	}{
+		{
+			name: "aggro land distribution (16 lands)",
+			selectedCards: []*scoredCard{
+				{card: &cards.Card{ManaCost: ptr("{R}{R}")}},
+				{card: &cards.Card{ManaCost: ptr("{1}{G}")}},
+			},
+			combo:     ColorCombination{Colors: []string{"R", "G"}, Name: "Gruul"},
+			landCount: 16,
+		},
+		{
+			name: "control land distribution (18 lands)",
+			selectedCards: []*scoredCard{
+				{card: &cards.Card{ManaCost: ptr("{U}{U}")}},
+				{card: &cards.Card{ManaCost: ptr("{1}{B}")}},
+				{card: &cards.Card{ManaCost: ptr("{2}{U}{B}")}},
+			},
+			combo:     ColorCombination{Colors: []string{"U", "B"}, Name: "Dimir"},
+			landCount: 18,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lands := suggester.distributeArchetypeLands(tt.selectedCards, tt.combo, tt.landCount)
+
+			total := 0
+			for _, land := range lands {
+				total += land.Quantity
+			}
+
+			if total != tt.landCount {
+				t.Errorf("expected %d total lands, got %d", tt.landCount, total)
+			}
+		})
+	}
+}
+
+func TestCalculateArchetypeScore(t *testing.T) {
+	suggester := &DeckSuggester{}
+
+	tests := []struct {
+		name          string
+		selectedCards []*scoredCard
+		analysis      *DeckSuggestionAnalysis
+		combo         ColorCombination
+		archetype     string
+		minScore      float64
+		maxScore      float64
+	}{
+		{
+			name: "good aggro deck",
+			selectedCards: func() []*scoredCard {
+				cards := make([]*scoredCard, 24)
+				for i := range cards {
+					cards[i] = &scoredCard{score: 0.8}
+				}
+				return cards
+			}(),
+			analysis: &DeckSuggestionAnalysis{
+				CreatureCount: 17,
+				AverageCMC:    2.3,
+			},
+			combo:     ColorCombination{Colors: []string{"R", "G"}},
+			archetype: "aggro",
+			minScore:  0.7,
+			maxScore:  1.0,
+		},
+		{
+			name: "poor aggro deck (too few creatures)",
+			selectedCards: func() []*scoredCard {
+				cards := make([]*scoredCard, 24)
+				for i := range cards {
+					cards[i] = &scoredCard{score: 0.7}
+				}
+				return cards
+			}(),
+			analysis: &DeckSuggestionAnalysis{
+				CreatureCount: 10,
+				AverageCMC:    2.5,
+			},
+			combo:     ColorCombination{Colors: []string{"R", "G"}},
+			archetype: "aggro",
+			minScore:  0.4,
+			maxScore:  0.8, // Slightly higher due to good CMC and card quality
+		},
+		{
+			name: "good control deck",
+			selectedCards: func() []*scoredCard {
+				cards := make([]*scoredCard, 22)
+				for i := range cards {
+					cards[i] = &scoredCard{score: 0.8}
+				}
+				return cards
+			}(),
+			analysis: &DeckSuggestionAnalysis{
+				CreatureCount: 11,
+				AverageCMC:    3.2,
+			},
+			combo:     ColorCombination{Colors: []string{"U", "B"}},
+			archetype: "control",
+			minScore:  0.7,
+			maxScore:  1.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := archetypeTargets[tt.archetype]
+			score := suggester.calculateArchetypeScore(tt.selectedCards, tt.analysis, tt.combo, target)
+
+			if score < tt.minScore || score > tt.maxScore {
+				t.Errorf("expected score between %.2f and %.2f, got %.2f", tt.minScore, tt.maxScore, score)
+			}
+		})
+	}
+}
+
+func TestExportToArenaFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		deck     *SuggestedDeck
+		contains []string
+		isEmpty  bool
+	}{
+		{
+			name:    "nil deck",
+			deck:    nil,
+			isEmpty: true,
+		},
+		{
+			name: "basic deck export",
+			deck: &SuggestedDeck{
+				ColorCombo: ColorCombination{Name: "Gruul"},
+				Spells: []*SuggestedCard{
+					{Name: "Goblin Guide"},
+					{Name: "Goblin Guide"},
+					{Name: "Llanowar Elves"},
+				},
+				Lands: []*SuggestedLand{
+					{Name: "Mountain", Quantity: 8},
+					{Name: "Forest", Quantity: 8},
+				},
+			},
+			contains: []string{
+				"Deck: Gruul Draft",
+				"2 Goblin Guide",
+				"1 Llanowar Elves",
+				"8 Mountain",
+				"8 Forest",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ExportToArenaFormat(tt.deck)
+
+			if tt.isEmpty {
+				if result != "" {
+					t.Errorf("expected empty string, got: %s", result)
+				}
+				return
+			}
+
+			for _, substr := range tt.contains {
+				if !containsString(result, substr) {
+					t.Errorf("expected result to contain %q, got:\n%s", substr, result)
+				}
+			}
+		})
+	}
+}
+
+func TestGetAvailableDraftArchetypes(t *testing.T) {
+	archetypes := GetAvailableDraftArchetypes()
+
+	if len(archetypes) != 3 {
+		t.Errorf("expected 3 archetypes, got %d", len(archetypes))
+	}
+
+	expected := map[string]bool{"aggro": true, "midrange": true, "control": true}
+	for _, arch := range archetypes {
+		if !expected[arch] {
+			t.Errorf("unexpected archetype: %s", arch)
+		}
+	}
+}
+
+func TestGetDraftArchetypeDescription(t *testing.T) {
+	tests := []struct {
+		key      string
+		contains string
+	}{
+		{"aggro", "Fast"},
+		{"midrange", "Balanced"},
+		{"control", "Slower"},
+		{"invalid", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			desc := GetDraftArchetypeDescription(tt.key)
+			if tt.contains == "" {
+				if desc != "" {
+					t.Errorf("expected empty description for invalid key, got: %s", desc)
+				}
+			} else {
+				if !containsString(desc, tt.contains) {
+					t.Errorf("expected description to contain %q, got: %s", tt.contains, desc)
+				}
+			}
+		})
+	}
+}
+
+// containsString is a helper to check if a string contains a substring
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
