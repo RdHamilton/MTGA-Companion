@@ -99,6 +99,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `benchmarks/` - GC and JSON benchmark suite
 - `internal/mtga/draft/analytics/` - Advanced draft analytics services
 
+### Added
+
+**Go 1.25 Features**
+- **Flight Recorder** - Low-overhead execution tracing using `runtime/trace.FlightRecorder` for debugging (#794)
+  - Automatic trace capture on errors exceeding threshold
+  - Configurable trace buffer size and retention
+  - Manual trace capture via daemon API
+- **GC Benchmarks** - Comprehensive benchmarks for comparing default GC vs experimental `greenteagc` (#795)
+  - Collection, draft session, match history allocation benchmarks
+  - JSON serialization, map operations, slice growth benchmarks
+  - Comparison script with `benchstat` integration
+- **JSON v2 Benchmarks** - Benchmarks for comparing `encoding/json` (v1) vs experimental `encoding/json/v2` (#793)
+  - Marshal/unmarshal benchmarks for cards, decks, and draft sessions
+  - Comparison script with formatted output
+
+### Changed
+
+- **Go Version** - Updated minimum Go version requirement to 1.25+
+
 ## [1.4.0] - 2025-12-27
 
 ### Added
