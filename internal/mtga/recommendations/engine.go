@@ -71,6 +71,12 @@ type ScoreFactors struct {
 	Playable  float64 // Playability in format/context (0.0-1.0)
 }
 
+// EmbeddingService is an interface for card embedding operations.
+type EmbeddingService interface {
+	GetSynergyBonus(ctx context.Context, cardArenaID int, deckCardArenaIDs []int) float64
+	ComputeSimilarity(ctx context.Context, arenaID1, arenaID2 int) (float64, error)
+}
+
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
 	cardService      *cards.Service
@@ -80,6 +86,7 @@ type RuleBasedEngine struct {
 	cooccurrenceRepo repository.CooccurrenceRepository // Co-occurrence data (optional)
 	edhrecRepo       repository.EDHRECRepository       // EDHREC synergy data (optional)
 	mtgzoneRepo      repository.MTGZoneRepository      // MTGZone archetype data (optional)
+	embeddingService EmbeddingService                  // Card embeddings for semantic similarity (optional)
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
@@ -127,6 +134,11 @@ func (e *RuleBasedEngine) SetEDHRECRepo(edhrecRepo repository.EDHRECRepository) 
 // SetMTGZoneRepo sets the MTGZone repository for archetype-based recommendations.
 func (e *RuleBasedEngine) SetMTGZoneRepo(mtgzoneRepo repository.MTGZoneRepository) {
 	e.mtgzoneRepo = mtgzoneRepo
+}
+
+// SetEmbeddingService sets the embedding service for semantic similarity scoring.
+func (e *RuleBasedEngine) SetEmbeddingService(embeddingService EmbeddingService) {
+	e.embeddingService = embeddingService
 }
 
 // GetRecommendations returns recommended cards based on deck analysis.
@@ -252,7 +264,7 @@ func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck 
 	// Factor 3: Card quality from ratings (25% weight)
 	factors.Quality = e.scoreCardQuality(ctx, card, deck)
 
-	// Factor 4: Synergy (15% weight) - combines rule-based, co-occurrence, EDHREC, and archetype analysis
+	// Factor 4: Synergy (15% weight) - combines rule-based, co-occurrence, EDHREC, archetype, and embedding analysis
 	factors.Synergy = e.scoreSynergyEnhanced(ctx, card, deck, analysis)
 
 	// Factor 5: Playability (5% weight)
@@ -573,7 +585,7 @@ func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 // - Rule-based only: 100% rule-based
 func (e *RuleBasedEngine) scoreSynergyEnhanced(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
 	// Get rule-based synergy score
-	ruleBasedScore := scoreSynergy(card, deck, analysis)
+	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
 
 	// Calculate co-occurrence score
 	coocScore, hasCoocData := e.calculateCooccurrenceScore(ctx, card, deck)
@@ -761,7 +773,8 @@ func normalizePMIScore(pmi float64) float64 {
 }
 
 // scoreSynergy calculates synergy with existing deck cards.
-func scoreSynergy(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
+// Uses keyword matching, tribal synergy, and optional embedding-based semantic similarity.
+func (e *RuleBasedEngine) scoreSynergy(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
 	synergy := 0.0
 	synergyCount := 0
 
@@ -798,6 +811,26 @@ func scoreSynergy(card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) f
 				synergy += tribalBonus
 				synergyCount++
 			}
+		}
+	}
+
+	// Embedding-based semantic similarity (if available)
+	if e.embeddingService != nil && len(deck.Cards) > 0 {
+		// Get deck card IDs for embedding comparison
+		deckCardIDs := make([]int, 0, len(deck.Cards))
+		for _, deckCard := range deck.Cards {
+			if deckCard.Board == "main" {
+				deckCardIDs = append(deckCardIDs, deckCard.CardID)
+			}
+		}
+
+		// Get embedding-based synergy bonus
+		embeddingBonus := e.embeddingService.GetSynergyBonus(ctx, card.ArenaID, deckCardIDs)
+		if embeddingBonus > 0 {
+			// Scale embedding bonus to 0.0-0.6 range (embeddings are good at finding similar cards)
+			scaledBonus := embeddingBonus * 0.6
+			synergy += scaledBonus
+			synergyCount++
 		}
 	}
 
@@ -1687,7 +1720,7 @@ func convertSetCardToCardsCard(setCard *models.SetCard) *cards.Card {
 // If archetype data is available, it enhances the score with archetype-specific synergies.
 func (e *RuleBasedEngine) scoreSynergyWithArchetype(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
 	// Get rule-based synergy score
-	ruleBasedScore := scoreSynergy(card, deck, analysis)
+	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
 
 	// If no MTGZone repo, use pure rule-based
 	if e.mtgzoneRepo == nil {

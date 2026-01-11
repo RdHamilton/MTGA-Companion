@@ -267,7 +267,10 @@ func TestScoreSynergy(t *testing.T) {
 				CreatureTypes: tt.creatures,
 			}
 
-			score := scoreSynergy(card, deck, analysis)
+			// Create engine to call the method
+			engine := &RuleBasedEngine{}
+			ctx := context.Background()
+			score := engine.scoreSynergy(ctx, card, deck, analysis)
 
 			if score < tt.expectedMin || score > tt.expectedMax {
 				t.Errorf("scoreSynergy() = %v, want between %v and %v",
