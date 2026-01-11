@@ -143,7 +143,7 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 ## Prerequisites
 
 - **MTG Arena** must be installed and configured to enable detailed logging
-- **Go 1.21+** (for building from source)
+- **Go 1.25+** (for building from source)
 - **Ollama** (optional) - For AI-powered natural language explanations
 
 ## Ollama Setup (Optional)
@@ -316,7 +316,7 @@ If you prefer not to use daemon mode, the GUI includes an embedded log poller th
 ### Build From Source
 
 **Prerequisites**:
-- [Go 1.24+](https://go.dev/dl/)
+- [Go 1.25+](https://go.dev/dl/)
 - [Node.js 20+](https://nodejs.org/) (for frontend)
 
 **Clone and Build**:
@@ -586,9 +586,37 @@ MTGA-Companion is built with modern technologies for performance and cross-platf
   - React SPA served via Vite or static files
   - Opens in your default browser - no native app required
 
+### Go 1.25 Features
+
+MTGA Companion leverages Go 1.25's new features for improved performance and debugging:
+
+**Flight Recorder** (`internal/daemon/flight_recorder.go`)
+- Uses `runtime/trace.FlightRecorder` for low-overhead execution tracing
+- Automatically captures traces when errors exceed threshold
+- Configurable trace buffer size and retention
+- Manual trace capture via daemon API
+
+**Benchmark Suite** (`benchmarks/`)
+- **GC Benchmarks**: Compare default GC vs experimental `greenteagc` garbage collector
+  ```bash
+  # Run with default GC
+  go test -bench=. -benchmem ./benchmarks/...
+
+  # Run with greenteagc (Go 1.25+ required)
+  GOEXPERIMENT=greenteagc go test -bench=. -benchmem ./benchmarks/...
+
+  # Compare results
+  ./benchmarks/run_gc_comparison.sh
+  ```
+- **JSON Benchmarks**: Compare `encoding/json` (v1) vs experimental `encoding/json/v2`
+  ```bash
+  # Run comparison (requires GOEXPERIMENT=jsonv2)
+  ./benchmarks/run_json_comparison.sh
+  ```
+
 ### Backend (Go)
 
-- **[Go 1.24+](https://go.dev/)** - Programming language
+- **[Go 1.25+](https://go.dev/)** - Programming language
 - **[Chi Router](https://github.com/go-chi/chi)** - Lightweight HTTP router
 - **[SQLite 3](https://www.sqlite.org/)** - Local database storage
 - **[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)** - Pure Go SQLite driver (no CGo required)
