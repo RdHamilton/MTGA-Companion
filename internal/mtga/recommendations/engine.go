@@ -80,10 +80,13 @@ type EmbeddingService interface {
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
 	cardService      *cards.Service
-	setCardRepo      repository.SetCardRepository // For faster lookups from local DB
+	setCardRepo      repository.SetCardRepository      // For faster lookups from local DB
 	ratingsRepo      repository.DraftRatingsRepository
-	cfbRatingsRepo   repository.CFBRatingsRepository // ChannelFireball ratings (optional)
-	embeddingService EmbeddingService                // Card embeddings for semantic similarity (optional)
+	cfbRatingsRepo   repository.CFBRatingsRepository   // ChannelFireball ratings (optional)
+	cooccurrenceRepo repository.CooccurrenceRepository // Co-occurrence data (optional)
+	edhrecRepo       repository.EDHRECRepository       // EDHREC synergy data (optional)
+	mtgzoneRepo      repository.MTGZoneRepository      // MTGZone archetype data (optional)
+	embeddingService EmbeddingService                  // Card embeddings for semantic similarity (optional)
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
@@ -116,6 +119,21 @@ func NewRuleBasedEngineWithCFB(cardService *cards.Service, setCardRepo repositor
 // SetCFBRatingsRepo sets the CFB ratings repository for the engine.
 func (e *RuleBasedEngine) SetCFBRatingsRepo(cfbRatingsRepo repository.CFBRatingsRepository) {
 	e.cfbRatingsRepo = cfbRatingsRepo
+}
+
+// SetCooccurrenceRepo sets the co-occurrence repository for enhanced synergy scoring.
+func (e *RuleBasedEngine) SetCooccurrenceRepo(cooccurrenceRepo repository.CooccurrenceRepository) {
+	e.cooccurrenceRepo = cooccurrenceRepo
+}
+
+// SetEDHRECRepo sets the EDHREC repository for Commander-based synergy data.
+func (e *RuleBasedEngine) SetEDHRECRepo(edhrecRepo repository.EDHRECRepository) {
+	e.edhrecRepo = edhrecRepo
+}
+
+// SetMTGZoneRepo sets the MTGZone repository for archetype-based recommendations.
+func (e *RuleBasedEngine) SetMTGZoneRepo(mtgzoneRepo repository.MTGZoneRepository) {
+	e.mtgzoneRepo = mtgzoneRepo
 }
 
 // SetEmbeddingService sets the embedding service for semantic similarity scoring.
@@ -246,8 +264,8 @@ func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck 
 	// Factor 3: Card quality from ratings (25% weight)
 	factors.Quality = e.scoreCardQuality(ctx, card, deck)
 
-	// Factor 4: Synergy (15% weight)
-	factors.Synergy = e.scoreSynergy(ctx, card, deck, analysis)
+	// Factor 4: Synergy (15% weight) - combines rule-based, co-occurrence, EDHREC, archetype, and embedding analysis
+	factors.Synergy = e.scoreSynergyEnhanced(ctx, card, deck, analysis)
 
 	// Factor 5: Playability (5% weight)
 	factors.Playable = scorePlayability(card, deck)
@@ -557,6 +575,201 @@ func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 	}
 
 	return 0.5 // Default neutral score
+}
+
+// scoreSynergyEnhanced calculates synergy using rule-based, co-occurrence, and EDHREC analysis.
+// Blending strategy depends on available data sources:
+// - All three sources: 45% rule-based + 30% co-occurrence + 25% EDHREC
+// - Rule-based + co-occurrence: 60% rule-based + 40% co-occurrence
+// - Rule-based + EDHREC: 60% rule-based + 40% EDHREC
+// - Rule-based only: 100% rule-based
+func (e *RuleBasedEngine) scoreSynergyEnhanced(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
+	// Get rule-based synergy score
+	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
+
+	// Calculate co-occurrence score
+	coocScore, hasCoocData := e.calculateCooccurrenceScore(ctx, card, deck)
+
+	// Calculate EDHREC score
+	edhrecScore, hasEDHRECData := e.calculateEDHRECScore(ctx, card, deck)
+
+	// Blend scores based on available data
+	if hasCoocData && hasEDHRECData {
+		// All three sources available: 45% rule-based + 30% co-occurrence + 25% EDHREC
+		return (ruleBasedScore * 0.45) + (coocScore * 0.30) + (edhrecScore * 0.25)
+	} else if hasCoocData {
+		// Rule-based + co-occurrence: 60% rule-based + 40% co-occurrence
+		return (ruleBasedScore * 0.60) + (coocScore * 0.40)
+	} else if hasEDHRECData {
+		// Rule-based + EDHREC: 60% rule-based + 40% EDHREC
+		return (ruleBasedScore * 0.60) + (edhrecScore * 0.40)
+	}
+
+	// Rule-based only
+	return ruleBasedScore
+}
+
+// calculateCooccurrenceScore calculates synergy from PMI co-occurrence data.
+func (e *RuleBasedEngine) calculateCooccurrenceScore(ctx context.Context, card *cards.Card, deck *DeckContext) (float64, bool) {
+	if e.cooccurrenceRepo == nil {
+		return 0, false
+	}
+
+	coocScore := 0.0
+	coocCount := 0
+
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		// Get PMI score between candidate card and deck card
+		pmi, err := e.cooccurrenceRepo.GetCooccurrenceScore(ctx, card.ArenaID, deckCard.CardID, deck.Format)
+		if err != nil || pmi == 0 {
+			continue
+		}
+
+		// Normalize PMI to 0-1 range (typical PMI is -5 to +5)
+		normalized := normalizePMIScore(pmi)
+		coocScore += normalized * float64(deckCard.Quantity)
+		coocCount += deckCard.Quantity
+	}
+
+	if coocCount > 0 {
+		return coocScore / float64(coocCount), true
+	}
+
+	return 0, false
+}
+
+// calculateEDHRECScore calculates synergy from EDHREC card relationship data.
+func (e *RuleBasedEngine) calculateEDHRECScore(ctx context.Context, card *cards.Card, deck *DeckContext) (float64, bool) {
+	if e.edhrecRepo == nil {
+		return 0, false
+	}
+
+	edhrecScore := 0.0
+	matchCount := 0
+
+	// Check synergy between the candidate card and each deck card
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		// Get card name from metadata
+		deckCardMeta, ok := deck.CardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		// Try to get EDHREC synergy score between the two cards
+		synergyScore, err := e.edhrecRepo.GetSynergyScore(ctx, card.Name, deckCardMeta.Name)
+		if err != nil || synergyScore == 0 {
+			continue
+		}
+
+		// EDHREC synergy scores are typically -1.0 to +1.0, normalize to 0.0-1.0
+		normalized := models.NormalizeSynergyScore(synergyScore)
+		edhrecScore += normalized * float64(deckCard.Quantity)
+		matchCount += deckCard.Quantity
+	}
+
+	// Also check theme-based synergy
+	themeScore, hasThemeData := e.calculateThemeSynergy(ctx, card, deck)
+	if hasThemeData {
+		// Blend card-based and theme-based EDHREC data
+		if matchCount > 0 {
+			cardBasedScore := edhrecScore / float64(matchCount)
+			// 70% card synergy + 30% theme synergy
+			return (cardBasedScore * 0.70) + (themeScore * 0.30), true
+		}
+		return themeScore, true
+	}
+
+	if matchCount > 0 {
+		return edhrecScore / float64(matchCount), true
+	}
+
+	return 0, false
+}
+
+// calculateThemeSynergy calculates synergy based on EDHREC theme data.
+func (e *RuleBasedEngine) calculateThemeSynergy(ctx context.Context, card *cards.Card, deck *DeckContext) (float64, bool) {
+	if e.edhrecRepo == nil || card.OracleText == nil {
+		return 0, false
+	}
+
+	// Get themes the candidate card belongs to
+	cardThemes, err := e.edhrecRepo.GetThemesForCard(ctx, card.Name)
+	if err != nil || len(cardThemes) == 0 {
+		return 0, false
+	}
+
+	// Build a map of deck card themes
+	deckThemes := make(map[string]int)
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		deckCardMeta, ok := deck.CardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		themes, err := e.edhrecRepo.GetThemesForCard(ctx, deckCardMeta.Name)
+		if err != nil {
+			continue
+		}
+
+		for _, theme := range themes {
+			deckThemes[theme.ThemeName] += deckCard.Quantity
+		}
+	}
+
+	if len(deckThemes) == 0 {
+		return 0, false
+	}
+
+	// Calculate theme overlap score
+	themeScore := 0.0
+	for _, cardTheme := range cardThemes {
+		if count, ok := deckThemes[cardTheme.ThemeName]; ok {
+			// Higher score for themes that appear more in the deck
+			// Normalize by total deck cards (analysis.TotalNonLands)
+			themeStrength := float64(count) / float64(len(deck.Cards))
+			if themeStrength > 1.0 {
+				themeStrength = 1.0
+			}
+			// Weight by the card's synergy score in that theme
+			themeScore += themeStrength * models.NormalizeSynergyScore(cardTheme.SynergyScore)
+		}
+	}
+
+	// Normalize by number of card themes
+	if len(cardThemes) > 0 {
+		themeScore = themeScore / float64(len(cardThemes))
+		if themeScore > 1.0 {
+			themeScore = 1.0
+		}
+		return themeScore, true
+	}
+
+	return 0, false
+}
+
+// normalizePMIScore converts PMI values to a 0.0-1.0 scale.
+func normalizePMIScore(pmi float64) float64 {
+	if pmi <= 0 {
+		return 0.0
+	}
+	// Map PMI 0-5 to 0-1
+	normalized := pmi / 5.0
+	if normalized > 1.0 {
+		normalized = 1.0
+	}
+	return normalized
 }
 
 // scoreSynergy calculates synergy with existing deck cards.
@@ -1501,4 +1714,204 @@ func convertSetCardToCardsCard(setCard *models.SetCard) *cards.Card {
 	}
 
 	return card
+}
+
+// scoreSynergyWithArchetype calculates synergy using both rule-based and MTGZone archetype data.
+// If archetype data is available, it enhances the score with archetype-specific synergies.
+func (e *RuleBasedEngine) scoreSynergyWithArchetype(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
+	// Get rule-based synergy score
+	ruleBasedScore := e.scoreSynergy(ctx, card, deck, analysis)
+
+	// If no MTGZone repo, use pure rule-based
+	if e.mtgzoneRepo == nil {
+		return ruleBasedScore
+	}
+
+	// Calculate archetype-based synergy
+	archetypeScore, hasArchetypeData := e.calculateArchetypeSynergy(ctx, card, deck)
+
+	// Blend scores if we have archetype data
+	if hasArchetypeData {
+		// 70% rule-based + 30% archetype
+		return (ruleBasedScore * 0.70) + (archetypeScore * 0.30)
+	}
+
+	return ruleBasedScore
+}
+
+// calculateArchetypeSynergy calculates synergy based on MTGZone archetype data.
+func (e *RuleBasedEngine) calculateArchetypeSynergy(ctx context.Context, card *cards.Card, deck *DeckContext) (float64, bool) {
+	if e.mtgzoneRepo == nil {
+		return 0, false
+	}
+
+	// Get archetypes that include this card
+	archetypes, err := e.mtgzoneRepo.GetArchetypesForCard(ctx, card.Name)
+	if err != nil || len(archetypes) == 0 {
+		return 0, false
+	}
+
+	// Check if any deck cards are in the same archetypes
+	matchScore := 0.0
+	matchCount := 0
+
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		// Get card name from metadata
+		deckCardMeta, ok := deck.CardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		// Check if this deck card shares archetypes with the candidate
+		deckCardArchetypes, err := e.mtgzoneRepo.GetArchetypesForCard(ctx, deckCardMeta.Name)
+		if err != nil || len(deckCardArchetypes) == 0 {
+			continue
+		}
+
+		// Calculate overlap between archetypes
+		for _, candidateArch := range archetypes {
+			for _, deckArch := range deckCardArchetypes {
+				if candidateArch.ID == deckArch.ID {
+					// Same archetype - strong synergy signal
+					// Higher tier archetypes get higher scores
+					tierBonus := 1.0 - (float64(models.GetTierRank(candidateArch.Tier)) / 10.0)
+					matchScore += (0.8 + tierBonus*0.2) * float64(deckCard.Quantity)
+					matchCount += deckCard.Quantity
+				}
+			}
+		}
+	}
+
+	// Also check for direct synergy annotations
+	synergyFromAnnotations := e.calculateAnnotationSynergy(ctx, card, deck)
+	if synergyFromAnnotations > 0 {
+		if matchCount > 0 {
+			// Blend archetype match and annotation synergy
+			archetypeMatchScore := matchScore / float64(matchCount)
+			return (archetypeMatchScore * 0.7) + (synergyFromAnnotations * 0.3), true
+		}
+		return synergyFromAnnotations, true
+	}
+
+	if matchCount > 0 {
+		return matchScore / float64(matchCount), true
+	}
+
+	return 0, false
+}
+
+// calculateAnnotationSynergy calculates synergy from MTGZone synergy annotations.
+func (e *RuleBasedEngine) calculateAnnotationSynergy(ctx context.Context, card *cards.Card, deck *DeckContext) float64 {
+	if e.mtgzoneRepo == nil {
+		return 0
+	}
+
+	totalScore := 0.0
+	matchCount := 0
+
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		deckCardMeta, ok := deck.CardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		// Check for synergy annotation between these two cards
+		synergy, err := e.mtgzoneRepo.GetSynergyBetween(ctx, card.Name, deckCardMeta.Name)
+		if err != nil || synergy == nil {
+			continue
+		}
+
+		// Use the confidence-weighted score
+		totalScore += synergy.Confidence * float64(deckCard.Quantity)
+		matchCount += deckCard.Quantity
+	}
+
+	if matchCount > 0 {
+		return totalScore / float64(matchCount)
+	}
+
+	return 0
+}
+
+// DetectDeckArchetype attempts to identify the deck's archetype based on its cards.
+func (e *RuleBasedEngine) DetectDeckArchetype(ctx context.Context, deck *DeckContext) (*models.MTGZoneArchetype, error) {
+	if e.mtgzoneRepo == nil {
+		return nil, nil
+	}
+
+	// Count archetype matches for each card
+	archetypeCounts := make(map[int64]int)
+	archetypeMap := make(map[int64]*models.MTGZoneArchetype)
+
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		deckCardMeta, ok := deck.CardMetadata[deckCard.CardID]
+		if !ok {
+			continue
+		}
+
+		archetypes, err := e.mtgzoneRepo.GetArchetypesForCard(ctx, deckCardMeta.Name)
+		if err != nil {
+			continue
+		}
+
+		for _, arch := range archetypes {
+			// Only consider archetypes that match the deck's format
+			if !strings.EqualFold(arch.Format, deck.Format) {
+				continue
+			}
+
+			archetypeCounts[arch.ID] += deckCard.Quantity
+			if _, exists := archetypeMap[arch.ID]; !exists {
+				archetypeMap[arch.ID] = arch
+			}
+		}
+	}
+
+	// Find the archetype with the most matches
+	var bestArchetype *models.MTGZoneArchetype
+	bestCount := 0
+
+	for archID, count := range archetypeCounts {
+		if count > bestCount {
+			bestCount = count
+			bestArchetype = archetypeMap[archID]
+		}
+	}
+
+	// Only return if we have a strong match (at least 10 cards match)
+	if bestCount >= 10 && bestArchetype != nil {
+		return bestArchetype, nil
+	}
+
+	return nil, nil
+}
+
+// GetSynergyExplanation gets a human-readable explanation for why two cards synergize.
+func (e *RuleBasedEngine) GetSynergyExplanation(ctx context.Context, cardA, cardB string) (string, error) {
+	if e.mtgzoneRepo == nil {
+		return "", nil
+	}
+
+	synergy, err := e.mtgzoneRepo.GetSynergyBetween(ctx, cardA, cardB)
+	if err != nil {
+		return "", err
+	}
+
+	if synergy != nil && synergy.Reason != "" {
+		return synergy.Reason, nil
+	}
+
+	return "", nil
 }
