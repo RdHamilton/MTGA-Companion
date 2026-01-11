@@ -73,10 +73,11 @@ type ScoreFactors struct {
 
 // RuleBasedEngine implements a rule-based recommendation system.
 type RuleBasedEngine struct {
-	cardService    *cards.Service
-	setCardRepo    repository.SetCardRepository // For faster lookups from local DB
-	ratingsRepo    repository.DraftRatingsRepository
-	cfbRatingsRepo repository.CFBRatingsRepository // ChannelFireball ratings (optional)
+	cardService      *cards.Service
+	setCardRepo      repository.SetCardRepository // For faster lookups from local DB
+	ratingsRepo      repository.DraftRatingsRepository
+	cfbRatingsRepo   repository.CFBRatingsRepository   // ChannelFireball ratings (optional)
+	cooccurrenceRepo repository.CooccurrenceRepository // Co-occurrence data (optional)
 }
 
 // NewRuleBasedEngine creates a new rule-based recommendation engine.
@@ -109,6 +110,11 @@ func NewRuleBasedEngineWithCFB(cardService *cards.Service, setCardRepo repositor
 // SetCFBRatingsRepo sets the CFB ratings repository for the engine.
 func (e *RuleBasedEngine) SetCFBRatingsRepo(cfbRatingsRepo repository.CFBRatingsRepository) {
 	e.cfbRatingsRepo = cfbRatingsRepo
+}
+
+// SetCooccurrenceRepo sets the co-occurrence repository for enhanced synergy scoring.
+func (e *RuleBasedEngine) SetCooccurrenceRepo(cooccurrenceRepo repository.CooccurrenceRepository) {
+	e.cooccurrenceRepo = cooccurrenceRepo
 }
 
 // GetRecommendations returns recommended cards based on deck analysis.
@@ -234,8 +240,8 @@ func (e *RuleBasedEngine) scoreCard(ctx context.Context, card *cards.Card, deck 
 	// Factor 3: Card quality from ratings (25% weight)
 	factors.Quality = e.scoreCardQuality(ctx, card, deck)
 
-	// Factor 4: Synergy (15% weight)
-	factors.Synergy = scoreSynergy(card, deck, analysis)
+	// Factor 4: Synergy (15% weight) - combines rule-based and co-occurrence analysis
+	factors.Synergy = e.scoreSynergyEnhanced(ctx, card, deck, analysis)
 
 	// Factor 5: Playability (5% weight)
 	factors.Playable = scorePlayability(card, deck)
@@ -545,6 +551,62 @@ func (e *RuleBasedEngine) fallbackQualityScore(card *cards.Card) float64 {
 	}
 
 	return 0.5 // Default neutral score
+}
+
+// scoreSynergyEnhanced calculates synergy using both rule-based and co-occurrence analysis.
+// If co-occurrence data is available, it blends the two sources (60% rule-based, 40% co-occurrence).
+// Otherwise, it falls back to pure rule-based synergy.
+func (e *RuleBasedEngine) scoreSynergyEnhanced(ctx context.Context, card *cards.Card, deck *DeckContext, analysis *DeckAnalysis) float64 {
+	// Get rule-based synergy score
+	ruleBasedScore := scoreSynergy(card, deck, analysis)
+
+	// If no co-occurrence repo, use pure rule-based
+	if e.cooccurrenceRepo == nil {
+		return ruleBasedScore
+	}
+
+	// Calculate co-occurrence score by averaging PMI with all deck cards
+	coocScore := 0.0
+	coocCount := 0
+
+	for _, deckCard := range deck.Cards {
+		if deckCard.Board != "main" {
+			continue
+		}
+
+		// Get PMI score between candidate card and deck card
+		pmi, err := e.cooccurrenceRepo.GetCooccurrenceScore(ctx, card.ArenaID, deckCard.CardID, deck.Format)
+		if err != nil || pmi == 0 {
+			continue
+		}
+
+		// Normalize PMI to 0-1 range (typical PMI is -5 to +5)
+		normalized := normalizePMIScore(pmi)
+		coocScore += normalized * float64(deckCard.Quantity)
+		coocCount += deckCard.Quantity
+	}
+
+	// If we have co-occurrence data, blend with rule-based
+	if coocCount > 0 {
+		coocScore = coocScore / float64(coocCount)
+		// Blend: 60% rule-based + 40% co-occurrence
+		return (ruleBasedScore * 0.6) + (coocScore * 0.4)
+	}
+
+	return ruleBasedScore
+}
+
+// normalizePMIScore converts PMI values to a 0.0-1.0 scale.
+func normalizePMIScore(pmi float64) float64 {
+	if pmi <= 0 {
+		return 0.0
+	}
+	// Map PMI 0-5 to 0-1
+	normalized := pmi / 5.0
+	if normalized > 1.0 {
+		normalized = 1.0
+	}
+	return normalized
 }
 
 // scoreSynergy calculates synergy with existing deck cards.
