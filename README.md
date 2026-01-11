@@ -54,13 +54,16 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 - **Real-Time Updates**: Live draft updates via `draft:updated` events
 - **Set Symbol Display**: Card displays now show set symbols/icons
 
-### ML-Powered Recommendations (v1.4)
+### ML-Powered Recommendations (v1.4+)
 - **Machine Learning Engine**: Intelligent card recommendations using trained ML models
 - **Personal Play Style Learning**: Adapts recommendations based on your deck building history and preferences
 - **Meta-Aware Suggestions**: Incorporates tournament data and metagame trends into recommendations
 - **Ollama Integration**: Optional local LLM support for natural language explanations of recommendations
 - **Feedback Collection**: Records your card acceptance/rejection to improve future recommendations
 - **Hybrid Scoring**: Combines ML predictions with rule-based analysis for best results
+- **Combo/Chain Detection** (v1.4.1): Identify multi-card synergies and combo potential
+- **Opponent Deck Analysis** (v1.4.1): Reconstruct opponent decks and match to meta archetypes
+- **Performance-Based Recommendations** (v1.4.1): Suggestions based on historical win rates
 
 ### Metagame Dashboard (v1.4)
 - **Live Meta Data**: Real-time metagame data from MTGGoldfish and MTGTop8
@@ -82,6 +85,40 @@ A modern companion application for Magic: The Gathering Arena (MTGA). Track your
 - **Quick Generate**: Instantly generate a complete 60-card deck with optimal land distribution
 - **Budget Mode**: Filter suggestions to cards you already own
 - **Score Breakdown**: See why cards are recommended (color fit, curve fit, synergy, card quality)
+
+### Play Tracking & Analysis (v1.4.1)
+- **In-Game Play Tracking**: Track every play in real-time during matches
+- **Deck Permutation Tracking**: Track every modification to your decks
+- **Deck Notes & Suggestions**: Post-match notes with improvement suggestions
+- **Game Play Timeline**: Visual timeline in Match Details showing game progression
+- **Match Comparison**: Compare matches side-by-side for performance analysis
+
+### Standard Format Features (v1.4.1)
+- **Standard Legality Validation**: Real-time legality checking for Standard format
+- **Set Rotation Notifications**: Alerts for upcoming set rotations
+- **Banned Cards Detection**: Legality banners and warnings for banned cards
+- **Automatic Set Metadata Sync**: Sync set data from Scryfall on startup
+
+### Data Integration (v1.4.1)
+- **Card Price Integration**: Scryfall price data for collection and deck valuation
+- **ChannelFireball Ratings**: CFB card ratings as secondary data source for recommendations
+- **17Lands JSON Export**: Export drafts to 17Lands format for analysis
+- **External Platform Export**: Export decks to Moxfield and Archidekt
+
+### Advanced Draft Analytics (v1.4.1)
+- **Drafting Pattern Analysis**: Analyze your color and card type preferences
+- **Archetype Performance**: Track win rates by color pair and archetype
+- **Temporal Trend Analysis**: Weekly/monthly performance trends with learning curve visualization
+- **Community Comparison**: Compare your performance vs 17Lands community averages
+- **Draft Deck Suggester**: Build decks by archetype (Aggro/Midrange/Control) with Arena export
+
+### Synergy Data Sources (v1.4.1)
+- **Card Embeddings**: Semantic similarity for better card recommendations
+- **MTGZone Archetype Data**: Integrate archetype data into recommendations
+- **EDHREC Integration**: Commander synergy data for card suggestions
+- **Archidekt Co-occurrence**: Card co-occurrence analysis for synergy detection
+- **Tribal Database**: Comprehensive creature type database for tribal synergies
+- **Oracle Pattern Detection**: Expanded oracle text pattern matching
 
 ### In-App Documentation (v1.4.1)
 - **Contextual Help Icons**: Click "?" icons throughout the app for detailed feature explanations
@@ -469,10 +506,13 @@ MTGA-Companion/
 │   ├── ml/                 # Machine learning engine (v1.4+)
 │   ├── llm/                # Ollama LLM client (v1.4+)
 │   ├── meta/               # Metagame data service (v1.4+)
+│   ├── daemon/             # Flight recorder & daemon services (v1.4.1+)
 │   ├── mtga/               # MTGA-specific logic
 │   │   ├── logreader/     # Log parsing
 │   │   ├── draft/         # Draft overlay
+│   │   │   └── analytics/ # Draft analytics services (v1.4.1+)
 │   │   └── recommendations/ # Card recommendations
+├── benchmarks/              # Performance benchmarks (v1.4.1+)
 │   └── storage/            # Database and persistence
 │       ├── models/        # Data models
 │       └── repository/    # Data access layer
@@ -643,9 +683,14 @@ MTGA Companion leverages Go 1.25's new features for improved performance and deb
 ### Data Sources
 
 - **[17Lands](https://www.17lands.com/)** - Draft statistics and card ratings
-- **[Scryfall](https://scryfall.com/)** - Card metadata and images
+- **[Scryfall](https://scryfall.com/)** - Card metadata, images, and price data (v1.4.1)
 - **[MTGGoldfish](https://www.mtggoldfish.com/)** - Metagame data
 - **[MTGTop8](https://www.mtgtop8.com/)** - Tournament results
+- **[ChannelFireball](https://www.channelfireball.com/)** (v1.4.1) - Card ratings and analysis
+- **[EDHREC](https://edhrec.com/)** (v1.4.1) - Commander synergy data
+- **[Archidekt](https://archidekt.com/)** (v1.4.1) - Deck co-occurrence analysis
+- **[MTGZone](https://mtgazone.com/)** (v1.4.1) - Archetype data and analysis
+- **[What's in Standard](https://whatsinstandard.com/)** (v1.4.1) - Standard legality and rotation data
 
 For a complete list of dependencies, see [`go.mod`](go.mod) and [`frontend/package.json`](frontend/package.json).
 

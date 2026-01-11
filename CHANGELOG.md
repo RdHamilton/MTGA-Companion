@@ -5,26 +5,99 @@ All notable changes to MTGA-Companion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.1] - Unreleased
 
 ### Added
 
+**Enhanced Deck Builder**
+- **Build Around Card** - Generate decks starting from any seed card with archetype selection (#767)
+- **Iterative Deck Building** - Add cards one at a time with live suggestions that update based on choices
+- **Complete Deck Generation** - Instantly generate full 60-card decks with optimal land distribution (#774)
+- **Undo/Redo Support** - Full undo/redo functionality with Ctrl+Z/Ctrl+Y keyboard shortcuts (#807)
+- **Score Breakdown** - Detailed visibility into why cards are recommended (color fit, curve, synergy, quality) (#816)
+
+**ML-Powered Intelligence**
+- **ML Suggestion Engine** - Learn from card combination success rates for smarter recommendations (#770)
+- **Performance-Based Recommendations** - Suggestions based on historical win rates (#771)
+- **Combo/Chain Detection** - Identify multi-card synergies and combo potential (#824)
+- **Opponent Deck Analysis** - Reconstruct opponent decks and match to meta archetypes (#775)
+
+**Play Tracking & Analysis**
+- **In-Game Play Tracking** - Track every play in real-time during matches (#769)
+- **Deck Permutation Tracking** - Track every modification to your decks (#766)
+- **Deck Notes & Suggestions** - Post-match notes with improvement suggestions (#772)
+- **Game Play Timeline** - Visual timeline in Match Details showing game progression (#812)
+- **Match Comparison** - Compare matches side-by-side for performance analysis (#162)
+
+**Standard Format Features**
+- **Standard Legality Validation** - Real-time legality checking for Standard format (#773)
+- **Set Rotation Notifications** - Alerts for upcoming set rotations (#803)
+- **Banned Cards Detection** - Legality banners and warnings for banned cards (#841)
+- **Automatic Set Metadata Sync** - Sync set data from Scryfall on startup (#815)
+
+**Data Integration**
+- **Card Price Integration** - Scryfall price data for collection and deck valuation (#144)
+- **ChannelFireball Ratings** - CFB card ratings as secondary data source for recommendations (#817)
+- **17Lands JSON Export** - Export drafts to 17Lands format for analysis (#265)
+- **External Platform Export** - Export decks to Moxfield and Archidekt (#849)
+
+**Advanced Draft Analytics**
+- **Drafting Pattern Analysis** - Analyze your color and card type preferences (#115)
+- **Archetype Performance** - Track win rates by color pair and archetype (#120)
+- **Temporal Trend Analysis** - Weekly/monthly performance trends with learning curve visualization (#121)
+- **Community Comparison** - Compare your performance vs 17Lands community averages (#122)
+- **Draft Deck Suggester** - Build decks by archetype (Aggro/Midrange/Control) with Arena export (#180)
+
+**Synergy Data Sources**
+- **Card Embeddings** - Semantic similarity for better card recommendations (#828)
+- **MTGZone Archetype Data** - Integrate archetype data into recommendations (#827)
+- **EDHREC Integration** - Commander synergy data for card suggestions (#826)
+- **Archidekt Co-occurrence** - Card co-occurrence analysis for synergy detection (#825)
+- **Tribal Database** - Comprehensive creature type database for tribal synergies (#823)
+- **Oracle Pattern Detection** - Expanded oracle text pattern matching (#822)
+
+**UI/UX Improvements**
+- **Loading States** - Progress indicators throughout the app (#805)
+- **In-App Documentation** - Help icons and tooltips explaining features (#808)
+- **Archetype Classification Display** - Show deck archetypes in deck list (#829)
+
 **Go 1.25 Features**
-- **Flight Recorder** - Low-overhead execution tracing using `runtime/trace.FlightRecorder` for debugging (#794)
+- **Flight Recorder** - Low-overhead execution tracing using `runtime/trace.FlightRecorder` (#794)
   - Automatic trace capture on errors exceeding threshold
   - Configurable trace buffer size and retention
-  - Manual trace capture via daemon API
-- **GC Benchmarks** - Comprehensive benchmarks for comparing default GC vs experimental `greenteagc` (#795)
-  - Collection, draft session, match history allocation benchmarks
-  - JSON serialization, map operations, slice growth benchmarks
-  - Comparison script with `benchstat` integration
-- **JSON v2 Benchmarks** - Benchmarks for comparing `encoding/json` (v1) vs experimental `encoding/json/v2` (#793)
-  - Marshal/unmarshal benchmarks for cards, decks, and draft sessions
-  - Comparison script with formatted output
+- **GC Benchmarks** - Compare default GC vs experimental `greenteagc` (#795)
+- **JSON v2 Benchmarks** - Compare `encoding/json` (v1) vs experimental `encoding/json/v2` (#793)
+
+### Fixed
+
+- **Real-Time Event Updates** - Fixed daemon events not forwarding to API server (#798)
+- **Collection Auto-Refresh Blinking** - Fixed constant fetching during auto-refresh (#786)
+- **Quest Data Sync** - Fixed MTGA reset time (9 AM UTC) and reroll detection (#787, #788)
+- **Set Completion Totals** - Fixed incorrect totals for incomplete set cache (#778)
+- **Win Rate Trend** - Fixed 400 error and Rank Progression Unranked issue (#761)
+- **Win Progress** - Calculate daily/weekly wins from match data (#754)
+- **Multi-Type Creature Synergy** - Fixed synergy scoring for multi-type creatures (#821)
+- **useRotationNotifications** - Fixed state updates after unmount (#843)
+- **API Route Validation** - Fixed mismatches between frontend and backend routes (#838)
+- **WebSocket Hub Shutdown** - Added graceful shutdown for WebSocket connections (#800)
 
 ### Changed
 
 - **Go Version** - Updated minimum Go version requirement to 1.25+
+- **sync.WaitGroup.Go()** - Adopted Go 1.25 pattern for goroutine management (#791)
+
+### Technical
+
+**Test Coverage**
+- Frontend: 1,700+ tests passing
+- Go Tests: All passing with race detection
+- E2E Pipeline Tests: Comprehensive log fixture testing
+- New test suites for replay engine, Standard handler, collection auto-fetch
+
+**New Packages**
+- `internal/daemon/flight_recorder.go` - Execution trace capture
+- `benchmarks/` - GC and JSON benchmark suite
+- `internal/mtga/draft/analytics/` - Advanced draft analytics services
 
 ## [1.4.0] - 2025-12-27
 
